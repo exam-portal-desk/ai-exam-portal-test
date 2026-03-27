@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ExamPortal{% endblock %}</title>
+    <script>(function(){var lt=localStorage.getItem('landingTheme')||'dark';var t=(lt==='paper')?'light':'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+    <script>
+    window.MathJax = {
+      tex: { inlineMath:[['$','$'],['\\(','\\)']], displayMath:[['$$','$$'],['\\[','\\]']], processEscapes:true, processEnvironments:true },
+      options: { skipHtmlTags:['script','noscript','style','textarea','pre','code'] }
+    };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+
+<style>
+    :root {
+      --accent:#2d5be3; --accent-hover:#2450c8;
+      --accent-subtle:rgba(45,91,227,0.15); --accent-border:rgba(45,91,227,0.2);
+    }
+    [data-theme="dark"] {
+      --bg:#0a0a0f; --navbar-bg:#0d0d12; --navbar-border:rgba(255,255,255,0.07);
+      --card-bg:#111118; --card-border:rgba(255,255,255,0.07);
+      --text-primary:#e6eef8; --text-secondary:rgba(255,255,255,0.55); --text-muted:rgba(255,255,255,0.28);
+      --nav-link-color:rgba(255,255,255,0.55); --nav-link-hover-color:rgba(255,255,255,0.9);
+      --nav-link-hover-bg:rgba(255,255,255,0.07); --nav-link-hover-border:rgba(255,255,255,0.08);
+      --nav-link-active-bg:rgba(45,91,227,0.15); --nav-link-active-color:#ffffff;
+      --nav-link-active-border:rgba(45,91,227,0.2); --navbar-text-color:rgba(255,255,255,0.35);
+      --footer-bg:#0d0d12; --footer-border:rgba(255,255,255,0.06);
+      --footer-text:#cbd5f5; --footer-link:#9fb3e6; --footer-copy:#94a3d4;
+      --theme-toggle-color:rgba(255,255,255,0.55); --theme-toggle-hover-bg:rgba(255,255,255,0.07);
+      --scrollbar-thumb:rgba(255,255,255,0.1);
+      --dropdown-bg:#18181f; --dropdown-border:rgba(255,255,255,0.09);
+      --dropdown-hover:rgba(255,255,255,0.06);
+      --input-bg:rgba(255,255,255,0.05); --input-border:rgba(255,255,255,0.1); --input-text:#e6eef8;
+    }
+    [data-theme="light"] {
+      --bg:#f0f2f8; --navbar-bg:#ffffff; --navbar-border:#e2e8f0;
+      --card-bg:#ffffff; --card-border:#e2e8f0;
+      --text-primary:#1a202c; --text-secondary:#4a5568; --text-muted:#718096;
+      --nav-link-color:#4a5568; --nav-link-hover-color:#1a202c;
+      --nav-link-hover-bg:rgba(0,0,0,0.05); --nav-link-hover-border:rgba(0,0,0,0.08);
+      --nav-link-active-bg:rgba(45,91,227,0.1); --nav-link-active-color:#2d5be3;
+      --nav-link-active-border:rgba(45,91,227,0.2); --navbar-text-color:#718096;
+      --footer-bg:#1e2030; --footer-border:rgba(255,255,255,0.06);
+      --footer-text:#cbd5f5; --footer-link:#9fb3e6; --footer-copy:#94a3d4;
+      --theme-toggle-color:#4a5568; --theme-toggle-hover-bg:rgba(0,0,0,0.06);
+      --scrollbar-thumb:rgba(0,0,0,0.15);
+      --dropdown-bg:#ffffff; --dropdown-border:#e2e8f0; --dropdown-hover:#f8faff;
+      --input-bg:#ffffff; --input-border:#e2e8f0; --input-text:#1a202c;
+    }
+
+    html,body { height:100%; margin:0; padding:0; }
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb); border-radius:6px; }
+    body {
+      background:var(--bg); min-height:100vh;
+      font-family:'DM Sans','Inter',-apple-system,sans-serif;
+      display:flex; flex-direction:column; color:var(--text-primary);
+      transition:background .3s,color .3s;
+    }
+    main { flex:1; }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      background:var(--navbar-bg); border-bottom:1px solid var(--navbar-border);
+      padding:.7rem 0; position:relative; z-index:1000;
+      transition:background .3s,border-color .3s;
+    }
+    .navbar::before { display:none; }
+    .navbar .container-fluid { display:flex; align-items:center; justify-content:space-between; padding:0 1.5rem; }
+    .navbar-brand {
+      display:flex; align-items:center; gap:.6rem;
+      font-family:'DM Serif Display',serif; font-weight:400; font-size:1.15rem;
+      color:var(--text-primary); text-decoration:none; cursor:default; pointer-events:none;
+    }
+    .navbar-brand i { background:#2d5be3; padding:8px; border-radius:10px; color:white; font-size:.95rem; }
+    .navbar-nav { display:flex; align-items:center; gap:.3rem; }
+    .nav-link {
+      color:var(--nav-link-color) !important; font-weight:500; font-size:.82rem;
+      padding:.45rem .85rem !important; border-radius:8px; transition:all .2s;
+      display:flex; align-items:center; gap:.4rem; text-decoration:none;
+      border:1px solid transparent; white-space:nowrap; min-height:34px;
+    }
+    .nav-link:hover { color:var(--nav-link-hover-color) !important; background:var(--nav-link-hover-bg) !important; border-color:var(--nav-link-hover-border); }
+    .nav-link:focus,.nav-link:active { outline:none; text-decoration:none; }
+    .nav-link.active { background:var(--nav-link-active-bg) !important; color:var(--nav-link-active-color) !important; border-color:var(--nav-link-active-border); }
+
+    /* ── PROFILE AVATAR BTN ── */
+    .profile-btn {
+      display:flex; align-items:center; gap:.55rem; padding:.35rem .65rem .35rem .4rem;
+      background:var(--nav-link-hover-bg); border:1px solid var(--navbar-border);
+      border-radius:20px; cursor:pointer; transition:all .2s; position:relative;
+      font-size:.82rem; font-weight:600; color:var(--text-primary);
+      white-space:nowrap; min-height:34px;
+    }
+    .profile-btn:hover { border-color:var(--accent); background:var(--accent-subtle); }
+    .profile-avatar {
+      width:26px; height:26px; border-radius:50%; background:var(--accent);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-size:.72rem; font-weight:700; flex-shrink:0; letter-spacing:0;
+    }
+    .profile-name { max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+    .profile-chevron { font-size:.65rem; color:var(--text-muted); transition:transform .2s; }
+    .profile-btn.open .profile-chevron { transform:rotate(180deg); }
+
+    /* ── PROFILE DROPDOWN ── */
+    .profile-dropdown {
+      position:absolute; top:calc(100% + 8px); right:0;
+      background:var(--dropdown-bg); border:1px solid var(--dropdown-border);
+      border-radius:12px; min-width:220px; padding:.4rem;
+      box-shadow:0 8px 32px rgba(0,0,0,.25); z-index:2000;
+      display:none; animation:ddIn .15s ease-out;
+    }
+    .profile-dropdown.open { display:block; }
+    @keyframes ddIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+    .dd-header {
+      padding:.65rem .8rem .5rem; border-bottom:1px solid var(--dropdown-border); margin-bottom:.3rem;
+    }
+    .dd-header-name { font-size:.88rem; font-weight:700; color:var(--text-primary); }
+    .dd-header-role { font-size:.72rem; color:var(--text-muted); margin-top:.1rem; }
+
+    .dd-item {
+      display:flex; align-items:center; gap:.65rem;
+      padding:.5rem .8rem; border-radius:8px; font-size:.82rem; font-weight:500;
+      color:var(--text-secondary); cursor:pointer; text-decoration:none;
+      transition:all .15s; border:none; background:none; width:100%; text-align:left;
+    }
+    .dd-item:hover { background:var(--dropdown-hover); color:var(--text-primary); }
+    .dd-item i { width:16px; text-align:center; font-size:.8rem; color:var(--text-muted); flex-shrink:0; }
+    .dd-item:hover i { color:var(--accent); }
+
+    .dd-divider { height:1px; background:var(--dropdown-border); margin:.3rem 0; }
+
+    .dd-item.danger { color:#ef4444; }
+    .dd-item.danger i { color:#ef4444; }
+    .dd-item.danger:hover { background:rgba(239,68,68,.08); color:#ef4444; }
+
+    /* Chat badge on nav */
+    .chat-badge {
+      display:none; position:absolute; top:2px; right:2px;
+      background:#ef4444; color:#fff; font-size:.6rem; font-weight:700;
+      padding:1px 4px; border-radius:8px; min-width:13px; text-align:center;
+    }
+
+    /* ── FLOATING TOGGLE ── */
+    .user-theme-toggle-float {
+      position:fixed; top:24px; left:24px; z-index:1001;
+      width:40px; height:40px; border-radius:10px;
+      background:var(--card-bg); border:1px solid var(--card-border);
+      color:var(--theme-toggle-color); display:none; align-items:center; justify-content:center;
+      cursor:pointer; transition:all .2s; font-size:.9rem; box-shadow:0 2px 8px rgba(0,0,0,.2);
+    }
+    .user-theme-toggle-float:hover { background:var(--theme-toggle-hover-bg); border-color:var(--accent); color:var(--accent); }
+
+    /* ── MODALS (Settings + Delete) ── */
+    .ep-modal-bd {
+      display:none; position:fixed; inset:0; z-index:3000;
+      background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+      align-items:center; justify-content:center; padding:1rem;
+    }
+    .ep-modal-bd.open { display:flex; }
+    .ep-modal {
+      background:var(--card-bg); border:1px solid var(--card-border);
+      border-radius:16px; width:100%; max-width:420px; overflow:hidden;
+      animation:mIn .2s ease-out;
+    }
+    @keyframes mIn { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+    .ep-modal-hdr {
+      padding:1.1rem 1.4rem; border-bottom:1px solid var(--card-border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .ep-modal-hdr h5 { margin:0; font-size:.95rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:.5rem; }
+    .ep-modal-body { padding:1.25rem 1.4rem; }
+    .ep-modal-footer { padding:.85rem 1.4rem; border-top:1px solid var(--card-border); display:flex; justify-content:flex-end; gap:.5rem; }
+    .ep-close { background:none; border:none; color:var(--text-muted); font-size:1rem; cursor:pointer; padding:0; line-height:1; }
+    .ep-close:hover { color:var(--text-primary); }
+
+    /* Settings sections */
+    .settings-section { margin-bottom:1.25rem; }
+    .settings-section:last-child { margin-bottom:0; }
+    .settings-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:.6rem; }
+    .theme-options { display:flex; gap:.5rem; }
+    .theme-opt {
+      flex:1; padding:.55rem; border-radius:9px; border:1px solid var(--card-border);
+      background:var(--dropdown-hover); cursor:pointer; transition:all .15s;
+      display:flex; align-items:center; justify-content:center; gap:.4rem;
+      font-size:.8rem; font-weight:600; color:var(--text-secondary);
+    }
+    .theme-opt:hover { border-color:var(--accent); color:var(--accent); }
+    .theme-opt.active { border-color:var(--accent); background:var(--accent-subtle); color:var(--accent); }
+
+    /* Delete warning box */
+    .delete-warn {
+      background:rgba(239,68,68,.07); border:1px solid rgba(239,68,68,.2);
+      border-radius:10px; padding:1rem; margin-bottom:1rem;
+    }
+    .delete-warn .warn-title { font-size:.88rem; font-weight:700; color:#ef4444; margin-bottom:.4rem; display:flex; align-items:center; gap:.4rem; }
+    .delete-warn ul { margin:0; padding-left:1.2rem; font-size:.82rem; color:var(--text-secondary); line-height:1.8; }
+    .confirm-input {
+      width:100%; background:var(--input-bg); border:1px solid var(--input-border);
+      color:var(--input-text); border-radius:8px; font-size:.85rem;
+      padding:.5rem .75rem; margin-top:.5rem;
+    }
+    .confirm-input:focus { border-color:#ef4444; outline:none; box-shadow:0 0 0 3px rgba(239,68,68,.15); }
+    .confirm-input::placeholder { color:var(--text-muted); }
+
+    /* Flat buttons */
+    .ep-btn { border-radius:8px; font-size:.82rem; font-weight:600; padding:.45rem 1rem; border:none; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:.3rem; }
+    .ep-btn.secondary { background:var(--dropdown-hover); border:1px solid var(--card-border); color:var(--text-secondary); }
+    .ep-btn.secondary:hover { border-color:var(--accent); color:var(--accent); }
+    .ep-btn.danger { background:#ef4444; color:#fff; }
+    .ep-btn.danger:hover { background:#dc2626; }
+    .ep-btn.danger:disabled { opacity:.4; cursor:not-allowed; }
+    .ep-btn.primary { background:var(--accent); color:#fff; }
+    .ep-btn.primary:hover { background:var(--accent-hover); }
+
+    /* ── ALERTS ── */
+    .alert { border-radius:12px; box-shadow:0 6px 18px rgba(2,6,23,.15); margin:1rem; }
+    [data-theme="light"] .alert-success { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+    [data-theme="light"] .alert-danger  { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+    [data-theme="light"] .alert-warning { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+    [data-theme="light"] .alert-info    { background:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
+    [data-theme="light"] .btn-close { filter:none; }
+
+    /* ── FOOTER ── */
+    .professional-footer {
+      background:var(--footer-bg); border-top:1px solid var(--footer-border);
+      color:var(--footer-text); padding:20px 0; margin-top:auto;
+    }
+    .professional-footer .container { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; }
+    .footer-brand { font-weight:700; color:#e2e8f0; display:flex; align-items:center; gap:8px; font-size:.95rem; }
+    .footer-brand i { color:#8ea2ff; }
+    .footer-links { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+    .footer-links a { color:var(--footer-link); text-decoration:none; font-size:.85rem; transition:color .2s; }
+    .footer-links a:hover { color:#ffffff; }
+    .professional-footer p { font-size:.8rem; color:var(--footer-copy); margin:0; }
+
+    @media(max-width:768px) {
+      .professional-footer .container { flex-direction:column; text-align:center; gap:10px; }
+      .footer-links { justify-content:center; gap:14px; }
+      .navbar .container-fluid { padding:0 1rem; }
+      .profile-name { display:none; }
+    }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+
+<button class="user-theme-toggle-float" id="userThemeToggleFloat" title="Toggle theme" style="display:none">
+    <i class="fas fa-moon" id="userThemeIconFloat"></i>
+</button>
+
+{% if 'user_id' in session and not (request.endpoint in ['exam_page','submit_exam','take_exam'] or request.path.startswith('/exam/') or request.path.startswith('/submit-exam')) %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid">
+    <div class="navbar-brand">
+      <i class="fas fa-graduation-cap"></i>
+      <span>ExamPortal</span>
+    </div>
+
+    <div class="navbar-nav ms-auto">
+      {% if session.get('admin_id') %}
+        {# ── Admin: simple links, no profile dropdown ── #}
+        <a class="nav-link" href="{{ url_for('admin.dashboard') }}"><i class="fas fa-tachometer-alt me-1"></i>Admin Dashboard</a>
+        <a class="nav-link" href="{{ url_for('admin.logout') }}"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+
+      {% elif session.get('user_id') %}
+        {# ── User nav links ── #}
+
+
+        {# ── Profile dropdown ── #}
+        <div style="position:relative; margin-left:.3rem">
+          <button class="profile-btn" id="profileBtn" onclick="toggleProfile()" aria-label="Profile menu">
+            <div class="profile-avatar" id="profileAvatar">
+              {{ session.get('full_name','U')[0].upper() }}
+            </div>
+            <span class="profile-name">{{ session.get('full_name', session.get('username','User')) }}</span>
+            <i class="fas fa-chevron-down profile-chevron" id="profileChevron"></i>
+          </button>
+
+          <div class="profile-dropdown" id="profileDropdown">
+            <div class="dd-header">
+              <div class="dd-header-name">{{ session.get('full_name', session.get('username','User')) }}</div>
+              <div class="dd-header-role"><i class="fas fa-user-circle me-1"></i>Student</div>
+            </div>
+
+            <a class="dd-item" href="{{ url_for('dashboard.dashboard') }}">
+              <i class="fas fa-home"></i>Dashboard
+            </a>
+            <a class="dd-item" href="{{ url_for('dashboard.student_analytics') }}">
+              <i class="fas fa-chart-line"></i>Analytics
+            </a>
+            <a class="dd-item" href="{{ url_for('ai.ai_assistant') }}">
+              <i class="fas fa-robot"></i>AI Assistant
+            </a>
+            <a class="dd-item" href="{{ url_for('chat.chat_page') }}" style="position:relative">
+              <i class="fas fa-comment-dots"></i>Chat
+              <span id="ddChatBadge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:8px"></span>
+            </a>
+            <a class="dd-item" href="{{ url_for('dashboard.results_history') }}">
+              <i class="fas fa-history"></i>Results History
+            </a>
+
+            <div class="dd-divider"></div>
+
+            <button class="dd-item" onclick="openSettings()">
+              <i class="fas fa-cog"></i>Account Settings
+            </button>
+
+            <div class="dd-divider"></div>
+
+            <a class="dd-item danger" href="{{ url_for('auth.logout') }}">
+              <i class="fas fa-sign-out-alt"></i>Logout
+            </a>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+{# ════════════════════════════════════════════════════
+   ACCOUNT SETTINGS MODAL
+════════════════════════════════════════════════════ #}
+{% if session.get('user_id') and not session.get('admin_id') %}
+<div class="ep-modal-bd" id="settingsModal">
+  <div class="ep-modal">
+    <div class="ep-modal-hdr">
+      <h5><i class="fas fa-cog" style="color:var(--accent)"></i>Account Settings</h5>
+      <button class="ep-close" onclick="closeSettings()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="ep-modal-body">
+
+      {# Theme preference #}
+      <div class="settings-section">
+        <div class="settings-label"><i class="fas fa-palette me-1"></i>Theme Preference</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);padding:0.5rem 0">
+          <i class="fas fa-info-circle me-1"></i>
+          Theme is controlled from the <a href="{{ url_for('misc.home') }}" style="color:var(--accent)">home page</a>.
+        </div>
+      </div>
+
+      {# Account info #}
+      <div class="settings-section">
+        <div class="settings-label"><i class="fas fa-user me-1"></i>Account Info</div>
+        <div style="background:var(--dropdown-hover);border:1px solid var(--card-border);border-radius:9px;padding:.75rem 1rem;font-size:.82rem;line-height:1.9">
+          <div><span style="color:var(--text-muted);font-weight:600">Name:</span>
+               <span style="color:var(--text-primary);margin-left:.5rem">{{ session.get('full_name','—') }}</span></div>
+          <div><span style="color:var(--text-muted);font-weight:600">Username:</span>
+               <span style="color:var(--text-primary);margin-left:.5rem">{{ session.get('username','—') }}</span></div>
+        </div>
+      </div>
+
+      {# Danger zone #}
+      <div class="settings-section" style="margin-bottom:0">
+        <div class="settings-label" style="color:#ef4444"><i class="fas fa-exclamation-triangle me-1"></i>Danger Zone</div>
+        <div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:9px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <div>
+            <div style="font-size:.83rem;font-weight:600;color:var(--text-primary)">Delete Account</div>
+            <div style="font-size:.74rem;color:var(--text-muted)">Permanently remove your account and all data</div>
+          </div>
+          <button class="ep-btn danger" style="font-size:.78rem;padding:.38rem .8rem" onclick="openDeleteConfirm()">
+            <i class="fas fa-trash-alt"></i>Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ════════════════════════════════════════════════════
+   DELETE ACCOUNT CONFIRMATION MODAL
+════════════════════════════════════════════════════ #}
+<div class="ep-modal-bd" id="deleteModal">
+  <div class="ep-modal">
+    <div class="ep-modal-hdr" style="background:rgba(239,68,68,.05);border-bottom-color:rgba(239,68,68,.2)">
+      <h5 style="color:#ef4444"><i class="fas fa-skull-crossbones"></i>Delete Account</h5>
+      <button class="ep-close" onclick="closeDeleteConfirm()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="ep-modal-body">
+      <div class="delete-warn">
+        <div class="warn-title"><i class="fas fa-exclamation-triangle"></i>This action is IRREVERSIBLE</div>
+        <ul>
+          <li>Your account will be permanently deleted</li>
+          <li>All your exam results and responses will be lost</li>
+          <li>All your chat history will be erased</li>
+          <li>You cannot recover any of this data</li>
+        </ul>
+      </div>
+      <div style="font-size:.83rem;color:var(--text-secondary);margin-bottom:.4rem;font-weight:600">
+        Type <span style="color:#ef4444;font-family:monospace">DELETE</span> to confirm:
+      </div>
+      <input type="text" class="confirm-input" id="deleteConfirmInput"
+             placeholder='Type "DELETE" here…' oninput="checkDeleteInput()">
+    </div>
+    <div class="ep-modal-footer">
+      <button class="ep-btn secondary" onclick="closeDeleteConfirm()">Cancel</button>
+      <button class="ep-btn danger" id="confirmDeleteBtn" disabled onclick="doDeleteAccount()">
+        <i class="fas fa-trash-alt me-1"></i>Delete My Account
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# Flash messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="container mt-3">
+    {% for category, message in messages %}
+    <div class="alert alert-{% if category == 'error' %}danger{% else %}{{ category }}{% endif %} alert-dismissible fade show" role="alert">
+      <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'error' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+
+{% if not (request.path.startswith('/exam/') or request.path.startswith('/submit-exam') or request.path == '/result' or request.path.startswith('/response')) %}
+<footer class="professional-footer">
+  <div class="container d-flex justify-content-between align-items-center flex-wrap">
+    <div class="footer-brand"><i class="fas fa-graduation-cap"></i> ExamPortal</div>
+    <div class="footer-links d-flex gap-3">
+      <a href="{{ url_for('misc.privacy_policy') }}">Privacy Policy</a>
+      <a href="{{ url_for('misc.terms_of_service') }}">Terms</a>
+      <a href="{{ url_for('misc.support') }}">Support</a>
+      <a href="{{ url_for('misc.contact') }}">Contact</a>
+      <a href="{{ url_for('misc.about') }}">About</a>
+    </div>
+    <p class="mb-0" style="color:#9fb3e6;">© {{ CURRENT_YEAR }} ExamPortal. All rights reserved.</p>
+  </div>
+</footer>
+{% endif %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* ── THEME ── */
+(function(){
+  var html=document.documentElement;
+  function applyFromLanding(){
+    var lt=localStorage.getItem('landingTheme')||'dark';
+    var t=(lt==='paper')?'light':'dark';
+    html.setAttribute('data-theme',t);
+    return t;
+  }
+  applyFromLanding();
+  window.setTheme=function(t){
+    /* Map back to landingTheme key */
+    var lt=(t==='light')?'paper':'dark';
+    localStorage.setItem('landingTheme',lt);
+    html.setAttribute('data-theme',t);
+  };
+  document.addEventListener('DOMContentLoaded', function(){
+    /* Hide the floating toggle — landing page is the only control */
+    var floatBtn=document.getElementById('userThemeToggleFloat');
+    if(floatBtn) floatBtn.style.display='none';
+    /* Sync settings modal opts if present */
+    var t=html.getAttribute('data-theme');
+    var od=document.getElementById('themeOptDark'), ol=document.getElementById('themeOptLight');
+    if(od && ol){ od.classList.toggle('active',t==='dark'); ol.classList.toggle('active',t==='light'); }
+  });
+  /* Re-apply if landing page updates landingTheme in another tab */
+  window.addEventListener('storage',function(e){
+    if(e.key==='landingTheme') applyFromLanding();
+  });
+})();
+</script>
+
+<script>
+/* ── PROFILE DROPDOWN ── */
+function toggleProfile(){
+  var btn=document.getElementById('profileBtn');
+  var dd=document.getElementById('profileDropdown');
+  var open=dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+// Close on outside click
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#profileBtn') && !e.target.closest('#profileDropdown')){
+    document.getElementById('profileDropdown')?.classList.remove('open');
+    document.getElementById('profileBtn')?.classList.remove('open');
+  }
+});
+
+/* ── SETTINGS MODAL ── */
+function openSettings(){
+  document.getElementById('profileDropdown')?.classList.remove('open');
+  document.getElementById('profileBtn')?.classList.remove('open');
+  document.getElementById('settingsModal')?.classList.add('open');
+  // Sync theme opts
+  var t=document.documentElement.getAttribute('data-theme');
+  document.getElementById('themeOptDark')?.classList.toggle('active', t==='dark');
+  document.getElementById('themeOptLight')?.classList.toggle('active', t==='light');
+}
+function closeSettings(){ document.getElementById('settingsModal')?.classList.remove('open'); }
+document.getElementById('settingsModal')?.addEventListener('click', function(e){
+  if(e.target===this) closeSettings();
+});
+
+/* ── DELETE MODAL ── */
+function openDeleteConfirm(){
+  closeSettings();
+  document.getElementById('deleteConfirmInput').value='';
+  document.getElementById('confirmDeleteBtn').disabled=true;
+  document.getElementById('deleteModal')?.classList.add('open');
+}
+function closeDeleteConfirm(){ document.getElementById('deleteModal')?.classList.remove('open'); }
+document.getElementById('deleteModal')?.addEventListener('click', function(e){
+  if(e.target===this) closeDeleteConfirm();
+});
+
+function checkDeleteInput(){
+  var val=document.getElementById('deleteConfirmInput')?.value || '';
+  document.getElementById('confirmDeleteBtn').disabled = (val !== 'DELETE');
+}
+
+function doDeleteAccount(){
+  var btn=document.getElementById('confirmDeleteBtn');
+  btn.disabled=true;
+  btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Deleting…';
+  fetch('/api/delete-account', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({confirm:'DELETE'})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.success){ window.location.href='/'; }
+    else{
+      btn.disabled=false;
+      btn.innerHTML='<i class="fas fa-trash-alt me-1"></i>Delete My Account';
+      alert(d.message||'Error occurred. Please try again.');
+    }
+  })
+  .catch(()=>{
+    btn.disabled=false;
+    btn.innerHTML='<i class="fas fa-trash-alt me-1"></i>Delete My Account';
+    alert('Network error. Please try again.');
+  });
+}
+
+/* ── Escape key closes modals ── */
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape'){
+    closeSettings(); closeDeleteConfirm();
+    document.getElementById('profileDropdown')?.classList.remove('open');
+    document.getElementById('profileBtn')?.classList.remove('open');
+  }
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var alerts=document.querySelectorAll('.alert-success');
+  alerts.forEach(function(a){
+    if(a.textContent.toLowerCase().includes('login successful')||a.textContent.toLowerCase().includes('logout'))
+      setTimeout(()=>new bootstrap.Alert(a).close(), 500);
+  });
+  document.querySelectorAll('.dropdown-toggle').forEach(dt=>dt.addEventListener('click',()=>dt.focus()));
+});
+</script>
+
+{% if session.get('user_id') %}
+<script>
+(function(){
+  var PING=30000;
+  function ping(){
+    fetch('/_ping',{method:'POST',credentials:'same-origin'})
+    .then(function(r){
+      if(r.status===401) r.json().then(function(j){
+        window.location.href=j&&j.reason==='other_device'?'/login?reason=other_device':'/login';
+      }).catch(()=>window.location.href='/login');
+    }).catch(()=>{});
+  }
+  setInterval(ping, PING);
+})();
+</script>
+{% endif %}
+
+{% if session.get('user_id') and not session.get('admin_id') %}
+<script>
+(function(){
+  async function pollBadge(){
+    try{
+      var r=await fetch('/api/chat/unread_count');
+      var d=await r.json();
+      var total=(d.unread||0)+(d.requests||0);
+      // Navbar badge
+      var nb=document.getElementById('navChatBadge');
+      if(nb){ nb.textContent=total; nb.style.display=total?'block':'none'; }
+      // Dropdown badge
+      var db=document.getElementById('ddChatBadge');
+      if(db){ db.textContent=total; db.style.display=total?'inline':'none'; }
+    }catch(e){}
+  }
+  pollBadge();
+  setInterval(pollBadge, 20000);
+})();
+</script>
+{% endif %}
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

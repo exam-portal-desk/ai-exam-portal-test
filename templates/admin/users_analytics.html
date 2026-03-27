@@ -1,0 +1,713 @@
+{% extends "admin_base.html" %}
+{% block title %}Users Analytics{% endblock %}
+
+{% block content %}
+<style>
+  .page-top { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+  .page-top h1 { font-size:clamp(1.2rem,3vw,1.6rem); font-weight:700; margin:0; color:var(--text-primary); }
+  .page-top p  { margin:.15rem 0 0; font-size:.82rem; color:var(--text-muted); }
+
+  /* ── Stat cards ── */
+  .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.25rem; }
+  @media(max-width:900px){ .stat-grid{grid-template-columns:repeat(2,1fr);} }
+  .stat-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.1rem 1.25rem; display:flex; align-items:center; gap:.9rem; }
+  .stat-icon { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+  .si-users   { background:rgba(45,91,227,.15);  color:var(--accent); }
+  .si-exams   { background:rgba(139,92,246,.15); color:#a78bfa; }
+  .si-results { background:rgba(16,185,129,.15); color:#10b981; }
+  .si-resp    { background:rgba(245,158,11,.15); color:#f59e0b; }
+  .stat-big   { font-size:1.55rem; font-weight:800; color:var(--text-primary); line-height:1.1; }
+  .stat-exact { font-size:.68rem; color:var(--text-muted); margin-top:.1rem; }
+  .stat-lbl   { font-size:.75rem; color:var(--text-muted); margin-top:.1rem; }
+
+  /* ── Tabs ── */
+  .tabs-card  { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; overflow:hidden; }
+  .tabs-nav   { display:flex; border-bottom:1px solid var(--card-border); background:var(--table-head-bg); padding:0 1rem; overflow-x:auto; }
+  .tab-btn    { background:none; border:none; border-bottom:3px solid transparent; color:var(--text-muted); font-size:.83rem; font-weight:600; padding:.85rem 1.1rem; cursor:pointer; white-space:nowrap; transition:all .15s; display:inline-flex; align-items:center; gap:.4rem; margin-bottom:-1px; }
+  .tab-btn:hover  { color:var(--text-primary); }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-pane  { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ── Filter bar (Results tab) ── */
+  .filter-bar { display:grid; grid-template-columns:1fr 1fr auto auto auto; gap:.75rem; align-items:end; padding:.9rem 1rem; background:var(--table-head-bg); border-bottom:1px solid var(--card-border); }
+  @media(max-width:900px){ .filter-bar{grid-template-columns:1fr 1fr;} }
+  .filter-bar label { font-size:.75rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:.25rem; }
+  .f-select,.f-date { background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:8px; font-size:.82rem; padding:.4rem .6rem; width:100%; }
+  .f-select:focus,.f-date:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; background:var(--input-bg); }
+  .f-select option { background:#111118; color:#e6eef8; }
+  /* User search autocomplete area */
+  .user-search-wrap { position:relative; }
+  .user-search-input { background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:8px; font-size:.82rem; padding:.4rem .6rem; width:100%; }
+  .user-search-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; }
+  .user-search-input::placeholder { color:var(--input-placeholder); }
+  .user-dropdown { position:absolute; top:100%; left:0; right:0; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; z-index:100; max-height:200px; overflow-y:auto; display:none; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .user-dropdown.open { display:block; }
+  .user-opt { padding:.5rem .75rem; font-size:.82rem; cursor:pointer; color:var(--text-primary); }
+  .user-opt:hover { background:var(--accent-subtle); }
+  .user-opt .opt-name { font-weight:600; }
+  .user-opt .opt-email { font-size:.73rem; color:var(--text-muted); }
+
+  /* ── Table ── */
+  .table { --bs-table-bg:transparent; --bs-table-color:var(--text-primary); }
+  .table thead th { background:var(--table-head-bg); color:var(--text-muted); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--table-border); padding:.7rem 1rem; white-space:nowrap; }
+  .table tbody td { border-bottom:1px solid var(--table-border); padding:.75rem 1rem; vertical-align:middle; font-size:.83rem; }
+  .table tbody tr:last-child td { border-bottom:none; }
+  .table tbody tr:hover td { background:var(--table-row-hover); }
+
+  /* ── Badges ── */
+  .pct-badge { padding:3px 9px; border-radius:20px; font-size:.72rem; font-weight:700; display:inline-block; }
+  .pct-ex { background:rgba(16,185,129,.12); color:#10b981; border:1px solid rgba(16,185,129,.2); }
+  .pct-gd { background:rgba(45,91,227,.12);  color:#7b9ef7; border:1px solid rgba(45,91,227,.2); }
+  .pct-av { background:rgba(245,158,11,.12); color:#f59e0b; border:1px solid rgba(245,158,11,.2); }
+  .pct-pr { background:rgba(239,68,68,.12);  color:#ef4444; border:1px solid rgba(239,68,68,.2); }
+
+  /* ── Pagination ── */
+  .pagi { display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; border-top:1px solid var(--card-border); flex-wrap:wrap; gap:.5rem; }
+  .pagi-info { font-size:.78rem; color:var(--text-muted); }
+  .pagi-btns { display:flex; gap:.3rem; flex-wrap:wrap; }
+  .pg-btn { background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-color); border-radius:7px; padding:4px 10px; font-size:.78rem; font-weight:600; cursor:pointer; transition:all .15s; }
+  .pg-btn:hover   { border-color:var(--accent); color:var(--accent); }
+  .pg-btn.active  { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pg-btn:disabled { opacity:.35; cursor:not-allowed; }
+
+  /* ── Action icon btns ── */
+  .icon-btn { width:28px; height:28px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:.72rem; transition:all .15s; text-decoration:none; }
+  .icon-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+  .icon-btn.dl:hover { border-color:#10b981; color:#10b981; background:rgba(16,185,129,.08); }
+
+  /* ── Flat buttons ── */
+  .btn-flat { border-radius:8px; font-size:.8rem; font-weight:600; padding:.4rem .9rem; border:none; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:.3rem; white-space:nowrap; }
+  .btn-flat.primary   { background:var(--accent); color:#fff; }
+  .btn-flat.primary:hover { background:var(--accent-hover); }
+  .btn-flat.secondary { background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-color); }
+  .btn-flat.secondary:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* ── Analytics tab ── */
+  .a-filter-bar { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:.75rem; align-items:end; padding:.9rem 1rem 1rem; background:var(--table-head-bg); border-bottom:1px solid var(--card-border); }
+  @media(max-width:768px){ .a-filter-bar{grid-template-columns:1fr 1fr;} }
+  #customRange { display:none; grid-template-columns:1fr 1fr; gap:.5rem; }
+
+  .a-stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; padding:1rem; border-bottom:1px solid var(--card-border); }
+  @media(max-width:900px){ .a-stats-grid{grid-template-columns:repeat(2,1fr);} }
+  .a-stat-card { background:var(--table-head-bg); border:1px solid var(--card-border); border-radius:10px; padding:.9rem 1rem; text-align:center; }
+  .a-stat-val  { font-size:1.6rem; font-weight:800; color:var(--text-primary); }
+  .a-stat-lbl  { font-size:.73rem; color:var(--text-muted); margin-top:.15rem; }
+
+  .charts-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; padding:1rem; border-bottom:1px solid var(--card-border); }
+  @media(max-width:768px){ .charts-grid{grid-template-columns:1fr;} }
+  .chart-card  { background:var(--table-head-bg); border:1px solid var(--card-border); border-radius:10px; padding:1rem; }
+  .chart-card h6 { font-size:.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:.75rem; }
+  .chart-wrap  { position:relative; height:200px; }
+
+  .tables-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; padding:1rem; }
+  @media(max-width:768px){ .tables-grid{grid-template-columns:1fr;} }
+  .perf-card   { background:var(--table-head-bg); border:1px solid var(--card-border); border-radius:10px; overflow:hidden; }
+  .perf-card h6 { font-size:.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin:0; padding:.75rem 1rem; border-bottom:1px solid var(--card-border); }
+  .perf-table   { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .perf-table th { background:var(--card-bg); color:var(--text-muted); font-size:.68rem; font-weight:700; text-transform:uppercase; padding:.5rem .75rem; border-bottom:1px solid var(--table-border); }
+  .perf-table td { padding:.6rem .75rem; border-bottom:1px solid var(--table-border); color:var(--text-primary); vertical-align:middle; }
+  .perf-table tr:last-child td { border-bottom:none; }
+  .perf-table tr:hover td { background:var(--table-row-hover); }
+
+  .score-bar  { height:8px; background:var(--score-bar-track); border-radius:99px; position:relative; overflow:hidden; min-width:80px; }
+  .score-fill { height:100%; border-radius:99px; background:var(--accent); transition:width .6s ease; }
+  [data-theme="dark"]  { --score-bar-track: rgba(255,255,255,0.12); }
+  [data-theme="light"] { --score-bar-track: rgba(0,0,0,0.12); }
+  .rank-badge { width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.65rem; font-weight:700; background:var(--accent-subtle); color:var(--accent); }
+  .rank-badge.top3 { background:rgba(245,158,11,.15); color:#f59e0b; }
+
+  /* Skeleton */
+  .skeleton { background:linear-gradient(90deg,var(--table-head-bg) 25%,var(--card-border) 50%,var(--table-head-bg) 75%); background-size:200% 100%; animation:shimmer 1.2s infinite; border-radius:6px; height:14px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  .loading-row { text-align:center; padding:2rem; color:var(--text-muted); font-size:.85rem; }
+  .empty-state { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+  .empty-state i { font-size:2.5rem; opacity:.2; display:block; margin-bottom:.75rem; }
+  .empty-state p { font-size:.88rem; margin:0; }
+
+  @media(max-width:768px){ .page-top{flex-direction:column;align-items:flex-start;} }
+</style>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-chart-line me-2" style="color:var(--accent)"></i>Users Analytics</h1>
+    <p>Performance insights, results, and exam statistics.</p>
+  </div>
+</div>
+
+<!-- ── Stat cards — AJAX loaded, compact format ── -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-icon si-users"><i class="fas fa-users"></i></div>
+    <div>
+      <div class="stat-big" id="sc-users">—</div>
+      <div class="stat-exact" id="sc-users-exact"></div>
+      <div class="stat-lbl">Total Users</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon si-exams"><i class="fas fa-file-alt"></i></div>
+    <div>
+      <div class="stat-big" id="sc-exams">—</div>
+      <div class="stat-exact" id="sc-exams-exact"></div>
+      <div class="stat-lbl">Total Exams</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon si-results"><i class="fas fa-trophy"></i></div>
+    <div>
+      <div class="stat-big" id="sc-results">—</div>
+      <div class="stat-exact" id="sc-results-exact"></div>
+      <div class="stat-lbl">Total Results</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon si-resp"><i class="fas fa-clipboard-check"></i></div>
+    <div>
+      <div class="stat-big" id="sc-responses">—</div>
+      <div class="stat-exact" id="sc-responses-exact"></div>
+      <div class="stat-lbl">Total Responses</div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs-card">
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('results',this)"><i class="fas fa-trophy"></i>Results</button>
+    <button class="tab-btn" onclick="switchTab('analytics',this)"><i class="fas fa-chart-bar"></i>Analytics</button>
+  </div>
+
+  <!-- ════════════════════════════════════
+       TAB 1: Results (fully AJAX)
+  ════════════════════════════════════ -->
+  <div id="pane-results" class="tab-pane active" style="padding:0">
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div>
+        <label>User</label>
+        <!-- AJAX search — no 50K dropdown dump -->
+        <div class="user-search-wrap">
+          <input type="text" class="user-search-input" id="rf-user-search"
+                 placeholder="Search username…" autocomplete="off"
+                 oninput="userSearchDebounce()" onfocus="userSearchDebounce()">
+          <input type="hidden" id="rf-user-id" value="">
+          <div class="user-dropdown" id="userDropdown"></div>
+        </div>
+      </div>
+      <div>
+        <label>Exam</label>
+        <select class="f-select" id="rf-exam">
+          <option value="">All Exams</option>
+          {% for e in exams %}
+          <option value="{{ e.id }}">{{ e.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Date From</label>
+        <input type="date" class="f-date" id="rf-from">
+      </div>
+      <div>
+        <label>Date To</label>
+        <input type="date" class="f-date" id="rf-to">
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:flex-end">
+        <button class="btn-flat primary" onclick="applyResultsFilter()"><i class="fas fa-search"></i>Filter</button>
+        <button class="btn-flat secondary" onclick="clearResultsFilter()"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+
+    <!-- Results table — AJAX rendered -->
+    <div id="resultsTableWrap">
+      <div style="text-align:center;padding:3rem;color:var(--text-muted)">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+        <p style="margin-top:.75rem;font-size:.85rem">Loading results…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════
+       TAB 2: Analytics (JS charts)
+  ════════════════════════════════════ -->
+  <div id="pane-analytics" class="tab-pane" style="padding:0">
+    <div class="a-filter-bar">
+      <div>
+        <label>Time Period</label>
+        <select class="f-select" id="af-period" onchange="toggleCustomRange(this.value)">
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="custom">Custom Range</option>
+        </select>
+      </div>
+      <div id="customRange">
+        <div><label>From</label><input type="date" class="f-date" id="af-from"></div>
+        <div><label>To</label>  <input type="date" class="f-date" id="af-to"></div>
+      </div>
+      <div>
+        <label>Exam</label>
+        <select class="f-select" id="af-exam">
+          <option value="">All Exams</option>
+          {% for e in exams %}
+          <option value="{{ e.id }}">{{ e.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="align-self:flex-end">
+        <button class="btn-flat primary" onclick="loadAnalytics()"><i class="fas fa-sync-alt"></i>Update</button>
+      </div>
+    </div>
+
+    <div class="a-stats-grid">
+      <div class="a-stat-card"><div class="a-stat-val" id="as-avg">—</div><div class="a-stat-lbl">Avg Score</div></div>
+      <div class="a-stat-card"><div class="a-stat-val" id="as-att">—</div><div class="a-stat-lbl">Total Attempts</div></div>
+      <div class="a-stat-card"><div class="a-stat-val" id="as-pass">—</div><div class="a-stat-lbl">Pass Rate</div></div>
+      <div class="a-stat-card"><div class="a-stat-val" id="as-users">—</div><div class="a-stat-lbl">Active Users</div></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h6><i class="fas fa-chart-pie me-1"></i>Score Distribution</h6>
+        <div class="chart-wrap"><canvas id="chartDist"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h6><i class="fas fa-chart-bar me-1"></i>Exam Performance</h6>
+        <div class="chart-wrap"><canvas id="chartExam"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tables-grid">
+      <div class="perf-card">
+        <h6><i class="fas fa-medal me-1"></i>Top Performers</h6>
+        <div class="table-responsive">
+          <table class="perf-table">
+            <thead><tr><th>#</th><th>User</th><th>Avg Score</th><th>Attempts</th></tr></thead>
+            <tbody id="topPerfBody"><tr><td colspan="4" class="loading-row"><i class="fas fa-spinner fa-spin"></i></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="perf-card">
+        <h6><i class="fas fa-file-alt me-1"></i>Exam Stats</h6>
+        <div class="table-responsive">
+          <table class="perf-table">
+            <thead><tr><th>Exam</th><th>Attempts</th><th>Avg %</th><th>Pass Rate</th></tr></thead>
+            <tbody id="examStatsBody"><tr><td colspan="4" class="loading-row"><i class="fas fa-spinner fa-spin"></i></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 1rem 1rem">
+      <div class="perf-card">
+        <h6><i class="fas fa-history me-1"></i>Recent Activity</h6>
+        <div class="table-responsive">
+          <table class="perf-table">
+            <thead><tr><th>Time</th><th>User</th><th>Exam</th><th>Score</th><th>%</th></tr></thead>
+            <tbody id="recentBody"><tr><td colspan="5" class="loading-row"><i class="fas fa-spinner fa-spin"></i></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════
+   STAT CARD HELPERS
+═══════════════════════════════════════════ */
+function fmtCompact(n) {
+  if (n >= 1e9)  return (n/1e9).toFixed(1).replace(/\.0$/,'')  + 'B+';
+  if (n >= 1e6)  return (n/1e6).toFixed(1).replace(/\.0$/,'')  + 'M+';
+  if (n >= 1e3)  return (n/1e3).toFixed(1).replace(/\.0$/,'')  + 'K+';
+  return String(n);
+}
+function fmtExact(n) {
+  return Number(n).toLocaleString('en-IN');
+}
+function setStatCard(bigId, exactId, value) {
+  const n = Number(value) || 0;
+  const bigEl   = document.getElementById(bigId);
+  const exactEl = document.getElementById(exactId);
+  if (bigEl)   bigEl.textContent   = fmtCompact(n);
+  if (exactEl) exactEl.textContent = n >= 1000 ? fmtExact(n) : '';
+}
+
+function loadStatCards() {
+  fetch('/admin/api/users-analytics/stats')
+    .then(r => r.json())
+    .then(d => {
+      setStatCard('sc-users',    'sc-users-exact',    d.total_users     || 0);
+      setStatCard('sc-exams',    'sc-exams-exact',    d.total_exams     || 0);
+      setStatCard('sc-results',  'sc-results-exact',  d.total_results   || 0);
+      setStatCard('sc-responses','sc-responses-exact', d.total_responses || 0);
+    })
+    .catch(() => {});
+}
+
+/* ═══════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════ */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pane-' + name).classList.add('active');
+  if (name === 'analytics' && !_analyticsLoaded) loadAnalytics();
+}
+
+/* ═══════════════════════════════════════════
+   USER SEARCH AUTOCOMPLETE (no 50K dump)
+═══════════════════════════════════════════ */
+let _userTimer = null;
+let _selectedUserId = '';
+
+function userSearchDebounce() {
+  clearTimeout(_userTimer);
+  _userTimer = setTimeout(fetchUserSuggestions, 300);
+}
+
+function fetchUserSuggestions() {
+  const q = document.getElementById('rf-user-search').value.trim();
+  const dd = document.getElementById('userDropdown');
+
+  if (!q) {
+    // Show "All Users" option when empty
+    dd.innerHTML = `<div class="user-opt" onclick="selectUser('','')">
+      <div class="opt-name">All Users</div>
+    </div>`;
+    dd.classList.add('open');
+    return;
+  }
+
+  if (q.length < 2) { dd.classList.remove('open'); return; }
+
+  fetch(`/admin/api/users/search?q=${encodeURIComponent(q)}&page=1`)
+    .then(r => r.json())
+    .then(d => {
+      const users = d.users || [];
+      if (!users.length) {
+        dd.innerHTML = `<div class="user-opt" style="color:var(--text-muted)">No users found</div>`;
+      } else {
+        dd.innerHTML = users.slice(0, 10).map(u =>
+          `<div class="user-opt" onclick="selectUser('${u.id}','${_esc(u.username)}')">
+            <div class="opt-name">${_esc(u.username)}</div>
+            <div class="opt-email">${_esc(u.email||'')}</div>
+          </div>`
+        ).join('');
+      }
+      dd.classList.add('open');
+    })
+    .catch(() => dd.classList.remove('open'));
+}
+
+function selectUser(id, name) {
+  document.getElementById('rf-user-id').value     = id;
+  document.getElementById('rf-user-search').value = name || (id ? name : '');
+  document.getElementById('userDropdown').classList.remove('open');
+  _selectedUserId = id;
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.user-search-wrap')) {
+    document.getElementById('userDropdown')?.classList.remove('open');
+  }
+});
+
+/* ═══════════════════════════════════════════
+   RESULTS TAB
+═══════════════════════════════════════════ */
+let _resultsCurPage = 1;
+let _resultsLoading = false;
+
+function applyResultsFilter() { _resultsCurPage = 1; _fetchResults(); }
+
+function clearResultsFilter() {
+  document.getElementById('rf-user-search').value = '';
+  document.getElementById('rf-user-id').value     = '';
+  document.getElementById('rf-exam').value         = '';
+  document.getElementById('rf-from').value         = '';
+  document.getElementById('rf-to').value           = '';
+  _selectedUserId = '';
+  _resultsCurPage = 1;
+  _fetchResults();
+}
+
+function resultsPage(p) { _resultsCurPage = p; _fetchResults(); }
+
+function _fetchResults() {
+  if (_resultsLoading) return;
+  _resultsLoading = true;
+  const wrap = document.getElementById('resultsTableWrap');
+  wrap.innerHTML = _skeletonTable();
+
+  const from = document.getElementById('rf-from').value;   // YYYY-MM-DD from date input
+  const to   = document.getElementById('rf-to').value;
+
+  const params = new URLSearchParams({
+    user:     document.getElementById('rf-user-id').value,
+    exam:     document.getElementById('rf-exam').value,
+    dateFrom: from,
+    dateTo:   to,
+    page:     _resultsCurPage,
+    partial:  '1'
+  });
+
+  fetch('/admin/users-analytics/results?' + params)
+    .then(r => r.text())
+    .then(html => { wrap.innerHTML = html; })
+    .catch(() => { wrap.innerHTML = '<p style="padding:2rem;color:#ef4444">Error loading results.</p>'; })
+    .finally(() => _resultsLoading = false);
+}
+
+function _skeletonTable() {
+  const rows = Array(5).fill(0).map(() =>
+    `<tr>${Array(8).fill(0).map(()=>`<td><div class="skeleton" style="width:${40+Math.random()*40|0}%"></div></td>`).join('')}</tr>`
+  ).join('');
+  return `<div class="table-responsive"><table class="table mb-0">
+    <thead><tr>
+      <th>User</th><th>Exam</th><th>Date</th><th>Score</th><th>%</th><th>Grade</th><th>Duration</th><th>Actions</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function popupOpen(url, w, h) {
+  const left = Math.round(window.screenX + (window.innerWidth - w) / 2);
+  const top  = Math.round(window.screenY + (window.innerHeight - h) / 2);
+  window.open(url, '_blank', `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+}
+
+/* ═══════════════════════════════════════════
+   ANALYTICS TAB
+═══════════════════════════════════════════ */
+let _analyticsLoaded = false;
+let _charts = {};
+
+const CHART_COLORS = {
+  accent: '#2d5be3',
+  green:  '#10b981',
+  amber:  '#f59e0b',
+  red:    '#ef4444',
+};
+
+function toggleCustomRange(v) {
+  const el = document.getElementById('customRange');
+  el.style.display = (v === 'custom') ? 'grid' : 'none';
+}
+
+function _themeColors() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  return {
+    tick:           isLight ? 'rgba(0,0,0,0.6)'   : 'rgba(255,255,255,0.5)',
+    grid:           isLight ? 'rgba(0,0,0,0.08)'  : 'rgba(255,255,255,0.07)',
+    doughnutBorder: isLight ? '#f0f2f8'            : '#111118',
+    legendColor:    isLight ? '#374151'            : 'rgba(255,255,255,0.75)',
+  };
+}
+
+function _chartDefaults() {
+  const tc = _themeColors();
+  return {
+    plugins: {
+      legend: { labels: { color: tc.legendColor, font:{ size:11 } } }
+    },
+    scales: {
+      x: { ticks:{ color:tc.tick, font:{size:10} }, grid:{ color:tc.grid } },
+      y: { ticks:{ color:tc.tick, font:{size:10} }, grid:{ color:tc.grid }, beginAtZero:true }
+    }
+  };
+}
+
+function _destroyChart(k) {
+  if (_charts[k]) { try { _charts[k].destroy(); } catch(e){} _charts[k] = null; }
+}
+
+function loadAnalytics() {
+  _analyticsLoaded = true;
+  const params = new URLSearchParams({
+    timePeriod: document.getElementById('af-period').value,
+    exam:       document.getElementById('af-exam').value,
+    startDate:  document.getElementById('af-from')?.value || '',
+    endDate:    document.getElementById('af-to')?.value   || '',
+  });
+  ['as-avg','as-att','as-pass','as-users'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:.9rem"></i>';
+  });
+  fetch('/admin/api/users-analytics/data?' + params)
+    .then(r => r.json())
+    .then(d => {
+      _renderSummary(d.summary || {});
+      _renderCharts(d.charts   || {});
+      _renderTables(d.tables   || {});
+    })
+    .catch(e => console.error('Analytics fetch error', e));
+}
+
+function _renderSummary(s) {
+  _set('as-avg',   s.avgScore  !== undefined ? Number(s.avgScore).toFixed(1) + '%' : '—');
+  _set('as-att',   s.totalAttempts ?? 0);
+  _set('as-pass',  s.passRate  !== undefined ? Number(s.passRate).toFixed(1) + '%' : '—');
+  _set('as-users', s.activeUsers ?? 0);
+}
+
+function _set(id, val) { const el=document.getElementById(id); if(el) el.textContent=val; }
+
+function _renderCharts(c) {
+  const tc = _themeColors();
+
+  _destroyChart('dist');
+  const dc = document.getElementById('chartDist');
+  if (dc) {
+    _charts.dist = new Chart(dc, {
+      type: 'doughnut',
+      data: {
+        labels: ['Excellent ≥90%','Good ≥75%','Average ≥60%','Poor <60%'],
+        datasets: [{
+          data: c.scoreDistribution || [0,0,0,0],
+          backgroundColor: [CHART_COLORS.green, CHART_COLORS.accent, CHART_COLORS.amber, CHART_COLORS.red],
+          borderColor:  tc.doughnutBorder,
+          borderWidth:  2,
+          hoverOffset:  6,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: tc.legendColor, font:{size:11}, padding:14, usePointStyle:true }
+          }
+        }
+      }
+    });
+  }
+
+  _destroyChart('exam');
+  const ec = document.getElementById('chartExam');
+  const ep = c.examPerformance || { labels:[], data:[] };
+  if (ec) {
+    const def = _chartDefaults();
+    _charts.exam = new Chart(ec, {
+      type: 'bar',
+      data: {
+        labels: ep.labels,
+        datasets: [{
+          label:           'Avg %',
+          data:            ep.data,
+          backgroundColor: CHART_COLORS.accent + 'cc',
+          borderColor:     CHART_COLORS.accent,
+          borderWidth:     1,
+          borderRadius:    5,
+          borderSkipped:   false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: def.plugins,
+        scales: { x:{...def.scales.x}, y:{...def.scales.y, max:100} }
+      }
+    });
+  }
+}
+
+function _renderTables(t) {
+  const tp = t.topPerformers || [];
+  const tpEl = document.getElementById('topPerfBody');
+  if (tpEl) {
+    tpEl.innerHTML = !tp.length
+      ? '<tr><td colspan="4" class="loading-row">No data</td></tr>'
+      : tp.map((u,i) => {
+          const pct = Number(u.avgScore||0);
+          return `<tr>
+            <td><span class="rank-badge ${i<3?'top3':''}">${i+1}</span></td>
+            <td>
+              <div style="font-weight:600">${_esc(u.username)}</div>
+              <div style="font-size:.73rem;color:var(--text-muted)">${_esc(u.full_name||'')}</div>
+            </td>
+            <td>
+              <div class="score-bar"><div class="score-fill" style="width:${Math.min(pct,100)}%"></div></div>
+              <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">${pct.toFixed(1)}%</div>
+            </td>
+            <td style="color:var(--text-muted)">${u.attempts||0}</td>
+          </tr>`;
+        }).join('');
+  }
+
+  const es = t.examStats || [];
+  const esEl = document.getElementById('examStatsBody');
+  if (esEl) {
+    esEl.innerHTML = !es.length
+      ? '<tr><td colspan="4" class="loading-row">No data</td></tr>'
+      : es.map(ex => {
+          const avg = Number(ex.avgScore||0);
+          return `<tr>
+            <td style="font-weight:600">${_esc(ex.name)}</td>
+            <td style="color:var(--text-muted)">${ex.attempts||0}</td>
+            <td>
+              <div class="score-bar"><div class="score-fill" style="width:${Math.min(avg,100)}%"></div></div>
+              <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">${avg.toFixed(1)}%</div>
+            </td>
+            <td style="color:var(--text-muted)">${ex.passRate !== undefined ? Number(ex.passRate).toFixed(1)+'%' : '—'}</td>
+          </tr>`;
+        }).join('');
+  }
+
+  const ra = t.recentActivity || [];
+  const raEl = document.getElementById('recentBody');
+  if (raEl) {
+    raEl.innerHTML = !ra.length
+      ? '<tr><td colspan="5" class="loading-row">No recent activity</td></tr>'
+      : ra.map(a => {
+          const pct  = Number(a.percentage||0);
+          const time = a.created_at ? new Date(a.created_at).toLocaleString() : '—';
+          return `<tr>
+            <td style="font-size:.73rem;color:var(--text-muted)">${_esc(time)}</td>
+            <td style="font-weight:600">${_esc(a.username||'')}</td>
+            <td style="font-size:.8rem">${_esc(a.exam_name||'')}</td>
+            <td style="font-weight:700">${_esc(String(a.score??'—'))}/${_esc(String(a.max_score??'—'))}</td>
+            <td><span class="pct-badge ${pct>=90?'pct-ex':pct>=75?'pct-gd':pct>=60?'pct-av':'pct-pr'}">${pct.toFixed(1)}%</span></td>
+          </tr>`;
+        }).join('');
+  }
+}
+
+/* ═══════════════════════════════════════════
+   THEME SYNC — redraw charts on theme change
+═══════════════════════════════════════════ */
+function _redrawChartsForTheme() {
+  if (_analyticsLoaded && (_charts.dist || _charts.exam)) {
+    // Reload analytics data to redraw with new theme colors
+    loadAnalytics();
+  }
+}
+
+// Watch for theme attribute changes on <html>
+const _themeObserver = new MutationObserver(muts => {
+  muts.forEach(m => {
+    if (m.attributeName === 'data-theme') _redrawChartsForTheme();
+  });
+});
+_themeObserver.observe(document.documentElement, { attributes: true });
+
+/* ═══════════════════════════════════════════
+   STAT ENDPOINT (for this page's own stats)
+═══════════════════════════════════════════ */
+function _esc(s) {
+  if (!s && s!==0) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  // Load stat cards via AJAX (accurate COUNT queries)
+  loadStatCards();
+  // Load initial results
+  _fetchResults();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,585 @@
+{% extends "admin_base.html" %}
+{% block title %}Attempts Management{% endblock %}
+
+{% block content %}
+<style>
+  .page-top { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+  .page-top h1 { font-size:clamp(1.2rem,3vw,1.6rem); font-weight:700; margin:0; color:var(--text-primary); }
+  .page-top p  { margin:0.15rem 0 0; font-size:0.82rem; color:var(--text-muted); }
+
+  .filter-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1rem 1.1rem; margin-bottom:1.25rem; }
+  .filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:0.75rem; margin-bottom:0.85rem; }
+  .filter-group label { display:block; font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:0.3rem; }
+  .filter-input { width:100%; background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:8px; font-size:0.82rem; padding:0.45rem 0.7rem; }
+  .filter-input::placeholder { color:var(--input-placeholder); }
+  .filter-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; background:var(--input-bg); }
+  .filter-input option { background:#111118; color:#e6eef8; }
+  .filter-actions { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; }
+  .filter-badge { background:rgba(16,185,129,0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); border-radius:20px; font-size:0.72rem; font-weight:700; padding:3px 10px; display:none; align-items:center; gap:0.3rem; }
+
+  .bulk-bar { background:var(--accent-subtle); border:1px solid var(--accent-border); border-radius:10px; padding:0.65rem 1rem; display:none; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+  .bulk-bar.show { display:flex; }
+  .bulk-count { background:var(--accent); color:white; border-radius:20px; font-size:0.75rem; font-weight:700; padding:3px 10px; margin-left:auto; }
+
+  .card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; overflow:hidden; }
+  .table-header-bar { display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.1rem; border-bottom:1px solid var(--card-border); flex-wrap:wrap; gap:0.5rem; }
+  .table-header-bar h3 { font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0; }
+  .results-pill { background:var(--table-head-bg); border:1px solid var(--card-border); border-radius:20px; font-size:0.75rem; font-weight:600; color:var(--text-muted); padding:3px 12px; }
+
+  .table { --bs-table-bg:transparent; --bs-table-color:var(--text-primary); width:100%; }
+  .table thead th { background:var(--table-head-bg); color:var(--text-muted); font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--table-border); padding:0.7rem 0.9rem; white-space:nowrap; }
+  .table tbody td { border-bottom:1px solid var(--table-border); padding:0.75rem 0.9rem; vertical-align:middle; }
+  .table tbody tr:last-child td { border-bottom:none; }
+  .table tbody tr:hover td { background:var(--table-row-hover); }
+
+  .user-chip { display:inline-flex; align-items:center; gap:0.35rem; background:var(--accent-subtle); border:1px solid var(--accent-border); border-radius:20px; padding:3px 10px; font-size:0.78rem; font-weight:700; color:var(--accent); }
+  .exam-chip { display:inline-flex; align-items:center; gap:0.35rem; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); border-radius:20px; padding:3px 10px; font-size:0.78rem; font-weight:700; color:#10b981; }
+  .id-text { font-size:0.7rem; color:var(--text-muted); margin-top:2px; }
+  .used-badge { background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); color:#f59e0b; border-radius:20px; font-size:0.78rem; font-weight:700; padding:3px 10px; display:inline-block; }
+  .remaining-val { font-size:0.9rem; font-weight:700; color:var(--text-primary); }
+  .remaining-val.unlimited { color:#10b981; }
+  .remaining-val.exhausted  { color:#ef4444; }
+
+  .icon-btn { width:30px; height:30px; border-radius:7px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text-secondary); font-size:0.72rem; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; }
+  .icon-btn.reset:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+  .icon-btn.inc:hover   { border-color:#10b981; color:#10b981; background:rgba(16,185,129,0.08); }
+  .icon-btn.dec:hover   { border-color:#f59e0b; color:#f59e0b; background:rgba(245,158,11,0.08); }
+  .action-cell { display:flex; gap:0.3rem; }
+
+  .pagination-bar { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.1rem; border-top:1px solid var(--card-border); flex-wrap:wrap; gap:0.5rem; }
+  .pagination-info { font-size:0.78rem; color:var(--text-muted); }
+
+  .btn-flat { border-radius:8px; font-size:0.8rem; font-weight:600; padding:0.4rem 0.9rem; border:none; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; gap:0.3rem; white-space:nowrap; }
+  .btn-flat.primary   { background:var(--accent); color:white; }
+  .btn-flat.primary:hover   { background:var(--accent-hover); }
+  .btn-flat.secondary { background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-color); }
+  .btn-flat.secondary:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-flat.success   { background:#10b981; color:white; }
+  .btn-flat.success:hover { background:#059669; }
+  .btn-flat.warning   { background:#f59e0b; color:#000; }
+  .btn-flat.warning:hover { background:#d97706; }
+  .btn-flat:disabled  { opacity:0.4; cursor:not-allowed; }
+
+  .enhanced-checkbox { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
+
+  /* Skeleton */
+  .skeleton { background:linear-gradient(90deg,var(--table-head-bg) 25%,var(--card-border) 50%,var(--table-head-bg) 75%); background-size:200% 100%; animation:shimmer 1.2s infinite; border-radius:6px; height:14px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  .empty-state { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+  .empty-state i { font-size:2.5rem; opacity:0.2; display:block; margin-bottom:0.75rem; }
+  .empty-state p { font-size:0.88rem; margin:0; }
+
+  /* Paginator buttons */
+  .pg-btn { cursor:pointer; padding:3px 9px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text-secondary); font-size:0.78rem; font-weight:600; }
+  .pg-btn.active { border-color:var(--accent); background:var(--accent); color:#fff; }
+  .pg-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+  .modal-bd { display:none; position:fixed; inset:0; z-index:1050; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:1rem; }
+  .modal-bd.show { display:flex; }
+  .modal-box { background:var(--modal-bg); border:1px solid var(--card-border); border-radius:14px; width:100%; max-width:460px; overflow:hidden; animation:mIn 0.2s ease-out; }
+  @keyframes mIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+  .mhdr { background:var(--card-bg); border-bottom:1px solid var(--card-border); padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; }
+  .mhdr h5 { font-size:0.95rem; font-weight:700; color:var(--text-primary); margin:0; }
+  .mbody { padding:1.25rem; }
+  .mfooter { background:var(--modal-footer-bg); border-top:1px solid var(--card-border); padding:0.75rem 1.25rem; display:flex; justify-content:flex-end; gap:0.5rem; }
+  .modal-close { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; padding:0; }
+  .modal-close:hover { color:var(--text-primary); }
+  .modal-info-box { background:var(--table-head-bg); border:1px solid var(--card-border); border-radius:8px; padding:0.75rem 1rem; font-size:0.83rem; color:var(--text-secondary); margin:0.75rem 0; line-height:1.6; }
+  .modal-info-box strong { color:var(--text-primary); }
+  .modal-label { font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:0.35rem; text-transform:uppercase; letter-spacing:0.4px; display:block; }
+  .modal-input { background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:8px; font-size:0.85rem; padding:0.5rem 0.8rem; }
+  .modal-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; background:var(--input-bg); }
+  .selected-list { max-height:160px; overflow-y:auto; margin:0.75rem 0; }
+  .selected-item { display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--table-border); font-size:0.8rem; }
+  .selected-item:last-child { border-bottom:none; }
+
+  .toast-container { position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; display:flex; flex-direction:column; gap:0.5rem; }
+  .toast-item { background:var(--card-bg); border:1px solid var(--card-border); border-radius:10px; padding:0.65rem 1rem; font-size:0.82rem; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem; min-width:220px; max-width:320px; box-shadow:0 4px 20px rgba(0,0,0,0.3); animation:tIn 0.2s ease-out; }
+  .toast-item.success { border-left:3px solid #10b981; }
+  .toast-item.danger  { border-left:3px solid #ef4444; }
+  .toast-item.info    { border-left:3px solid var(--accent); }
+  @keyframes tIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+
+  @media (max-width:768px) {
+    .page-top,.bulk-bar,.table-header-bar,.pagination-bar { flex-direction:column; align-items:flex-start; }
+    .bulk-count { margin-left:0; }
+    .filter-grid { grid-template-columns:1fr 1fr; }
+  }
+  @media (max-width:480px) { .filter-grid { grid-template-columns:1fr; } }
+</style>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-users-cog me-2" style="color:var(--accent)"></i>Attempts Management</h1>
+    <p>Reset, increase, or decrease user exam attempts. Type username to search.</p>
+  </div>
+</div>
+
+<div class="filter-card">
+  <div class="filter-grid">
+    <div class="filter-group">
+      <label><i class="fas fa-user me-1"></i>Username</label>
+      <input type="text" id="userFilter" class="filter-input" placeholder="Search username…" oninput="debounceSearch()">
+    </div>
+    <div class="filter-group">
+      <label><i class="fas fa-file-alt me-1"></i>Exam</label>
+      <select id="examFilter" class="filter-input" onchange="fetchAttempts(1)">
+        <option value="">All Exams</option>
+        {% for exam in exams %}
+        <option value="{{ exam.id }}">{{ exam.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label><i class="fas fa-chart-bar me-1"></i>Status</label>
+      <select id="statusFilter" class="filter-input" onchange="fetchAttempts(1)">
+        <option value="">All Status</option>
+        <option value="unlimited">Unlimited</option>
+        <option value="available">Has Remaining</option>
+        <option value="exhausted">Exhausted</option>
+      </select>
+    </div>
+  </div>
+  <div class="filter-actions">
+    <button class="btn-flat secondary" onclick="clearFilters()"><i class="fas fa-times"></i>Clear</button>
+    <span class="filter-badge" id="filterBadge"><i class="fas fa-check-circle"></i>Filters Active</span>
+    <span style="font-size:0.78rem;color:var(--text-muted);margin-left:auto">
+      <i class="fas fa-info-circle me-1"></i>Type a username to load results
+    </span>
+  </div>
+</div>
+
+<div class="bulk-bar" id="bulkBar">
+  <button class="btn-flat primary"   onclick="openBulkModal('reset')">   <i class="fas fa-redo"></i>Bulk Reset</button>
+  <button class="btn-flat success"   onclick="openBulkModal('increase')"><i class="fas fa-plus"></i>Bulk +</button>
+  <button class="btn-flat warning"   onclick="openBulkModal('decrease')"><i class="fas fa-minus"></i>Bulk -</button>
+  <button class="btn-flat secondary" onclick="clearAllSelections()">     <i class="fas fa-times"></i>Clear</button>
+  <span class="bulk-count" id="selectedCount">0 selected</span>
+</div>
+
+<div class="card">
+  <div class="table-header-bar">
+    <h3><i class="fas fa-table me-2" style="color:var(--accent)"></i>Attempts Overview</h3>
+    <span class="results-pill" id="resultsCounter">—</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:40px"><input type="checkbox" id="selectAll" class="enhanced-checkbox" onchange="toggleSelectAll()"></th>
+          <th>User</th><th>Exam</th><th>Max</th><th>Used</th><th>Remaining</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="attemptsBody">
+        <tr><td colspan="7">
+          <div class="empty-state">
+            <i class="fas fa-search"></i>
+            <p><strong>Enter a username above to search</strong><br>
+            <span style="font-size:0.8rem">Or select an exam filter to browse all attempts</span></p>
+          </div>
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination-bar">
+    <span class="pagination-info" id="paginationInfo"></span>
+    <div style="display:flex;gap:0.3rem;flex-wrap:wrap" id="paginatorBtns"></div>
+  </div>
+</div>
+
+<!-- Single Action Modal -->
+<div class="modal-bd" id="actionModal">
+  <div class="modal-box">
+    <div class="mhdr">
+      <h5 id="modalTitle">Confirm Action</h5>
+      <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:0.83rem;color:var(--text-secondary);margin:0 0 0.25rem" id="modalMessage"></p>
+      <div class="modal-info-box" id="modalInfoBox"></div>
+      <div id="amountWrap" style="display:none">
+        <label class="modal-label">Amount</label>
+        <input type="number" id="amount" class="modal-input" min="1" value="1" style="width:120px">
+      </div>
+    </div>
+    <div class="mfooter">
+      <button class="btn-flat secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-flat primary" id="confirmBtn" onclick="confirmAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Modal -->
+<div class="modal-bd" id="bulkModal">
+  <div class="modal-box">
+    <div class="mhdr">
+      <h5 id="bulkModalTitle">Bulk Action</h5>
+      <button class="modal-close" onclick="closeBulkModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:0.83rem;color:var(--text-secondary);margin:0 0 0.25rem" id="bulkModalMsg"></p>
+      <div class="selected-list" id="selectedItemsList"></div>
+      <div id="bulkAmountWrap" style="display:none;margin-top:0.5rem">
+        <label class="modal-label">Amount</label>
+        <input type="number" id="bulkAmount" class="modal-input" min="1" value="1" style="width:120px">
+      </div>
+    </div>
+    <div class="mfooter">
+      <button class="btn-flat secondary" onclick="closeBulkModal()">Cancel</button>
+      <button class="btn-flat primary" id="bulkConfirmBtn" onclick="confirmBulkAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+let _page         = 1;
+let _searchTimer  = null;
+let _isProcessing = false;
+let _selectedItems = new Set();   // "sid-eid" keys, persists across pages
+let _currentAction = null, _currentSid = null, _currentEid = null;
+let _currentBulkAction = null;
+// Store current page row data for bulk modal labels
+let _currentRows = [];
+
+/* ═══════════════════════════════════════════════
+   SEARCH / FETCH
+═══════════════════════════════════════════════ */
+function debounceSearch() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => fetchAttempts(1), 400);
+}
+
+function fetchAttempts(page) {
+  _page = page;
+  const q      = document.getElementById('userFilter').value.trim();
+  const examId = document.getElementById('examFilter').value;
+  const status = document.getElementById('statusFilter').value;
+
+  // Show hint if no filters at all
+  if (!q && !examId && !status) {
+    document.getElementById('attemptsBody').innerHTML = `
+      <tr><td colspan="7"><div class="empty-state">
+        <i class="fas fa-search"></i>
+        <p><strong>Enter a username or select an exam</strong><br>
+        <span style="font-size:0.8rem">Results will load here</span></p>
+      </div></td></tr>`;
+    document.getElementById('resultsCounter').textContent = '—';
+    document.getElementById('paginationInfo').textContent = '';
+    document.getElementById('paginatorBtns').innerHTML   = '';
+    return;
+  }
+
+  // Show skeleton
+  const tbody = document.getElementById('attemptsBody');
+  tbody.innerHTML = Array(5).fill(0).map(() =>
+    `<tr><td colspan="7"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
+  ).join('');
+
+  const badge = document.getElementById('filterBadge');
+  badge.style.display = (q || examId || status) ? 'inline-flex' : 'none';
+
+  const params = new URLSearchParams({ page, q, exam_id: examId, status });
+  fetch(`/admin/api/attempts/search?${params}`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.success === false) { renderError(d.message); return; }
+      _currentRows = d.rows || [];
+      renderRows(_currentRows);
+      renderPaginator(d.page, d.total_pages, d.total);
+      document.getElementById('resultsCounter').textContent =
+        `${d.total} result${d.total!==1?'s':''}`;
+    })
+    .catch(err => renderError('Network error: ' + err));
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER ROWS
+═══════════════════════════════════════════════ */
+function renderRows(rows) {
+  const tbody = document.getElementById('attemptsBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+      <i class="fas fa-search"></i>
+      <p><strong>No Results</strong><br><span style="font-size:0.8rem">Adjust filters to see entries.</span></p>
+    </div></td></tr>`;
+    syncSelectAll(); return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const remCls = r.remaining === '∞' ? 'unlimited' : r.remaining === 0 ? 'exhausted' : '';
+    const isSel  = _selectedItems.has(`${r.student_id}-${r.exam_id}`);
+    const esc    = s => String(s).replace(/'/g, "\\'");
+    return `
+    <tr data-student-id="${r.student_id}" data-exam-id="${r.exam_id}">
+      <td><input type="checkbox" class="enhanced-checkbox row-select" ${isSel?'checked':''}
+          onchange="onRowCheck(this,'${r.student_id}','${r.exam_id}')"></td>
+      <td>
+        <span class="user-chip"><i class="fas fa-user"></i>${r.username}</span>
+        <div class="id-text">ID: ${r.student_id}</div>
+      </td>
+      <td>
+        <span class="exam-chip"><i class="fas fa-file-alt"></i>${r.exam_name}</span>
+        <div class="id-text">EID: ${r.exam_id}</div>
+      </td>
+      <td><strong style="color:var(--text-primary)">${r.max_attempts}</strong></td>
+      <td><span class="used-badge">${r.attempts_used}</span></td>
+      <td><span class="remaining-val ${remCls}">${r.remaining}</span></td>
+      <td>
+        <div class="action-cell">
+          <button class="icon-btn reset" title="Reset"  onclick="openModal('reset',   '${r.student_id}','${r.exam_id}','${esc(r.username)}','${esc(r.exam_name)}')"><i class="fas fa-redo"></i></button>
+          <button class="icon-btn inc"   title="Add"    onclick="openModal('increase','${r.student_id}','${r.exam_id}','${esc(r.username)}','${esc(r.exam_name)}')"><i class="fas fa-plus"></i></button>
+          <button class="icon-btn dec"   title="Remove" onclick="openModal('decrease','${r.student_id}','${r.exam_id}','${esc(r.username)}','${esc(r.exam_name)}')"><i class="fas fa-minus"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  syncSelectAll();
+}
+
+function renderError(msg) {
+  document.getElementById('attemptsBody').innerHTML =
+    `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#ef4444">
+      <i class="fas fa-exclamation-circle me-2"></i>${msg}
+    </td></tr>`;
+}
+
+/* ═══════════════════════════════════════════════
+   PAGINATOR
+═══════════════════════════════════════════════ */
+function renderPaginator(page, totalPages, total) {
+  const perPage = 50;
+  const start   = (page-1)*perPage+1, end = Math.min(page*perPage, total);
+  document.getElementById('paginationInfo').textContent =
+    total ? `Showing ${start}–${end} of ${total}` : 'No entries';
+
+  const wrap = document.getElementById('paginatorBtns');
+  if (totalPages <= 1) { wrap.innerHTML=''; return; }
+
+  let pages = [];
+  if (totalPages <= 7) { pages = Array.from({length:totalPages},(_,i)=>i+1); }
+  else {
+    pages = [1];
+    const s=Math.max(2,page-2), e=Math.min(totalPages-1,page+2);
+    if(s>2) pages.push('…');
+    for(let i=s;i<=e;i++) pages.push(i);
+    if(e<totalPages-1) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  wrap.innerHTML = `
+    <button class="pg-btn" ${page===1?'disabled':''} onclick="fetchAttempts(${page-1})">‹</button>
+    ${pages.map(p => p==='…'
+      ? `<span style="color:var(--text-muted);padding:0 4px">…</span>`
+      : `<button class="pg-btn${p===page?' active':''}" onclick="fetchAttempts(${p})">${p}</button>`
+    ).join('')}
+    <button class="pg-btn" ${page===totalPages?'disabled':''} onclick="fetchAttempts(${page+1})">›</button>`;
+}
+
+/* ═══════════════════════════════════════════════
+   FILTER HELPERS
+═══════════════════════════════════════════════ */
+function clearFilters() {
+  document.getElementById('userFilter').value = '';
+  document.getElementById('examFilter').value = '';
+  document.getElementById('statusFilter').value = '';
+  document.getElementById('filterBadge').style.display = 'none';
+  // Reset to empty hint state
+  fetchAttempts(1);
+}
+
+/* ═══════════════════════════════════════════════
+   SELECTION
+═══════════════════════════════════════════════ */
+function onRowCheck(cb, sid, eid) {
+  const key = `${sid}-${eid}`;
+  if (cb.checked) _selectedItems.add(key);
+  else            _selectedItems.delete(key);
+  syncSelectAll(); updateBulkBar();
+}
+
+function toggleSelectAll() {
+  const chk = document.getElementById('selectAll').checked;
+  document.querySelectorAll('#attemptsBody .row-select').forEach(cb => {
+    cb.checked = chk;
+    const tr = cb.closest('tr');
+    const sid = tr?.dataset.studentId, eid = tr?.dataset.examId;
+    if (sid && eid) {
+      const key = `${sid}-${eid}`;
+      if (chk) _selectedItems.add(key); else _selectedItems.delete(key);
+    }
+  });
+  updateBulkBar();
+}
+
+function syncSelectAll() {
+  const all = document.querySelectorAll('#attemptsBody .row-select');
+  const chk = document.querySelectorAll('#attemptsBody .row-select:checked');
+  const sa  = document.getElementById('selectAll'); if (!sa) return;
+  if (!all.length)              { sa.indeterminate=false; sa.checked=false; }
+  else if (!chk.length)         { sa.indeterminate=false; sa.checked=false; }
+  else if(chk.length===all.length){ sa.indeterminate=false; sa.checked=true; }
+  else                          { sa.indeterminate=true; }
+}
+
+function updateBulkBar() {
+  const n = _selectedItems.size;
+  document.getElementById('bulkBar').classList.toggle('show', n>0);
+  document.getElementById('selectedCount').textContent = `${n} selected`;
+}
+
+function clearAllSelections() {
+  _selectedItems.clear();
+  document.querySelectorAll('#attemptsBody .row-select').forEach(cb => cb.checked=false);
+  const sa = document.getElementById('selectAll');
+  if(sa){sa.checked=false;sa.indeterminate=false;}
+  updateBulkBar();
+}
+
+/* ═══════════════════════════════════════════════
+   SINGLE ACTION MODAL
+═══════════════════════════════════════════════ */
+function openModal(action, sid, eid, uname, ename) {
+  _currentAction = action; _currentSid = sid; _currentEid = eid;
+  const titles = {reset:'Reset Attempts', increase:'Add Attempts', decrease:'Remove Attempts'};
+  const msgs   = {reset:'This will reset ALL attempts. Cannot be undone.', increase:'Add extra attempts for this user.', decrease:'Remove attempts from this user.'};
+  document.getElementById('modalTitle').textContent   = titles[action];
+  document.getElementById('modalMessage').textContent = msgs[action];
+  document.getElementById('modalInfoBox').innerHTML   = `<strong>User:</strong> ${uname}<br><strong>Exam:</strong> ${ename}`;
+  document.getElementById('amountWrap').style.display = action==='reset'?'none':'block';
+  if (action !== 'reset') document.getElementById('amount').value = 1;
+  document.getElementById('actionModal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('actionModal').classList.remove('show'); }
+
+async function confirmAction() {
+  if (_isProcessing) return;
+  _isProcessing = true;
+  const btn = document.getElementById('confirmBtn'), orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  try {
+    const r = await fetch("{{ url_for('admin.attempts_modify') }}", {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        student_id: _currentSid, exam_id: _currentEid,
+        action: _currentAction,
+        amount: parseInt(document.getElementById('amount').value || 1)
+      })
+    });
+    const d = await r.json();
+    if (d.success) {
+      toast('Done!', 'success');
+      closeModal();
+      fetchAttempts(_page);   // reload current page — no full reload
+    } else {
+      toast(d.message || 'Failed', 'danger');
+      btn.innerHTML = orig; btn.disabled = false; _isProcessing = false;
+    }
+  } catch {
+    toast('Network error', 'danger');
+    btn.innerHTML = orig; btn.disabled = false; _isProcessing = false;
+  } finally {
+    _isProcessing = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   BULK MODAL
+═══════════════════════════════════════════════ */
+function openBulkModal(action) {
+  if (!_selectedItems.size) { toast('Select at least one item', 'info'); return; }
+  _currentBulkAction = action;
+  const titles = {reset:'Bulk Reset', increase:'Bulk Add Attempts', decrease:'Bulk Remove Attempts'};
+  document.getElementById('bulkModalTitle').textContent = titles[action];
+  document.getElementById('bulkModalMsg').textContent   =
+    `${action==='reset'?'Reset':'Modify'} attempts for ${_selectedItems.size} item(s).`;
+
+  // Build list from stored row data
+  const rowMap = {};
+  _currentRows.forEach(r => { rowMap[`${r.student_id}-${r.exam_id}`] = r; });
+
+  let html = '';
+  _selectedItems.forEach(key => {
+    const r = rowMap[key];
+    if (r) html += `<div class="selected-item"><span><strong>${r.username}</strong> — ${r.exam_name}</span><small>#${r.student_id}</small></div>`;
+    else {
+      const [s,e] = key.split('-');
+      html += `<div class="selected-item"><span>User ${s} — Exam ${e}</span></div>`;
+    }
+  });
+  document.getElementById('selectedItemsList').innerHTML = html;
+  document.getElementById('bulkAmountWrap').style.display = action==='reset'?'none':'block';
+  if (action !== 'reset') document.getElementById('bulkAmount').value = 1;
+  document.getElementById('bulkModal').classList.add('show');
+}
+
+function closeBulkModal() { document.getElementById('bulkModal').classList.remove('show'); }
+
+async function confirmBulkAction() {
+  if (_isProcessing) return;
+  _isProcessing = true;
+  const btn = document.getElementById('bulkConfirmBtn'), orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  const items = Array.from(_selectedItems).map(k => {
+    const [s,e] = k.split('-'); return {student_id:s, exam_id:e};
+  });
+  try {
+    const r = await fetch("{{ url_for('admin.attempts_bulk_modify') }}", {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        items, action: _currentBulkAction,
+        amount: parseInt(document.getElementById('bulkAmount').value || 1)
+      })
+    });
+    const d = await r.json();
+    if (d.success) {
+      toast(`Done! ${d.processed} processed.`, 'success');
+      closeBulkModal();
+      clearAllSelections();
+      fetchAttempts(_page);   // reload — no full page reload
+    } else {
+      toast(d.message || 'Failed', 'danger');
+      btn.innerHTML = orig; btn.disabled = false; _isProcessing = false;
+    }
+  } catch {
+    toast('Network error', 'danger');
+    btn.innerHTML = orig; btn.disabled = false; _isProcessing = false;
+  } finally {
+    _isProcessing = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════ */
+function toast(msg, type='info') {
+  const icons  = {success:'fa-check-circle', danger:'fa-exclamation-circle', info:'fa-info-circle'};
+  const colors = {success:'#10b981', danger:'#ef4444', info:'var(--accent)'};
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.innerHTML = `<i class="fas ${icons[type]||icons.info}" style="color:${colors[type]||colors.info}"></i><span>${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ═══════════════════════════════════════════════
+   KEYBOARD & CLICK-OUTSIDE
+═══════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeBulkModal(); }
+});
+document.getElementById('actionModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.getElementById('bulkModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeBulkModal();
+});
+</script>
+{% endblock %}

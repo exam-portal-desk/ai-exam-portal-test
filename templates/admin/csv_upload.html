@@ -1,0 +1,736 @@
+{# ═══════════════════════════════════════════════════════════════════════════
+   csv_upload.html  —  Jinja2 partial (NO extends / block)
+   Location : templates/admin/csv_upload.html
+   Usage    : {% include 'admin/csv_upload.html' %} on any page
+   ═══════════════════════════════════════════════════════════════════════════ #}
+
+<!-- ── CSV Uploader Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="csvUploaderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen">
+    <div class="modal-content" style="background:var(--bg);">
+
+      <div class="modal-header" style="background:var(--accent);border:none;padding:1.1rem 1.5rem;">
+        <div class="d-flex align-items-center gap-3">
+          <div style="width:40px;height:40px;background:rgba(255,255,255,0.18);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-file-csv" style="color:white;font-size:1.2rem;"></i>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold text-white mb-0">CSV Upload &amp; Editor</h5>
+            <small style="color:rgba(255,255,255,0.72);">Parse → Preview → Edit → Save to Database</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body p-4" style="background:var(--bg);">
+
+        <!-- Step 1: Upload -->
+        <div id="csvStep1">
+          <div class="row justify-content-center">
+            <div class="col-lg-6">
+              <div class="card">
+                <div class="card-body p-4">
+                  <h5 class="fw-bold mb-1" style="color:var(--text-primary)">Upload your CSV file</h5>
+                  <p class="mb-4" style="font-size:0.82rem;color:var(--text-muted)">
+                    Required columns:
+                    <code style="background:var(--input-bg);color:var(--accent);padding:2px 5px;border-radius:4px;font-size:0.78rem;">exam_id, question_text, option_a–d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance</code>
+                  </p>
+
+                  <div id="csvDropZone"
+                       onclick="document.getElementById('csvFileInput').click()"
+                       ondragover="csvDragOver(event)"
+                       ondragleave="csvDragLeave(event)"
+                       ondrop="csvDrop(event)"
+                       style="border:2px dashed var(--input-border);border-radius:12px;padding:2.25rem;text-align:center;cursor:pointer;background:var(--input-bg);transition:all .2s;">
+                    <i class="fas fa-cloud-upload-alt" style="font-size:2.2rem;color:var(--accent);margin-bottom:.6rem;display:block;"></i>
+                    <div class="fw-semibold" style="color:var(--text-primary);">Drop CSV here or <span style="color:var(--accent);">browse</span></div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;" id="csvFileName">No file selected</div>
+                  </div>
+                  <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="csvFileSelected(this)">
+
+                  <div class="d-flex align-items-center gap-2 my-4">
+                    <hr style="flex:1;border-color:var(--card-border);">
+                    <span style="font-size:0.78rem;color:var(--text-muted);">or</span>
+                    <hr style="flex:1;border-color:var(--card-border);">
+                  </div>
+
+                  <div class="d-flex align-items-center justify-content-between p-3 rounded-3" style="background:var(--input-bg);border:1px solid var(--input-border);">
+                    <div>
+                      <div class="fw-semibold" style="font-size:0.85rem;color:var(--text-primary);">Need a template?</div>
+                      <div style="font-size:0.78rem;color:var(--text-muted);">Download a pre-filled sample CSV</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="csvDownloadSample()">
+                      <i class="fas fa-download me-1"></i>Sample CSV
+                    </button>
+                  </div>
+
+                  <button class="btn btn-primary w-100 mt-4" onclick="csvParse()">
+                    <i class="fas fa-table me-2"></i>Parse &amp; Preview
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /Step1 -->
+
+        <!-- Step 2: Preview/Edit -->
+        <div id="csvStep2" style="display:none;">
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-3">
+              <button class="btn btn-secondary btn-sm" onclick="csvBackToUpload()">
+                <i class="fas fa-arrow-left me-1"></i>Back
+              </button>
+              <span class="fw-bold" style="font-size:1rem;color:var(--text-primary);">
+                <i class="fas fa-list-ol me-2" style="color:var(--accent)"></i>
+                <span id="csvQCount">0</span> questions
+              </span>
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <div class="dropdown">
+                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-text-height me-1"></i>Global Size
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="#" onclick="csvApplyGlobalSize('small');return false;">Small</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="csvApplyGlobalSize('normalsize');return false;">Normal</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="csvApplyGlobalSize('large');return false;">Large</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="csvApplyGlobalSize('Large');return false;">Extra Large</a></li>
+                </ul>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="csvRenderAll()" title="Render all cards to MathJax view">
+                <i class="fas fa-calculator me-1"></i>Render All
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="csvRawAll()" title="Show raw LaTeX for all cards">
+                <i class="fas fa-code me-1"></i>Raw All
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="csvExport()">
+                <i class="fas fa-file-export me-1"></i>Export CSV
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="csvConfirmSave()">
+                <i class="fas fa-database me-1"></i>Save to DB
+              </button>
+            </div>
+          </div>
+          <div id="csvCardList"></div>
+        </div><!-- /Step2 -->
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Modals & Toast for CSV Upload -->
+
+<!-- Toast Container -->
+<div id="csvToastContainer" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:19999;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none;"></div>
+
+<!-- Confirm Save Modal -->
+<div id="csvConfirmModal" style="display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card-bg,#1e1e2e);border-radius:18px;padding:2rem;max-width:420px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.5);animation:csvModalIn 0.22s cubic-bezier(.34,1.56,.64,1)">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.5rem;">
+      <i class="fas fa-database" style="color:#10b981"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;font-size:1.1rem;font-weight:700;color:var(--text-primary)">Confirm Save to Database</h3>
+    <p style="text-align:center;margin:0 0 1.25rem;color:var(--text-muted);font-size:0.85rem;line-height:1.6">
+      You are about to save <strong id="csvConfirmCount" style="color:#10b981">0</strong> questions to the database.<br>
+      <small style="color:var(--text-muted)">This action cannot be undone.</small>
+    </p>
+    <div style="display:flex;gap:0.75rem">
+      <button onclick="document.getElementById('csvConfirmModal').style.display='none'"
+        style="flex:1;padding:0.65rem;background:var(--btn-secondary-bg,#2a2a3a);color:var(--btn-secondary-color,#fff);border:1px solid var(--card-border,#333);border-radius:10px;font-weight:600;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-times me-1"></i>Cancel
+      </button>
+      <button onclick="csvSaveToDB()"
+        style="flex:1;padding:0.65rem;background:#10b981;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-database me-1"></i>Yes, Save All
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Confirm Modal -->
+<div id="csvExportModal" style="display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card-bg,#1e1e2e);border-radius:18px;padding:2rem;max-width:400px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.5);animation:csvModalIn 0.22s cubic-bezier(.34,1.56,.64,1)">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.5rem;">
+      <i class="fas fa-file-export" style="color:#3b82f6"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;font-size:1.05rem;font-weight:700;color:var(--text-primary)">Export CSV?</h3>
+    <p style="text-align:center;margin:0 0 1.25rem;color:var(--text-muted);font-size:0.84rem;line-height:1.6">
+      You are about to export <strong id="csvExportCount" style="color:#3b82f6">0</strong> questions.
+    </p>
+    <div style="display:flex;gap:0.75rem">
+      <button onclick="document.getElementById('csvExportModal').style.display='none'"
+        style="flex:1;padding:0.65rem;background:var(--btn-secondary-bg,#2a2a3a);color:var(--btn-secondary-color,#fff);border:1px solid var(--card-border,#333);border-radius:10px;font-weight:600;cursor:pointer;font-size:0.88rem;">
+        Cancel
+      </button>
+      <button onclick="csvExecuteExport()"
+        style="flex:1;padding:0.65rem;background:#3b82f6;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        Yes, Export
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Question Confirm Modal -->
+<div id="csvDeleteModal" style="display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card-bg,#1e1e2e);border-radius:18px;padding:2rem;max-width:380px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.5);animation:csvModalIn 0.22s cubic-bezier(.34,1.56,.64,1)">
+    <div style="width:52px;height:52px;border-radius:50%;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.4rem;">
+      <i class="fas fa-trash" style="color:#ef4444"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;font-size:1rem;font-weight:700;color:var(--text-primary)">Delete Question?</h3>
+    <p style="text-align:center;margin:0 0 1.25rem;color:var(--text-muted);font-size:0.84rem;line-height:1.5">
+      This question will be removed from the preview list.<br>
+      <small>You can still go back and re-upload the CSV.</small>
+    </p>
+    <div style="display:flex;gap:0.75rem">
+      <button onclick="document.getElementById('csvDeleteModal').style.display='none'"
+        style="flex:1;padding:0.65rem;background:var(--btn-secondary-bg,#2a2a3a);color:var(--btn-secondary-color,#fff);border:1px solid var(--card-border,#333);border-radius:10px;font-weight:600;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-times me-1"></i>Cancel
+      </button>
+      <button id="csvDeleteConfirmBtn" onclick="csvExecuteDelete()"
+        style="flex:1;padding:0.65rem;background:#ef4444;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-trash me-1"></i>Yes, Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Discard Changes Confirm Modal -->
+<div id="csvDiscardModal" style="display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card-bg,#1e1e2e);border-radius:18px;padding:2rem;max-width:380px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.5);animation:csvModalIn 0.22s cubic-bezier(.34,1.56,.64,1)">
+    <div style="width:52px;height:52px;border-radius:50%;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.4rem;">
+      <i class="fas fa-exclamation-triangle" style="color:#f59e0b"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;font-size:1rem;font-weight:700;color:var(--text-primary)">Discard All Changes?</h3>
+    <p style="text-align:center;margin:0 0 1.25rem;color:var(--text-muted);font-size:0.84rem;line-height:1.5">
+      All edits and parsed questions will be lost.<br>
+      <small>You will be taken back to the upload screen.</small>
+    </p>
+    <div style="display:flex;gap:0.75rem">
+      <button onclick="document.getElementById('csvDiscardModal').style.display='none'"
+        style="flex:1;padding:0.65rem;background:var(--btn-secondary-bg,#2a2a3a);color:var(--btn-secondary-color,#fff);border:1px solid var(--card-border,#333);border-radius:10px;font-weight:600;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-times me-1"></i>Keep Editing
+      </button>
+      <button onclick="csvExecuteDiscard()"
+        style="flex:1;padding:0.65rem;background:#f59e0b;color:#000;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-arrow-left me-1"></i>Yes, Go Back
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes csvModalIn { from{opacity:0;transform:scale(0.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
+.csv-toast {
+  display:flex;align-items:flex-start;gap:0.7rem;
+  padding:0.85rem 1rem 0.85rem 1.1rem;
+  border-radius:10px;
+  font-size:0.82rem;font-weight:500;
+  color:#f1f5f9;
+  background:#1e2330;
+  border:1px solid #2d3448;
+  box-shadow:0 8px 32px rgba(0,0,0,0.45);
+  min-width:270px;max-width:360px;
+  pointer-events:all;
+  animation:csvToastIn 0.22s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes csvToastIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+.csv-toast.removing { animation:csvToastOut 0.2s ease forwards; }
+@keyframes csvToastOut { to{opacity:0;transform:translateX(40px)} }
+.csv-toast-success { border-left:3px solid #10b981; }
+.csv-toast-success .csv-ti { color:#10b981; }
+.csv-toast-danger  { border-left:3px solid #ef4444; }
+.csv-toast-danger  .csv-ti { color:#ef4444; }
+.csv-toast-warning { border-left:3px solid #f59e0b; }
+.csv-toast-warning .csv-ti { color:#f59e0b; }
+.csv-toast-title { font-weight:700;color:#f8fafc;font-size:0.83rem; }
+.csv-toast-detail { font-size:0.77rem;color:#94a3b8;font-weight:400;margin-top:2px; }
+.csv-toast-close { margin-left:auto;background:none;border:none;color:#64748b;cursor:pointer;font-size:0.78rem;padding:0;flex-shrink:0;transition:color .15s; }
+.csv-toast-close:hover { color:#f1f5f9; }
+</style>
+
+<style>
+.csv-q-card {
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-left:3px solid var(--accent);
+  border-radius:10px; padding:1.1rem 1.25rem; margin-bottom:.75rem; transition:box-shadow .2s;
+}
+.csv-q-card:hover { box-shadow:var(--shadow); }
+
+.csv-rend-opt {
+  background:var(--input-bg); border:1px solid var(--input-border);
+  border-radius:7px; padding:7px 11px; margin-bottom:5px;
+  overflow-x:hidden; overflow-wrap:anywhere; word-break:break-word;
+  color:var(--text-primary);
+}
+
+.csv-latex {
+  display:inline;
+  width:auto;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.9;
+  color:var(--text-primary);
+}
+
+.csv-raw-code {
+  display:block; background:rgba(0,0,0,0.22); color:#a5b4fc;
+  padding:7px 10px; border-radius:6px; white-space:pre-wrap;
+  word-break:break-all; font-size:0.78rem; font-family:monospace;
+  border:1px solid var(--card-border);
+}
+[data-theme="light"] .csv-raw-code { background:#f1f5f9; color:#4338ca; }
+
+.csv-size-wrap {
+  display:flex; align-items:center; gap:0.35rem;
+  background:var(--input-bg); border:1px solid var(--input-border);
+  border-radius:7px; padding:2px 8px;
+}
+.csv-size-wrap select {
+  background:transparent; border:none; color:var(--text-secondary);
+  font-size:0.73rem; width:88px; cursor:pointer; outline:none;
+}
+
+#csvDropZone.drag-over { border-color:var(--accent); background:var(--accent-subtle); }
+
+.csv-badge-mcq     { background:rgba(16,185,129,0.12); color:#10b981; }
+.csv-badge-msq     { background:rgba(245,158,11,0.12);  color:#f59e0b; }
+.csv-badge-numeric { background:rgba(45,91,227,0.12);   color:#4f7ef7; }
+
+#csvUploaderModal mjx-container {
+  display:inline !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  max-width:100% !important;
+  margin:0 !important;
+  text-align:left !important;
+}
+.csv-latex mjx-container {
+  display:inline !important;
+  margin:0 !important;
+  overflow:visible !important;
+  max-width:100% !important;
+}
+.csv-latex mjx-container[jax="CHTML"] {
+  display:inline !important;
+  text-align:left !important;
+}
+.csv-latex mjx-math { white-space:normal !important; }
+</style>
+
+<script>
+(function(){
+  let _csvRows  = [];
+  let _csvConfirm = null;
+
+  // Toast helper
+  function csvToast(msg, type, detail) {
+    const icons = {success:'fa-check-circle', danger:'fa-times-circle', warning:'fa-exclamation-triangle'};
+    const el = document.createElement('div');
+    el.className = 'csv-toast csv-toast-' + type;
+    el.innerHTML = '<i class="fas '+(icons[type]||'fa-info-circle')+' csv-ti" style="flex-shrink:0;margin-top:1px;font-size:0.95rem"></i>'
+      + '<div style="flex:1"><div class="csv-toast-title">'+msg+'</div>'
+      + (detail ? '<div class="csv-toast-detail">'+detail+'</div>' : '')
+      + '</div>'
+      + '<button class="csv-toast-close" onclick="csvRemoveToast(this.parentElement)"><i class="fas fa-times"></i></button>';
+    document.getElementById('csvToastContainer').appendChild(el);
+    setTimeout(() => csvRemoveToast(el), 5000);
+  }
+  function csvRemoveToast(el) {
+    if (!el || el._r) return; el._r = true;
+    el.classList.add('removing'); setTimeout(() => el.remove(), 220);
+  }
+
+  window.csvDragOver=function(e){e.preventDefault();document.getElementById('csvDropZone').classList.add('drag-over');};
+  window.csvDragLeave=function(){document.getElementById('csvDropZone').classList.remove('drag-over');};
+  window.csvDrop=function(e){
+    e.preventDefault();
+    document.getElementById('csvDropZone').classList.remove('drag-over');
+    const file=e.dataTransfer.files[0];
+    if(file&&file.name.endsWith('.csv')){
+      const input=document.getElementById('csvFileInput');
+      const dt=new DataTransfer(); dt.items.add(file); input.files=dt.files;
+      _handleFile(file);
+    } else { csvToast('Please drop a .csv file', 'warning'); }
+  };
+
+  window.csvFileSelected=function(input){const file=input.files[0];if(file)_handleFile(file);};
+  function _handleFile(file){document.getElementById('csvFileName').textContent=file.name;}
+
+  window.csvDownloadSample=function(){
+    const hdr='exam_id,question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance';
+    const r1='1,"$\\\\large\\\\text{A particle moves with velocity }v$","$\\\\large\\\\text{10 m/s}$","$\\\\large\\\\text{20 m/s}$","$\\\\large\\\\text{30 m/s}$","$\\\\large\\\\text{40 m/s}$",B,MCQ,,4,1,0';
+    const r2='1,"$\\\\large\\\\text{Numeric: What is } 2+2?$","","","","",4,NUMERIC,,3,0,0.01';
+    _download(new Blob([[hdr,r1,r2].join('\n')],{type:'text/csv'}),'sample_questions.csv');
+  };
+
+  window.csvParse=function(){
+    const input=document.getElementById('csvFileInput');
+    const file=input.files[0];
+    if(!file){csvToast('Please select or drop a CSV file first.','warning');return;}
+    const reader=new FileReader();
+    reader.onload=function(e){
+      function _parseCSV(text){
+        const rows=[];let cur=[];let field='';let inQ=false;
+        for(let i=0;i<text.length;i++){
+          const ch=text[i];
+          if(ch==='"'){
+            if(inQ&&text[i+1]==='"'){field+='"';i++;}
+            else inQ=!inQ;
+          } else if(ch===','&&!inQ){cur.push(field.trim());field='';}
+          else if((ch==='\n'||ch==='\r')&&!inQ){
+            if(ch==='\r'&&text[i+1]==='\n')i++;
+            cur.push(field.trim());field='';
+            if(cur.some(f=>f!=''))rows.push(cur);
+            cur=[];
+          } else field+=ch;
+        }
+        if(field||cur.length){cur.push(field.trim());if(cur.some(f=>f!=''))rows.push(cur);}
+        return rows;
+      }
+      const rows=_parseCSV(e.target.result);
+      if(rows.length<2){csvToast('CSV has no data rows.','warning');return;}
+      const headers=rows[0].map(h=>h.trim());
+      const FIELDS=['exam_id','question_text','option_a','option_b','option_c','option_d',
+                    'correct_answer','question_type','image_path','positive_marks','negative_marks','tolerance'];
+      _csvRows=[];
+      for(let i=1;i<rows.length;i++){
+        const vals=rows[i];
+        const q={};
+        headers.forEach((h,idx)=>{if(h) q[h]=idx<vals.length?vals[idx]:''});
+        FIELDS.forEach(f=>{if(q[f]===undefined)q[f]='';});
+        if(!q.exam_id||!q.question_text)continue;
+        _csvRows.push(q);
+      }
+      if(!_csvRows.length){csvToast('No valid rows found.','warning','Check column headers match the required format.');return;}
+      document.getElementById('csvStep1').style.display='none';
+      document.getElementById('csvStep2').style.display='block';
+      _renderCards();
+    };
+    reader.readAsText(file);
+  };
+
+  function _parseRow(row){
+    const res=[];let cur='';let inQ=false;
+    for(const ch of row){
+      if(ch==='"'){inQ=!inQ;}
+      else if(ch===','&&!inQ){res.push(cur.trim());cur='';}
+      else cur+=ch;
+    }
+    res.push(cur.trim());return res;
+  }
+
+  function _renderCards(){
+    document.getElementById('csvQCount').textContent=_csvRows.length;
+    document.getElementById('csvCardList').innerHTML=_csvRows.map((q,i)=>_cardHTML(q,i)).join('');
+  }
+
+  function _cardHTML(q,i){
+    const isNum=q.question_type==='NUMERIC';
+    const badgeCls=q.question_type==='MCQ'?'csv-badge-mcq':q.question_type==='MSQ'?'csv-badge-msq':'csv-badge-numeric';
+    const pm=q.positive_marks||4, nm=q.negative_marks||1;
+
+    const rawOpts=!isNum?`
+      <div class="row g-2 mb-2">
+        <div class="col-6"><strong style="color:var(--text-muted);font-size:.78rem;">A)</strong> <code class="csv-raw-code">${_esc(q.option_a).replace(/\$/g,'&#36;')}</code></div>
+        <div class="col-6"><strong style="color:var(--text-muted);font-size:.78rem;">B)</strong> <code class="csv-raw-code">${_esc(q.option_b).replace(/\$/g,'&#36;')}</code></div>
+        <div class="col-6"><strong style="color:var(--text-muted);font-size:.78rem;">C)</strong> <code class="csv-raw-code">${_esc(q.option_c).replace(/\$/g,'&#36;')}</code></div>
+        <div class="col-6"><strong style="color:var(--text-muted);font-size:.78rem;">D)</strong> <code class="csv-raw-code">${_esc(q.option_d).replace(/\$/g,'&#36;')}</code></div>
+      </div>` : '';
+
+    const rendOpts=!isNum?`
+      <div class="mt-2">
+        <div class="csv-rend-opt"><strong style="color:#10b981;font-size:.78rem;">A)</strong> <span class="csv-latex" id="cropt-${i}-a">${q.option_a||''}</span></div>
+        <div class="csv-rend-opt"><strong style="color:#10b981;font-size:.78rem;">B)</strong> <span class="csv-latex" id="cropt-${i}-b">${q.option_b||''}</span></div>
+        <div class="csv-rend-opt"><strong style="color:#10b981;font-size:.78rem;">C)</strong> <span class="csv-latex" id="cropt-${i}-c">${q.option_c||''}</span></div>
+        <div class="csv-rend-opt"><strong style="color:#10b981;font-size:.78rem;">D)</strong> <span class="csv-latex" id="cropt-${i}-d">${q.option_d||''}</span></div>
+      </div>` : '';
+
+    const editOpts=!isNum?`
+      <div class="row g-2 mb-3">
+        <div class="col-6"><label class="form-label">A:</label><input class="form-control form-control-sm" id="ceoa-${i}" value="${_esc(q.option_a||'')}"></div>
+        <div class="col-6"><label class="form-label">B:</label><input class="form-control form-control-sm" id="ceob-${i}" value="${_esc(q.option_b||'')}"></div>
+        <div class="col-6"><label class="form-label">C:</label><input class="form-control form-control-sm" id="ceoc-${i}" value="${_esc(q.option_c||'')}"></div>
+        <div class="col-6"><label class="form-label">D:</label><input class="form-control form-control-sm" id="ceod-${i}" value="${_esc(q.option_d||'')}"></div>
+      </div>` : '';
+
+    return `
+    <div class="csv-q-card" id="ccard-${i}">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge rounded-pill px-3 py-1 ${badgeCls}" style="font-size:.72rem;">${q.question_type}</span>
+          <span class="badge" style="background:var(--input-bg);border:1px solid var(--card-border);color:var(--text-secondary);font-size:.72rem;">+${pm} / -${nm}</span>
+          <small style="color:var(--text-muted)">Exam ID: ${q.exam_id}</small>
+          <div class="csv-size-wrap">
+            <i class="fas fa-text-height" style="color:var(--accent);font-size:.68rem;"></i>
+            <select onchange="csvChangeSize(${i},this.value)">
+              <option value="" disabled selected>LaTeX Size</option>
+              <option value="small">Small</option>
+              <option value="normalsize">Normal</option>
+              <option value="large">Large</option>
+              <option value="Large">Extra Large</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-secondary" id="ctbtn-${i}" onclick="csvToggleView(${i})">
+            <i class="fas fa-eye"></i> Rendered
+          </button>
+          <button class="btn btn-secondary" onclick="csvEditCard(${i})">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button class="btn" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);" onclick="csvDeleteCard(${i})">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <p class="fw-bold mb-2" style="font-size:0.78rem;color:var(--accent);">Question ${i+1}</p>
+
+      <div id="craw-${i}">
+        <div class="mb-2">
+          <p class="mb-1" style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">QUESTION TEXT</p>
+          <code class="csv-raw-code">${_esc(q.question_text).replace(/\$/g,'&#36;')}</code>
+        </div>
+        ${rawOpts}
+      </div>
+
+      <div id="crend-${i}" style="display:none;background:var(--input-bg);border:1px solid var(--input-border);border-radius:8px;padding:.9rem;">
+        <p class="mb-1" style="font-size:0.72rem;color:var(--accent);font-weight:600;">QUESTION</p>
+        <div class="csv-latex" id="crq-${i}">${q.question_text}</div>
+        ${rendOpts}
+      </div>
+
+      <div id="cedit-${i}" style="display:none;">
+        <div class="mb-3">
+          <label class="form-label">Question Text:</label>
+          <textarea class="form-control form-control-sm" id="ceq-${i}" rows="3">${_esc(q.question_text)}</textarea>
+        </div>
+        ${editOpts}
+        <div class="row g-2 mb-3">
+          <div class="col-4"><label class="form-label">Correct Answer:</label><input class="form-control form-control-sm" id="ceoa-ans-${i}" value="${_esc(q.correct_answer)}"></div>
+          <div class="col-2"><label class="form-label">+Marks:</label><input type="number" step="0.5" class="form-control form-control-sm" id="cepm-${i}" value="${pm}"></div>
+          <div class="col-2"><label class="form-label">-Marks:</label><input type="number" step="0.5" class="form-control form-control-sm" id="cenm-${i}" value="${nm}"></div>
+          <div class="col-2"><label class="form-label">Tolerance:</label><input type="number" step="0.01" class="form-control form-control-sm" id="cetol-${i}" value="${q.tolerance||0}"></div>
+          <div class="col-2"><label class="form-label">Image Path:</label><input class="form-control form-control-sm" id="ceimg-${i}" value="${_esc(q.image_path||'')}"></div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary btn-sm" onclick="csvSaveEdit(${i})"><i class="fas fa-save me-1"></i>Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="csvCancelEdit(${i})">Cancel</button>
+        </div>
+      </div>
+
+      <div class="mt-3" style="font-size:0.82rem;color:#10b981;font-weight:600;">
+        <i class="fas fa-check-circle me-1"></i>Answer: <span id="cans-${i}">${q.correct_answer}</span>
+      </div>
+    </div>`;
+  }
+
+  window.csvToggleView=function(i){
+    const raw=document.getElementById(`craw-${i}`);
+    const rend=document.getElementById(`crend-${i}`);
+    const btn=document.getElementById(`ctbtn-${i}`);
+    if(raw.style.display!=='none'){
+      raw.style.display='none'; rend.style.display='block';
+      btn.innerHTML='<i class="fas fa-code"></i> Raw';
+      if(window.MathJax) MathJax.typesetPromise([rend]).catch(()=>{});
+    } else {
+      raw.style.display='block'; rend.style.display='none';
+      btn.innerHTML='<i class="fas fa-eye"></i> Rendered';
+    }
+  };
+
+  window.csvEditCard=function(i){
+    document.getElementById(`craw-${i}`).style.display='none';
+    document.getElementById(`crend-${i}`).style.display='none';
+    document.getElementById(`cedit-${i}`).style.display='block';
+  };
+  window.csvCancelEdit=function(i){
+    document.getElementById(`craw-${i}`).style.display='block';
+    document.getElementById(`cedit-${i}`).style.display='none';
+  };
+  window.csvSaveEdit=function(i){
+    const q=_csvRows[i];
+    q.question_text=document.getElementById(`ceq-${i}`).value;
+    q.correct_answer=document.getElementById(`ceoa-ans-${i}`).value;
+    q.positive_marks=document.getElementById(`cepm-${i}`).value;
+    q.negative_marks=document.getElementById(`cenm-${i}`).value;
+    q.tolerance=document.getElementById(`cetol-${i}`).value;
+    q.image_path=document.getElementById(`ceimg-${i}`).value;
+    if(q.question_type!=='NUMERIC'){
+      q.option_a=document.getElementById(`ceoa-${i}`).value;
+      q.option_b=document.getElementById(`ceob-${i}`).value;
+      q.option_c=document.getElementById(`ceoc-${i}`).value;
+      q.option_d=document.getElementById(`ceod-${i}`).value;
+    }
+    _renderCards();
+  };
+  let _csvDeleteIdx = null;
+  window.csvDeleteCard=function(i){
+    _csvDeleteIdx = i;
+    document.getElementById('csvDeleteModal').style.display = 'flex';
+  };
+  window.csvExecuteDelete=function(){
+    document.getElementById('csvDeleteModal').style.display = 'none';
+
+    if(_csvDeleteIdx !== null){ 
+      _csvRows.splice(_csvDeleteIdx,1); 
+      _csvDeleteIdx=null; 
+      _renderCards();
+      csvToast('Question deleted', 'success', 'Removed from preview list');
+    }
+  };
+  window.csvBackToUpload=function(){
+    document.getElementById('csvDiscardModal').style.display = 'flex';
+  };
+  window.csvExecuteDiscard=function(){
+    document.getElementById('csvDiscardModal').style.display = 'none';
+    _csvRows=[];
+    document.getElementById('csvStep1').style.display='block';
+    document.getElementById('csvStep2').style.display='none';
+    document.getElementById('csvFileInput').value='';
+    document.getElementById('csvFileName').textContent='No file selected';
+  };
+
+  window.csvExport=function(){
+    if(!_csvRows.length){csvToast('Nothing to export.','warning');return;}
+    document.getElementById('csvExportCount').textContent=_csvRows.length;
+    document.getElementById('csvExportModal').style.display='flex';
+  };
+
+  window.csvExecuteExport=function(){
+    document.getElementById('csvExportModal').style.display='none';
+
+    const hdr='exam_id,question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance';
+    const rows=_csvRows.map(q=>[q.exam_id,`"${(q.question_text||'').replace(/"/g,'""')}"`,`"${(q.option_a||'').replace(/"/g,'""')}"`,`"${(q.option_b||'').replace(/"/g,'""')}"`,`"${(q.option_c||'').replace(/"/g,'""')}"`,`"${(q.option_d||'').replace(/"/g,'""')}"`,`"${(q.correct_answer||'').replace(/"/g,'""')}"`,`"${(q.question_type||'').replace(/"/g,'""')}"`,`"${(q.image_path||'').replace(/"/g,'""')}"`,q.positive_marks||4,q.negative_marks||1,q.tolerance||0].join(',')).join('\n');
+
+    _download(new Blob([hdr+'\n'+rows],{type:'text/csv'}),'edited_questions.csv');
+
+    csvToast('Export successful','success',`${_csvRows.length} questions exported`);
+  };
+
+  window.csvConfirmSave=function(){
+    if(!_csvRows.length){csvToast('No questions to save.','warning');return;}
+    document.getElementById('csvConfirmCount').textContent=_csvRows.length;
+    document.getElementById('csvConfirmModal').style.display='flex';
+  };
+
+  window.csvSaveToDB=async function(){
+    document.getElementById('csvConfirmModal').style.display='none';
+    const hdr='exam_id,question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance';
+    const rows=_csvRows.map(q=>[q.exam_id,`"${(q.question_text||'').replace(/"/g,'""')}"`,`"${(q.option_a||'').replace(/"/g,'""')}"`,`"${(q.option_b||'').replace(/"/g,'""')}"`,`"${(q.option_c||'').replace(/"/g,'""')}"`,`"${(q.option_d||'').replace(/"/g,'""')}"`,`"${(q.correct_answer||'').replace(/"/g,'""')}"`,`"${(q.question_type||'').replace(/"/g,'""')}"`,`"${(q.image_path||'').replace(/"/g,'""')}"`,q.positive_marks||4,q.negative_marks||1,q.tolerance||0].join(',')).join('\n');
+    const fd=new FormData();
+    fd.append('csv_file',new Blob([hdr+'\n'+rows],{type:'text/csv'}),'questions.csv');
+    try {
+      const res=await fetch('/admin/questions/import-csv',{method:'POST',body:fd});
+      const data=await res.json();
+      if(data.success){
+        csvToast(`Saved successfully!`, 'success', `Inserted: ${data.inserted} · Skipped: ${data.skipped}`);
+        setTimeout(()=>{
+          bootstrap.Modal.getInstance(document.getElementById('csvUploaderModal'))?.hide();
+          location.reload();
+        }, 1800);
+      } else {
+        csvToast('Save failed', 'danger', data.message || 'Unknown error');
+      }
+    } catch(err){
+      csvToast('Server error', 'danger', err.message);
+    }
+  };
+
+  window.addEventListener('beforeunload', function (e) {
+    if (typeof _csvRows !== 'undefined' && _csvRows.length > 0) {
+      e.preventDefault();
+      e.returnValue = 'Unsaved progress will be lost. Are you sure?';
+    }
+  });
+
+  function _applyLatexSize(text, sizeCmd) {
+    if (!text) return text;
+    // Match $$...$$ first (display math), then $...$ (inline math) — order matters
+    return text
+      .replace(/\$\$([\s\S]*?)\$\$/g, (match, content) => {
+        let inner = content.trim().replace(/^\\(small|normalsize|large|Large|LARGE|huge|Huge)\s+/, '').trim();
+        return `$$\\${sizeCmd} ${inner}$$`;
+      })
+      .replace(/(?<!\$)\$(?!\$)([\s\S]*?)(?<!\$)\$(?!\$)/g, (match, content) => {
+        let inner = content.trim().replace(/^\\(small|normalsize|large|Large|LARGE|huge|Huge)\s+/, '').trim();
+        return `$\\${sizeCmd} ${inner}$`;
+      });
+  }
+
+  window.csvChangeSize=function(i,size){
+    const q=_csvRows[i];
+    q.question_text=_applyLatexSize(q.question_text,size);
+    if(q.question_type!=='NUMERIC'){
+      q.option_a=_applyLatexSize(q.option_a,size);
+      q.option_b=_applyLatexSize(q.option_b,size);
+      q.option_c=_applyLatexSize(q.option_c,size);
+      q.option_d=_applyLatexSize(q.option_d,size);
+    }
+    _renderCards();
+  };
+
+  // Global size change for all rows
+  window.csvApplyGlobalSize = function(size) {
+    if (!_csvRows || _csvRows.length === 0) return;
+    _csvRows.forEach((q) => {
+      q.question_text = _applyLatexSize(q.question_text, size);
+      if (q.question_type !== 'NUMERIC') {
+        ['option_a', 'option_b', 'option_c', 'option_d'].forEach(opt => {
+          if (q[opt]) q[opt] = _applyLatexSize(q[opt], size);
+        });
+      }
+    });
+    _renderCards();
+    csvToast(`LaTeX size updated`, 'success', `Applied \\${size} to all formulas across ${_csvRows.length} questions`);
+  };
+
+  // Global Render All — switch every card to rendered view and typeset MathJax
+  window.csvRenderAll = function() {
+    if (!_csvRows || !_csvRows.length) { csvToast('No questions to render.', 'warning'); return; }
+    let count = 0;
+    _csvRows.forEach((q, i) => {
+      const raw  = document.getElementById(`craw-${i}`);
+      const rend = document.getElementById(`crend-${i}`);
+      const btn  = document.getElementById(`ctbtn-${i}`);
+      if (raw && rend && raw.style.display !== 'none') {
+        raw.style.display  = 'none';
+        rend.style.display = 'block';
+        if (btn) btn.innerHTML = '<i class="fas fa-code"></i> Raw';
+        count++;
+      }
+    });
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      const container = document.getElementById('csvCardList');
+      MathJax.typesetPromise([container]).catch(err => console.error('MathJax Error:', err));
+    }
+    if (count > 0) csvToast('Render complete', 'success', `${count} question(s) rendered`);
+    else csvToast('Already rendered', 'warning', 'All cards are already in rendered view');
+  };
+
+  // Global Raw All — switch every card back to raw LaTeX code view
+  window.csvRawAll = function() {
+    if (!_csvRows || !_csvRows.length) { csvToast('No questions loaded.', 'warning'); return; }
+    let count = 0;
+    _csvRows.forEach((q, i) => {
+      const raw  = document.getElementById(`craw-${i}`);
+      const rend = document.getElementById(`crend-${i}`);
+      const btn  = document.getElementById(`ctbtn-${i}`);
+      if (raw && rend && rend.style.display !== 'none') {
+        rend.style.display = 'none';
+        raw.style.display  = 'block';
+        if (btn) btn.innerHTML = '<i class="fas fa-eye"></i> Rendered';
+        count++;
+      }
+    });
+    if (count > 0) csvToast('Raw view', 'success', `${count} question(s) switched to raw LaTeX`);
+    else csvToast('Already raw', 'warning', 'All cards are already in raw view');
+  };
+
+  function _esc(t){const d=document.createElement('div');d.textContent=t||'';return d.innerHTML;}
+  function _download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();URL.revokeObjectURL(a.href);document.body.removeChild(a);}
+
+})();
+</script>

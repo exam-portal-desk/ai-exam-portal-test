@@ -1,0 +1,1121 @@
+{% extends "admin_base.html" %}
+{% block title %}AI Command Centre{% endblock %}
+{% block content %}
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$']], packages: {'[+]': ['newcommand']} },
+  chtml: { scale:1, displayAlign:'left', displayIndent:'0', linebreaks:{automatic:true,width:"container"} },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+.page-top { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+.page-top h1 { font-size:clamp(1.3rem,3vw,1.65rem); font-weight:700; color:var(--text-primary); margin:0 0 0.25rem; }
+.page-top p  { color:var(--text-secondary); font-size:0.875rem; margin:0; }
+
+.status-badge {
+  display:inline-flex; align-items:center; gap:0.5rem;
+  padding:0.4rem 0.9rem;
+  background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.22);
+  border-radius:50px; color:#10b981; font-size:0.8rem; font-weight:600;
+}
+.status-dot { width:7px; height:7px; background:#10b981; border-radius:50%; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.2)} }
+
+/* ── Mode Cards ── */
+.ai-mode-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; margin-bottom:1.75rem; }
+@media(max-width:768px){ .ai-mode-grid { grid-template-columns:1fr; } }
+
+.ai-card {
+  background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px;
+  padding:1.75rem; cursor:pointer; transition:all 0.22s; position:relative; overflow:hidden;
+}
+.ai-card::after {
+  content:''; position:absolute; bottom:0; left:0; right:0; height:3px;
+  background:var(--accent); transform:scaleX(0); transition:transform 0.22s; border-radius:0 0 14px 14px;
+}
+.ai-card:hover { border-color:var(--accent-border); box-shadow:var(--shadow-hover); transform:translateY(-3px); }
+.ai-card:hover::after { transform:scaleX(1); }
+
+.mode-icon {
+  width:56px; height:56px; border-radius:14px;
+  background:var(--accent-subtle); border:1px solid var(--accent-border);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.4rem; color:var(--accent); margin-bottom:1.1rem;
+}
+.ai-card-title { font-size:1rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem; }
+.ai-card-desc  { color:var(--text-secondary); font-size:0.83rem; margin-bottom:1rem; line-height:1.5; }
+.ai-card-action { color:var(--accent); font-weight:600; font-size:0.8rem; display:flex; align-items:center; gap:0.4rem; }
+
+/* ── Preview Section ── */
+.preview-section { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:1.4rem; }
+
+.question-preview-card {
+  background:var(--input-bg); border:1px solid var(--card-border);
+  border-left:3px solid var(--accent);
+  border-radius:10px; padding:1.25rem; margin-bottom:1rem; transition:all 0.2s;
+}
+.question-preview-card:hover { border-color:var(--accent-border); box-shadow:var(--shadow); }
+
+/* ── Config Modal Sections ── */
+.config-section {
+  background:var(--input-bg); border:1px solid var(--input-border);
+  border-radius:10px; padding:1.25rem; margin-bottom:1.1rem;
+}
+.config-section-title {
+  font-size:0.72rem; font-weight:700; letter-spacing:0.08em;
+  text-transform:uppercase; color:var(--text-muted); margin-bottom:0.85rem;
+  display:flex; align-items:center; gap:0.4rem;
+}
+
+/* ── Type badges ── */
+.type-badge { display:inline-block; padding:0.2rem 0.65rem; border-radius:6px; font-size:0.72rem; font-weight:700; }
+.type-badge-mcq     { background:rgba(16,185,129,0.12); color:#10b981; }
+.type-badge-msq     { background:rgba(245,158,11,0.12); color:#f59e0b; }
+.type-badge-numeric { background:rgba(45,91,227,0.12);  color:#4f7ef7; }
+
+/* ── Rendered view box ── */
+.rendered-view-box {
+  display:none; background:var(--input-bg); border:1px solid var(--input-border);
+  border-radius:8px; padding:1rem; width:100%;
+  overflow-x:visible; overflow-wrap:break-word; word-break:break-word;
+  color:var(--text-primary);
+}
+.rendered-view-box * { max-width:100%; overflow-wrap:break-word; word-break:break-word; }
+.rendered-view-box mjx-container {
+  display:inline !important;
+  margin:0 !important;
+  overflow:visible !important;
+  max-width:100% !important;
+}
+.rendered-view-box mjx-container[jax="CHTML"] {
+  display:inline !important;
+  text-align:left !important;
+}
+
+.rendered-option {
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:7px; padding:9px 12px; margin-bottom:7px;
+  overflow-x:auto; overflow-wrap:break-word; word-break:break-word;
+  color:var(--text-primary);
+}
+
+/* ── Code block in raw view ── */
+.raw-code {
+  display:block; background:rgba(0,0,0,0.25); color:#a5b4fc;
+  padding:10px 12px; border-radius:7px; white-space:pre-wrap;
+  font-size:0.8rem; border:1px solid var(--card-border); font-family:monospace;
+}
+[data-theme="light"] .raw-code { background:#f1f5f9; color:#4338ca; }
+
+/* ── Size selector ── */
+.size-selector-wrap {
+  display:flex; align-items:center; gap:0.4rem;
+  background:var(--input-bg); border:1px solid var(--input-border);
+  border-radius:7px; padding:3px 8px;
+}
+.size-selector-wrap select {
+  background:transparent; border:none; color:var(--text-secondary);
+  font-size:0.75rem; width:90px; cursor:pointer; outline:none;
+}
+
+/* ── Dropdown theme-aware fix ── */
+.form-select {
+  background-color: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--input-border) !important;
+}
+.form-select:focus {
+  background-color: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: rgba(45,91,227,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(45,91,227,0.1) !important;
+}
+.form-select option {
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+}
+.form-select option:hover,
+.form-select option:checked {
+  background-color: var(--accent);
+  color: white;
+}
+
+/* ── Loading Overlay ── */
+#loadingOverlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(10,10,15,0.92);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  z-index:9999; align-items:center; justify-content:center;
+}
+.loading-card {
+  background:var(--card-bg); border:1px solid rgba(45,91,227,0.3);
+  border-radius:20px; padding:2.5rem 3rem; text-align:center; max-width:420px; width:90%;
+  box-shadow:0 30px 70px rgba(0,0,0,0.6);
+}
+.orbital-ring { position:relative; width:88px; height:88px; margin:0 auto 1.75rem; }
+.orbit { position:absolute; inset:0; border-radius:50%; border:2px solid transparent; }
+.orbit-1 { border-top-color:#6366f1; border-bottom-color:rgba(99,102,241,0.1); animation:orb 1.4s cubic-bezier(0.5,0,0.5,1) infinite; }
+.orbit-2 { inset:12px; border-left-color:#a855f7; border-right-color:rgba(168,85,247,0.1); animation:orb 1s linear infinite reverse; }
+.orbit-3 { inset:24px; border-top-color:#10b981; border-bottom-color:rgba(16,185,129,0.1); animation:orb 0.7s linear infinite; }
+.orbit-core { position:absolute; inset:36px; background:radial-gradient(circle,rgba(99,102,241,0.4),transparent); border-radius:50%; animation:corePulse 2s ease-in-out infinite; }
+@keyframes orb { to{transform:rotate(360deg)} }
+@keyframes corePulse { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.3);opacity:1} }
+
+.loading-title { font-size:1.15rem; font-weight:700; color:var(--text-primary); margin-bottom:0.25rem; }
+.loading-sub   { color:var(--text-muted); font-size:0.83rem; min-height:1.2em; }
+
+.ai-progress-wrap { width:100%; height:3px; background:var(--input-border); border-radius:99px; overflow:hidden; margin:1.25rem 0 1rem; }
+.ai-progress-bar  { height:100%; width:5%; background:linear-gradient(90deg,var(--accent),#a855f7,#10b981); border-radius:99px; animation:progressFlow 4s ease-in-out infinite; }
+@keyframes progressFlow { 0%{width:5%} 30%{width:45%} 65%{width:75%} 90%{width:90%} 100%{width:93%} }
+
+.loading-steps { display:flex; justify-content:center; gap:1rem; margin-top:1rem; }
+.loading-step  { display:flex; flex-direction:column; align-items:center; gap:4px; opacity:0.25; transition:opacity 0.4s; font-size:0.65rem; color:var(--text-muted); letter-spacing:0.06em; font-weight:700; }
+.loading-step.active { opacity:1; }
+.step-dot { width:6px; height:6px; border-radius:50%; background:var(--input-border); transition:background 0.4s, box-shadow 0.4s; }
+.loading-step.active .step-dot { background:#10b981; box-shadow:0 0 7px rgba(16,185,129,0.7); animation:dotBeat 0.9s ease-in-out infinite; }
+@keyframes dotBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.5)} }
+
+/* ── Toast ── */
+.acc-toast {
+  position:fixed; bottom:1.5rem; right:1.5rem; z-index:10000;
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:10px; padding:0.85rem 1.1rem; min-width:260px; max-width:380px;
+  box-shadow:var(--shadow-hover); display:flex; align-items:flex-start; gap:0.75rem;
+  animation:toastIn 0.25s ease; color:var(--text-primary); font-size:0.875rem;
+}
+.acc-toast.success { border-left:3px solid #10b981; }
+.acc-toast.error   { border-left:3px solid #ef4444; }
+.acc-toast.info    { border-left:3px solid var(--accent); }
+@keyframes toastIn { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+/* ── ACC Modals (Confirm / Success / Error) ── */
+.acc-modal-backdrop {
+  display:none; position:fixed; inset:0; z-index:10500;
+  background:rgba(0,0,0,0.55);
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;
+}
+.acc-modal-backdrop.show { display:flex; }
+.acc-modal-box {
+  background:var(--modal-bg); border:1px solid var(--card-border);
+  border-radius:16px; width:100%; max-width:420px;
+  box-shadow:0 24px 60px rgba(0,0,0,0.45);
+  animation:accModalIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  overflow:hidden;
+}
+@keyframes accModalIn {
+  from{opacity:0;transform:scale(0.92) translateY(12px)}
+  to  {opacity:1;transform:scale(1)    translateY(0)}
+}
+.acc-modal-icon-wrap {
+  display:flex; align-items:center; justify-content:center;
+  width:60px; height:60px; border-radius:50%; margin:0 auto 1rem;
+  font-size:1.6rem;
+}
+.acc-modal-icon-wrap.confirm { background:rgba(45,91,227,0.12); color:var(--accent); border:1px solid var(--accent-border); }
+.acc-modal-icon-wrap.success { background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.25); }
+.acc-modal-icon-wrap.error   { background:rgba(239,68,68,0.12);  color:#ef4444; border:1px solid rgba(239,68,68,0.22); }
+.acc-modal-icon-wrap.warning { background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.22); }
+.acc-modal-body {
+  padding:2rem 1.75rem 1.5rem; text-align:center;
+}
+.acc-modal-title {
+  font-size:1.05rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem;
+}
+.acc-modal-msg {
+  font-size:0.875rem; color:var(--text-secondary); line-height:1.55;
+}
+.acc-modal-footer {
+  padding:1rem 1.5rem 1.5rem; display:flex; gap:0.75rem; justify-content:center;
+}
+.acc-modal-footer .btn { min-width:110px; border-radius:9px; font-weight:600; }
+</style>
+
+<!-- Page Header -->
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-robot me-2" style="color:var(--accent)"></i>AI Command Centre</h1>
+    <p>Generate high-quality exam questions using Gemini 2.5 Flash AI</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <div class="status-badge"><span class="status-dot"></span>System Online</div>
+    <button class="btn btn-secondary btn-sm" onclick="openCSVUploaderModal()">
+      <i class="fas fa-file-csv me-1"></i>Upload CSV
+    </button>
+  </div>
+</div>
+
+<!-- Three Mode Cards -->
+<div class="ai-mode-grid">
+  <div class="ai-card" onclick="openModeModal('extract')">
+    <div class="mode-icon"><i class="fas fa-file-pdf"></i></div>
+    <h3 class="ai-card-title">Direct Extraction</h3>
+    <p class="ai-card-desc">Extract existing questions directly from PDF papers. Perfect for previous year questions.</p>
+    <div class="ai-card-action">Configure &amp; Generate <i class="fas fa-arrow-right"></i></div>
+  </div>
+  <div class="ai-card" onclick="openModeModal('mine')">
+    <div class="mode-icon"><i class="fas fa-brain"></i></div>
+    <h3 class="ai-card-title">Concept Mining</h3>
+    <p class="ai-card-desc">AI reads theory PDFs and generates new questions based on concepts using RAG technology.</p>
+    <div class="ai-card-action">Configure &amp; Generate <i class="fas fa-arrow-right"></i></div>
+  </div>
+  <div class="ai-card" onclick="openModeModal('pure')">
+    <div class="mode-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+    <h3 class="ai-card-title">Pure Generation</h3>
+    <p class="ai-card-desc">Generate questions directly from a topic name. No PDF required, just pure AI creativity.</p>
+    <div class="ai-card-action">Configure &amp; Generate <i class="fas fa-arrow-right"></i></div>
+  </div>
+</div>
+
+<!-- Preview Section -->
+<div id="previewSection" style="display:none;">
+  <div class="preview-section">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h3 class="fw-bold mb-0" style="font-size:1.1rem;">
+        <i class="fas fa-check-circle me-2" style="color:#10b981"></i>
+        Generated Questions (<span id="questionCount">0</span>)
+      </h3>
+<div class="d-flex gap-2 flex-wrap">
+  <div class="dropdown">
+    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+      <i class="fas fa-text-height me-1"></i>Global Size
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('small');return false;">Small</a></li>
+      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('normalsize');return false;">Normal</a></li>
+      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('large');return false;">Large</a></li>
+      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('Large');return false;">Extra Large</a></li>
+    </ul>
+  </div>
+
+  <button class="btn btn-secondary btn-sm" onclick="accRenderAll()">
+    <i class="fas fa-calculator me-1"></i>Render All
+  </button>
+
+  <button class="btn btn-secondary btn-sm" onclick="accRawAll()">
+    <i class="fas fa-code me-1"></i>Raw All
+  </button>
+
+  <button class="btn btn-secondary btn-sm" onclick="exportToCSV()">
+    <i class="fas fa-download me-1"></i>Export CSV
+  </button>
+
+  <button class="btn btn-primary btn-sm" onclick="saveToDatabase()">
+    <i class="fas fa-save me-1"></i>Save to Database
+  </button>
+</div>
+    </div>
+    <div id="questionsPreviewList"></div>
+  </div>
+</div>
+
+<!-- Configuration Modal -->
+<div class="modal fade" id="generationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="aiGenForm" enctype="multipart/form-data">
+        <input type="hidden" name="mode" id="modalMode">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle"><i class="fas fa-cog me-2"></i>Configuration Engine</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+          <div class="config-section">
+            <div class="config-section-title"><i class="fas fa-sliders-h"></i>Basic Configuration</div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Select Exam</label>
+                <select name="exam_id" class="form-select" required>
+                  <option value="">Choose exam...</option>
+                  {% for exam in exams %}
+                  <option value="{{ exam.id }}">{{ exam.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Difficulty Level</label>
+                <select name="difficulty" class="form-select">
+                  <option>Easy</option>
+                  <option selected>Medium</option>
+                  <option>Hard</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-section" id="pdfInputArea">
+            <div class="config-section-title"><i class="fas fa-file-pdf"></i>Upload PDF Document</div>
+            <input type="file" name="pdf_file" class="form-control" accept=".pdf">
+            <small class="text-muted mt-1 d-block">Upload your PDF containing questions or theory content</small>
+          </div>
+
+          <div class="config-section" id="topicInputArea" style="display:none;">
+            <div class="config-section-title"><i class="fas fa-lightbulb"></i>Enter Topic</div>
+            <input type="text" name="topic" id="topicInput" class="form-control" placeholder="e.g., Newton's Laws of Motion">
+            <small class="text-muted mt-1 d-block">Enter the topic for AI to generate questions</small>
+          </div>
+
+          <div class="config-section">
+            <div class="config-section-title"><i class="fas fa-list-ol"></i>Question Counts</div>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">MCQ (Single Correct)</label>
+                <input type="number" name="mcq_count" class="form-control" value="5" min="0">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">MSQ (Multiple Correct)</label>
+                <input type="number" name="msq_count" class="form-control" value="2" min="0">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">NUMERIC (Integer Answer)</label>
+                <input type="number" name="numeric_count" class="form-control" value="3" min="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="config-section">
+            <div class="config-section-title"><i class="fas fa-star"></i>Marking Scheme</div>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label" style="color:#10b981">MCQ: Positive Marks</label>
+                <input type="number" name="mcq_plus" class="form-control" value="4" step="0.5">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" style="color:#ef4444">MCQ: Negative Marks</label>
+                <input type="number" name="mcq_minus" class="form-control" value="1" step="0.5">
+              </div>
+              <div class="col-md-4"></div>
+              <div class="col-md-4">
+                <label class="form-label" style="color:#10b981">MSQ: Positive Marks</label>
+                <input type="number" name="msq_plus" class="form-control" value="4" step="0.5">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" style="color:#ef4444">MSQ: Negative Marks</label>
+                <input type="number" name="msq_minus" class="form-control" value="2" step="0.5">
+              </div>
+              <div class="col-md-4"></div>
+              <div class="col-md-4">
+                <label class="form-label" style="color:#10b981">NUMERIC: Positive Marks</label>
+                <input type="number" name="numeric_plus" class="form-control" value="3" step="0.5">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">NUMERIC: Tolerance</label>
+                <input type="number" name="numeric_tolerance" class="form-control" value="0.01" step="0.01">
+                <small class="text-muted">Acceptable error margin (e.g., 0.01)</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-section">
+            <div class="config-section-title"><i class="fas fa-comment-dots"></i>Custom Instructions (Optional)</div>
+            <textarea name="custom_instructions" class="form-control" rows="3"
+              placeholder="E.g., Focus more on Organic Chemistry reactions..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-rocket me-2"></i>Launch AI Engine
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay">
+  <div class="loading-card">
+    <div class="orbital-ring">
+      <div class="orbit orbit-1"></div>
+      <div class="orbit orbit-2"></div>
+      <div class="orbit orbit-3"></div>
+      <div class="orbit-core"></div>
+    </div>
+    <div class="loading-title">AI Engine Active</div>
+    <div class="loading-sub" id="loadingSubText">Initialising question generation...</div>
+    <div class="ai-progress-wrap"><div class="ai-progress-bar"></div></div>
+    <div class="loading-steps">
+      <div class="loading-step active" id="lstep-1"><div class="step-dot"></div><span>READING</span></div>
+      <div class="loading-step" id="lstep-2"><div class="step-dot"></div><span>ANALYSING</span></div>
+      <div class="loading-step" id="lstep-3"><div class="step-dot"></div><span>CRAFTING</span></div>
+      <div class="loading-step" id="lstep-4"><div class="step-dot"></div><span>VALIDATING</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACC Confirm Modal ── -->
+<div class="acc-modal-backdrop" id="accConfirmModal" role="dialog" aria-modal="true" aria-labelledby="accConfirmTitle">
+  <div class="acc-modal-box">
+    <div class="acc-modal-body">
+      <div class="acc-modal-icon-wrap confirm" id="accConfirmIcon">
+        <i class="fas fa-database"></i>
+      </div>
+      <div class="acc-modal-title" id="accConfirmTitle">Confirm Action</div>
+      <div class="acc-modal-msg" id="accConfirmMsg">Are you sure you want to proceed?</div>
+    </div>
+    <div class="acc-modal-footer">
+      <button class="btn btn-secondary" id="accConfirmCancelBtn" onclick="accModalClose('accConfirmModal')">
+        <i class="fas fa-times me-1"></i>Cancel
+      </button>
+      <button class="btn btn-primary" id="accConfirmOkBtn">
+        <i class="fas fa-check me-1"></i>Confirm
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACC Success Modal ── -->
+<div class="acc-modal-backdrop" id="accSuccessModal" role="dialog" aria-modal="true" aria-labelledby="accSuccessTitle">
+  <div class="acc-modal-box">
+    <div class="acc-modal-body">
+      <div class="acc-modal-icon-wrap success">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div class="acc-modal-title" id="accSuccessTitle">Success</div>
+      <div class="acc-modal-msg" id="accSuccessMsg">Operation completed successfully.</div>
+    </div>
+    <div class="acc-modal-footer">
+      <button class="btn btn-primary" onclick="accModalClose('accSuccessModal')">
+        <i class="fas fa-check me-1"></i>Done
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACC Error Modal ── -->
+<div class="acc-modal-backdrop" id="accErrorModal" role="dialog" aria-modal="true" aria-labelledby="accErrorTitle">
+  <div class="acc-modal-box">
+    <div class="acc-modal-body">
+      <div class="acc-modal-icon-wrap error">
+        <i class="fas fa-exclamation-circle"></i>
+      </div>
+      <div class="acc-modal-title" id="accErrorTitle">Operation Failed</div>
+      <div class="acc-modal-msg" id="accErrorMsg">Something went wrong. Please try again.</div>
+    </div>
+    <div class="acc-modal-footer">
+      <button class="btn btn-secondary" onclick="accModalClose('accErrorModal')">
+        <i class="fas fa-times me-1"></i>Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACC Delete Confirm Modal ── -->
+<div class="acc-modal-backdrop" id="accDeleteModal" role="dialog" aria-modal="true" aria-labelledby="accDeleteTitle">
+  <div class="acc-modal-box">
+    <div class="acc-modal-body">
+      <div class="acc-modal-icon-wrap warning">
+        <i class="fas fa-trash-alt"></i>
+      </div>
+      <div class="acc-modal-title" id="accDeleteTitle">Delete Question</div>
+      <div class="acc-modal-msg">Are you sure you want to remove this question? This cannot be undone.</div>
+    </div>
+    <div class="acc-modal-footer">
+      <button class="btn btn-secondary" onclick="accModalClose('accDeleteModal')">
+        <i class="fas fa-times me-1"></i>Cancel
+      </button>
+      <button class="btn" id="accDeleteOkBtn"
+        style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);min-width:110px;border-radius:9px;font-weight:600;">
+        <i class="fas fa-trash me-1"></i>Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACC Export Confirm Modal ── -->
+<div class="acc-modal-backdrop" id="accExportModal" role="dialog" aria-modal="true" aria-labelledby="accExportTitle">
+  <div class="acc-modal-box">
+    <div class="acc-modal-body">
+      <div class="acc-modal-icon-wrap" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.25);">
+        <i class="fas fa-file-export"></i>
+      </div>
+      <div class="acc-modal-title" id="accExportTitle">Export CSV?</div>
+      <div class="acc-modal-msg" id="accExportMsg">You are about to export <strong id="accExportCount" style="color:#3b82f6">0</strong> questions.</div>
+    </div>
+    <div class="acc-modal-footer">
+      <button class="btn btn-secondary" onclick="accModalClose('accExportModal')">
+        <i class="fas fa-times me-1"></i>Cancel
+      </button>
+      <button class="btn" id="accExportOkBtn"
+        style="background:#3b82f6;color:white;border:none;min-width:110px;border-radius:9px;font-weight:600;">
+        <i class="fas fa-download me-1"></i>Yes, Export
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let genModal;
+let generatedQuestions = [];
+let pendingURL = null;
+
+// 1. Intercept reload/close tab — show custom HTML modal instead of browser popup
+window.addEventListener('beforeunload', (e) => {
+    if (generatedQuestions.length > 0) {
+        e.preventDefault();
+        e.returnValue = ''; // Required for Chrome to trigger the event (shows browser default only as fallback)
+    }
+});
+
+// 2. Custom Exit Modal — uses acc-modal-backdrop .show class (matches existing modal system)
+const exitManager = {
+    el: () => document.getElementById('exitConfirmModal'),
+    show: (url) => {
+        pendingURL = url;
+        exitManager.el().classList.add('show');
+    },
+    hide: () => {
+        exitManager.el().classList.remove('show');
+        pendingURL = null;
+    }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modalEl = document.getElementById('generationModal');
+    if (modalEl) genModal = new bootstrap.Modal(modalEl);
+
+    // Intercept all clicks on the page for navigation
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (link && generatedQuestions.length > 0) {
+            const url = link.getAttribute('href');
+            // Skip: hash links, modal links, blob/data URLs (programmatic downloads), and links not in DOM nav
+            if (
+                url &&
+                !url.startsWith('#') &&
+                !url.startsWith('blob:') &&
+                !url.startsWith('data:') &&
+                !link.closest('#exitConfirmModal') &&
+                !link.hasAttribute('download')
+            ) {
+                e.preventDefault();
+                exitManager.show(url);
+            }
+        }
+    });
+
+    // Modal Button Handlers
+    document.getElementById('confirmExit').onclick = () => exitManager.hide(); // "Keep Editing"
+    document.getElementById('cancelExit').onclick = () => { // "Discard Changes"
+        generatedQuestions = []; // Reset array to bypass beforeunload
+        if (pendingURL) window.location.href = pendingURL;
+        else exitManager.hide();
+    };
+});
+function openModeModal(mode) {
+  if (!genModal) { showToast('Page not ready — please refresh.', 'error'); return; }
+  document.getElementById('modalMode').value = mode;
+  document.getElementById('modalTitle').innerHTML =
+    '<i class="fas fa-cog me-2"></i>' +
+    {extract:'Direct Extraction',mine:'Concept Mining',pure:'Pure Generation'}[mode] + ' Configuration';
+  document.getElementById('pdfInputArea').style.display   = mode === 'pure' ? 'none' : 'block';
+  document.getElementById('topicInputArea').style.display = mode === 'pure' ? 'block' : 'none';
+  genModal.show();
+}
+
+document.getElementById('aiGenForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const mode = document.getElementById('modalMode').value;
+  const formData = new FormData(e.target);
+  if (mode === 'pure' && !formData.get('topic')?.trim()) {
+    showToast('Topic Required — please enter a topic for Pure Generation.', 'error'); return;
+  }
+  genModal.hide();
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  startLoadingAnimation();
+  try {
+    const res  = await fetch('/admin/ai-command-centre/generate', {method:'POST', body:formData});
+    const data = await res.json();
+    stopLoadingAnimation();
+    document.getElementById('loadingOverlay').style.display = 'none';
+    if (data.success) {
+      generatedQuestions = data.questions;
+      renderPreview();
+      document.getElementById('previewSection').style.display = 'block';
+      showToast(`Generated ${data.count} questions successfully!`, 'success');
+      document.getElementById('previewSection').scrollIntoView({behavior:'smooth'});
+    } else {
+      showToast('Generation Failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+  } catch {
+    stopLoadingAnimation();
+    document.getElementById('loadingOverlay').style.display = 'none';
+    showToast('Could not connect to server.', 'error');
+  }
+};
+
+function applyLatexSize(text, sizeCmd) {
+    if (!text) return text;
+    // Match $$...$$ first (display math), then $...$ (inline math) — order matters
+    return text
+      .replace(/\$\$([\s\S]*?)\$\$/g, (match, content) => {
+        let inner = content.trim().replace(/^\\(small|normalsize|large|Large|LARGE|huge|Huge)\s+/, '').trim();
+        return `$$\\${sizeCmd} ${inner}$$`;
+      })
+      .replace(/(?<!\$)\$(?!\$)([\s\S]*?)(?<!\$)\$(?!\$)/g, (match, content) => {
+        let inner = content.trim().replace(/^\\(small|normalsize|large|Large|LARGE|huge|Huge)\s+/, '').trim();
+        return `$\\${sizeCmd} ${inner}$`;
+      });
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+}
+
+function renderPreview() {
+  const list = document.getElementById('questionsPreviewList');
+  document.getElementById('questionCount').textContent = generatedQuestions.length;
+  list.innerHTML = generatedQuestions.map((q, i) => {
+    const typeBadgeClass = q.question_type==='MCQ'?'type-badge-mcq':q.question_type==='MSQ'?'type-badge-msq':'type-badge-numeric';
+    const optionsRaw = q.question_type !== 'NUMERIC' ? `
+      <div class="row g-2 mb-3">
+        <div class="col-6"><strong style="color:var(--text-secondary)">A)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_a)}</code></div>
+        <div class="col-6"><strong style="color:var(--text-secondary)">B)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_b)}</code></div>
+        <div class="col-6"><strong style="color:var(--text-secondary)">C)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_c)}</code></div>
+        <div class="col-6"><strong style="color:var(--text-secondary)">D)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_d)}</code></div>
+      </div>` : '';
+    const optionsRendered = q.question_type !== 'NUMERIC' ? `
+      <div class="row g-2 mb-2">
+        <div class="col-6"><div class="rendered-option"><strong style="color:#10b981">A)</strong> <span id="ropt-${i}-a">${q.option_a}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:#10b981">B)</strong> <span id="ropt-${i}-b">${q.option_b}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:#10b981">C)</strong> <span id="ropt-${i}-c">${q.option_c}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:#10b981">D)</strong> <span id="ropt-${i}-d">${q.option_d}</span></div></div>
+      </div>` : '';
+    const optionsEdit = q.question_type !== 'NUMERIC' ? `
+      <div class="row g-2 mb-3">
+        <div class="col-6"><label class="form-label">Option A:</label><input type="text" class="form-control" id="edit-opt-a-${i}" value="${escapeHtml(q.option_a)}"></div>
+        <div class="col-6"><label class="form-label">Option B:</label><input type="text" class="form-control" id="edit-opt-b-${i}" value="${escapeHtml(q.option_b)}"></div>
+        <div class="col-6"><label class="form-label">Option C:</label><input type="text" class="form-control" id="edit-opt-c-${i}" value="${escapeHtml(q.option_c)}"></div>
+        <div class="col-6"><label class="form-label">Option D:</label><input type="text" class="form-control" id="edit-opt-d-${i}" value="${escapeHtml(q.option_d)}"></div>
+      </div>` : '';
+
+    return `
+    <div class="question-preview-card" id="card-${i}">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <span class="type-badge ${typeBadgeClass}">${q.question_type}</span>
+          <span class="badge" style="background:var(--input-bg);border:1px solid var(--card-border);color:var(--text-secondary);font-size:0.72rem;">+${q.positive_marks} / -${q.negative_marks}</span>
+          <div class="size-selector-wrap">
+            <i class="fas fa-text-height" style="color:var(--accent);font-size:0.7rem;"></i>
+            <select onchange="changeSize(${i}, this.value)">
+              <option value="" disabled selected>LaTeX Size</option>
+              <option value="small">Small</option>
+              <option value="normalsize">Normal</option>
+              <option value="large">Large</option>
+              <option value="Large">Extra Large</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-secondary" id="toggle-btn-${i}" onclick="toggleView(${i})">
+            <i class="fas fa-eye"></i> Rendered
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="editQuestion(${i})">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);" onclick="deleteQuestion(${i})">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <p class="fw-bold mb-2" style="font-size:0.8rem;color:var(--accent);">Question ${i+1}</p>
+
+      <div id="raw-view-${i}">
+        <div class="mb-3">
+          <p class="mb-1" style="font-size:0.78rem;color:var(--text-muted);font-weight:600;">QUESTION TEXT</p>
+          <code class="raw-code">${escapeHtml(q.question_text)}</code>
+        </div>
+        ${optionsRaw}
+      </div>
+
+      <div id="rendered-view-${i}" class="rendered-view-box">
+        <p class="mb-1" style="font-size:0.78rem;color:var(--accent);font-weight:600;">QUESTION</p>
+        <div style="margin-top:6px;line-height:1.9;overflow-wrap:break-word;" id="rq-${i}">${q.question_text}</div>
+        ${optionsRendered}
+      </div>
+
+      <div id="edit-mode-${i}" style="display:none;">
+        <div class="mb-3">
+          <label class="form-label">Question Text:</label>
+          <textarea class="form-control" id="edit-q-text-${i}" rows="3">${escapeHtml(q.question_text)}</textarea>
+        </div>
+        ${optionsEdit}
+        <div class="mb-3">
+          <label class="form-label">Correct Answer:</label>
+          <input type="text" class="form-control" id="edit-ans-${i}" value="${escapeHtml(q.correct_answer)}">
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary btn-sm" onclick="saveEdit(${i})"><i class="fas fa-save me-1"></i>Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="cancelEdit(${i})"><i class="fas fa-times me-1"></i>Cancel</button>
+        </div>
+      </div>
+
+      <div class="mt-3" style="font-size:0.83rem;color:#10b981;font-weight:600;">
+        <i class="fas fa-check-circle me-1"></i>Correct Answer: <span id="answer-${i}">${escapeHtml(q.correct_answer)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function accApplyGlobalSize(size){
+  if(!generatedQuestions || !generatedQuestions.length) return;
+
+  generatedQuestions.forEach(q=>{
+    q.question_text = applyLatexSize(q.question_text, size);
+
+    if(q.question_type !== 'NUMERIC'){
+      ['option_a','option_b','option_c','option_d'].forEach(opt=>{
+        if(q[opt]) q[opt] = applyLatexSize(q[opt], size);
+      });
+    }
+  });
+
+  renderPreview();
+  showToast(`LaTeX size updated`, 'success');
+}
+
+function accRenderAll(){
+  if (!generatedQuestions || !generatedQuestions.length) { showToast('No questions to render.', 'error'); return; }
+  let count = 0;
+  generatedQuestions.forEach((q, i) => {
+    const raw  = document.getElementById(`raw-view-${i}`);
+    const rend = document.getElementById(`rendered-view-${i}`);
+    const btn  = document.getElementById(`toggle-btn-${i}`);
+    if (raw && rend && raw.style.display !== 'none') {
+      raw.style.display  = 'none';
+      rend.style.display = 'block';
+      if (btn) btn.innerHTML = '<i class="fas fa-code"></i> Raw LaTeX';
+      count++;
+    }
+  });
+  if (window.MathJax && window.MathJax.typesetPromise) {
+    const container = document.getElementById('questionsPreviewList');
+    MathJax.typesetPromise([container]).catch(err => console.error('MathJax Error:', err));
+  }
+  if (count > 0) showToast(`Render complete — ${count} question(s) rendered`, 'success');
+  else showToast('Already rendered', 'info');
+}
+
+function accRawAll(){
+  if (!generatedQuestions || !generatedQuestions.length) { showToast('No questions loaded.', 'error'); return; }
+  let count = 0;
+  generatedQuestions.forEach((q, i) => {
+    const raw  = document.getElementById(`raw-view-${i}`);
+    const rend = document.getElementById(`rendered-view-${i}`);
+    const btn  = document.getElementById(`toggle-btn-${i}`);
+    if (raw && rend && rend.style.display !== 'none') {
+      rend.style.display = 'none';
+      raw.style.display  = 'block';
+      if (btn) btn.innerHTML = '<i class="fas fa-eye"></i> Rendered';
+      count++;
+    }
+  });
+  if (count > 0) showToast(`Raw view — ${count} question(s) switched to raw LaTeX`, 'success');
+  else showToast('Already in raw view', 'info');
+}
+
+function toggleView(index) {
+  const rawView = document.getElementById(`raw-view-${index}`);
+  const renderedView = document.getElementById(`rendered-view-${index}`);
+  const btn = document.getElementById(`toggle-btn-${index}`);
+  const isRaw = rawView.style.display !== 'none';
+  if (isRaw) {
+    rawView.style.display = 'none'; renderedView.style.display = 'block';
+    btn.innerHTML = '<i class="fas fa-code"></i> Raw LaTeX';
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([renderedView]).catch(()=>{});
+  } else {
+    rawView.style.display = 'block'; renderedView.style.display = 'none';
+    btn.innerHTML = '<i class="fas fa-eye"></i> Rendered';
+  }
+}
+
+function changeSize(index, sizeCmd) {
+  const q = generatedQuestions[index];
+  q.question_text = applyLatexSize(q.question_text, sizeCmd);
+  if (q.question_type !== 'NUMERIC') {
+    q.option_a = applyLatexSize(q.option_a, sizeCmd);
+    q.option_b = applyLatexSize(q.option_b, sizeCmd);
+    q.option_c = applyLatexSize(q.option_c, sizeCmd);
+    q.option_d = applyLatexSize(q.option_d, sizeCmd);
+  }
+  const rawQ = document.querySelector(`#raw-view-${index} code`);
+  if (rawQ) rawQ.textContent = q.question_text;
+  if (q.question_type !== 'NUMERIC') {
+    const rawOpts = document.querySelectorAll(`#raw-view-${index} code`);
+    const optKeys = ['option_a','option_b','option_c','option_d'];
+    rawOpts.forEach((el,i)=>{ if(i>0 && optKeys[i-1]) el.textContent = q[optKeys[i-1]]; });
+  }
+  const rq = document.getElementById(`rq-${index}`);
+  if (rq) {
+    rq.innerHTML = q.question_text;
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([rq]).catch(()=>{});
+  }
+  if (q.question_type !== 'NUMERIC') {
+    [['a',q.option_a],['b',q.option_b],['c',q.option_c],['d',q.option_d]].forEach(([letter,val])=>{
+      const el = document.getElementById(`ropt-${index}-${letter}`);
+      if (el) { el.innerHTML = val; if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([el]).catch(()=>{}); }
+    });
+  }
+}
+
+function editQuestion(index) {
+  document.getElementById(`raw-view-${index}`).style.display = 'none';
+  document.getElementById(`rendered-view-${index}`).style.display = 'none';
+  document.getElementById(`edit-mode-${index}`).style.display = 'block';
+}
+function cancelEdit(index) {
+  document.getElementById(`raw-view-${index}`).style.display = 'block';
+  document.getElementById(`edit-mode-${index}`).style.display = 'none';
+}
+function saveEdit(index) {
+  const q = generatedQuestions[index];
+  q.question_text = document.getElementById(`edit-q-text-${index}`).value;
+  if (q.question_type !== 'NUMERIC') {
+    q.option_a = document.getElementById(`edit-opt-a-${index}`).value;
+    q.option_b = document.getElementById(`edit-opt-b-${index}`).value;
+    q.option_c = document.getElementById(`edit-opt-c-${index}`).value;
+    q.option_d = document.getElementById(`edit-opt-d-${index}`).value;
+  }
+  q.correct_answer = document.getElementById(`edit-ans-${index}`).value;
+  renderPreview();
+  showToast(`Question ${index+1} updated successfully`, 'success');
+}
+function deleteQuestion(index) {
+  accShowConfirmDelete(() => {
+    generatedQuestions.splice(index, 1);
+    renderPreview();
+    showToast('Question removed', 'info');
+  });
+}
+
+async function saveToDatabase() {
+  if (!generatedQuestions.length) { showToast('No questions to save!', 'error'); return; }
+  accShowConfirm({
+    icon: 'fas fa-database',
+    iconType: 'confirm',
+    title: 'Save to Database',
+    msg: `Save <strong>${generatedQuestions.length} question${generatedQuestions.length !== 1 ? 's' : ''}</strong> to the database? This will permanently add them to the selected exam.`,
+    okLabel: '<i class="fas fa-save me-1"></i>Save',
+    onOk: async () => {
+      try {
+        const res = await fetch('/admin/ai-command-centre/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questions: generatedQuestions })
+        });
+        const data = await res.json();
+        if (data.success) {
+          accShowSuccess({
+            title: 'Saved Successfully',
+            msg: `<strong>${data.count} question${data.count !== 1 ? 's' : ''}</strong> have been saved to the database successfully.`,
+            onClose: () => location.reload()
+          });
+        } else {
+          accShowError({
+            title: 'Save Failed',
+            msg: data.message || 'An error occurred while saving questions. Please try again.'
+          });
+        }
+      } catch {
+        accShowError({
+          title: 'Server Error',
+          msg: 'Could not connect to the server. Please check your connection and try again.'
+        });
+      }
+    }
+  });
+}
+
+function exportToCSV() {
+  if (!generatedQuestions.length) { showToast('No questions to export!', 'error'); return; }
+  document.getElementById('accExportCount').textContent = generatedQuestions.length;
+  const okBtn = document.getElementById('accExportOkBtn');
+  okBtn.onclick = () => { accModalClose('accExportModal'); accExecuteExport(); };
+  document.getElementById('accExportModal').classList.add('show');
+}
+
+async function accExecuteExport() {
+  try {
+    const res = await fetch('/admin/ai-command-centre/export-csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questions: generatedQuestions })
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const examSelect = document.querySelector('select[name="exam_id"]');
+      const examName = examSelect.options[examSelect.selectedIndex].text
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      const now = new Date();
+      const dt = now.getFullYear()
+        + ('0'+(now.getMonth()+1)).slice(-2)
+        + ('0'+now.getDate()).slice(-2)
+        + '_' + ('0'+now.getHours()).slice(-2)
+        + ('0'+now.getMinutes()).slice(-2)
+        + ('0'+now.getSeconds()).slice(-2);
+      a.download = `ai_generated_questions_${examName}_${dt}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+      accShowSuccess({
+        title: 'Export Complete',
+        msg: `<strong>${generatedQuestions.length} question${generatedQuestions.length !== 1 ? 's' : ''}</strong> exported successfully as a CSV file.`
+      });
+    } else {
+      accShowError({
+        title: 'Export Failed',
+        msg: 'The export could not be completed. Please try again.'
+      });
+    }
+  } catch {
+    accShowError({
+      title: 'Server Error',
+      msg: 'Could not connect to the server. Please check your connection and try again.'
+    });
+  }
+}
+
+/* ── ACC Modal Controllers ── */
+function accModalClose(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+
+function accShowConfirm({ icon = 'fas fa-question-circle', iconType = 'confirm', title, msg, okLabel = '<i class="fas fa-check me-1"></i>Confirm', onOk }) {
+  document.getElementById('accConfirmIcon').className = `acc-modal-icon-wrap ${iconType}`;
+  document.getElementById('accConfirmIcon').innerHTML = `<i class="${icon}"></i>`;
+  document.getElementById('accConfirmTitle').textContent = title;
+  document.getElementById('accConfirmMsg').innerHTML = msg;
+  const okBtn = document.getElementById('accConfirmOkBtn');
+  okBtn.innerHTML = okLabel;
+  okBtn.onclick = () => {
+    accModalClose('accConfirmModal');
+    if (typeof onOk === 'function') onOk();
+  };
+  document.getElementById('accConfirmModal').classList.add('show');
+}
+
+function accShowConfirmDelete(onOk) {
+  const okBtn = document.getElementById('accDeleteOkBtn');
+  okBtn.onclick = () => {
+    accModalClose('accDeleteModal');
+    if (typeof onOk === 'function') onOk();
+  };
+  document.getElementById('accDeleteModal').classList.add('show');
+}
+
+function accShowSuccess({ title = 'Success', msg, onClose }) {
+  document.getElementById('accSuccessTitle').textContent = title;
+  document.getElementById('accSuccessMsg').innerHTML = msg;
+  const modal = document.getElementById('accSuccessModal');
+  const doneBtn = modal.querySelector('.btn-primary');
+  doneBtn.onclick = () => {
+    accModalClose('accSuccessModal');
+    if (typeof onClose === 'function') onClose();
+  };
+  modal.classList.add('show');
+}
+
+function accShowError({ title = 'Operation Failed', msg }) {
+  document.getElementById('accErrorTitle').textContent = title;
+  document.getElementById('accErrorMsg').innerHTML = msg;
+  document.getElementById('accErrorModal').classList.add('show');
+}
+
+// Close modal on backdrop click
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.acc-modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', function (e) {
+      if (e.target !== this) return;
+      if (this.id === 'exitConfirmModal') exitManager.hide(); // also resets pendingURL
+      else accModalClose(this.id);
+    });
+  });
+});
+
+function showToast(msg, type='info') {
+  const id = 'toast-' + Date.now();
+  const icon = type==='success'?'check-circle':type==='error'?'exclamation-circle':'info-circle';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="${id}" class="acc-toast ${type}">
+      <i class="fas fa-${icon}" style="color:${type==='success'?'#10b981':type==='error'?'#ef4444':'var(--accent)'};flex-shrink:0;margin-top:2px;"></i>
+      <div style="flex:1;font-size:0.85rem;">${msg}</div>
+      <button onclick="document.getElementById('${id}').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;padding:0;flex-shrink:0;">×</button>
+    </div>`);
+  setTimeout(()=>document.getElementById(id)?.remove(), 4000);
+}
+
+const _loadSteps = [
+  [1,'Reading and parsing PDF content...'],
+  [2,'Analysing concepts with RAG pipeline...'],
+  [3,'Crafting high-quality questions via Gemini...'],
+  [4,'Validating LaTeX and schema compliance...'],
+];
+let _loadTimer = null;
+
+function startLoadingAnimation() {
+  let idx = 0;
+  for (let i=1;i<=4;i++) document.getElementById(`lstep-${i}`)?.classList.remove('active');
+  document.getElementById('lstep-1')?.classList.add('active');
+  const sub = document.getElementById('loadingSubText');
+  if (sub) sub.textContent = _loadSteps[0][1];
+  _loadTimer = setInterval(()=>{
+    idx++;
+    if (idx >= _loadSteps.length) { clearInterval(_loadTimer); return; }
+    const [step, msg] = _loadSteps[idx];
+    document.getElementById(`lstep-${step-1}`)?.classList.remove('active');
+    document.getElementById(`lstep-${step}`)?.classList.add('active');
+    if (sub) sub.textContent = msg;
+  }, 2200);
+}
+function stopLoadingAnimation() {
+  if (_loadTimer) clearInterval(_loadTimer);
+  for (let i=1;i<=4;i++) document.getElementById(`lstep-${i}`)?.classList.remove('active');
+}
+</script>
+
+{% include 'admin/csv_upload.html' %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  window._csvModal = new bootstrap.Modal(document.getElementById('csvUploaderModal'));
+});
+function openCSVUploaderModal() {
+  if (window._csvModal) window._csvModal.show();
+}
+</script>
+
+<!-- Unsaved Progress / Exit Confirm Modal -->
+<div class="acc-modal-backdrop" id="exitConfirmModal" role="dialog" aria-modal="true" aria-labelledby="exitConfirmTitle">
+  <div class="acc-modal-box">
+    <div class="acc-modal-body">
+      <div class="acc-modal-icon-wrap warning">
+        <i class="fas fa-triangle-exclamation"></i>
+      </div>
+      <div class="acc-modal-title" id="exitConfirmTitle">Unsaved Progress</div>
+      <div class="acc-modal-msg">
+        You have generated questions that are not saved yet.<br>
+        If you leave now, all progress will be permanently lost.
+      </div>
+    </div>
+    <div class="acc-modal-footer" style="flex-direction:column; gap:0.6rem;">
+      <button id="confirmExit" class="btn btn-primary w-100" style="min-width:unset;">
+        <i class="fas fa-pen me-1"></i>Keep Editing
+      </button>
+      <button id="cancelExit" class="btn w-100"
+        style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.25);font-weight:600;border-radius:9px;min-width:unset;">
+        <i class="fas fa-sign-out-alt me-1"></i>Discard &amp; Leave
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}

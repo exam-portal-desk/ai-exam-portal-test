@@ -1,0 +1,1378 @@
+{% extends "base.html" %}
+
+{% block title %}Exam Response Analysis - ExamPortal{% endblock %}
+
+{% block content %}
+<style>
+:root{
+  --bg: #0a0a0f;
+  --card: #111118;
+  --border: rgba(255,255,255,0.07);
+  --accent: #2d5be3;
+  --accent-h: #3d6bf3;
+  --success: #059669;
+  --success-h: #10b981;
+  --danger: #ef4444;
+  --warning: #d97706;
+  --white: #ffffff;
+  --muted: rgba(255,255,255,0.7);
+  --muted-2: rgba(255,255,255,0.45);
+  --gold-1: #ffd166;
+  --gold-2: #ffb703;
+}
+
+html, body { background: var(--bg) !important; font-family: 'DM Sans', sans-serif !important; color: rgba(255,255,255,0.85); }
+
+.container.mt-4 { position: relative; z-index: 10; }
+
+/* ── Cards ── */
+.card {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--white);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.card .card-body { background: transparent; color: rgba(255,255,255,0.85); font-family: 'DM Sans', sans-serif; }
+.card h6 { color: #fff; font-weight: 600; font-family: 'DM Sans', sans-serif; }
+.card p { color: rgba(255,255,255,0.8); font-family: 'DM Sans', sans-serif; font-size: 0.95rem; line-height: 1.75; word-break: break-word; overflow-wrap: break-word; }
+
+/* ── Header card ── */
+.header-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  color: #fff;
+  padding: 1.2rem 1.4rem;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.header-card h3 { margin: 0; font-weight: 700; font-family: 'DM Serif Display', serif; font-size: 1.3rem; }
+.score-summary h4 { margin: 0; font-weight: 900; color: #fff; }
+.score-summary p { margin: 0; color: var(--muted); font-weight: 500; }
+
+/* ── Buttons ── */
+.btn {
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  transition: transform .15s ease, box-shadow .18s ease;
+  position: relative;
+  color: #fff !important;
+  padding: .4rem .85rem;
+  border: none;
+}
+.btn.btn-lg {
+  font-size: 0.82rem !important;
+  padding: .42rem .9rem !important;
+}
+.btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(45,91,227,0.2); }
+.btn::before { display: none; }
+
+.btn-primary-custom { background: var(--accent); box-shadow: 0 2px 8px rgba(45,91,227,0.25); }
+.btn-primary-custom:hover { background: var(--accent-h); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(45,91,227,0.35); }
+
+.btn-success-custom { background: var(--success); box-shadow: 0 2px 8px rgba(5,150,105,0.25); }
+.btn-success-custom:hover { background: var(--success-h); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(5,150,105,0.35); }
+
+.btn-danger-custom { background: #dc2626; box-shadow: 0 2px 8px rgba(220,38,38,0.25); }
+.btn-danger-custom:hover { background: #ef4444; transform: translateY(-1px); }
+
+.btn-outline-success { border: 1px solid rgba(5,150,105,0.5) !important; color: #34d399 !important; background: rgba(5,150,105,0.07) !important; }
+.btn-outline-success:hover { background: rgba(5,150,105,0.15) !important; transform: translateY(-1px); }
+
+/* ── Question response cards ── */
+.question-response-card { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+.question-response-card .card-header {
+  color: #fff;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.question-response-card .card-body { background: var(--card); color: rgba(255,255,255,0.85); padding: 1.2rem; }
+
+/* Card header status colors — flat */
+.question-response-card .card-header.bg-secondary { background: rgba(255,255,255,0.06) !important; }
+.question-response-card .card-header.bg-success  { background: rgba(5,150,105,0.25) !important; border-left: 4px solid #059669; }
+.question-response-card .card-header.bg-danger   { background: rgba(239,68,68,0.2) !important; border-left: 4px solid #ef4444; }
+
+/* ── Options ── */
+.option-display {
+  padding: .65rem .9rem;
+  border-radius: 10px;
+  margin-bottom: .6rem;
+  font-weight: 500;
+  font-size: 0.92rem;
+  font-family: 'DM Sans', sans-serif;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  border: 1px solid transparent;
+}
+.bg-light    { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.07) !important; color: rgba(255,255,255,0.85) !important; }
+.bg-success  { background: rgba(5,150,105,0.18) !important; border-color: rgba(5,150,105,0.4) !important; color: #fff !important; }
+.bg-danger   { background: rgba(239,68,68,0.18) !important; border-color: rgba(239,68,68,0.4) !important; color: #fff !important; }
+.bg-warning  { background: rgba(217,119,6,0.18) !important; border-color: rgba(217,119,6,0.4) !important; color: #fcd34d !important; }
+.bg-secondary{ background: rgba(255,255,255,0.04) !important; color: rgba(255,255,255,0.7) !important; }
+
+/* ── Badges ── */
+.badge-custom {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: .25rem .55rem;
+  font-size: 0.78rem;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ── Stats section ── */
+.stats-header {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.8rem 1rem;
+  border-radius: 8px 8px 0 0;
+}
+.stats-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+.stat-inner { padding: 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); }
+.stat-value { font-size: 1.45rem; font-weight: 800; color: #fff; }
+.stat-label { color: var(--muted-2); font-weight: 600; font-size: 0.82rem; margin-top: 2px; }
+
+/* ── Score metric ── */
+.metric-glow {
+  background: linear-gradient(90deg, var(--gold-1), var(--gold-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 900;
+  font-size: 1.9rem;
+}
+.glow-star {
+  background: linear-gradient(90deg, var(--gold-2), #ff9f1c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 1.4rem;
+}
+
+/* ── Labels ── */
+.label-glow-gold  { color:#fcd34d; display:inline-block; padding:.1rem .4rem; border-radius:6px; background:rgba(255,209,102,0.1); font-weight:700; font-size:0.85rem; }
+.label-glow-green { color:#34d399; display:inline-block; padding:.1rem .4rem; border-radius:6px; background:rgba(5,150,105,0.12); font-weight:700; font-size:0.85rem; }
+.label-glow-teal  { color:#5eead4; display:inline-block; padding:.1rem .4rem; border-radius:6px; background:rgba(45,212,191,0.1); font-weight:700; font-size:0.85rem; }
+
+.text-muted-light { color: var(--muted) !important; font-weight: 500; }
+.text-muted { color: var(--muted-2) !important; }
+
+/* ── Modal ── */
+.modal-content { background: var(--card); border: 1px solid var(--border); color: #fff; }
+.modal-header { border-bottom: 1px solid var(--border); }
+.modal-footer { border-top: 1px solid var(--border); }
+.btn-close { filter: invert(1) brightness(0.7); }
+
+/* ── Discussion system ── */
+.disc-section{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.2rem;margin-top:1.2rem;}
+.disc-header{display:flex;align-items:center;gap:.6rem;cursor:pointer;user-select:none;}
+.disc-header h6{margin:0;font-weight:600;color:rgba(255,255,255,0.7);font-size:.9rem;}
+.disc-count-badge{background:var(--accent);color:#fff;font-size:.68rem;font-weight:700;padding:.15rem .48rem;border-radius:20px;min-width:1.4rem;text-align:center;}
+.disc-chevron{color:rgba(255,255,255,0.3);font-size:.78rem;margin-left:auto;transition:transform .25s;}
+.disc-chevron.open{transform:rotate(180deg);}
+.disc-body{display:none;margin-top:.9rem;}
+.disc-body.open{display:block;}
+.disc-input-wrap{position:relative;}
+.disc-textarea{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;padding:.6rem 4.2rem .6rem .85rem;font-size:.86rem;resize:none;outline:none;transition:border .2s;line-height:1.45;min-height:2.6rem;font-family:'DM Sans',sans-serif;}
+.disc-textarea:focus{border-color:var(--accent);}
+.disc-textarea::placeholder{color:rgba(255,255,255,0.28);}
+.disc-actions-row{position:absolute;right:.4rem;bottom:.4rem;display:flex;gap:.25rem;align-items:center;}
+.disc-emoji-trigger{background:none;border:none;font-size:1.05rem;cursor:pointer;line-height:1;padding:.18rem .22rem;border-radius:6px;transition:background .15s;}
+.disc-emoji-trigger:hover{background:rgba(255,255,255,0.08);}
+.disc-send{background:var(--accent);border:none;border-radius:7px;color:#fff;width:1.85rem;height:1.85rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.disc-send:hover{transform:scale(1.08);box-shadow:0 4px 14px rgba(45,91,227,0.4);}
+.disc-char{font-size:.7rem;color:rgba(255,255,255,0.25);text-align:right;margin:.22rem 0 .55rem;}
+.emoji-picker-pop{position:absolute;bottom:calc(100% + .4rem);right:0;z-index:1000;display:none;background:#16161e;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:.55rem;box-shadow:0 16px 50px rgba(0,0,0,0.7);}
+.emoji-picker-pop.open{display:block;}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:.25rem;}
+.e-btn{background:none;border:none;font-size:1.15rem;cursor:pointer;border-radius:6px;padding:.12rem;transition:background .12s;line-height:1;}
+.e-btn:hover{background:rgba(255,255,255,0.1);}
+.comments-list{display:flex;flex-direction:column;gap:.7rem;}
+
+/* ── Top-level comment card ── */
+.c-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:.8rem 1rem;
+}
+.c-card.is-pinned{border-color:rgba(255,209,102,0.35);background:rgba(255,209,102,0.05);}
+.c-card.is-best{border-color:rgba(5,150,105,0.35);background:rgba(5,150,105,0.05);}
+
+/* ── Reply threading container ── */
+.replies-wrap{
+  margin-top:.5rem;
+  padding-left:.9rem;
+  border-left:2px solid rgba(45,91,227,0.35);
+  display:flex;flex-direction:column;gap:.4rem;
+}
+
+/* ── Reply card — visually distinct from parent ── */
+.c-card.is-reply{
+  background:rgba(45,91,227,0.07);
+  border:1px solid rgba(45,91,227,0.18);
+  border-radius:8px;
+  padding:.6rem .85rem;
+}
+
+/* ── "Replying to" chip shown at top of reply ── */
+.reply-to-chip{
+  display:inline-flex;align-items:center;gap:.3rem;
+  font-size:.68rem;font-weight:600;
+  color:rgba(45,91,227,0.85);
+  background:rgba(45,91,227,0.1);
+  border-radius:4px;padding:.1rem .4rem;
+  margin-bottom:.25rem;
+}
+.reply-to-chip i{font-size:.6rem;}
+.c-avatar{width:1.9rem;height:1.9rem;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;color:#fff;flex-shrink:0;}
+.c-username{font-weight:700;font-size:.83rem;color:#e2e8f0;}
+.c-time{font-size:.7rem;color:rgba(255,255,255,0.3);}
+.c-text{color:rgba(255,255,255,0.75);font-size:.85rem;margin-top:.3rem;word-break:break-word;white-space:pre-wrap;font-family:'DM Sans',sans-serif;}
+.c-meta{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.05rem;}
+.badge-pin{font-size:.65rem;background:rgba(255,209,102,0.14);color:#ffd166;border-radius:5px;padding:.08rem .35rem;font-weight:700;}
+.badge-best{font-size:.65rem;background:rgba(5,150,105,0.14);color:#10b981;border-radius:5px;padding:.08rem .35rem;font-weight:700;}
+.badge-edited{font-size:.65rem;color:rgba(255,255,255,0.22);font-style:italic;}
+.reply-to-chip{font-size:.72rem;color:rgba(45,91,227,0.75);font-weight:600;margin-bottom:.18rem;display:flex;align-items:center;gap:.25rem;}
+.reply-to-chip strong{color:rgba(45,91,227,0.9);}
+.c-actions{display:flex;gap:.6rem;margin-top:.38rem;flex-wrap:wrap;}
+.ca-btn{background:none;border:none;color:rgba(255,255,255,0.32);font-size:.73rem;cursor:pointer;padding:0;transition:color .15s;display:flex;align-items:center;gap:.25rem;}
+.ca-btn:hover{color:var(--accent);}
+.ca-btn.red:hover{color:#ef4444;}
+.reply-box{display:none;margin-top:.6rem;}
+.reply-box.open{display:block;}
+.disc-edit-wrap{margin:.3rem 0 0;display:flex;align-items:flex-start;gap:.5rem;}
+.disc-edit-textarea{flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--accent);border-radius:8px;color:#fff;padding:.45rem .7rem;font-size:.85rem;resize:none;outline:none;line-height:1.4;min-height:2.2rem;max-height:6rem;font-family:'DM Sans',sans-serif;}
+.disc-edit-actions{display:flex;gap:.4rem;margin-top:.3rem;}
+.disc-edit-save{background:rgba(5,150,105,0.15);border:1px solid rgba(5,150,105,0.35);border-radius:6px;color:#10b981;padding:.22rem .55rem;font-size:.73rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.25rem;transition:background .15s;}
+.disc-edit-cancel{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:rgba(255,255,255,0.4);padding:.22rem .55rem;font-size:.73rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.25rem;transition:background .15s;}
+.disc-edit-save:hover{background:rgba(5,150,105,0.25);}
+.disc-edit-cancel:hover{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);}
+.no-comments{text-align:center;color:rgba(255,255,255,0.22);font-size:.82rem;padding:.7rem 0;}
+.disc-spinner{text-align:center;color:rgba(255,255,255,0.28);padding:.9rem;font-size:.82rem;}
+.disc-toast{position:fixed;bottom:1.4rem;right:1.4rem;z-index:9999;padding:.6rem 1rem;border-radius:10px;font-size:.83rem;font-weight:700;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,0.45);pointer-events:none;animation:toastIn .2s ease;}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.disc-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.disc-confirm-box{background:#16161e;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:1.4rem 1.6rem;width:min(320px,90vw);box-shadow:0 24px 60px rgba(0,0,0,0.7);}
+.disc-confirm-box h6{color:#fff;font-weight:700;margin:0 0 .4rem;font-size:.95rem;}
+.disc-confirm-box p{color:rgba(255,255,255,0.45);font-size:.8rem;margin:0 0 1.2rem;}
+.disc-confirm-btns{display:flex;gap:.6rem;justify-content:flex-end;}
+.disc-confirm-btns button{border:none;border-radius:8px;padding:.45rem .95rem;font-size:.82rem;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.disc-confirm-btns button:hover{opacity:.85;}
+.disc-cb-cancel{background:rgba(255,255,255,0.08);color:#fff;}
+.disc-cb-delete{background:#dc2626;color:#fff;}
+
+/* ── MathJax ── */
+.math-wrap{max-width:100%;overflow-x:auto;overflow-y:hidden;}
+.math-wrap mjx-container{max-width:100% !important;overflow-x:auto !important;}
+.math-wrap mjx-container[display="true"]{display:block !important;margin:0.3rem 0 !important;}
+mjx-container{max-width:100% !important;}
+mjx-math{white-space:normal !important;}
+.option-display{overflow-x:auto;}
+.option-display mjx-container{max-width:100% !important;}
+
+/* ── Font safety — keep FA icons intact ── */
+.card-body p, .card-body h6, .card-body strong, .card-body small,
+.card-body .option-display, .question-response-card .card-body {
+  font-family: 'DM Sans', sans-serif !important;
+}
+.card-body i.fas, .card-body i.far, .card-body i.fab,
+.btn i, .btn i.fas, .btn i.far {
+  font-family: 'Font Awesome 6 Free', 'FontAwesome' !important;
+  font-weight: 900 !important;
+}
+
+/* ── HR ── */
+hr { border-color: rgba(255,255,255,0.07); }
+
+/* ── Alerts ── */
+.alert-warning { background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.3); color: #fcd34d; border-radius: 10px; }
+
+@media (max-width: 767px) {
+  .score-summary { margin-top: .8rem; text-align: center; }
+}
+@media print {
+  .navbar, .btn, #responseLoadingAlert { display: none !important; }
+  body { background: white !important; color: #000 !important; }
+}
+
+/* ── LIGHT THEME OVERRIDES ─────────────────────────────── */
+[data-theme="light"] { --bg: #f0f2f8; --card: #ffffff; --border: #e2e8f0; --muted: rgba(0,0,0,0.6); --muted-2: #718096; --white: #1a202c; }
+[data-theme="light"] html, [data-theme="light"] body { background: #f0f2f8 !important; color: #1a202c; }
+
+/* Cards */
+[data-theme="light"] .card { background: #ffffff; border-color: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .card .card-body { background: #ffffff; color: #1a202c; }
+[data-theme="light"] .card h6 { color: #1a202c; }
+[data-theme="light"] .card p { color: #4a5568; }
+[data-theme="light"] .header-card { background: #ffffff; border-color: #e2e8f0; border-top-color: #2d5be3; color: #1a202c; }
+[data-theme="light"] .header-card h3 { color: #1a202c; }
+[data-theme="light"] .score-summary h4 { color: #1a202c; }
+[data-theme="light"] .score-summary p { color: #718096; }
+
+/* Question response cards */
+[data-theme="light"] .question-response-card { border-color: #e2e8f0; }
+[data-theme="light"] .question-response-card .card-header { color: #1a202c; border-bottom-color: #e2e8f0; }
+[data-theme="light"] .question-response-card .card-header.bg-secondary { background: #f1f5f9 !important; color: #4a5568; }
+[data-theme="light"] .question-response-card .card-header.bg-success { background: rgba(5,150,105,0.12) !important; color: #065f46; border-left-color: #059669; }
+[data-theme="light"] .question-response-card .card-header.bg-danger  { background: rgba(239,68,68,0.1) !important; color: #991b1b; border-left-color: #ef4444; }
+[data-theme="light"] .question-response-card .card-body { background: #ffffff; color: #1a202c; }
+
+/* Options */
+[data-theme="light"] .bg-light    { background: #f8faff !important; border-color: #e2e8f0 !important; color: #1a202c !important; }
+[data-theme="light"] .bg-success  { background: rgba(5,150,105,0.1) !important; border-color: rgba(5,150,105,0.3) !important; color: #065f46 !important; }
+[data-theme="light"] .bg-danger   { background: rgba(239,68,68,0.08) !important; border-color: rgba(239,68,68,0.25) !important; color: #991b1b !important; }
+[data-theme="light"] .bg-warning  { background: rgba(217,119,6,0.08) !important; border-color: rgba(217,119,6,0.25) !important; color: #92400e !important; }
+[data-theme="light"] .bg-secondary{ background: #f1f5f9 !important; color: #4a5568 !important; }
+
+/* Stats */
+[data-theme="light"] .stats-card { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .stat-inner { background: #f8faff; border-color: #e2e8f0 !important; }
+[data-theme="light"] .stat-value { color: #1a202c; }
+[data-theme="light"] .stat-label { color: #718096; }
+
+/* Badges & labels */
+[data-theme="light"] .badge-custom { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
+[data-theme="light"] .text-muted-light { color: #4a5568 !important; }
+[data-theme="light"] .text-muted { color: #718096 !important; }
+[data-theme="light"] .label-glow-gold  { background: rgba(217,119,6,0.08); color: #92400e; }
+[data-theme="light"] .label-glow-green { background: rgba(5,150,105,0.08); color: #065f46; }
+[data-theme="light"] .label-glow-teal  { background: rgba(45,212,191,0.08); color: #0f766e; }
+
+/* Alerts */
+[data-theme="light"] .alert-warning { background: #fffbeb; border-color: #fde68a !important; color: #92400e; }
+
+/* Discussion system */
+[data-theme="light"] .disc-section { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .disc-header h6 { color: #4a5568; }
+[data-theme="light"] .disc-chevron { color: #a0aec0; }
+[data-theme="light"] .disc-textarea { background: #ffffff; border-color: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .disc-textarea:focus { border-color: #2d5be3; }
+[data-theme="light"] .disc-textarea::placeholder { color: #a0aec0; }
+[data-theme="light"] .disc-emoji-trigger:hover { background: rgba(0,0,0,0.05); }
+[data-theme="light"] .disc-char { color: #a0aec0; }
+[data-theme="light"] .emoji-picker-pop { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 16px 50px rgba(0,0,0,0.12); }
+[data-theme="light"] .e-btn:hover { background: rgba(0,0,0,0.06); }
+[data-theme="light"] .c-card { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .c-card.is-pinned { border-color: rgba(217,119,6,0.25); background: rgba(217,119,6,0.04); }
+[data-theme="light"] .c-card.is-best   { border-color: rgba(5,150,105,0.25); background: rgba(5,150,105,0.04); }
+[data-theme="light"] .c-card.is-reply { background: #eef2ff; border-color: rgba(45,91,227,0.2); }
+[data-theme="light"] .replies-wrap { border-left-color: rgba(45,91,227,0.3); }
+[data-theme="light"] .reply-to-chip { background: rgba(45,91,227,0.08); color: #2d5be3; }
+[data-theme="light"] .replies-wrap { border-left-color: rgba(45,91,227,0.2); }
+[data-theme="light"] .c-username { color: #1a202c; }
+[data-theme="light"] .c-time { color: #a0aec0; }
+[data-theme="light"] .c-text { color: #4a5568; }
+[data-theme="light"] .ca-btn { color: #a0aec0; }
+[data-theme="light"] .ca-btn:hover { color: #2d5be3; }
+[data-theme="light"] .reply-bar { background: rgba(45,91,227,0.06); border-left-color: #2d5be3; }
+[data-theme="light"] .reply-bar strong { color: #2d5be3; }
+[data-theme="light"] .no-comments { color: #a0aec0; }
+[data-theme="light"] .disc-spinner { color: #a0aec0; }
+[data-theme="light"] .disc-edit-textarea { background: #ffffff; border-color: #2d5be3; color: #1a202c; }
+[data-theme="light"] .disc-edit-cancel { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .disc-edit-cancel:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .disc-confirm-box { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .disc-confirm-box h6 { color: #1a202c; }
+[data-theme="light"] .disc-confirm-box p { color: #718096; }
+[data-theme="light"] .disc-cb-cancel { background: #f1f5f9; color: #4a5568; }
+
+/* Modal */
+[data-theme="light"] .modal-content { background: #ffffff; border-color: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .modal-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .modal-footer { border-top-color: #e2e8f0; }
+[data-theme="light"] .btn-close { filter: none; }
+
+/* HR */
+[data-theme="light"] hr { border-color: #e2e8f0; }
+</style>
+
+<div class="container mt-4" id="responseContainer">
+  <div class="card">
+    <div class="card-body">
+
+      {% if from_history %}
+      <div class="row mb-3">
+        <div class="col text-center">
+          <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-sm btn-primary-custom" style="border:1px solid rgba(255,255,255,0.06);">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="row mb-4" id="examHeader">
+        <div class="col-md-12">
+          <div class="header-card">
+            <div class="row align-items-center">
+              <div class="col-md-8">
+                <h3><i class="fas fa-clipboard-check" style="color:var(--gold-2)"></i> {{ exam.name }} - Response Analysis</h3>
+                <p class="mb-1 text-muted-light">Student: {{ session.full_name }}</p>
+                <p class="mb-0 text-muted-light">Completed: {{ result.completed_at }}</p>
+              </div>
+              <div class="col-md-4 text-md-end score-summary">
+                <div class="metric-glow">{{ result.score }} / {{ result.max_score }}</div>
+                <p class="mb-0 text-muted-light">{{ result.percentage }}% &nbsp; | &nbsp; <span class="glow-star"><i class="fas fa-star"></i></span> &nbsp;<strong style="color:#fff;">{{ result.grade }}</strong></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<div class="row mb-4">
+  <div class="col-md-12 text-center d-flex flex-wrap justify-content-center gap-2">
+    <button id="downloadPdfBtn" class="btn btn-success-custom">
+      <i class="fas fa-file-pdf me-1"></i> Download PDF
+    </button>
+    <a href="{{ url_for('result.response_pdf', exam_id=exam.id) }}" 
+       class="btn btn-outline-success" target="_blank">
+      <i class="fas fa-file-alt me-1"></i> Download Text
+    </a>
+    <button onclick="window.print()" class="btn btn-primary-custom">
+      <i class="fas fa-print me-1"></i> Print
+    </button>
+    <button onclick="closeResponseWindow()" class="btn btn-danger-custom">
+      <i class="fas fa-times me-1"></i> Close
+    </button>
+  </div>
+</div>
+
+      <div id="responseContent">
+        {% if responses %}
+          {% for response in responses %}
+          <div class="card mb-4 question-response-card">
+            <div class="card-header
+              {% if not response.is_attempted %}bg-secondary
+              {% elif response.is_correct %}bg-success
+              {% else %}bg-danger{% endif %}">
+              <div class="row align-items-center">
+                <div class="col-md-8">
+                  <h6 class="mb-0">
+                    <i class="fas fa-question-circle"></i> Question {{ loop.index }}
+                    <span class="badge badge-custom ms-2">
+                      {% if response.question_type == 'MCQ' %}Single Choice
+                      {% elif response.question_type == 'MSQ' %}Multiple Choice
+                      {% elif response.question_type == 'NUMERIC' %}Numerical
+                      {% else %}{{ response.question_type }}{% endif %}
+                    </span>
+                  </h6>
+                </div>
+                <div class="col-md-4 text-end">
+                  <span class="badge badge-custom fs-6">
+                    {% if not response.is_attempted %}
+                      <i class="fas fa-minus"></i> Not Attempted (0)
+                    {% elif response.is_correct %}
+                      <i class="fas fa-check"></i> Correct (+{{ response.marks_obtained }})
+                    {% else %}
+                      <i class="fas fa-times"></i> Incorrect ({{ response.marks_obtained }})
+                    {% endif %}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <h6><strong>Question:</strong></h6>
+              <p>{{ response.question.question_text | safe }}</p>
+
+              {% if response.question.has_image and response.question.image_url %}
+              <div class="mb-3">
+                <div class="card border-0">
+                  <div class="card-body p-2">
+                    <div id="resp-img-loading-{{ loop.index }}" class="image-loading text-center" style="background:rgba(255,255,255,0.03);border:2px dashed rgba(45,91,227,0.3);border-radius:10px;padding:18px;display:none;">
+                      <div class="text-muted">Loading question image...</div>
+                    </div>
+                    <div id="resp-img-error-{{ loop.index }}" class="image-error text-center" style="background:rgba(245,158,11,0.08);border:2px dashed rgba(245,158,11,0.35);border-radius:10px;padding:18px;display:none;">
+                      <i class="fas fa-exclamation-triangle fa-2x mb-3" style="color:#fbbf24;"></i>
+                      <div style="color:#fbbf24;"><strong>Image Loading Failed</strong></div>
+                      <div class="small mt-2 mb-3" style="color:#fbbf24;">Unable to load the question image</div>
+                      <div>
+                        <a href="{{ response.question.image_url }}" target="_blank" class="btn btn-sm" style="background:rgba(45,91,227,0.2);color:#93c5fd;border:1px solid rgba(45,91,227,0.3);">
+                          <i class="fas fa-external-link-alt"></i> Open in new tab
+                        </a>
+                      </div>
+                    </div>
+                    <div id="resp-img-container-{{ loop.index }}" class="text-center">
+                      <img src="{{ response.question.image_url }}"
+                           alt="Question {{ loop.index }} Image"
+                           class="img-fluid rounded shadow"
+                           style="max-width:100%;max-height:520px;cursor:pointer;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.35);transition:opacity 0.45s ease-in-out;"
+                           loading="eager"
+                           decoding="async"
+                           onclick="openImageModal(this.src, 'Question {{ loop.index }} Image')"
+                           onload="document.getElementById('resp-img-loading-{{ loop.index }}').style.display='none'; document.getElementById('resp-img-error-{{ loop.index }}').style.display='none'; this.style.opacity='1';"
+                           onerror="document.getElementById('resp-img-loading-{{ loop.index }}').style.display='none'; document.getElementById('resp-img-container-{{ loop.index }}').style.display='none'; document.getElementById('resp-img-error-{{ loop.index }}').style.display='block';"
+                           title="Click to enlarge image">
+                      <div class="mt-2">
+                        <small style="color:rgba(255,255,255,0.4);"><i class="fas fa-search-plus"></i> Click image to enlarge</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+
+              {% if response.question_type == 'MCQ' %}
+                {% set options = [
+                  {'id': 'A', 'text': response.question.option_a},
+                  {'id': 'B', 'text': response.question.option_b},
+                  {'id': 'C', 'text': response.question.option_c},
+                  {'id': 'D', 'text': response.question.option_d}
+                ] %}
+                <div class="row">
+                  <div class="col-md-6">
+                    <h6><strong>Options:</strong></h6>
+                    {% for opt in options %}
+                      {% if opt.text and opt.text != 'nan' and opt.text|string|trim != '' and opt.text != 'None' %}
+                        <div class="option-display
+                          {% if response.is_attempted and opt.id == response.given_answer and opt.id == response.correct_answer %}bg-success
+                          {% elif response.is_attempted and opt.id == response.given_answer and opt.id != response.correct_answer %}bg-danger
+                          {% elif opt.id == response.correct_answer %}bg-success
+                          {% else %}bg-light{% endif %}">
+                          <strong>{{ opt.id }}.</strong> {{ opt.text | safe }}
+                          {% if response.is_attempted and opt.id == response.given_answer %}
+                            <i class="fas fa-arrow-left ms-2"></i> <span class="label-glow-gold">Your Choice</span>
+                          {% endif %}
+                          {% if opt.id == response.correct_answer %}
+                            <i class="fas fa-check ms-2"></i> <span class="label-glow-green">Correct Answer</span>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+
+                  <div class="col-md-6">
+                    <strong><span class="label-glow-gold">Your Answer:</span></strong>
+                    {% if response.is_attempted and response.given_answer %}
+                      {{ response.given_answer }}
+                    {% else %}
+                      <span class="text-muted-light">Not Answered</span>
+                    {% endif %}<br>
+                    <strong><span class="label-glow-green">Correct Answer:</span></strong> {{ response.correct_answer or 'N/A' }}
+                  </div>
+                </div>
+
+              {% elif response.question_type == 'MSQ' %}
+                {% set options = [
+                  {'id': 'A', 'text': response.question.option_a},
+                  {'id': 'B', 'text': response.question.option_b},
+                  {'id': 'C', 'text': response.question.option_c},
+                  {'id': 'D', 'text': response.question.option_d}
+                ] %}
+
+                {% set given_list = [] %}
+                {% set correct_list = [] %}
+                {% if response.is_attempted and response.given_answer %}
+                  {% if response.given_answer is string and response.given_answer != 'None' %}
+                    {% set given_list = response.given_answer.split(',') if ',' in response.given_answer else [response.given_answer] %}
+                  {% elif response.given_answer is iterable and response.given_answer is not string %}
+                    {% set given_list = response.given_answer %}
+                  {% endif %}
+                {% endif %}
+                {% if response.correct_answer %}
+                  {% if response.correct_answer is string and response.correct_answer != 'None' %}
+                    {% set correct_list = response.correct_answer.split(',') if ',' in response.correct_answer else [response.correct_answer] %}
+                  {% elif response.correct_answer is iterable and response.correct_answer is not string %}
+                    {% set correct_list = response.correct_answer %}
+                  {% endif %}
+                {% endif %}
+
+                <div class="row">
+                  <div class="col-md-6">
+                    <h6><strong>Options:</strong></h6>
+                    {% for opt in options %}
+                      {% if opt.text and opt.text != 'nan' and opt.text|string|trim != '' and opt.text != 'None' %}
+                        {% set in_given = response.is_attempted and opt.id in given_list %}
+                        {% set in_correct = opt.id in correct_list %}
+                        <div class="option-display
+                          {% if in_given and in_correct %}bg-success
+                          {% elif in_given and not in_correct %}bg-danger
+                          {% elif not in_given and in_correct %}bg-warning
+                          {% else %}bg-light{% endif %}">
+                          <strong>{{ opt.id }}.</strong> {{ opt.text | safe }}
+                          {% if in_given %} <i class="fas fa-check-square ms-2"></i> <span class="label-glow-gold">Your Choice</span>{% endif %}
+                          {% if in_correct %} <i class="fas fa-star ms-2"></i> <span class="label-glow-green">Correct Option</span>{% endif %}
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+
+                  <div class="col-md-6">
+                    <strong><span class="label-glow-gold">Your Selection:</span></strong>
+                    {% if response.is_attempted and given_list %}
+                      {{ given_list|join(', ') }}
+                    {% else %}
+                      <span class="text-muted-light">Not Answered</span>
+                    {% endif %}<br>
+                    <strong><span class="label-glow-green">Correct Selection:</span></strong> {{ correct_list|join(', ') or 'N/A' }}
+                  </div>
+                </div>
+
+              {% elif response.question_type == 'NUMERIC' %}
+                <div class="row">
+                  <div class="col-md-12">
+                    <strong><span class="label-glow-gold">Your Answer:</span></strong>
+                    {% if response.is_attempted and response.given_answer %}
+                      {{ response.given_answer }}
+                    {% else %}
+                      <span class="text-muted-light">Not Answered</span>
+                    {% endif %}<br>
+                    <strong><span class="label-glow-green">Correct Answer:</span></strong> {{ response.correct_answer or 'N/A' }}
+                    {% if response.question.tolerance %}
+                      <br><strong><span class="label-glow-teal">Tolerance:</span></strong> ±{{ response.question.tolerance }}
+                    {% endif %}
+                  </div>
+                </div>
+{% else %}
+                <div class="alert alert-warning">
+                  <strong>Unknown question type:</strong> {{ response.question_type }}
+                </div>
+              {% endif %}
+
+              <div class="disc-section">
+                <div class="disc-header" onclick="discToggle({{ response.question.id }}, {{ exam.id }})">
+                  <i class="fas fa-comments" style="color:#667eea;font-size:.9rem;"></i>
+                  <h6>Discussion <span class="disc-count-badge" id="disc-cnt-{{ response.question.id }}">•••</span></h6>
+                  <i class="fas fa-chevron-down disc-chevron" id="disc-chev-{{ response.question.id }}"></i>
+                </div>
+                <div class="disc-body" id="disc-body-{{ response.question.id }}">
+                  <div class="disc-input-wrap" style="margin-bottom:0;">
+                    <textarea class="disc-textarea" id="disc-ta-{{ response.question.id }}" rows="2"
+                      placeholder="Write a comment… (Shift+Enter for new line, Enter to send)"
+                      maxlength="500"
+                      oninput="discCharCount({{ response.question.id }})"
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discPost({{ response.question.id }},{{ exam.id }});}"></textarea>
+                    <div class="disc-actions-row">
+                      <div style="position:relative;">
+                        <button class="disc-emoji-trigger" type="button"
+                          onclick="discEmojiToggle(event,'main',{{ response.question.id }},null)">😊</button>
+                        <div class="emoji-picker-pop" id="epop-main-{{ response.question.id }}">
+                          <div class="emoji-grid" id="egrid-main-{{ response.question.id }}"></div>
+                        </div>
+                      </div>
+                      <button class="disc-send" type="button"
+                        onclick="discPost({{ response.question.id }},{{ exam.id }})" title="Send">
+                        <i class="fas fa-paper-plane" style="font-size:.68rem;"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="disc-char" id="disc-char-{{ response.question.id }}">0 / 500</div>
+                  <div class="comments-list" id="disc-list-{{ response.question.id }}">
+                    <div class="disc-spinner"><i class="fas fa-circle-notch fa-spin"></i></div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="alert alert-warning text-center">
+            <h4><i class="fas fa-exclamation-triangle"></i> No Response Data Found</h4>
+            <p>No responses were found for this exam.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header stats-header text-center">
+          <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Performance Summary</h5>
+        </div>
+        <div class="card-body stats-card">
+          <div class="row text-center g-3">
+            <div class="col-6 col-md-2">
+              <div class="stat-inner">
+                <div class="stat-value">{{ result.correct_answers if result.correct_answers is defined else (responses|selectattr('is_correct')|selectattr('is_attempted')|list|length) }}</div>
+                <div class="stat-label">Correct</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="stat-inner">
+                <div class="stat-value">{{ result.incorrect_answers if result.incorrect_answers is defined else (responses|rejectattr('is_correct')|selectattr('is_attempted')|list|length) }}</div>
+                <div class="stat-label">Incorrect</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="stat-inner">
+                <div class="stat-value">{{ result.unanswered_questions if result.unanswered_questions is defined else (responses|rejectattr('is_attempted')|list|length) }}</div>
+                <div class="stat-label">Unanswered</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="stat-inner">
+                <div class="stat-value metric-glow">{{ result.score }}</div>
+                <div class="stat-label">Score</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="stat-inner">
+                <div class="stat-value">{{ result.total_questions }}</div>
+                <div class="stat-label">Total</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="stat-inner">
+                <div class="stat-value">{{ result.percentage }}%</div>
+                <div class="stat-label">Percentage</div>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="row text-center mt-3">
+            <div class="col-md-6">
+              <strong>Attempted:</strong>
+              {% set attempted_count = (result.correct_answers if result.correct_answers is defined else (responses|selectattr('is_correct')|selectattr('is_attempted')|list|length)) + (result.incorrect_answers if result.incorrect_answers is defined else (responses|rejectattr('is_correct')|selectattr('is_attempted')|list|length)) %}
+              {{ attempted_count }} / {{ result.total_questions }}
+            </div>
+            <div class="col-md-6">
+              <strong>Accuracy (on attempted):</strong>
+              {% set correct_count = result.correct_answers if result.correct_answers is defined else (responses|selectattr('is_correct')|selectattr('is_attempted')|list|length) %}
+              {% if attempted_count > 0 %}
+                {{ (correct_count / attempted_count * 100) | round(1) }}%
+              {% else %}
+                N/A
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="responseImageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageModalTitle"><i class="fas fa-image me-2"></i> Question Image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-4">
+        <img id="responseModalImage" src="" alt="Question image" class="img-fluid rounded shadow" style="max-height: 80vh;">
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openImageModal(src, title) {
+    const modal = document.getElementById('responseImageModal');
+    const img = document.getElementById('responseModalImage');
+    const titleEl = document.getElementById('imageModalTitle');
+    
+    if (modal && img && titleEl) {
+        img.src = src;
+        titleEl.innerHTML = '<i class="fas fa-image me-2"></i>' + title;
+        
+        if (window.bootstrap) {
+            new bootstrap.Modal(modal).show();
+        }
+    }
+}
+
+function closeResponseWindow() {
+    if (window.opener) {
+        window.close();
+    } else {
+        window.history.back();
+    }
+}
+
+document.getElementById('downloadPdfBtn').onclick = function() {
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+    window.open('{{ url_for("result.response_pdf", exam_id=exam.id) }}', '_blank');
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = originalText; }, 2000);
+};
+
+// ─── DISCUSSION SYSTEM ────────────────────────────────────────────────────────
+const DISC_IS_ADMIN = {{ ('admin' in (session.role or '')) | tojson }};
+const DISC_UID      = {{ session.user_id | tojson }};
+const DISC_UNAME    = {{ (session.full_name or session.username or 'User') | tojson }};
+const DISC_POLL     = 30000;
+const _discWS       = (typeof io !== 'undefined') ? io() : null;
+const _wsJoined     = new Set();
+const _discPolls    = {};
+const _discOpen     = new Set();
+const _pendingDisc  = new Set(); // temp_ids of our own in-flight posts
+const _discLastHash = {};
+const DISC_EMOJIS   = ['😊','😂','🤔','👍','👎','❤️','🔥','🎉','😮','😢','👏','💡','✅','❌','⭐','🙏','😅','🤣','😍','🥳','🤯','💪','🎯','📚','✏️','🧠','⚡','🌟','💯','🤝','😎','😆','😜','🥲','🫡','🙌','💬','📝','🔑','⚠️','🚀','💎'];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function discEsc(t) {
+  return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function discTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.includes('Z') ? ts : ts + 'Z');
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return d.toLocaleDateString();
+}
+
+// Deterministic hue from username — same person always same colour
+function _avatarHue(name) {
+  let h = 0;
+  for (let i = 0; i < (name||'').length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return h % 360;
+}
+
+// Get username text from a rendered parent card
+function _parentUname(parentId) {
+  const card = document.getElementById('ccard-' + parentId);
+  if (!card) return null;
+  const el = card.querySelector('.c-username');
+  return el ? el.textContent.trim() : null;
+}
+
+// Insert a reply HTML string into the parent card's replies-wrap div.
+// Creates replies-wrap if it doesn't exist yet.
+// Returns true on success, false if parent card not found.
+function _insertReplyIntoParent(parentId, html) {
+  const parentCard = document.getElementById('ccard-' + parentId);
+  if (!parentCard) return false;
+  let wrap = parentCard.querySelector(':scope > .replies-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.className = 'replies-wrap';
+    parentCard.appendChild(wrap);
+  }
+  wrap.insertAdjacentHTML('beforeend', html);
+  return true;
+}
+
+// ── Card renderer ─────────────────────────────────────────────────────────────
+
+function discCard(c, qid, examId, isReply, pUname) {
+  const init     = (c.username||'U')[0].toUpperCase();
+  const hue      = _avatarHue(c.username);
+  const avatarBg = isReply ? `hsl(${hue},52%,40%)` : `hsl(${hue},58%,36%)`;
+
+  const editedBadge = c.is_edited      ? '<span class="badge-edited">(edited)</span>'    : '';
+  const pinBadge    = c.is_pinned      ? '<span class="badge-pin">📌 Pinned</span>'       : '';
+  const bestBadge   = c.is_best_answer ? '<span class="badge-best">✅ Best Answer</span>' : '';
+
+  // "Replying to X" chip shown inside reply cards
+  const replyChip = (isReply && pUname)
+    ? `<div class="reply-to-chip"><i class="fas fa-reply" style="font-size:.65rem;"></i> Replying to <strong>${discEsc(pUname)}</strong></div>`
+    : '';
+
+  const replyBtn  = !isReply
+    ? `<button class="ca-btn" onclick="discReplyToggle(${c.id},${qid},${examId})"><i class="fas fa-reply"></i> Reply</button>`
+    : '';
+  const editBtn   = c.is_own
+    ? `<button class="ca-btn" onclick="discEditStart(${c.id},${qid},${examId})"><i class="fas fa-pen"></i> Edit</button>`
+    : '';
+  const deleteBtn = (c.is_own || DISC_IS_ADMIN)
+    ? `<button class="ca-btn red" onclick="discDelete(${c.id},${qid},${examId})"><i class="fas fa-trash"></i></button>`
+    : '';
+  const pinBtn    = DISC_IS_ADMIN
+    ? `<button class="ca-btn" onclick="discAdminPin(${c.id},${qid},${examId})"><i class="fas fa-thumbtack"></i> ${c.is_pinned?'Unpin':'Pin'}</button>`
+    : '';
+  const bestBtn   = DISC_IS_ADMIN
+    ? `<button class="ca-btn" onclick="discAdminBest(${c.id},${qid},${examId})"><i class="fas fa-star"></i> ${c.is_best_answer?'Unmark':'Best'}</button>`
+    : '';
+
+  // Render nested replies inside this card
+  const repliesHtml = (c.replies||[]).map(r => discCard(r, qid, examId, true, c.username)).join('');
+
+  // Reply input box (only on top-level cards)
+  const replyBox = !isReply ? `
+      <div class="reply-box" id="rbox-${c.id}">
+        <div class="disc-input-wrap" style="margin-bottom:0;">
+          <textarea class="disc-textarea" id="rta-${c.id}" rows="2"
+            placeholder="Write a reply…" maxlength="500"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discReply(${c.id},${qid},${examId});}"></textarea>
+          <div class="disc-actions-row">
+            <div style="position:relative;">
+              <button class="disc-emoji-trigger" type="button"
+                onclick="discEmojiToggle(event,'reply',${qid},${c.id})">😊</button>
+              <div class="emoji-picker-pop" id="epop-reply-${c.id}">
+                <div class="emoji-grid" id="egrid-reply-${c.id}"></div>
+              </div>
+            </div>
+            <button class="disc-send" type="button" onclick="discReply(${c.id},${qid},${examId})">
+              <i class="fas fa-paper-plane" style="font-size:.68rem;"></i>
+            </button>
+          </div>
+        </div>
+      </div>` : '';
+
+  return `
+<div class="c-card ${c.is_pinned?'is-pinned':''} ${c.is_best_answer?'is-best':''} ${isReply?'is-reply':''}" id="ccard-${c.id}">
+  <div style="display:flex;gap:.6rem;align-items:flex-start;">
+    <div class="c-avatar" style="background:${avatarBg}">${discEsc(init)}</div>
+    <div style="flex:1;min-width:0;">
+      ${replyChip}
+      <div class="c-meta">
+        <span class="c-username">${discEsc(c.username)}</span>
+        <span class="c-time">${discTime(c.created_at)}</span>
+        ${editedBadge}${pinBadge}${bestBadge}
+      </div>
+      <div class="c-text" id="ctext-${c.id}">${discEsc(c.message)}</div>
+      <div class="c-actions">${replyBtn}${editBtn}${deleteBtn}${pinBtn}${bestBtn}</div>
+      ${replyBox}
+    </div>
+  </div>
+  ${repliesHtml ? `<div class="replies-wrap">${repliesHtml}</div>` : ''}
+</div>`;
+}
+
+// ── Render full thread ────────────────────────────────────────────────────────
+
+function discRender(qid, examId, comments) {
+  const list = document.getElementById(`disc-list-${qid}`);
+  if (!list) return;
+  if (!comments.length) {
+    list.innerHTML = '<div class="no-comments">No comments yet. Start the discussion!</div>';
+    return;
+  }
+  const pinned = comments.filter(c => c.is_pinned);
+  const rest   = comments.filter(c => !c.is_pinned);
+  list.innerHTML = [...pinned, ...rest].map(c => discCard(c, qid, examId, false)).join('');
+}
+
+// ── Socket events ─────────────────────────────────────────────────────────────
+
+if (_discWS) {
+  _discWS.on('new_message', function(msg) {
+    const qid = msg.question_id;
+    if (!_discOpen.has(qid)) return;
+    // Skip our own — discPost/discReply already rendered it locally
+    if (msg.sender_uid === DISC_UID || _pendingDisc.has(msg.temp_id)) return;
+    const list = document.getElementById(`disc-list-${qid}`);
+    if (!list) return;
+    if (list.querySelector('.disc-spinner')) { discLoad(qid, null); return; }
+    msg.replies = msg.replies || [];
+    list.querySelector('.no-comments')?.remove();
+    if (msg.parent_id) {
+      const pUname = _parentUname(msg.parent_id);
+      if (!_insertReplyIntoParent(msg.parent_id, discCard(msg, qid, null, true, pUname))) {
+        discLoad(qid, null); // parent not in DOM yet, fallback to full reload
+      }
+    } else {
+      list.insertAdjacentHTML('beforeend', discCard(msg, qid, null, false));
+    }
+    document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = msg.count);
+  });
+
+  _discWS.on('delete_message', d => document.getElementById(`ccard-${d.comment_id}`)?.remove());
+
+  _discWS.on('edit_message', function(d) {
+    const el = document.getElementById(`ctext-${d.comment_id}`);
+    if (el && !el.querySelector('textarea')) el.textContent = d.message;
+  });
+
+  _discWS.on('pin_message', function(d) {
+    const card = document.getElementById(`ccard-${d.comment_id}`);
+    if (!card) return;
+    card.classList.toggle('is-pinned', d.is_pinned);
+    const badge = card.querySelector('.badge-pin');
+    if (d.is_pinned && !badge) card.querySelector('.c-meta')?.insertAdjacentHTML('beforeend','<span class="badge-pin">📌 Pinned</span>');
+    else if (!d.is_pinned && badge) badge.remove();
+  });
+
+  _discWS.on('best_message', function(d) {
+    document.querySelectorAll('.is-best').forEach(c => c.classList.remove('is-best'));
+    if (d.is_best_answer) document.getElementById(`ccard-${d.comment_id}`)?.classList.add('is-best');
+  });
+}
+
+// ── Toggle open/close ─────────────────────────────────────────────────────────
+
+function discToggle(qid, examId) {
+  const body = document.getElementById(`disc-body-${qid}`);
+  const chev = document.getElementById(`disc-chev-${qid}`);
+  if (_discOpen.has(qid)) {
+    body.classList.remove('open');
+    chev.classList.remove('open');
+    _discOpen.delete(qid);
+    clearInterval(_discPolls[qid]);
+    delete _discPolls[qid];
+    if (_discWS && _wsJoined.has(qid)) { _discWS.emit('leave_discussion', {question_id: qid}); _wsJoined.delete(qid); }
+  } else {
+    if (_discOpen.size >= 3) { discToast('Close other discussions first', 'warn'); return; }
+    body.classList.add('open');
+    chev.classList.add('open');
+    _discOpen.add(qid);
+    discLoad(qid, examId);
+    if (_discWS && !_wsJoined.has(qid)) { _discWS.emit('join_discussion', {question_id: qid}); _wsJoined.add(qid); }
+    _discPolls[qid] = setInterval(() => discLoad(qid, examId), DISC_POLL);
+  }
+}
+
+// ── Load comments from server ─────────────────────────────────────────────────
+
+async function discLoad(qid, examId) {
+  try {
+    const r = await fetch(`/api/discussion/${qid}`);
+    const d = await r.json();
+    if (!d.success) return;
+    document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = d.count);
+
+    // Hash check — skip re-render if nothing changed
+    const newHash = JSON.stringify(d.comments.map(c => ({
+      id: c.id, msg: c.message, edited: c.is_edited,
+      pinned: c.is_pinned, best: c.is_best_answer,
+      replies: (c.replies||[]).map(r => ({id: r.id, msg: r.message}))
+    })));
+    if (_discLastHash[qid] === newHash) return;
+    _discLastHash[qid] = newHash;
+
+    // Preserve open reply boxes and their text
+    const openReplies = {};
+    document.querySelectorAll('[id^="rbox-"]').forEach(el => {
+      if (el.classList.contains('open')) {
+        const pid = el.id.replace('rbox-', '');
+        const ta  = document.getElementById(`rta-${pid}`);
+        openReplies[pid] = ta ? ta.value : '';
+      }
+    });
+
+    // Preserve active input focus
+    const activeId  = document.activeElement?.id || null;
+    const activeVal = document.activeElement?.value || '';
+    const activeSS  = document.activeElement?.selectionStart ?? 0;
+    const activeSE  = document.activeElement?.selectionEnd   ?? 0;
+
+    discRender(qid, examId, d.comments);
+
+    // Restore open reply boxes
+    Object.entries(openReplies).forEach(([pid, val]) => {
+      const box = document.getElementById(`rbox-${pid}`);
+      if (box) { box.classList.add('open'); const ta = document.getElementById(`rta-${pid}`); if (ta && val) ta.value = val; }
+    });
+
+    // Restore focus
+    if (activeId) {
+      const el = document.getElementById(activeId);
+      if (el && el !== document.activeElement) {
+        el.focus();
+        if (el.setSelectionRange) try { el.setSelectionRange(activeSS, activeSE); } catch(e) {}
+        if (activeVal && el.value !== activeVal) el.value = activeVal;
+      }
+    }
+  } catch(e) {}
+}
+
+// ── Char counter ──────────────────────────────────────────────────────────────
+
+function discCharCount(qid) {
+  const ta = document.getElementById(`disc-ta-${qid}`);
+  const el = document.getElementById(`disc-char-${qid}`);
+  if (ta && el) el.textContent = `${ta.value.length} / 500`;
+}
+
+// ── Post top-level comment ────────────────────────────────────────────────────
+
+async function discPost(qid, examId) {
+  const ta = document.getElementById(`disc-ta-${qid}`);
+  if (!ta) return;
+  const msg = ta.value.trim();
+  if (!msg) return;
+  ta.disabled = true;
+
+  const list = document.getElementById(`disc-list-${qid}`);
+  const optId = `opt-${Date.now()}`;
+  const hue   = _avatarHue(DISC_UNAME);
+  list?.querySelector('.no-comments')?.remove();
+  list?.insertAdjacentHTML('beforeend', `
+<div class="c-card" id="${optId}" style="opacity:.55;">
+  <div style="display:flex;gap:.6rem;align-items:flex-start;">
+    <div class="c-avatar" style="background:hsl(${hue},58%,36%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="c-meta"><span class="c-username">${discEsc(DISC_UNAME)}</span><span class="c-time">just now</span></div>
+      <div class="c-text">${discEsc(msg)}</div>
+    </div>
+  </div>
+</div>`);
+
+  try {
+    const r = await fetch(`/api/discussion/${qid}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, exam_id: examId})
+    });
+    const d = await r.json();
+    document.getElementById(optId)?.remove();
+    if (d.success) {
+      ta.value = '';
+      discCharCount(qid);
+      const m = d.message;
+      if (m) {
+        if (m.temp_id) { _pendingDisc.add(m.temp_id); setTimeout(() => _pendingDisc.delete(m.temp_id), 300); }
+        m.is_own = true;
+        list?.insertAdjacentHTML('beforeend', discCard(m, qid, examId, false));
+        document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = m.count);
+        _discLastHash[qid] = ''; // invalidate so next discLoad re-renders
+      } else if (!_discWS || !_wsJoined.has(qid)) discLoad(qid, examId);
+    } else discToast(d.message || 'Error posting', 'err');
+  } catch(e) { document.getElementById(optId)?.remove(); discToast('Network error','err'); }
+  ta.disabled = false;
+}
+
+// ── Post reply ────────────────────────────────────────────────────────────────
+
+async function discReply(parentId, qid, examId) {
+  const ta = document.getElementById(`rta-${parentId}`);
+  const msg = ta?.value.trim();
+  if (!msg) return;
+  ta.disabled = true;
+
+  const pUname = _parentUname(parentId);
+  const hue    = _avatarHue(DISC_UNAME);
+  const chip   = pUname
+    ? `<div class="reply-to-chip"><i class="fas fa-reply" style="font-size:.65rem;"></i> Replying to <strong>${discEsc(pUname)}</strong></div>`
+    : '';
+  const optId  = `opt-r-${Date.now()}`;
+
+  // Show optimistic reply inside parent box immediately
+  _insertReplyIntoParent(parentId, `
+<div class="c-card is-reply" id="${optId}" style="opacity:.55;">
+  <div style="display:flex;gap:.6rem;align-items:flex-start;">
+    <div class="c-avatar" style="background:hsl(${hue},52%,40%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>
+    <div style="flex:1;min-width:0;">
+      ${chip}
+      <div class="c-meta"><span class="c-username">${discEsc(DISC_UNAME)}</span><span class="c-time">just now</span></div>
+      <div class="c-text">${discEsc(msg)}</div>
+    </div>
+  </div>
+</div>`);
+
+  ta.value = '';
+  document.getElementById(`rbox-${parentId}`)?.classList.remove('open');
+
+  try {
+    const r = await fetch(`/api/discussion/${qid}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, exam_id: examId, parent_id: parentId})
+    });
+    const d = await r.json();
+    document.getElementById(optId)?.remove();
+    if (d.success) {
+      const m = d.message;
+      if (m) {
+        if (m.temp_id) { _pendingDisc.add(m.temp_id); setTimeout(() => _pendingDisc.delete(m.temp_id), 300); }
+        m.is_own = true;
+        _insertReplyIntoParent(parentId, discCard(m, qid, examId, true, pUname));
+        document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = m.count);
+        _discLastHash[qid] = ''; // invalidate hash
+      } else if (!_discWS || !_wsJoined.has(qid)) discLoad(qid, examId);
+    } else discToast(d.message || 'Error posting', 'err');
+  } catch(e) { document.getElementById(optId)?.remove(); discToast('Network error','err'); }
+  ta.disabled = false;
+}
+
+// ── Reply box toggle ──────────────────────────────────────────────────────────
+
+function discReplyToggle(parentId, qid, examId) {
+  const box = document.getElementById(`rbox-${parentId}`);
+  if (!box) return;
+  box.classList.toggle('open');
+  if (box.classList.contains('open')) document.getElementById(`rta-${parentId}`)?.focus();
+}
+
+// ── Edit ──────────────────────────────────────────────────────────────────────
+
+const _discEditOriginal = {};
+
+function discEditStart(commentId, qid, examId) {
+  const textEl = document.getElementById(`ctext-${commentId}`);
+  if (!textEl) return;
+  _discEditOriginal[commentId] = textEl.textContent.trim();
+  textEl.innerHTML = `
+    <div class="disc-edit-wrap">
+      <textarea class="disc-edit-textarea" id="eta-${commentId}" rows="2" maxlength="500"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discEditSubmit(${commentId},${qid},${examId});}">${_discEditOriginal[commentId]}</textarea>
+    </div>
+    <div class="disc-edit-actions">
+      <button class="disc-edit-save"   onclick="discEditSubmit(${commentId},${qid},${examId})">Save</button>
+      <button class="disc-edit-cancel" onclick="discEditCancel(${commentId})">Cancel</button>
+    </div>`;
+  const ta = document.getElementById(`eta-${commentId}`);
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+
+function discEditCancel(commentId) {
+  const textEl = document.getElementById(`ctext-${commentId}`);
+  if (textEl) textEl.innerHTML = discEsc(_discEditOriginal[commentId] || '');
+  delete _discEditOriginal[commentId];
+}
+
+async function discEditSubmit(commentId, qid, examId) {
+  const ta = document.getElementById(`eta-${commentId}`);
+  if (!ta) return;
+  const msg = ta.value.trim();
+  if (!msg) { discToast('Message cannot be empty','err'); return; }
+  ta.disabled = true;
+  try {
+    const r = await fetch(`/api/discussion/edit/${commentId}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg})
+    });
+    const d = await r.json();
+    if (d.success) {
+      delete _discEditOriginal[commentId];
+      // Update in-place without full reload
+      const textEl = document.getElementById(`ctext-${commentId}`);
+      if (textEl) textEl.innerHTML = discEsc(msg);
+      const card = document.getElementById(`ccard-${commentId}`);
+      if (card && !card.querySelector('.badge-edited')) {
+        card.querySelector('.c-meta')?.insertAdjacentHTML('beforeend','<span class="badge-edited">(edited)</span>');
+      }
+      _discLastHash[qid] = '';
+    } else { ta.disabled = false; discToast(d.message || 'Edit failed','err'); }
+  } catch(e) { ta.disabled = false; discToast('Network error','err'); }
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+
+function discDelete(commentId, qid, examId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'disc-confirm-overlay';
+  overlay.innerHTML = `
+    <div class="disc-confirm-box">
+      <h6>🗑️ Delete Comment?</h6>
+      <p>This action cannot be undone.</p>
+      <div class="disc-confirm-btns">
+        <button class="disc-cb-cancel">Cancel</button>
+        <button class="disc-cb-delete">Delete</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.disc-cb-cancel').onclick = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('.disc-cb-delete').onclick = async () => {
+    overlay.remove();
+    try {
+      const r = await fetch(`/api/discussion/delete/${commentId}`, {method:'DELETE'});
+      const d = await r.json();
+      if (d.success) {
+        document.getElementById(`ccard-${commentId}`)?.remove();
+        _discLastHash[qid] = '';
+      } else discToast('Delete failed','err');
+    } catch(e) { discToast('Network error','err'); }
+  };
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+async function discAdminPin(commentId, qid, examId) {
+  try {
+    const r = await fetch(`/api/discussion/admin/pin/${commentId}`, {method:'PUT'});
+    const d = await r.json();
+    if (d.success) discLoad(qid, examId);
+  } catch(e) {}
+}
+
+async function discAdminBest(commentId, qid, examId) {
+  try {
+    const r = await fetch(`/api/discussion/admin/best/${commentId}`, {method:'PUT'});
+    const d = await r.json();
+    if (d.success) discLoad(qid, examId);
+  } catch(e) {}
+}
+
+// ── Emoji picker ──────────────────────────────────────────────────────────────
+
+function discEmojiToggle(event, type, qid, refId) {
+  event.stopPropagation();
+  const key = type === 'main' ? `main-${qid}` : type === 'reply' ? `reply-${refId}` : `edit-${refId}`;
+  const pop = document.getElementById(`epop-${key}`);
+  if (!pop) return;
+  const isOpen = pop.classList.contains('open');
+  document.querySelectorAll('.emoji-picker-pop.open').forEach(p => p.classList.remove('open'));
+  if (isOpen) return;
+  const grid = document.getElementById(`egrid-${key}`);
+  if (grid && !grid.dataset.built) {
+    grid.innerHTML = DISC_EMOJIS.map(e =>
+      `<button class="e-btn" type="button" onclick="discEmojiInsert('${e}','${type}',${qid},${refId})">${e}</button>`
+    ).join('');
+    grid.dataset.built = '1';
+  }
+  pop.classList.add('open');
+}
+
+function discEmojiInsert(emoji, type, qid, refId) {
+  let ta;
+  if (type === 'main')  ta = document.getElementById(`disc-ta-${qid}`);
+  else if (type === 'reply') ta = document.getElementById(`rta-${refId}`);
+  else if (type === 'edit')  ta = document.getElementById(`eta-${refId}`);
+  if (ta) {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    ta.value = ta.value.slice(0,s) + emoji + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + emoji.length;
+    ta.focus();
+    discCharCount(qid);
+  }
+  const key = type === 'main' ? `main-${qid}` : type === 'reply' ? `reply-${refId}` : `edit-${refId}`;
+  document.getElementById(`epop-${key}`)?.classList.remove('open');
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.emoji-picker-pop.open').forEach(p => p.classList.remove('open'));
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function discToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'disc-toast';
+  t.style.background = type === 'err' ? '#ef4444' : type === 'warn' ? '#d97706' : '#2d5be3';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── MathJax ───────────────────────────────────────────────────────────────────
+
+function discWrapMath() {
+  document.querySelectorAll('.question-response-card .card-body').forEach(card => {
+    card.querySelectorAll('p, .option-display').forEach(el => {
+      if (!el.closest('.disc-section') && !el.classList.contains('math-wrap'))
+        el.classList.add('math-wrap');
+    });
+  });
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([...document.querySelectorAll('.math-wrap')]).catch(e => console.warn(e));
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.MathJax) MathJax.startup.promise.then(() => discWrapMath());
+  else window.addEventListener('load', discWrapMath);
+});
+
+// ── Bulk count init ───────────────────────────────────────────────────────────
+
+(async function discInitCounts() {
+  const badges = document.querySelectorAll('[id^="disc-cnt-"]');
+  const qids   = [...badges].map(b => parseInt(b.id.replace('disc-cnt-','')));
+  if (!qids.length) return;
+  try {
+    const r = await fetch('/api/discussion/counts/bulk', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({question_ids: qids})
+    });
+    const d = await r.json();
+    if (d.success) badges.forEach(b => { const q = b.id.replace('disc-cnt-',''); b.textContent = d.counts[q] ?? '0'; });
+  } catch(e) { badges.forEach(b => b.textContent = '0'); }
+})();
+
+</script>
+{% endblock %}

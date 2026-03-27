@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - {% block title %}{% endblock %}</title>
+
+  <!-- ── Sync: theme + sidebar state applied before paint → no flash ── -->
+  <script>
+  (function(){
+    var t = localStorage.getItem('adminTheme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    if(localStorage.getItem('adminSidebarCollapsed') === 'true')
+      document.documentElement.setAttribute('data-sidebar', 'collapsed');
+  })();
+  </script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+
+  <style>
+  /* ═══════════════════════════════════════════════════════════════
+     DESIGN TOKENS
+  ═══════════════════════════════════════════════════════════════ */
+  :root {
+    --accent:         #2d5be3;
+    --accent-hover:   #2450c8;
+    --accent-subtle:  rgba(45,91,227,0.14);
+    --accent-border:  rgba(45,91,227,0.25);
+
+    /* Sidebar */
+    --sb-w-open:      240px;
+    --sb-w-closed:    68px;
+    --sb-bg:          #0d0d12;
+    --sb-border:      rgba(255,255,255,0.07);
+    --sb-ease:        cubic-bezier(0.4, 0, 0.2, 1);
+    --sb-dur:         0.22s;
+  }
+
+  [data-theme="dark"] {
+    --bg:                #0a0a0f;
+    --card-bg:           #111118;
+    --card-border:       rgba(255,255,255,0.07);
+    --header-bg:         #0d0d12;
+    --text-primary:      #e6eef8;
+    --text-secondary:    rgba(255,255,255,0.55);
+    --text-muted:        rgba(255,255,255,0.28);
+    --input-bg:          rgba(255,255,255,0.05);
+    --input-border:      rgba(255,255,255,0.1);
+    --input-text:        #e6eef8;
+    --input-placeholder: rgba(255,255,255,0.22);
+    --table-head-bg:     rgba(255,255,255,0.03);
+    --table-row-hover:   rgba(45,91,227,0.06);
+    --table-border:      rgba(255,255,255,0.05);
+    --shadow:            0 4px 20px rgba(0,0,0,0.4);
+    --shadow-hover:      0 8px 32px rgba(0,0,0,0.5);
+    --modal-bg:          #111118;
+    --modal-footer-bg:   #0e0e16;
+    --footer-bg:         #0d0d12;
+    --footer-border:     rgba(255,255,255,0.06);
+    --scrollbar-thumb:   rgba(255,255,255,0.1);
+    --select-bg:         #111118;
+    --btn-sec-bg:        rgba(255,255,255,0.05);
+    --btn-sec-border:    rgba(255,255,255,0.1);
+    --btn-sec-color:     rgba(255,255,255,0.55);
+    --nav-hover-bg:      rgba(255,255,255,0.06);
+    --nav-hover-border:  rgba(255,255,255,0.07);
+    --section-label-c:   rgba(255,255,255,0.18);
+    --nav-color:         rgba(255,255,255,0.48);
+    --nav-icon-op:       0.55;
+    --toggle-bg:         rgba(255,255,255,0.07);
+    --toggle-border:     rgba(255,255,255,0.1);
+    --toggle-color:      rgba(255,255,255,0.5);
+    --toggle-hover-bg:   rgba(255,255,255,0.13);
+    --toggle-hover-c:    rgba(255,255,255,0.9);
+    --tip-bg:            rgba(12,12,18,0.97);
+    --tip-border:        rgba(255,255,255,0.1);
+    --tip-color:         #e6eef8;
+  }
+
+  [data-theme="light"] {
+    --bg:                #f0f2f8;
+    --card-bg:           #ffffff;
+    --card-border:       #e2e8f0;
+    --header-bg:         #f8faff;
+    --text-primary:      #1a202c;
+    --text-secondary:    #4a5568;
+    --text-muted:        #718096;
+    --input-bg:          #ffffff;
+    --input-border:      #cbd5e0;
+    --input-text:        #1a202c;
+    --input-placeholder: #a0aec0;
+    --table-head-bg:     #f8faff;
+    --table-row-hover:   rgba(45,91,227,0.04);
+    --table-border:      #e8edf5;
+    --shadow:            0 4px 12px rgba(0,0,0,0.07);
+    --shadow-hover:      0 8px 25px rgba(0,0,0,0.12);
+    --modal-bg:          #ffffff;
+    --modal-footer-bg:   #f8faff;
+    --footer-bg:         #0d0d12;
+    --footer-border:     rgba(255,255,255,0.06);
+    --scrollbar-thumb:   rgba(0,0,0,0.16);
+    --select-bg:         #ffffff;
+    --btn-sec-bg:        #f1f5f9;
+    --btn-sec-border:    #e2e8f0;
+    --btn-sec-color:     #4a5568;
+    --nav-hover-bg:      rgba(255,255,255,0.09);
+    --nav-hover-border:  rgba(255,255,255,0.1);
+    --section-label-c:   rgba(255,255,255,0.2);
+    --nav-color:         rgba(255,255,255,0.5);
+    --nav-icon-op:       0.6;
+    --toggle-bg:         rgba(255,255,255,0.08);
+    --toggle-border:     rgba(255,255,255,0.12);
+    --toggle-color:      rgba(255,255,255,0.55);
+    --toggle-hover-bg:   rgba(255,255,255,0.16);
+    --toggle-hover-c:    rgba(255,255,255,0.95);
+    --tip-bg:            rgba(12,12,18,0.97);
+    --tip-border:        rgba(255,255,255,0.1);
+    --tip-color:         #e6eef8;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RESET & BASE
+  ═══════════════════════════════════════════════════════════════ */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    transition: background 0.3s, color 0.3s;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 6px; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     LAYOUT
+  ═══════════════════════════════════════════════════════════════ */
+  .admin-wrapper { display: flex; min-height: 100vh; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     SIDEBAR — clean display:none label approach
+     Collapse strategy:
+       • Sidebar width: 240px → 70px (CSS transition)
+       • Labels/brand-text/badges: display:none toggled by JS
+         AFTER the width transition completes (so text doesn't
+         partially show during animation — JS waits 220ms)
+       • On expand: display restored BEFORE width animates
+       • Toggle: plain flex item, always last in sb-header,
+         always visible. No absolute positioning.
+       • Icons: 36×36 fixed box, always centered.
+  ═══════════════════════════════════════════════════════════════ */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: var(--sb-w-open);
+    min-width: var(--sb-w-open);
+    background: var(--sb-bg);
+    border-right: 1px solid var(--sb-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+    transition:
+      width var(--sb-dur) var(--sb-ease),
+      min-width var(--sb-dur) var(--sb-ease);
+    z-index: 200;
+  }
+
+  .sidebar.is-collapsed {
+    width: var(--sb-w-closed);
+    min-width: var(--sb-w-closed);
+  }
+
+  /* No sb-inner wrapper needed — sidebar IS the flex column */
+
+  /* ── HEADER ── */
+  .sb-header {
+    display: flex;
+    align-items: center;
+    height: 60px;
+    padding: 0 12px;
+    gap: 8px;
+    border-bottom: 1px solid var(--sb-border);
+    flex-shrink: 0;
+  }
+  .is-collapsed .sb-header {
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .brand-icon {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .brand-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  /* JS adds sb-hide to brand-text after collapse animation */
+  .brand-text.sb-hide { display: none; }
+
+  .brand-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 0.88rem;
+    color: #fff;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+  .brand-sub {
+    font-size: 0.56rem;
+    color: rgba(255,255,255,0.28);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* ── TOGGLE BUTTON ─────────────────────────────────
+     Ordinary flex item, last in sb-header.
+     Expanded: margin-left:auto pushes it to right edge.
+     Collapsed: brand-text is display:none, margin-left:0,
+       header is justify-content:center → icon + toggle centered.
+     Rotates 180° when collapsed. Always visible.
+  ────────────────────────────────────────────────── */
+  .sb-toggle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--toggle-bg);
+    border: 1px solid var(--toggle-border);
+    color: var(--toggle-color);
+    cursor: pointer;
+    font-size: 0.65rem;
+    margin-left: auto;
+    transition: background 0.15s, color 0.15s, transform var(--sb-dur) var(--sb-ease);
+  }
+  .sb-toggle:hover {
+    background: var(--toggle-hover-bg);
+    color: var(--toggle-hover-c);
+  }
+  .is-collapsed .sb-toggle {
+    transform: rotate(180deg);
+    margin-left: 0;
+  }
+
+  /* ── NAV SCROLL AREA ── */
+  .sb-nav-wrap {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
+    scrollbar-width: none;
+  }
+  .sb-nav-wrap::-webkit-scrollbar { display: none; }
+  .is-collapsed .sb-nav-wrap { padding: 6px; }
+
+  /* ── NAV LIST ── */
+  .sb-nav { list-style: none; padding: 0; margin: 0; }
+  .sb-nav > li { margin-bottom: 1px; }
+
+  /* ── SECTION LABELS ── */
+  .section-label {
+    display: block;
+    font-size: 0.57rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--section-label-c);
+    padding: 14px 8px 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+  }
+  /* Collapsed: JS adds sb-hide, replaced by a thin hr divider */
+  .section-label.sb-hide {
+    font-size: 0;
+    padding: 0;
+    margin: 6px 6px;
+    height: 1px;
+    background: var(--sb-border);
+    display: block;
+    pointer-events: none;
+  }
+
+  /* ── NAV LINK ── */
+  .sb-nav .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    color: var(--nav-color);
+    font-size: 0.835rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .is-collapsed .sb-nav .nav-link {
+    justify-content: center;
+    padding: 6px 0;
+    gap: 0;
+  }
+
+  /* ── ICON WRAPPER — 36×36 fixed, always centered ── */
+  .nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    opacity: var(--nav-icon-op);
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .nav-icon i { font-size: 0.88rem; line-height: 1; }
+
+  /* ── LABEL — JS adds sb-hide after collapse animation ── */
+  .nav-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .nav-label.sb-hide { display: none; }
+
+  /* ── BADGE ── */
+  .nav-badge {
+    flex-shrink: 0;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 20px;
+    padding: 1px 6px;
+    font-size: 0.59rem;
+    font-weight: 700;
+    min-width: 17px;
+    text-align: center;
+  }
+  .nav-badge.sb-hide { display: none; }
+
+  /* ── HOVER ── */
+  .sb-nav .nav-link:hover {
+    background: var(--nav-hover-bg);
+    color: rgba(255,255,255,0.9);
+    border-color: var(--nav-hover-border);
+  }
+  .sb-nav .nav-link:hover .nav-icon { opacity: 1; }
+
+  /* ── ACTIVE ── */
+  .sb-nav .nav-link.active {
+    background: var(--accent-subtle);
+    color: #fff;
+    border-color: var(--accent-border);
+  }
+  .sb-nav .nav-link.active .nav-icon {
+    opacity: 1;
+    background: rgba(45,91,227,0.15);
+  }
+
+  /* ── LOGOUT ── */
+  .sb-nav .nav-link.nav-logout { color: rgba(239,68,68,0.6); }
+  .sb-nav .nav-link.nav-logout:hover {
+    background: rgba(239,68,68,0.08);
+    color: #ef4444;
+    border-color: rgba(239,68,68,0.15);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TOOLTIP — fixed div, anchored to sidebar right edge
+  ═══════════════════════════════════════════════════════════════ */
+  #sb-tooltip {
+    position: fixed;
+    background: rgba(12,12,18,0.97);
+    color: #e6eef8;
+    font-size: 0.73rem;
+    font-weight: 600;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    white-space: nowrap;
+    padding: 5px 10px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+  }
+  #sb-tooltip.visible { opacity: 1; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     CONTENT AREA
+  ═══════════════════════════════════════════════════════════════ */
+  .content-wrap {
+    flex: 1;
+    min-width: 0;
+    padding: 1.75rem 2rem;
+    background: var(--bg);
+    transition: background 0.3s;
+  }
+
+  /* ── TOP BAR ─────────────────────────────────────── */
+  .admin-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .topbar-btn {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 8px; color: var(--text-secondary);
+    padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 0.35rem;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .topbar-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+  .theme-toggle-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── CARDS ───────────────────────────────────────── */
+  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: none; color: var(--text-primary); }
+  .card:hover { box-shadow: var(--shadow); }
+  .card-header { background: var(--header-bg); border-bottom: 1px solid var(--card-border); border-radius: 12px 12px 0 0 !important; padding: 1rem 1.4rem; font-weight: 600; color: var(--text-primary); }
+  .card-body { padding: 1.4rem; }
+
+  /* ── FORMS ───────────────────────────────────────── */
+  .form-control, .form-select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    border-radius: 8px; padding: 0.55rem 0.9rem;
+    font-size: 0.875rem; font-weight: 500; color: var(--input-text);
+    transition: border-color 0.2s, box-shadow 0.2s; font-family: inherit;
+  }
+  .form-control::placeholder { color: var(--input-placeholder); font-weight: 400; }
+  .form-control:focus, .form-select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,91,227,0.12);
+    outline: none; background: var(--input-bg); color: var(--input-text);
+  }
+  .form-select { background-color: var(--select-bg); color: var(--input-text); }
+  .form-label { font-weight: 600; color: var(--text-primary); margin-bottom: 0.4rem; font-size: 0.82rem; }
+  textarea.form-control { resize: vertical; min-height: 90px; }
+
+  /* ── BUTTONS ─────────────────────────────────────── */
+  .btn { border-radius: 8px; padding: 0.55rem 1.1rem; font-weight: 600; font-size: 0.875rem; border: none; transition: all 0.2s; font-family: inherit; cursor: pointer; }
+  .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.78rem; }
+  .btn-lg { padding: 0.72rem 1.5rem; font-size: 1rem; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); color: white; transform: translateY(-1px); }
+  .btn-danger { background: #ef4444; color: white; }
+  .btn-danger:hover { background: #dc2626; color: white; transform: translateY(-1px); }
+  .btn-success { background: #10b981; color: white; }
+  .btn-success:hover { background: #059669; color: white; transform: translateY(-1px); }
+  .btn-warning { background: #f59e0b; color: white; }
+  .btn-warning:hover { background: #d97706; color: white; }
+  .btn-secondary { background: var(--btn-sec-bg); color: var(--btn-sec-color); border: 1px solid var(--btn-sec-border); }
+  .btn-secondary:hover { color: var(--text-primary); border-color: var(--accent); background: var(--accent-subtle); }
+  .btn-outline-primary { border: 1px solid var(--accent); color: var(--accent); background: transparent; }
+  .btn-outline-primary:hover { background: var(--accent); color: white; }
+  .btn-close { opacity: 0.5; }
+  [data-theme="dark"] .btn-close { filter: brightness(0) invert(1); opacity: 0.4; }
+
+  /* ── TABLE ───────────────────────────────────────── */
+  .table {
+    background: transparent; color: var(--text-primary); margin-bottom: 0;
+    --bs-table-bg: transparent; --bs-table-color: var(--text-primary); --bs-table-border-color: var(--table-border);
+  }
+  .table thead th {
+    background: var(--table-head-bg); border: none; font-weight: 700; color: var(--text-secondary);
+    padding: 0.9rem 1.1rem; font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--table-border);
+  }
+  .table tbody td {
+    border: none; border-bottom: 1px solid var(--table-border);
+    padding: 0.9rem 1.1rem; color: var(--text-secondary); font-weight: 500; font-size: 0.875rem; vertical-align: middle;
+  }
+  .table tbody tr:hover { background: var(--table-row-hover); }
+  .table tbody tr:last-child td { border-bottom: none; }
+  .table-responsive { border-radius: 12px; border: 1px solid var(--card-border); overflow: hidden; }
+
+  /* ── ALERTS ──────────────────────────────────────── */
+  .alert { border-radius: 10px; border: 1px solid; font-weight: 500; font-size: 0.875rem; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  [data-theme="dark"] .alert-success { background: rgba(16,185,129,0.1);  border-color: rgba(16,185,129,0.22); color: #6ee7b7; }
+  [data-theme="dark"] .alert-danger  { background: rgba(239,68,68,0.1);   border-color: rgba(239,68,68,0.22);  color: #fca5a5; }
+  [data-theme="dark"] .alert-warning { background: rgba(245,158,11,0.1);  border-color: rgba(245,158,11,0.22); color: #fcd34d; }
+  [data-theme="dark"] .alert-info    { background: rgba(45,91,227,0.1);   border-color: rgba(45,91,227,0.22);  color: #a5b4fc; }
+  [data-theme="light"] .alert-success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+  [data-theme="light"] .alert-danger  { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+  [data-theme="light"] .alert-warning { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+  [data-theme="light"] .alert-info    { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+
+  /* ── MODALS ──────────────────────────────────────── */
+  .modal-content { background: var(--modal-bg); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.35); color: var(--text-primary); }
+  .modal-header { background: var(--card-bg); border-bottom: 1px solid var(--card-border); border-radius: 14px 14px 0 0; padding: 1rem 1.4rem; }
+  .modal-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+  .modal-body { padding: 1.4rem; background: var(--modal-bg); color: var(--text-primary); }
+  .modal-footer { border: none; padding: 1rem 1.4rem; background: var(--modal-footer-bg); border-radius: 0 0 14px 14px; border-top: 1px solid var(--card-border); }
+
+  /* ── MISC ────────────────────────────────────────── */
+  h1,h2,h3,h4,h5,h6 { color: var(--text-primary); font-weight: 700; }
+  .text-muted { color: var(--text-muted) !important; }
+  small, .small { color: var(--text-muted); font-size: 0.78rem; }
+  input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  hr { border-color: var(--card-border); opacity: 1; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.1rem 1.3rem; display: flex; align-items: center; gap: 1rem; }
+  .stat-card:hover { box-shadow: var(--shadow); }
+  .stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+  .stat-icon.blue   { background: rgba(45,91,227,0.12); color: #4f7ef7; }
+  .stat-icon.green  { background: rgba(16,185,129,0.12); color: #10b981; }
+  .stat-icon.orange { background: rgba(245,158,11,0.12); color: #f59e0b; }
+  .stat-icon.red    { background: rgba(239,68,68,0.12);  color: #ef4444; }
+  .stat-icon.purple { background: rgba(139,92,246,0.12); color: #8b5cf6; }
+  .stat-num   { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1; }
+  .stat-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; margin-top: 0.2rem; }
+
+  /* ── FOOTER ──────────────────────────────────────── */
+  .professional-footer { background: var(--footer-bg); border-top: 1px solid var(--footer-border); color: rgba(255,255,255,0.35); padding: 1.1rem 0; }
+  .footer-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; }
+  .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .footer-links a { color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.8rem; font-weight: 500; transition: color 0.2s; }
+  .footer-links a:hover { color: rgba(255,255,255,0.7); }
+  .footer-social { display: flex; gap: 0.5rem; }
+  .footer-social a { width: 30px; height: 30px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 7px; color: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; transition: all 0.2s; }
+  .footer-social a:hover { background: var(--accent); color: white; border-color: var(--accent); }
+  @media (max-width: 768px) {
+    .professional-footer { padding: 1.25rem 0; }
+    .footer-content { flex-direction: column; align-items: center; text-align: center; gap: 0.75rem; }
+    .footer-links { justify-content: center; gap: 1rem; }
+    .footer-social { justify-content: center; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     MOBILE
+  ═══════════════════════════════════════════════════════════════ */
+  .mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 14px; left: 14px;
+    z-index: 1001;
+    background: var(--accent);
+    border: none;
+    border-radius: 9px;
+    width: 38px; height: 38px;
+    color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.52);
+    z-index: 999;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .mobile-overlay.active { display: block; }
+
+  @media (max-width: 768px) {
+    .mobile-menu-toggle { display: flex; }
+    .sb-toggle { display: none; }
+    .admin-wrapper { flex-direction: column; }
+    .sidebar {
+      position: fixed !important;
+      top: 0; left: -100%;
+      width: 260px !important;
+      min-width: 260px !important;
+      height: 100vh;
+      z-index: 1000;
+      overflow: hidden !important;
+      transition: left 0.24s ease !important;
+      border-radius: 0 12px 12px 0;
+    }
+    .sidebar.mobile-open { left: 0; }
+    /* Force expanded appearance on mobile regardless of collapsed state */
+    .sidebar.mobile-open .brand-text,
+    .sidebar.mobile-open .nav-label,
+    .sidebar.mobile-open .nav-badge {
+      display: block !important;
+    }
+    .sidebar.mobile-open .section-label {
+      font-size: 0.57rem !important;
+      padding: 14px 8px 4px !important;
+      background: none !important;
+      height: auto !important;
+      margin: 0 !important;
+      display: block !important;
+    }
+    .sidebar.mobile-open .sb-header { justify-content: flex-start !important; gap: 8px !important; }
+    .sidebar.mobile-open .sb-toggle { display: none !important; }
+    /* Mobile close button: top-right, no overlap with logo */
+    .sb-mobile-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      margin-left: auto;
+      flex-shrink: 0;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.55);
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    /* Modal centering fix for mobile */
+    #accountSettingsModal .modal-dialog {
+      max-width: calc(100% - 2rem) !important;
+      margin: auto !important;
+      width: 100% !important;
+    }
+    .sidebar.mobile-open .sb-nav .nav-link {
+      justify-content: flex-start !important;
+      padding: 6px 8px !important;
+      gap: 10px !important;
+    }
+    .content-wrap { padding: 4.5rem 1rem 1.5rem; }
+    .admin-topbar { margin-bottom: 1rem; padding-bottom: 0.75rem; }
+    .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table thead th, .table tbody td { padding: 0.65rem 0.8rem; font-size: 0.78rem; }
+    h1 { font-size: 1.4rem; } h2 { font-size: 1.2rem; } h3 { font-size: 1.05rem; }
+    .stat-card { padding: 0.85rem 1rem; gap: 0.75rem; }
+    .stat-num { font-size: 1.2rem; }
+    .card-body { padding: 1rem; }
+    .card-header { padding: 0.75rem 1rem; }
+    .btn { font-size: 0.82rem; padding: 0.45rem 0.85rem; }
+    .btn-sm { font-size: 0.73rem; padding: 0.3rem 0.65rem; }
+    .footer-content { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    .footer-links { gap: 0.75rem; }
+  }
+  @media (max-width: 576px) {
+    .sidebar { width: 100% !important; border-radius: 0; }
+    .content-wrap { padding: 4rem 0.75rem 1rem; }
+    .stat-card { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @supports (padding: max(0px)) {
+    @media (max-width: 768px) {
+      .mobile-menu-toggle {
+        top: max(14px, env(safe-area-inset-top));
+        left: max(14px, env(safe-area-inset-left));
+      }
+      .content-wrap {
+        padding-top: max(4.5rem, calc(env(safe-area-inset-top) + 3.5rem));
+      }
+    }
+  }
+
+  /* Mobile close button — hidden on desktop */
+  .sb-mobile-close { display: none; }
+
+  /* Flash-free pre-paint collapsed state (applied via <head> script) */
+  [data-sidebar="collapsed"] #adminSidebar {
+    width: var(--sb-w-closed) !important;
+    min-width: var(--sb-w-closed) !important;
+  }
+  </style>
+</head>
+<body>
+<div class="admin-wrapper">
+
+  <!-- ════════════════════════════════════════════════════════
+       SIDEBAR
+  ════════════════════════════════════════════════════════ -->
+  <aside class="sidebar" id="adminSidebar" role="navigation" aria-label="Admin navigation">
+
+      <!-- ── Header: Brand + Always-Visible Toggle ── -->
+      <div class="sb-header">
+        <div class="brand-icon" aria-hidden="true">
+          <i class="fas fa-user-shield"></i>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">Admin Portal</div>
+          <div class="brand-sub">Control Panel</div>
+        </div>
+        <button class="sb-toggle" id="sidebarToggleBtn"
+                aria-label="Collapse sidebar">
+          <i class="fas fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button class="sb-mobile-close" id="sidebarMobileClose" aria-label="Close navigation">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <!-- ── Nav ── -->
+      <div class="sb-nav-wrap">
+        <ul class="sb-nav" role="list">
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.dashboard') %}active{% endif %}"
+               href="{{ url_for('admin.dashboard') }}"
+               data-tooltip="Dashboard">
+              <span class="nav-icon"><i class="fas fa-home"></i></span>
+              <span class="nav-label">Dashboard</span>
+            </a>
+          </li>
+
+          <!-- Content -->
+          <li><span class="section-label">Content</span></li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.categories') %}active{% endif %}"
+               href="{{ url_for('admin.categories') }}"
+               data-tooltip="Manage Exams Categories">
+              <span class="nav-icon"><i class="fas fa-layer-group"></i></span>
+              <span class="nav-label">Manage Categories</span>
+            </a>
+          </li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.exams') %}active{% endif %}"
+               href="{{ url_for('admin.exams') }}"
+               data-tooltip="Manage Exams">
+              <span class="nav-icon"><i class="fas fa-file-alt"></i></span>
+              <span class="nav-label">Manage Exams</span>
+            </a>
+          </li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.subjects') %}active{% endif %}"
+               href="{{ url_for('admin.subjects') }}"
+               data-tooltip="Manage Subjects">
+              <span class="nav-icon"><i class="fas fa-book"></i></span>
+              <span class="nav-label">Manage Subjects</span>
+            </a>
+          </li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.questions') or request.endpoint == 'admin.questions_index') %}active{% endif %}"
+               href="{{ url_for('admin.questions_index') }}"
+               data-tooltip="Manage Questions">
+              <span class="nav-icon"><i class="fas fa-question-circle"></i></span>
+              <span class="nav-label">Manage Questions</span>
+            </a>
+          </li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.upload_images') %}active{% endif %}"
+               href="{{ url_for('admin.upload_images_page') }}"
+               data-tooltip="Upload Images">
+              <span class="nav-icon"><i class="fas fa-images"></i></span>
+              <span class="nav-label">Upload Images</span>
+            </a>
+          </li>
+
+          <li>
+            <button id="open-latex-editor-admin-base" class="nav-link"
+                    data-tooltip="LaTeX Editor">
+              <span class="nav-icon"><i class="fas fa-square-root-alt"></i></span>
+              <span class="nav-label">LaTeX Editor</span>
+            </button>
+          </li>
+
+          <!-- Management -->
+          <li><span class="section-label">Management</span></li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.requests') or request.endpoint.startswith('admin.new_requests') or request.endpoint.startswith('admin.requests_history')) %}active{% endif %}"
+               href="{{ url_for('admin.requests_dashboard') }}"
+               data-tooltip="Users &amp; Requests">
+              <span class="nav-icon"><i class="fas fa-user-plus"></i></span>
+              <span class="nav-label">Users &amp; Requests</span>
+              <span class="nav-badge" id="requestsBadge" style="display:none">0</span>
+            </a>
+          </li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.attempts') %}active{% endif %}"
+               href="{{ url_for('admin.attempts') }}"
+               data-tooltip="Manage Attempts">
+              <span class="nav-icon"><i class="fas fa-list-ol"></i></span>
+              <span class="nav-label">Manage Attempts</span>
+            </a>
+          </li>
+
+          <!-- Analytics -->
+          <li><span class="section-label">Analytics</span></li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.users_analytics') %}active{% endif %}"
+               href="{{ url_for('admin.users_analytics') }}"
+               data-tooltip="Users Analytics">
+              <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
+              <span class="nav-label">Users Analytics</span>
+            </a>
+          </li>
+
+          <li>
+            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
+               href="{{ url_for('admin.ai_command_centre') }}"
+               data-tooltip="AI Command Centre">
+              <span class="nav-icon"><i class="fas fa-robot"></i></span>
+              <span class="nav-label">AI Command Centre</span>
+            </a>
+          </li>
+
+          <!-- Account Settings -->
+          <li>
+            <button class="nav-link" id="accountSettingsBtn"
+                    data-tooltip="Account Settings">
+              <span class="nav-icon"><i class="fas fa-cog"></i></span>
+              <span class="nav-label">Account Settings</span>
+            </button>
+          </li>
+
+
+        </ul>
+      </div><!-- /sb-nav-wrap -->
+
+  </aside>
+
+  <!-- ════════════════════════════════════════════════════════
+       MAIN CONTENT
+  ════════════════════════════════════════════════════════ -->
+  <div class="content-wrap">
+    <div class="admin-topbar">
+
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show mb-3" role="alert">
+            <i class="fas fa-{{ 'exclamation-triangle' if category in ('error','danger') else 'check-circle' if category == 'success' else 'info-circle' }} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+</div><!-- /admin-wrapper -->
+
+<footer class="professional-footer">
+  <div class="container-fluid px-4">
+    <div class="footer-content">
+      <div style="display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:600;color:rgba(255,255,255,0.4)">
+        <i class="fas fa-user-shield" style="color:rgba(45,91,227,0.7)"></i> AdminPortal
+      </div>
+      <div class="footer-links">
+        <a href="{{ url_for('misc.privacy_policy') }}">Privacy</a>
+        <a href="{{ url_for('misc.terms_of_service') }}">Terms</a>
+        <a href="{{ url_for('misc.support') }}">Support</a>
+        <a href="{{ url_for('misc.contact') }}">Contact</a>
+        <a href="{{ url_for('misc.about') }}">About</a>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem">
+        <span style="font-size:.75rem;color:rgba(255,255,255,0.25)">&copy; {{ CURRENT_YEAR }} ExamPortal Admin</span>
+        <div class="footer-social">
+          <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+          <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+          <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ══ THEME ══════════════════════════════════════════════ -->
+<script>
+(function(){
+  var html=document.documentElement, KEY='adminTheme', D='dark', L='light';
+  function syncIcon(){
+    var icon=document.getElementById('themeIcon');
+    if(icon) icon.className = html.getAttribute('data-theme')===D ? 'fas fa-sun' : 'fas fa-moon';
+  }
+  function apply(t){
+    html.setAttribute('data-theme',t);
+    localStorage.setItem(KEY,t);
+    syncIcon();
+    try{
+      [window._resultPopup,window._responsesPopup].forEach(function(w){
+        if(w&&!w.closed) w.postMessage({type:'adminThemeChange',theme:t},window.location.origin);
+      });
+    }catch(e){}
+  }
+  syncIcon();
+  var btn=document.getElementById('themeToggle');
+  if(btn) btn.addEventListener('click',function(){ apply(html.getAttribute('data-theme')===D?L:D); });
+})();
+</script>
+
+<!-- ══ SIDEBAR TOGGLE ═════════════════════════════════════ -->
+<script>
+(function(){
+  var STORE = 'adminSidebarCollapsed';
+  var DUR   = 230; /* ms — matches CSS --sb-dur */
+  var sb    = document.getElementById('adminSidebar');
+  var btn   = document.getElementById('sidebarToggleBtn');
+  if (!sb || !btn) return;
+
+  /* Elements whose text must be completely hidden when collapsed */
+  function getHideEls() {
+    return sb.querySelectorAll('.nav-label, .nav-badge, .brand-text, .section-label');
+  }
+
+  var collapsed = localStorage.getItem(STORE) === 'true';
+
+  function applyCollapsed(animate) {
+    /* Remove SSR attr — JS class takes over */
+    document.documentElement.removeAttribute('data-sidebar');
+
+    if (animate) {
+      /* Collapsing: hide text FIRST (instant), then animate width */
+      getHideEls().forEach(function(el) { el.classList.add('sb-hide'); });
+      /* Tiny rAF so display:none settles before width transition starts */
+      requestAnimationFrame(function() {
+        sb.classList.add('is-collapsed');
+      });
+    } else {
+      /* No animation (page load): apply everything at once */
+      getHideEls().forEach(function(el) { el.classList.add('sb-hide'); });
+      sb.classList.add('is-collapsed');
+    }
+    btn.setAttribute('aria-label', 'Expand sidebar');
+  }
+
+  function applyExpanded(animate) {
+    document.documentElement.removeAttribute('data-sidebar');
+
+    if (animate) {
+      /* Expanding: start width animation immediately */
+      sb.classList.remove('is-collapsed');
+      /* Show text AFTER width finishes */
+      setTimeout(function() {
+        getHideEls().forEach(function(el) { el.classList.remove('sb-hide'); });
+      }, DUR);
+    } else {
+      sb.classList.remove('is-collapsed');
+      getHideEls().forEach(function(el) { el.classList.remove('sb-hide'); });
+    }
+    btn.setAttribute('aria-label', 'Collapse sidebar');
+  }
+
+  function applyState(c, animate) {
+    collapsed = c;
+    localStorage.setItem(STORE, String(c));
+    if (c) applyCollapsed(animate);
+    else   applyExpanded(animate);
+  }
+
+  /* Page load — also handle SSR pre-paint state */
+  if (collapsed) {
+    applyCollapsed(false);
+  } else {
+    /* If SSR set data-sidebar=collapsed but stored state is expanded, clear it */
+    document.documentElement.removeAttribute('data-sidebar');
+  }
+
+  btn.addEventListener('click', function() { applyState(!collapsed, true); });
+
+  /* Expose for Account Settings modal */
+  window._adminSidebarApplyState = applyState;
+})();
+</script>
+
+<!-- ══ MOBILE SIDEBAR ════════════════════════════════════ -->
+<script>
+(function(){
+  function init(){
+    if(document.querySelector('.mobile-menu-toggle')) return;
+
+    var btn = document.createElement('button');
+    btn.className = 'mobile-menu-toggle';
+    btn.innerHTML = '<i class="fas fa-bars"></i>';
+    btn.setAttribute('aria-label','Open navigation');
+    document.body.appendChild(btn);
+
+    var ov = document.createElement('div');
+    ov.className = 'mobile-overlay';
+    document.body.appendChild(ov);
+
+    var sb = document.getElementById('adminSidebar');
+
+    function openM(){
+      sb.classList.add('mobile-open');
+      ov.classList.add('active');
+      btn.innerHTML='<i class="fas fa-times"></i>';
+      document.body.style.overflow='hidden';
+    }
+    function closeM(){
+      sb.classList.remove('mobile-open');
+      ov.classList.remove('active');
+      btn.innerHTML='<i class="fas fa-bars"></i>';
+      document.body.style.overflow='';
+    }
+
+    btn.addEventListener('click', function(){ sb.classList.contains('mobile-open')?closeM():openM(); });
+    ov.addEventListener('click', closeM);
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeM(); });
+    var mobileCloseBtn = document.getElementById('sidebarMobileClose');
+    if(mobileCloseBtn) mobileCloseBtn.addEventListener('click', closeM);
+    document.querySelectorAll('.sidebar .nav-link').forEach(function(l){
+      l.addEventListener('click', function(){ setTimeout(closeM,150); });
+    });
+
+    function resize(){
+      if(window.innerWidth>768){ closeM(); btn.style.display='none'; }
+      else btn.style.display='flex';
+    }
+    window.addEventListener('resize', resize);
+    resize();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+
+<!-- ══ LATEX EDITOR ══════════════════════════════════════ -->
+<script>
+(function(){
+  function openEditor(){
+    var w=Math.max(Math.round(window.innerWidth*.6),900),
+        h=Math.max(Math.round(window.innerHeight*.75),600);
+    window.open('/admin/latex_editor','latexEditor',
+      'width='+w+',height='+h+
+      ',left='+Math.round(window.screenX+(window.innerWidth-w)/2)+
+      ',top='+Math.round(window.screenY+(window.innerHeight-h)/2)+
+      ',resizable=yes');
+  }
+  ['open-latex-editor-admin-base','open-latex-editor-topbar'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('click', openEditor);
+  });
+  window.addEventListener('message',function(ev){
+    try{
+      if(ev.origin!==window.location.origin) return;
+      var d=ev.data||{};
+      if(d.type!=='latex-selected'||typeof d.latex!=='string') return;
+      var latex=d.latex;
+      var target=document.querySelector('textarea[name="latex_content"],textarea#latex_editor,textarea[name="question_text"],textarea#question_text,textarea');
+      if(target){
+        var s=target.selectionStart||target.value.length,e=target.selectionEnd||s;
+        target.value=target.value.slice(0,s)+latex+target.value.slice(e);
+        target.focus();target.selectionStart=target.selectionEnd=s+latex.length;
+        target.dispatchEvent(new Event('input',{bubbles:true}));
+      } else {
+        var a=document.activeElement;
+        if(a&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&a.type==='text'))){
+          var s=a.selectionStart||a.value.length,e=a.selectionEnd||s;
+          a.value=a.value.slice(0,s)+latex+a.value.slice(e);
+          a.selectionStart=a.selectionEnd=s+latex.length;
+          a.dispatchEvent(new Event('input',{bubbles:true}));
+        } else { alert('Paste manually:\n\n'+latex); }
+      }
+    }catch(ex){console.error(ex);}
+  },false);
+})();
+</script>
+
+<!-- ══ REQUESTS BADGE ════════════════════════════════════ -->
+<script>
+(function(){
+  function upd(){
+    fetch('/admin/api/requests/stats')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var b=document.getElementById('requestsBadge');
+        if(!b) return;
+        var n=d.pending||0;
+        b.textContent=n;
+        b.style.display=n>0?'inline':'none';
+      }).catch(function(){});
+  }
+  upd();
+  if(window.location.pathname.startsWith('/admin/')) setInterval(upd,30000);
+})();
+</script>
+
+<!-- ══ AUTO-DISMISS LOGIN ALERTS ════════════════════════ -->
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('.alert-success').forEach(function(a){
+    var t=a.textContent.toLowerCase();
+    if(t.includes('login successful')||t.includes('logged out')||t.includes('logout')){
+      setTimeout(function(){try{new bootstrap.Alert(a).close();}catch(e){}},600);
+    }
+  });
+});
+</script>
+
+<!-- ══ SIDEBAR TOOLTIPS (collapsed state only) ═══════════ -->
+<script>
+(function(){
+  var tip = document.createElement('div');
+  tip.id = 'sb-tooltip';
+  document.body.appendChild(tip);
+
+  var sb = document.getElementById('adminSidebar');
+  var hideTimer;
+
+  function show(el) {
+    if (!sb.classList.contains('is-collapsed')) return;
+    var label = el.getAttribute('data-tooltip');
+    if (!label) return;
+    tip.textContent = label;
+    var r   = el.getBoundingClientRect();
+    var sbR = sb.getBoundingClientRect();
+    tip.style.top       = Math.round(r.top + r.height / 2) + 'px';
+    tip.style.left      = Math.round(sbR.right + 8) + 'px';
+    tip.style.transform = 'translateY(-50%)';
+    clearTimeout(hideTimer);
+    tip.classList.add('visible');
+  }
+  function hide() {
+    hideTimer = setTimeout(function() { tip.classList.remove('visible'); }, 80);
+  }
+
+  document.querySelectorAll('.sidebar .nav-link[data-tooltip]').forEach(function(el) {
+    el.addEventListener('mouseenter', function() { show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('click', function() { tip.classList.remove('visible'); });
+  });
+})();
+</script>
+
+{% block scripts %}{% endblock %}
+
+<!-- ══ ACCOUNT SETTINGS MODAL ════════════════════════════ -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:440px">
+    <div class="modal-content" style="border-radius:14px">
+
+      <div class="modal-header" style="padding:1.1rem 1.4rem 0.9rem">
+        <div style="display:flex;align-items:center;gap:0.6rem">
+          <div style="width:30px;height:30px;border-radius:8px;background:var(--accent-subtle);border:1px solid var(--accent-border);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:0.75rem">
+            <i class="fas fa-cog"></i>
+          </div>
+          <div>
+            <h6 class="modal-title mb-0" id="accountSettingsModalLabel" style="font-size:0.92rem;font-weight:700">Account Settings</h6>
+            <div style="font-size:0.68rem;color:var(--text-muted);margin-top:1px">Appearance &amp; preferences</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body" style="padding:1.25rem 1.4rem 1.5rem">
+
+        <!-- Appearance -->
+        <div style="margin-bottom:1.35rem">
+          <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.65rem">Appearance</div>
+          <div style="display:flex;flex-direction:column;gap:6px" id="accs-theme-group">
+
+            <label class="accs-opt-row" data-accs-theme="light">
+              <input type="radio" name="accsTheme" value="light" style="display:none">
+              <div class="accs-opt-radio"></div>
+              <div class="accs-opt-icon"><i class="fas fa-sun"></i></div>
+              <div>
+                <div class="accs-opt-name">Light</div>
+                <div class="accs-opt-desc">Clean white interface</div>
+              </div>
+            </label>
+
+            <label class="accs-opt-row" data-accs-theme="dark">
+              <input type="radio" name="accsTheme" value="dark" style="display:none">
+              <div class="accs-opt-radio"></div>
+              <div class="accs-opt-icon"><i class="fas fa-moon"></i></div>
+              <div>
+                <div class="accs-opt-name">Dark</div>
+                <div class="accs-opt-desc">Easy on the eyes</div>
+              </div>
+            </label>
+
+            
+
+          </div>
+        </div>
+
+        <hr style="border-color:var(--card-border);margin:0 0 1.25rem">
+
+        <!-- Sidebar Preference -->
+        <div>
+          <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.65rem">Sidebar Default</div>
+          <div style="display:flex;flex-direction:column;gap:6px" id="accs-sidebar-group">
+
+            <label class="accs-opt-row" data-accs-sidebar="false">
+              <input type="radio" name="accsSidebar" value="false" style="display:none">
+              <div class="accs-opt-radio"></div>
+              <div class="accs-opt-icon"><i class="fas fa-columns"></i></div>
+              <div>
+                <div class="accs-opt-name">Expanded</div>
+                <div class="accs-opt-desc">Show icons and labels</div>
+              </div>
+            </label>
+
+            <label class="accs-opt-row" data-accs-sidebar="true">
+              <input type="radio" name="accsSidebar" value="true" style="display:none">
+              <div class="accs-opt-radio"></div>
+              <div class="accs-opt-icon"><i class="fas fa-bars"></i></div>
+              <div>
+                <div class="accs-opt-name">Collapsed</div>
+                <div class="accs-opt-desc">Icons only</div>
+              </div>
+            </label>
+
+          </div>
+        </div>
+
+        <hr style="border-color:var(--card-border);margin:1.25rem 0 1.1rem">
+
+        <!-- Logout -->
+        <a href="{{ url_for('admin.logout') }}"
+           style="display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.6rem 1rem;border-radius:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#ef4444;font-size:0.835rem;font-weight:600;text-decoration:none;transition:background 0.15s,border-color 0.15s;"
+           onmouseover="this.style.background='rgba(239,68,68,0.18)';this.style.borderColor='rgba(239,68,68,0.4)'"
+           onmouseout="this.style.background='rgba(239,68,68,0.1)';this.style.borderColor='rgba(239,68,68,0.25)'">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.accs-opt-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 9px;
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.accs-opt-row:hover {
+  background: var(--nav-hover-bg);
+  border-color: rgba(255,255,255,0.1);
+}
+.accs-opt-row.accs-selected {
+  background: var(--accent-subtle);
+  border-color: var(--accent-border);
+}
+.accs-opt-radio {
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  border-radius: 50%;
+  border: 2px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.12s, background 0.12s;
+  position: relative;
+}
+.accs-opt-row.accs-selected .accs-opt-radio {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.accs-opt-row.accs-selected .accs-opt-radio::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+}
+.accs-opt-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  flex-shrink: 0;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  transition: background 0.12s, color 0.12s;
+}
+.accs-opt-row.accs-selected .accs-opt-icon {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.accs-opt-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.accs-opt-desc {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+</style>
+
+<script>
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+
+    var openBtn = document.getElementById('accountSettingsBtn');
+    if(!openBtn) return;
+
+    /* Bootstrap modal instance */
+    var modalEl = document.getElementById('accountSettingsModal');
+    var bsModal = new bootstrap.Modal(modalEl);
+
+    openBtn.addEventListener('click', function(){
+      syncSelections();
+      bsModal.show();
+    });
+
+    /* ── Resolve theme value ── */
+    function resolveActual(val){
+      return val || 'dark';
+    }
+
+    /* ── Sync radio UI to current localStorage ── */
+    function syncSelections(){
+      var storedTheme   = localStorage.getItem('adminTheme') || 'dark';
+      var storedSidebar = localStorage.getItem('adminSidebarCollapsed') || 'false';
+
+      document.querySelectorAll('[data-accs-theme]').forEach(function(el){
+        el.classList.toggle('accs-selected', el.getAttribute('data-accs-theme') === storedTheme);
+      });
+      document.querySelectorAll('[data-accs-sidebar]').forEach(function(el){
+        el.classList.toggle('accs-selected', el.getAttribute('data-accs-sidebar') === storedSidebar);
+      });
+    }
+
+    /* ── Theme selection ── */
+    document.querySelectorAll('[data-accs-theme]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var val = el.getAttribute('data-accs-theme');
+        localStorage.setItem('adminTheme', val);
+
+        /* Apply immediately — same logic as existing theme script */
+        var actual = resolveActual(val);
+        document.documentElement.setAttribute('data-theme', actual);
+
+        /* Sync existing theme icon if present */
+        var icon = document.getElementById('themeIcon');
+        if(icon) icon.className = actual === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+
+        /* Notify popups */
+        try{
+          [window._resultPopup, window._responsesPopup].forEach(function(w){
+            if(w && !w.closed) w.postMessage({type:'adminThemeChange', theme:actual}, window.location.origin);
+          });
+        }catch(e){}
+
+        syncSelections();
+      });
+    });
+
+    /* ── Sidebar preference selection ── */
+    document.querySelectorAll('[data-accs-sidebar]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var val = el.getAttribute('data-accs-sidebar'); /* 'true' | 'false' */
+        var shouldCollapse = (val === 'true');
+        /* Trigger existing sidebar logic — updates localStorage + DOM */
+        if(typeof window._adminSidebarApplyState === 'function'){
+          window._adminSidebarApplyState(shouldCollapse, true);
+        }
+        syncSelections();
+      });
+    });
+
+    /* Sync on modal open */
+    modalEl.addEventListener('show.bs.modal', syncSelections);
+  });
+})();
+</script>
+</body>
+</html>

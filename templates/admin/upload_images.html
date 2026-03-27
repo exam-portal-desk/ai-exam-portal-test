@@ -1,0 +1,261 @@
+{% extends "admin_base.html" %}
+{% block title %}Upload Question Images{% endblock %}
+
+{% block content %}
+<style>
+  .page-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+  }
+  .page-top h1 { font-size: clamp(1.2rem,3vw,1.6rem); font-weight: 700; margin: 0; color: var(--text-primary); }
+  .page-top p  { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--text-muted); }
+
+  .upload-card {
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-title {
+    font-size: 0.88rem; font-weight: 700; color: var(--text-primary);
+    margin-bottom: 1rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--card-border);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .section-title i { color: var(--accent); }
+
+  .form-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.35rem; }
+  .form-select, .form-control {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 9px; font-size: 0.85rem; padding: 0.55rem 0.8rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-select:focus, .form-control:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); outline: none; background: var(--input-bg);
+  }
+  .form-select option { background: #111118; color: #e6eef8; }
+  .form-hint {
+    font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem;
+  }
+  .form-hint i { color: var(--accent); }
+
+  .drop-zone {
+    border: 2px dashed var(--card-border); border-radius: 12px;
+    background: var(--table-head-bg); padding: 3rem 1.5rem;
+    text-align: center; transition: border-color 0.2s, background 0.2s; cursor: pointer;
+  }
+  .drop-zone.dragover {
+    border-color: var(--accent); background: var(--accent-subtle);
+  }
+  .drop-icon { font-size: 2.8rem; color: var(--accent); margin-bottom: 1rem; display: block; opacity: 0.7; }
+  .drop-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.3rem; }
+  .drop-subtitle { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.25rem; }
+
+  .file-list-wrap {
+    background: var(--table-head-bg); border: 1px solid var(--card-border);
+    border-radius: 11px; padding: 1rem; margin-top: 1.25rem;
+  }
+  .file-list-title {
+    font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.75rem;
+  }
+  .file-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 9px; padding: 0.55rem 0.9rem; margin-bottom: 0.5rem;
+  }
+  .file-item:last-child { margin-bottom: 0; }
+  .file-item i { color: var(--accent); font-size: 0.9rem; }
+  .file-name { flex: 1; font-size: 0.82rem; color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+  .remove-file-btn {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
+    color: #ef4444; border-radius: 6px; padding: 3px 8px; font-size: 0.72rem;
+    cursor: pointer; transition: all 0.15s; line-height: 1;
+  }
+  .remove-file-btn:hover { background: #ef4444; color: white; }
+
+  .btn-flat {
+    border-radius: 9px; font-size: 0.85rem; font-weight: 600;
+    padding: 0.55rem 1.25rem; border: none; cursor: pointer; transition: all 0.15s;
+    text-decoration: none; display: inline-flex; align-items: center;
+  }
+  .btn-flat.primary { background: var(--accent); color: white; }
+  .btn-flat.primary:hover { background: var(--accent-hover); color: white; }
+  .btn-flat.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-flat.secondary { background: var(--btn-secondary-bg); border: 1px solid var(--btn-secondary-border); color: var(--btn-secondary-color); }
+  .btn-flat.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .uploader-section { display: none; }
+  .uploader-section.show { display: block; }
+
+  .warn-box {
+    background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);
+    border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 1.25rem;
+    font-size: 0.83rem; color: #f59e0b;
+  }
+
+  @media (max-width: 768px) {
+    .page-top { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-images me-2" style="color:var(--accent)"></i>Upload Question Images</h1>
+    <p>Upload images to a subject folder on Google Drive.</p>
+  </div>
+</div>
+
+{% if load_error %}
+<div class="warn-box">
+  <i class="fas fa-exclamation-triangle me-2"></i>
+  <strong>Loading Issue:</strong> {{ load_error }}
+  <br><small style="opacity:0.8">If you just added a new subject, go to <strong>Publish</strong> and try again.</small>
+</div>
+{% endif %}
+
+<!-- Subject Selector -->
+<div class="upload-card">
+  <div class="section-title"><i class="fas fa-folder"></i>Choose Subject Folder</div>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-7">
+      <label class="form-label">Subject Folder</label>
+      <select class="form-select" id="subject_folder_id" name="subject_folder_id" required>
+        <option value="" disabled selected>-- Select a subject folder --</option>
+        {% for subj in subjects %}
+          <option value="{{ subj.folder_id }}">{{ subj.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-hint">
+        <i class="fas fa-info-circle"></i>
+        If subject isn't listed, add it in <strong>Subjects</strong> then click <strong>Publish</strong>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Section -->
+<div class="upload-card uploader-section" id="uploader-section">
+  <div class="section-title"><i class="fas fa-cloud-upload-alt"></i>Upload Images</div>
+
+  <div id="drop-zone" class="drop-zone">
+    <i class="fas fa-cloud-upload-alt drop-icon"></i>
+    <div class="drop-title">Drag &amp; Drop Images Here</div>
+    <div class="drop-subtitle">or click to browse files</div>
+    <button type="button" id="pick-files" class="btn-flat primary">
+      <i class="fas fa-folder-open me-1"></i>Choose Files
+    </button>
+    <input type="file" id="file-input" accept="image/*" multiple hidden>
+    <div class="form-hint mt-3">Supported: JPG, PNG, GIF, SVG &nbsp;•&nbsp; Max 10MB per file</div>
+  </div>
+
+  <div id="file-list" class="d-none"></div>
+
+  <div class="text-end mt-3">
+    <button id="upload-btn" class="btn-flat primary" disabled>
+      <i class="fas fa-rocket me-1"></i>Upload Images
+    </button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const selectEl   = document.getElementById('subject_folder_id');
+  const section    = document.getElementById('uploader-section');
+  const dropZone   = document.getElementById('drop-zone');
+  const pickBtn    = document.getElementById('pick-files');
+  const fileInput  = document.getElementById('file-input');
+  const fileListDiv= document.getElementById('file-list');
+  const uploadBtn  = document.getElementById('upload-btn');
+  let selectedFiles = [];
+
+  function fmt(bytes) {
+    if (!bytes) return '0 B';
+    const k = 1024, s = ['B','KB','MB','GB'], i = Math.floor(Math.log(bytes)/Math.log(k));
+    return parseFloat((bytes/Math.pow(k,i)).toFixed(1)) + ' ' + s[i];
+  }
+
+  function render() {
+    if (!selectedFiles.length) {
+      fileListDiv.classList.add('d-none');
+      uploadBtn.disabled = true;
+      return;
+    }
+    fileListDiv.classList.remove('d-none');
+    fileListDiv.innerHTML = `
+      <div class="file-list-wrap">
+        <div class="file-list-title"><i class="fas fa-list me-1" style="color:var(--accent)"></i>Selected Files (${selectedFiles.length})</div>
+        ${selectedFiles.map((f,i) => `
+          <div class="file-item">
+            <i class="fas fa-image"></i>
+            <span class="file-name">${f.name}</span>
+            <span class="file-size">${fmt(f.size)}</span>
+            <button class="remove-file-btn" onclick="removeFile(${i})"><i class="fas fa-times"></i></button>
+          </div>
+        `).join('')}
+      </div>`;
+    uploadBtn.disabled = false;
+  }
+
+  window.removeFile = function(i) { selectedFiles.splice(i, 1); render(); };
+
+  function addFiles(files) {
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) continue;
+      if (f.size > 10*1024*1024) { alert(`${f.name} exceeds 10MB limit.`); continue; }
+      selectedFiles.push(f);
+    }
+    render();
+  }
+
+  selectEl.addEventListener('change', () => { if (selectEl.value) section.classList.add('show'); });
+  pickBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => addFiles(e.target.files));
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', e => { if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('dragover'); });
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+
+  uploadBtn.addEventListener('click', async () => {
+    const folderId = selectEl.value;
+    if (!folderId || !selectedFiles.length) return;
+    const fd = new FormData();
+    fd.append('subject_folder_id', folderId);
+    selectedFiles.forEach(f => fd.append('images', f, f.name));
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
+    try {
+      const resp = await fetch('{{ url_for("admin.upload_images_page") }}', { method: 'POST', body: fd });
+      const text = await resp.text();
+      let result;
+      try { result = JSON.parse(text); } catch { alert('Unexpected error: ' + text.slice(0,300)); return; }
+      if (!result.success) {
+        toast(result.message || 'Upload failed', 'danger');
+      } else if (result.failed?.length) {
+        toast(`Uploaded ${result.uploaded||0} ✓  •  Failed ${result.failed.length} ✗`, 'warning');
+      } else {
+        toast(`${result.uploaded||0} image${result.uploaded===1?'':'s'} uploaded successfully!`, 'success');
+      }
+      selectedFiles = []; render();
+    } catch(err) { toast('Network error: ' + err, 'danger'); }
+    finally { uploadBtn.disabled = false; uploadBtn.innerHTML = '<i class="fas fa-rocket me-1"></i>Upload Images'; }
+  });
+})();
+
+function toast(msg, type) {
+    const colors = { success:'#10b981', danger:'#ef4444', warning:'#f59e0b' };
+    const icons  = { success:'fa-check-circle', danger:'fa-times-circle', warning:'fa-exclamation-triangle' };
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
+      background:var(--card-bg);border:1px solid var(--card-border);
+      border-left:3px solid ${colors[type]||colors.success};
+      color:var(--text-primary);padding:.75rem 1.1rem;border-radius:10px;
+      font-size:.83rem;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.3);
+      max-width:340px;display:flex;align-items:center;gap:.6rem;`;
+    t.innerHTML = `<i class="fas ${icons[type]||icons.success}" style="color:${colors[type]};flex-shrink:0"></i><span>${msg}</span>`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4500);
+  }
+</script>
+{% endblock %}
+
+
+

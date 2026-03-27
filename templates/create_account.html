@@ -1,0 +1,705 @@
+{% extends "base.html" %}
+
+{% block title %}Register - ExamPortal{% endblock %}
+
+{% block content %}
+<!-- Floating Particles Background -->
+<div class="particles-container">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+</div>
+
+<!-- Top Navigation -->
+<div class="top-navigation-minimal">
+    <a href="{{ url_for('misc.home') }}" class="minimal-btn" title="Home">
+        <i class="fas fa-home"></i>
+        <span class="btn-label">Home</span>
+    </a>
+    <a href="{{ url_for('auth.login') }}" class="minimal-btn" title="Login">
+        <i class="fas fa-sign-in-alt"></i>
+        <span class="btn-label">Login</span>
+    </a>
+</div>
+
+<div class="login-wrapper">
+    <div class="login-container">
+{% if success %}
+    <!-- Success State -->
+    <div class="login-header">
+        <div class="logo-section">
+            <div class="logo-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h1 class="brand-name">ExamPortal</h1>
+        </div>
+        <h2 class="welcome-text">Registration Successful!</h2>
+        <p class="welcome-subtitle">A setup link has been sent to your email. Please check your inbox and spam folder.</p>
+    </div>
+
+
+
+    <div class="setup-instructions-card">
+        <div class="setup-header">
+            <i class="fas fa-envelope"></i>
+            <span>Next Steps</span>
+        </div>
+        <div class="setup-content">
+            <div class="setup-item">
+                <strong>1. Check your email:</strong> Look for a message from ExamPortal
+            </div>
+            <div class="setup-item">
+                <strong>2. Click the setup link:</strong> This will open a secure password setup form
+            </div>
+            <div class="setup-item">
+                <strong>3. Create your password:</strong> Choose a strong password for your account
+            </div>
+            <div class="setup-item">
+                <strong>4. Login:</strong> Use your username and new password to access the portal
+            </div>
+        </div>
+    </div>
+
+    <button onclick="window.location.href='{{ url_for('auth.login') }}'" class="login-button">
+        <span class="button-content">
+            <i class="fas fa-sign-in-alt"></i>
+            <span>Go to Login</span>
+        </span>
+    </button>
+{% else %}
+    <!-- Keep existing form as-is -->
+                        <!-- Registration Form State -->
+                        <div class="login-header">
+                            <div class="logo-section">
+                                <div class="logo-icon">
+                                    <i class="fas fa-user-plus"></i>
+                                </div>
+                                <h1 class="brand-name">ExamPortal</h1>
+                            </div>
+                            <h2 class="welcome-text">Create Account</h2>
+                            <p class="welcome-subtitle">Register for your exam portal account</p>
+                        </div>
+
+                        <!-- Flash Messages -->
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                <div class="flash-messages">
+                                    {% for category, message in messages %}
+                                        <div class="flash-alert flash-{{ category }}">
+                                            <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' if category == 'success' else 'info-circle' }}"></i>
+                                            <span>{{ message }}</span>
+                                            <button type="button" class="flash-close">&times;</button>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+
+                        <!-- Registration Form -->
+<!-- REPLACE THE FORM SECTION IN create_account.html WITH THIS: -->
+
+<form method="POST" id="registrationForm" class="login-form">
+    <div class="form-group">
+        <label for="first_name" class="form-label">
+            <i class="fas fa-user"></i> First Name <span class="required">*</span>
+        </label>
+        <div class="input-wrapper">
+            <div class="input-icon">
+                <i class="fas fa-user"></i>
+            </div>
+            <input type="text"
+                   class="form-input"
+                   id="first_name"
+                   name="first_name"
+                   placeholder="Enter your first name"
+                   value="{{ first_name or '' }}"
+                   required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="last_name" class="form-label">
+            <i class="fas fa-user"></i> Last Name <span class="required">*</span>
+        </label>
+        <div class="input-wrapper">
+            <div class="input-icon">
+                <i class="fas fa-user"></i>
+            </div>
+            <input type="text"
+                   class="form-input"
+                   id="last_name"
+                   name="last_name"
+                   placeholder="Enter your last name"
+                   value="{{ last_name or '' }}"
+                   required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="email" class="form-label">
+            <i class="fas fa-envelope"></i> Email Address <span class="required">*</span>
+        </label>
+        <div class="input-wrapper">
+            <div class="input-icon">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <input type="email"
+                   class="form-input"
+                   id="email"
+                   name="email"
+                   placeholder="Enter your email address"
+                   value="{{ email or '' }}"
+                   required>
+        </div>
+        <small class="input-note">
+            We'll send your login credentials and a password reset link to this email
+        </small>
+    </div>
+
+    <button type="submit" class="login-button" id="submitBtn">
+        <span class="button-content" id="submitText">
+            <i class="fas fa-user-plus"></i>
+            <span>Create Account</span>
+        </span>
+        <span class="button-loading" id="loadingText">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span>Creating Account...</span>
+        </span>
+    </button>
+</form>
+
+                        <!-- Action Links -->
+                        <div class="action-links">
+                            <a href="{{ url_for('auth.login') }}" class="action-link secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                <span>Back to Login</span>
+                            </a>
+                        </div>
+
+                        <!-- Help Section -->
+                        <div class="help-section">
+                            <div class="help-card">
+                                <div class="help-header">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>How Registration Works</span>
+                                </div>
+                                <div class="help-content">
+                                    <div class="help-item">
+                                        <strong>New User:</strong> Enter details → Account created → password generate link will be sent to your email
+                                    </div>
+                                    <div class="help-item">
+                                        <strong>Existing User:</strong> Use login page to access your account
+                                    </div>
+                                    <div class="help-item">
+                                        <strong>Valid Domains:</strong> Gmail, Yahoo, Outlook, Educational domains supported
+                                    </div>
+                                    <div class="help-item">
+                                        <strong>Security:</strong> Emails include both your credentials and a password reset link for better security
+                                    </div>                                    
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Security Footer -->
+                    <div class="security-footer">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Secured by ExamPortal</span>
+                        <div class="security-indicators">
+                            <div class="security-dot"></div>
+                            <div class="security-dot"></div>
+                            <div class="security-dot"></div>
+                        </div>
+                    </div>
+                </div>
+</div>
+
+<style>
+body {
+    background: #0a0a0f;
+    font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+    overflow-x: hidden; min-height: 100vh;
+}
+.particles-container {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    overflow: hidden; z-index: 1; pointer-events: none;
+}
+.particle {
+    position: absolute; background: rgba(45,91,227,0.3);
+    border-radius: 50%; animation: float 10s ease-in-out infinite;
+}
+.particle:nth-child(1){width:3px;height:3px;top:15%;left:20%;animation-delay:0s}
+.particle:nth-child(2){width:2px;height:2px;top:65%;left:80%;animation-delay:2s}
+.particle:nth-child(3){width:4px;height:4px;top:35%;left:8%;animation-delay:4s}
+.particle:nth-child(4){width:2px;height:2px;top:75%;left:25%;animation-delay:1s}
+.particle:nth-child(5){width:3px;height:3px;top:25%;left:88%;animation-delay:3s}
+.particle:nth-child(6){width:2px;height:2px;top:55%;left:65%;animation-delay:5s}
+.particle:nth-child(7){width:3px;height:3px;top:45%;left:30%;animation-delay:6s}
+.particle:nth-child(8){width:2px;height:2px;top:85%;left:55%;animation-delay:7s}
+
+.top-navigation-minimal {
+    position: fixed; top: 24px; right: 24px;
+    z-index: 1000; display: flex; gap: 10px;
+}
+.minimal-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);
+    text-decoration: none; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.95rem; transition: all 0.2s; position: relative;
+}
+.minimal-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.85);
+    border-color: rgba(255,255,255,0.15);
+}
+.btn-label {
+    position: absolute; right: 48px;
+    background: rgba(0,0,0,0.9); color: white;
+    padding: 6px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s; white-space: nowrap;
+}
+.minimal-btn:hover .btn-label { opacity: 1; }
+
+.login-wrapper {
+    position: relative; z-index: 2; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+.login-container {
+    background: #111118;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 18px; padding: 40px 36px;
+    width: 100%; max-width: 420px; position: relative; overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.login-container::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(45,91,227,0.4), transparent);
+}
+
+.login-header { text-align: center; margin-bottom: 28px; }
+.logo-section {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin-bottom: 16px;
+}
+.logo-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: #2d5be3;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; color: white;
+}
+.logo-icon.success {
+    background: #059669;
+}
+.brand-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.4rem; font-weight: 400;
+    color: white; margin: 0; letter-spacing: -0.01em;
+}
+.welcome-text {
+    font-size: 1.3rem; font-weight: 600; color: white;
+    margin: 0 0 6px 0; letter-spacing: -0.01em;
+}
+.welcome-subtitle { color: rgba(255,255,255,0.35); font-size: 0.85rem; margin: 0; }
+
+.flash-messages { margin-bottom: 20px; }
+.flash-alert {
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px; font-size: 0.85rem;
+}
+.flash-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+.flash-success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
+.flash-info { background: rgba(45,91,227,0.1); border: 1px solid rgba(45,91,227,0.2); color: #93c5fd; }
+.flash-close { background: none; border: none; color: inherit; font-size: 1rem; cursor: pointer; margin-left: auto; opacity: 0.5; }
+.flash-close:hover { opacity: 1; }
+
+.login-form { margin-bottom: 16px; }
+.form-group { margin-bottom: 16px; }
+.form-label {
+    display: block; color: rgba(255,255,255,0.5); font-weight: 500;
+    margin-bottom: 7px; font-size: 0.8rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+}
+.form-label i { display: none; }
+.required { color: rgba(239,68,68,0.7); }
+.input-wrapper { position: relative; }
+.input-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: rgba(255,255,255,0.2); z-index: 2; font-size: 0.85rem;
+}
+.form-input {
+    width: 100%; padding: 12px 14px 12px 40px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; color: white;
+    font-size: 0.9rem; font-family: inherit;
+    transition: all 0.2s; outline: none;
+}
+.form-input::placeholder { color: rgba(255,255,255,0.2); }
+        .form-input:-webkit-autofill,
+        .form-input:-webkit-autofill:hover,
+        .form-input:-webkit-autofill:focus,
+        .form-input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 1000px #111118 inset !important;
+            -webkit-text-fill-color: white !important;
+            caret-color: white;
+            border-color: rgba(255,255,255,0.08) !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+.form-input:focus {
+    border-color: rgba(45,91,227,0.5);
+    background: rgba(45,91,227,0.05);
+    box-shadow: 0 0 0 3px rgba(45,91,227,0.1);
+}
+.input-note { color: rgba(255,255,255,0.25); font-size: 0.78rem; margin-top: 6px; display: block; }
+
+.login-button {
+    width: 100%; padding: 13px;
+    background: #2d5be3; border: none; border-radius: 10px;
+    color: white; font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+    box-shadow: 0 4px 16px rgba(45,91,227,0.3);
+}
+.login-button:hover {
+    background: #3d6bf3; transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(45,91,227,0.4);
+}
+.login-button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.button-content, .button-loading {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.button-loading { display: none; }
+.login-button.loading .button-content { display: none; }
+.login-button.loading .button-loading { display: flex; }
+
+.action-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.action-link {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 11px 16px; border-radius: 10px;
+    text-decoration: none; font-weight: 500; font-size: 0.85rem;
+    transition: all 0.2s; border: 1px solid transparent;
+}
+.action-link.secondary {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.45);
+}
+.action-link.secondary:hover {
+    background: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.8); text-decoration: none;
+}
+
+.help-section { margin-bottom: 20px; }
+.help-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 16px;
+}
+.help-header {
+    display: flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.3); font-weight: 600;
+    margin-bottom: 12px; font-size: 0.8rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+}
+.help-content { display: flex; flex-direction: column; gap: 8px; }
+.help-item { color: rgba(255,255,255,0.35); font-size: 0.8rem; line-height: 1.5; }
+.help-item strong { color: rgba(255,255,255,0.55); }
+
+.setup-instructions-card {
+    background: rgba(34,197,94,0.06);
+    border: 1px solid rgba(34,197,94,0.15);
+    border-radius: 10px; padding: 16px; margin-bottom: 20px;
+}
+.setup-header {
+    display: flex; align-items: center; gap: 8px;
+    color: #86efac; font-weight: 600; font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+.setup-content { display: flex; flex-direction: column; gap: 8px; }
+.setup-item { color: rgba(255,255,255,0.45); font-size: 0.82rem; line-height: 1.5; }
+.setup-item strong { color: rgba(134,239,172,0.8); }
+
+.security-footer {
+    text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.security-indicators { display: flex; gap: 3px; margin-left: 6px; }
+.security-dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: rgba(45,91,227,0.5);
+    animation: pulse 2s ease-in-out infinite;
+}
+.security-dot:nth-child(2){animation-delay:0.3s}
+.security-dot:nth-child(3){animation-delay:0.6s}
+
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+@media (max-width: 768px) {
+    .top-navigation-minimal { top: 16px; right: 16px; }
+    .login-container { padding: 28px 18px; margin: 0; border-radius: 16px; width: 100%; }
+    .welcome-text { font-size: 1.15rem; }
+}
+@media (max-width: 480px) {
+    .login-container { padding: 24px 16px; }
+    .logo-section { flex-direction: column; gap: 6px; }
+}
+
+/* ── LIGHT THEME OVERRIDES ── */
+[data-theme="light"] body { background: #f0f2f8; color: #1a202c; }
+[data-theme="light"] .particles-container,
+[data-theme="light"] .pending-particles { opacity: 0.4; }
+[data-theme="light"] .minimal-btn { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
+[data-theme="light"] .minimal-btn:hover { background: #e2e8f0; color: #1a202c; border-color: #cbd5e0; }
+[data-theme="light"] .btn-label { background: rgba(0,0,0,0.75); }
+[data-theme="light"] .login-wrapper,
+[data-theme="light"] .reset-wrapper,
+[data-theme="light"] .request-wrapper { background: transparent; }
+[data-theme="light"] .login-container,
+[data-theme="light"] .reset-container,
+[data-theme="light"] .request-container,
+[data-theme="light"] .pending-card { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+[data-theme="light"] .login-container::before,
+[data-theme="light"] .reset-container::before,
+[data-theme="light"] .request-container::before,
+[data-theme="light"] .pending-card::before { background: linear-gradient(90deg, transparent, rgba(45,91,227,0.2), transparent); }
+[data-theme="light"] .brand-name { color: #1a202c; -webkit-text-fill-color: #1a202c; background: none; }
+[data-theme="light"] .welcome-text,
+[data-theme="light"] .success-title,
+[data-theme="light"] .pending-title { color: #1a202c; }
+[data-theme="light"] .welcome-subtitle,
+[data-theme="light"] .reset-subtitle,
+[data-theme="light"] .success-subtitle,
+[data-theme="light"] .pending-exam-name { color: #718096; }
+[data-theme="light"] .form-label { color: #4a5568 !important; }
+[data-theme="light"] .form-label i { color: #2d5be3; }
+[data-theme="light"] .input-icon { color: #a0aec0; }
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-control,
+[data-theme="light"] .form-select {
+    background: #f8faff !important;
+    border-color: #e2e8f0 !important;
+    color: #1a202c !important;
+}
+[data-theme="light"] .form-input::placeholder,
+[data-theme="light"] .form-control::placeholder { color: #a0aec0 !important; }
+[data-theme="light"] .form-input:-webkit-autofill,
+[data-theme="light"] .form-input:-webkit-autofill:hover,
+[data-theme="light"] .form-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
+    -webkit-text-fill-color: #1a202c !important;
+    caret-color: #1a202c !important;
+}
+[data-theme="light"] .form-select option { background: #ffffff; color: #1a202c; }
+[data-theme="light"] .toggle-password { color: #a0aec0; }
+[data-theme="light"] .toggle-password:hover { color: #4a5568; }
+[data-theme="light"] .help-card,
+[data-theme="light"] .step-section,
+[data-theme="light"] .user-details-card,
+[data-theme="light"] .request-history-section,
+[data-theme="light"] .new-request-section { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .help-header,
+[data-theme="light"] .card-title { color: #718096; }
+[data-theme="light"] .help-item { color: #4a5568; }
+[data-theme="light"] .help-item strong { color: #1a202c; }
+[data-theme="light"] .action-link.primary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .action-link.primary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .action-link.secondary { background: transparent; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .action-link.secondary:hover { background: #f1f5f9; color: #1a202c; }
+[data-theme="light"] .back-link { color: #a0aec0; }
+[data-theme="light"] .back-link:hover { color: #4a5568; }
+[data-theme="light"] .security-footer { color: #a0aec0; }
+[data-theme="light"] .step-title { color: #4a5568; }
+[data-theme="light"] .step-title i { color: #2d5be3; }
+[data-theme="light"] .request-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .table thead th { background: #f1f5f9 !important; color: #718096 !important; border-bottom-color: #e2e8f0 !important; }
+[data-theme="light"] .table tbody td { background: transparent !important; color: #4a5568 !important; border-bottom-color: #f1f5f9 !important; }
+[data-theme="light"] .table tbody tr:hover { background: rgba(45,91,227,0.04) !important; }
+[data-theme="light"] .table { background: transparent !important; }
+[data-theme="light"] .table-responsive { border-color: #e2e8f0; }
+[data-theme="light"] .text-muted { color: #718096 !important; }
+[data-theme="light"] .loading-state { color: #718096; }
+[data-theme="light"] .user-info-card { background: rgba(45,91,227,0.05); border-color: rgba(45,91,227,0.15); }
+[data-theme="light"] .user-name { color: #1a202c; }
+[data-theme="light"] .user-email { color: #718096; }
+[data-theme="light"] .input-note { color: #a0aec0; }
+[data-theme="light"] .username-display { color: #1a202c; }
+[data-theme="light"] .text-muted-improved { color: #a0aec0; }
+[data-theme="light"] .date-display { color: #718096; }
+[data-theme="light"] .reason-display { color: #4a5568; }
+[data-theme="light"] .user-email-display { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .password-requirements .requirement { color: #a0aec0; }
+[data-theme="light"] .requirement.valid { color: rgba(5,150,105,0.8); }
+[data-theme="light"] .setup-instructions-card { background: rgba(5,150,105,0.05); border-color: rgba(5,150,105,0.15); }
+[data-theme="light"] .setup-header { color: #059669; }
+[data-theme="light"] .setup-item { color: #4a5568; }
+[data-theme="light"] .setup-item strong { color: #059669; }
+[data-theme="light"] .instructions-panel { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .panel-header { color: #059669; }
+[data-theme="light"] .main-message { color: #4a5568; }
+[data-theme="light"] .step-details strong { color: #1a202c; }
+[data-theme="light"] .step-details span { color: #718096; }
+[data-theme="light"] .help-text { color: #a0aec0; }
+[data-theme="light"] .portal-card { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .portal-title { color: #1a202c; }
+[data-theme="light"] .portal-desc { color: #718096; }
+[data-theme="light"] .portal-arrow { color: #a0aec0; }
+[data-theme="light"] .portal-user:hover { border-color: rgba(45,91,227,0.3); background: rgba(45,91,227,0.05); }
+[data-theme="light"] .portal-admin:hover { border-color: rgba(217,119,6,0.3); background: rgba(217,119,6,0.05); }
+[data-theme="light"] .portal-card:hover .portal-arrow { color: #4a5568; }
+[data-theme="light"] .pending-body { background: #f0f2f8; }
+[data-theme="light"] .pending-reason { background: rgba(168,85,247,0.05); color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .refresh-note { color: #a0aec0; }
+[data-theme="light"] .success-container { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .success-header { border-bottom-color: #e2e8f0; }
+</style>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('registrationForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const firstName = document.getElementById('first_name').value.trim();
+            const lastName = document.getElementById('last_name').value.trim();
+            const email = document.getElementById('email').value.trim();
+
+            // Basic validation
+            if (!firstName || firstName.length < 2) {
+                e.preventDefault();
+                alert('Please enter a valid first name (at least 2 characters)');
+                return;
+            }
+
+            if (!lastName || lastName.length < 2) {
+                e.preventDefault();
+                alert('Please enter a valid last name (at least 2 characters)');
+                return;
+            }
+
+            if (!email || !email.includes('@')) {
+                e.preventDefault();
+                alert('Please enter a valid email address');
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+        });
+    }
+
+    // Flash message handling
+    const flashAlerts = document.querySelectorAll('.flash-alert');
+    flashAlerts.forEach(alert => {
+        const closeBtn = alert.querySelector('.flash-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => alert.remove(), 300);
+            });
+        }
+    });
+
+    // Auto-dismiss flash messages after 5 seconds
+    setTimeout(() => {
+        flashAlerts.forEach(alert => {
+            if (alert && alert.parentNode) {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 300);
+            }
+        });
+    }, 5000);
+
+    // Input focus animations
+    const inputs = document.querySelectorAll('.form-input');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.style.transform = 'translateY(-2px)';
+            this.parentElement.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.2)';
+        });
+
+        input.addEventListener('blur', function() {
+            this.parentElement.style.transform = 'translateY(0)';
+            this.parentElement.style.boxShadow = 'none';
+        });
+    });
+
+    // Dynamic particle generation
+    function createDynamicParticle() {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.width = Math.random() * 6 + 3 + 'px';
+        particle.style.height = particle.style.width;
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.top = Math.random() * 100 + '%';
+        particle.style.animationDuration = Math.random() * 6 + 6 + 's';
+        particle.style.animationDelay = Math.random() * 3 + 's';
+        
+        const particlesContainer = document.querySelector('.particles-container');
+        if (particlesContainer) {
+            particlesContainer.appendChild(particle);
+            
+            setTimeout(() => {
+                if (particle.parentNode) {
+                    particle.remove();
+                }
+            }, 12000);
+        }
+    }
+
+    // Generate new particles periodically
+    setInterval(createDynamicParticle, 4000);
+
+    // Add entrance animation
+    const loginContainer = document.querySelector('.login-container');
+    if (loginContainer) {
+        loginContainer.style.opacity = '0';
+        loginContainer.style.transform = 'translateY(30px)';
+        
+        setTimeout(() => {
+            loginContainer.style.transition = 'all 0.8s ease';
+            loginContainer.style.opacity = '1';
+            loginContainer.style.transform = 'translateY(0)';
+        }, 300);
+    }
+
+    // Focus on first empty field
+    const firstNameField = document.getElementById('first_name');
+    const lastNameField = document.getElementById('last_name');
+    const emailField = document.getElementById('email');
+
+    if (firstNameField && !firstNameField.value) {
+        firstNameField.focus();
+    } else if (lastNameField && !lastNameField.value) {
+        lastNameField.focus();
+    } else if (emailField && !emailField.value) {
+        emailField.focus();
+    }
+});
+</script>
+{% endblock %}
+
+
+

@@ -1,0 +1,802 @@
+{% extends "admin_base.html" %}
+{% block title %}Manage Categories{% endblock %}
+{% block content %}
+
+<style>
+/* ── Page Layout ── */
+.cat-page-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ── Page Header ── */
+.cat-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+.cat-page-header h1 {
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+.cat-page-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ── Table Card ── */
+.cat-table-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cat-table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+.cat-table-card thead th {
+  padding: 0.9rem 1.2rem;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--table-head-bg);
+  border-bottom: 1px solid var(--table-border);
+  white-space: nowrap;
+}
+.cat-table-card tbody td {
+  padding: 0.9rem 1.2rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--table-border);
+  vertical-align: middle;
+}
+.cat-table-card tbody tr:last-child td {
+  border-bottom: none;
+}
+.cat-table-card tbody tr:hover td {
+  background: var(--table-row-hover);
+}
+
+/* ── Thumbnail ── */
+.cat-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--card-border);
+}
+.cat-thumb-placeholder {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 1.3rem;
+}
+
+/* ── Name cell ── */
+.cat-name-cell {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+/* ── Date cell ── */
+.cat-date-cell {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Action Buttons in table ── */
+.cat-action-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.78rem;
+}
+.icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+.icon-btn.danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ── Empty State ── */
+.cat-empty-state {
+  text-align: center;
+  padding: 3.5rem 1rem;
+  color: var(--text-muted);
+}
+.cat-empty-state i {
+  font-size: 2.5rem;
+  opacity: 0.25;
+  display: block;
+  margin-bottom: 1rem;
+}
+.cat-empty-state p {
+  font-size: 0.9rem;
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ── Modal Backdrop ── */
+.ep-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.ep-backdrop.open {
+  display: flex;
+}
+
+/* ── Modal Box ── */
+.ep-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 460px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  animation: epModalIn 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes epModalIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Modal Header ── */
+.ep-modal-hdr {
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--header-bg);
+}
+.ep-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.ep-modal-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.ep-modal-icon.blue   { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-border); }
+.ep-modal-icon.red    { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+.ep-modal-icon.green  { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+.ep-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.15s;
+}
+.ep-close-btn:hover { color: var(--text-primary); }
+
+/* ── Modal Body ── */
+.ep-modal-body {
+  padding: 1.25rem 1.4rem;
+}
+
+/* ── Modal Footer ── */
+.ep-modal-footer {
+  padding: 0.85rem 1.4rem;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  background: var(--modal-footer-bg);
+}
+
+/* ── Form Fields ── */
+.ep-field { margin-bottom: 1rem; }
+.ep-field:last-child { margin-bottom: 0; }
+.ep-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+.ep-input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ep-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(45, 91, 227, 0.12);
+}
+.ep-input[type="file"] {
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+
+/* ── Image Preview ── */
+.img-preview-wrap {
+  margin-top: 0.6rem;
+  display: none;
+}
+.img-preview-wrap img {
+  max-width: 90px;
+  border-radius: 9px;
+  border: 1px solid var(--card-border);
+}
+
+/* ── Current Image Box ── */
+.current-img-box {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  margin-bottom: 0.75rem;
+}
+.current-img-box img {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--card-border);
+}
+.current-img-box span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ── Delete Warning Box ── */
+.delete-warning-box {
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.delete-warning-box .dw-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ef4444;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.delete-warning-box ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.8;
+}
+
+/* ── Buttons ── */
+.ep-btn {
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.48rem 1rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: inherit;
+}
+.ep-btn.primary   { background: var(--accent); color: #fff; }
+.ep-btn.primary:hover { background: var(--accent-hover); }
+.ep-btn.secondary {
+  background: var(--btn-sec-bg);
+  border: 1px solid var(--btn-sec-border);
+  color: var(--btn-sec-color);
+}
+.ep-btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+.ep-btn.danger    { background: #ef4444; color: #fff; }
+.ep-btn.danger:hover { background: #dc2626; }
+.ep-btn:disabled  { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Toast Container ── */
+#catToastContainer {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.cat-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  min-width: 220px;
+  max-width: 340px;
+  pointer-events: all;
+  animation: toastIn 0.22s ease-out;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cat-toast.success { border-color: rgba(16,185,129,0.4); }
+.cat-toast.danger  { border-color: rgba(239,68,68,0.4);  }
+.cat-toast.warning { border-color: rgba(245,158,11,0.4); }
+.cat-toast-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.cat-toast.success .cat-toast-icon { color: #10b981; }
+.cat-toast.danger  .cat-toast-icon { color: #ef4444; }
+.cat-toast.warning .cat-toast-icon { color: #f59e0b; }
+.cat-toast-msg {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.cat-toast-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 600px) {
+  .cat-page-header { flex-direction: column; }
+  .cat-table-card { overflow-x: auto; }
+  .cat-table-card table { min-width: 520px; }
+}
+</style>
+
+<!-- ══ PAGE ════════════════════════════════════════════════════════════════ -->
+<div class="cat-page-wrap">
+
+  <!-- Header -->
+  <div class="cat-page-header">
+    <div>
+      <h1><i class="fas fa-layer-group me-2" style="color:var(--accent)"></i>Manage Categories</h1>
+      <p>Create, edit and delete exam categories shown on the student portal.</p>
+    </div>
+    <button class="ep-btn primary" onclick="openAdd()">
+      <i class="fas fa-plus"></i>Add Category
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="cat-table-card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:72px">Image</th>
+          <th>Name</th>
+          <th>Created</th>
+          <th style="width:110px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="catTbody">
+        {% for cat in categories %}
+        <tr id="row-{{ cat.id }}">
+          <td>
+            {% if cat.image_url %}
+            <img src="{{ cat.image_url }}" class="cat-thumb"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div class="cat-thumb-placeholder" style="display:none">
+              <i class="fas fa-graduation-cap"></i>
+            </div>
+            {% else %}
+            <div class="cat-thumb-placeholder">
+              <i class="fas fa-graduation-cap"></i>
+            </div>
+            {% endif %}
+          </td>
+          <td><div class="cat-name-cell">{{ cat.name }}</div></td>
+          <td><div class="cat-date-cell">{{ cat.created_at[:10] if cat.created_at else '—' }}</div></td>
+          <td>
+            <div class="cat-action-row">
+              <button class="icon-btn"
+                      title="Edit"
+                      onclick="openEdit({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}', '{{ cat.image_url or "" }}')">
+                <i class="fas fa-pencil-alt"></i>
+              </button>
+              <button class="icon-btn danger"
+                      title="Delete"
+                      onclick="openDelete({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}')">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr id="empty-row">
+          <td colspan="4">
+            <div class="cat-empty-state">
+              <i class="fas fa-layer-group"></i>
+              <p>No categories yet. Click <strong>Add Category</strong> to create one.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- /cat-page-wrap -->
+
+
+<!-- ══ ADD MODAL ══════════════════════════════════════════════════════════ -->
+<div class="ep-backdrop" id="addModal">
+  <div class="ep-modal">
+    <div class="ep-modal-hdr">
+      <h5 class="ep-modal-title">
+        <span class="ep-modal-icon blue"><i class="fas fa-plus"></i></span>
+        Add Category
+      </h5>
+      <button class="ep-close-btn" onclick="closeAdd()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="ep-modal-body">
+      <div class="ep-field">
+        <label class="ep-label">Category Name <span style="color:#ef4444">*</span></label>
+        <input type="text" id="addName" class="ep-input" placeholder="e.g. JEE, NEET, GATE">
+      </div>
+      <div class="ep-field">
+        <label class="ep-label">Image <span style="color:var(--text-muted);font-weight:400">(optional, max 5 MB)</span></label>
+        <input type="file" id="addImage" class="ep-input" accept="image/*"
+               onchange="previewImage(this,'addPreviewWrap','addPreviewImg')">
+        <div class="img-preview-wrap" id="addPreviewWrap">
+          <img id="addPreviewImg" src="" alt="preview">
+        </div>
+      </div>
+    </div>
+    <div class="ep-modal-footer">
+      <button class="ep-btn secondary" onclick="closeAdd()">Cancel</button>
+      <button class="ep-btn primary" id="addBtn" onclick="submitAdd()">
+        <i class="fas fa-plus"></i>Create
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ EDIT MODAL ═════════════════════════════════════════════════════════ -->
+<div class="ep-backdrop" id="editModal">
+  <div class="ep-modal">
+    <div class="ep-modal-hdr">
+      <h5 class="ep-modal-title">
+        <span class="ep-modal-icon blue"><i class="fas fa-pencil-alt"></i></span>
+        Edit Category
+      </h5>
+      <button class="ep-close-btn" onclick="closeEdit()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="ep-modal-body">
+      <input type="hidden" id="editId">
+      <div class="ep-field">
+        <label class="ep-label">Category Name</label>
+        <input type="text" id="editName" class="ep-input">
+      </div>
+      <div class="ep-field">
+        <label class="ep-label">Replace Image <span style="color:var(--text-muted);font-weight:400">(leave empty to keep current)</span></label>
+        <div class="current-img-box" id="editCurrentBox">
+          <img id="editCurrentImg" src="" alt="current">
+          <span>Current image</span>
+        </div>
+        <input type="file" id="editImage" class="ep-input" accept="image/*"
+               onchange="previewImage(this,'editPreviewWrap','editPreviewImg')">
+        <div class="img-preview-wrap" id="editPreviewWrap">
+          <img id="editPreviewImg" src="" alt="preview">
+        </div>
+      </div>
+    </div>
+    <div class="ep-modal-footer">
+      <button class="ep-btn secondary" onclick="closeEdit()">Cancel</button>
+      <button class="ep-btn primary" id="editBtn" onclick="submitEdit()">
+        <i class="fas fa-save"></i>Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ DELETE CONFIRM MODAL ═══════════════════════════════════════════════ -->
+<div class="ep-backdrop" id="deleteModal">
+  <div class="ep-modal">
+    <div class="ep-modal-hdr">
+      <h5 class="ep-modal-title">
+        <span class="ep-modal-icon red"><i class="fas fa-trash"></i></span>
+        Delete Category
+      </h5>
+      <button class="ep-close-btn" onclick="closeDelete()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="ep-modal-body">
+      <div class="delete-warning-box">
+        <div class="dw-title"><i class="fas fa-exclamation-triangle"></i>Are you sure?</div>
+        <ul>
+          <li>This will permanently delete <strong id="deleteCatName" style="color:var(--text-primary)"></strong></li>
+          <li>Category cannot be deleted if exams are linked to it</li>
+          <li>This action cannot be undone</li>
+        </ul>
+      </div>
+      <input type="hidden" id="deleteId">
+    </div>
+    <div class="ep-modal-footer">
+      <button class="ep-btn secondary" onclick="closeDelete()">Cancel</button>
+      <button class="ep-btn danger" id="deleteBtn" onclick="submitDelete()">
+        <i class="fas fa-trash"></i>Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ TOAST CONTAINER ════════════════════════════════════════════════════ -->
+<div id="catToastContainer"></div>
+
+
+<!-- ══ SCRIPTS ════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ── Toast ── */
+  function toast(msg, type, sub) {
+    type = type || 'success';
+    var icons = { success: 'fa-check-circle', danger: 'fa-times-circle', warning: 'fa-exclamation-circle' };
+    var icon  = icons[type] || icons.success;
+    var el = document.createElement('div');
+    el.className = 'cat-toast ' + type;
+    el.innerHTML =
+      '<i class="fas ' + icon + ' cat-toast-icon"></i>' +
+      '<div>' +
+        '<div class="cat-toast-msg">' + msg + '</div>' +
+        (sub ? '<div class="cat-toast-sub">' + sub + '</div>' : '') +
+      '</div>';
+    document.getElementById('catToastContainer').appendChild(el);
+    setTimeout(function () { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 2700);
+    setTimeout(function () { el.remove(); }, 3000);
+  }
+
+  /* ── Image preview ── */
+  window.previewImage = function (input, wrapId, imgId) {
+    var wrap = document.getElementById(wrapId);
+    var img  = document.getElementById(imgId);
+    if (input.files && input.files[0]) {
+      var r = new FileReader();
+      r.onload = function (e) {
+        img.src = e.target.result;
+        wrap.style.display = 'block';
+      };
+      r.readAsDataURL(input.files[0]);
+    }
+  };
+
+  /* ── Loading state ── */
+  function setLoading(btnId, loading, idleHtml) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? '<i class="fas fa-spinner fa-spin"></i>Please wait…'
+      : idleHtml;
+  }
+
+  /* ── ADD modal ── */
+  window.openAdd = function () {
+    document.getElementById('addName').value  = '';
+    document.getElementById('addImage').value = '';
+    document.getElementById('addPreviewWrap').style.display = 'none';
+    document.getElementById('addPreviewImg').src = '';
+    setLoading('addBtn', false, '<i class="fas fa-plus"></i>Create');
+    document.getElementById('addModal').classList.add('open');
+    setTimeout(function () { document.getElementById('addName').focus(); }, 80);
+  };
+  window.closeAdd = function () {
+    document.getElementById('addModal').classList.remove('open');
+  };
+
+  window.submitAdd = function () {
+    var name = document.getElementById('addName').value.trim();
+    if (!name) {
+      toast('Category name is required.', 'warning');
+      document.getElementById('addName').focus();
+      return;
+    }
+    var fd = new FormData();
+    fd.append('name', name);
+    var img = document.getElementById('addImage').files[0];
+    if (img) fd.append('image', img);
+
+    setLoading('addBtn', true, '<i class="fas fa-plus"></i>Create');
+    fetch('/admin/categories/create', { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        setLoading('addBtn', false, '<i class="fas fa-plus"></i>Create');
+        if (d.success) {
+          toast('Category created successfully.', 'success');
+          closeAdd();
+          setTimeout(function () { location.reload(); }, 900);
+        } else {
+          toast(d.message || 'Failed to create category.', 'danger');
+        }
+      })
+      .catch(function () {
+        setLoading('addBtn', false, '<i class="fas fa-plus"></i>Create');
+        toast('Network error. Please try again.', 'danger');
+      });
+  };
+
+  /* ── EDIT modal ── */
+  window.openEdit = function (id, name, imgUrl) {
+    document.getElementById('editId').value    = id;
+    document.getElementById('editName').value  = name;
+    document.getElementById('editImage').value = '';
+    document.getElementById('editPreviewWrap').style.display = 'none';
+    document.getElementById('editPreviewImg').src = '';
+
+    var box = document.getElementById('editCurrentBox');
+    var cur = document.getElementById('editCurrentImg');
+    if (imgUrl) {
+      cur.src = imgUrl;
+      box.style.display = 'flex';
+    } else {
+      box.style.display = 'none';
+    }
+
+    setLoading('editBtn', false, '<i class="fas fa-save"></i>Save Changes');
+    document.getElementById('editModal').classList.add('open');
+    setTimeout(function () { document.getElementById('editName').focus(); }, 80);
+  };
+  window.closeEdit = function () {
+    document.getElementById('editModal').classList.remove('open');
+  };
+
+  window.submitEdit = function () {
+    var id   = document.getElementById('editId').value;
+    var name = document.getElementById('editName').value.trim();
+    var img  = document.getElementById('editImage').files[0];
+
+    if (!name && !img) {
+      toast('Please provide a name or a new image.', 'warning');
+      return;
+    }
+
+    var fd = new FormData();
+    if (name) fd.append('name', name);
+    if (img)  fd.append('image', img);
+
+    setLoading('editBtn', true, '<i class="fas fa-save"></i>Save Changes');
+    fetch('/admin/categories/update/' + id, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        setLoading('editBtn', false, '<i class="fas fa-save"></i>Save Changes');
+        if (d.success) {
+          toast('Category updated.', 'success');
+          closeEdit();
+          setTimeout(function () { location.reload(); }, 900);
+        } else {
+          toast(d.message || 'Failed to update category.', 'danger');
+        }
+      })
+      .catch(function () {
+        setLoading('editBtn', false, '<i class="fas fa-save"></i>Save Changes');
+        toast('Network error. Please try again.', 'danger');
+      });
+  };
+
+  /* ── DELETE modal ── */
+  window.openDelete = function (id, name) {
+    document.getElementById('deleteId').value       = id;
+    document.getElementById('deleteCatName').textContent = name;
+    setLoading('deleteBtn', false, '<i class="fas fa-trash"></i>Delete');
+    document.getElementById('deleteModal').classList.add('open');
+  };
+  window.closeDelete = function () {
+    document.getElementById('deleteModal').classList.remove('open');
+  };
+
+  window.submitDelete = function () {
+    var id = document.getElementById('deleteId').value;
+    setLoading('deleteBtn', true, '<i class="fas fa-trash"></i>Delete');
+    fetch('/admin/categories/delete/' + id, { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        setLoading('deleteBtn', false, '<i class="fas fa-trash"></i>Delete');
+        if (d.success) {
+          closeDelete();
+          var row = document.getElementById('row-' + id);
+          if (row) row.remove();
+          toast('Category deleted.', 'success');
+        } else {
+          toast(d.message || 'Failed to delete.', 'danger');
+        }
+      })
+      .catch(function () {
+        setLoading('deleteBtn', false, '<i class="fas fa-trash"></i>Delete');
+        toast('Network error. Please try again.', 'danger');
+      });
+  };
+
+  /* ── Backdrop click + Escape ── */
+  ['addModal', 'editModal', 'deleteModal'].forEach(function (id) {
+    document.getElementById(id).addEventListener('click', function (e) {
+      if (e.target === this) {
+        if (id === 'addModal')    closeAdd();
+        if (id === 'editModal')   closeEdit();
+        if (id === 'deleteModal') closeDelete();
+      }
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeAdd(); closeEdit(); closeDelete(); }
+  });
+
+})();
+</script>
+
+{% endblock %}

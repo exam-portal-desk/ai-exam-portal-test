@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Detailed Responses</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+  <script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$','$'],['\\(','\\)']],
+    displayMath: [['$$','$$'],['\\[','\\]']],
+    processEscapes: true
+  },
+  chtml: { linebreaks: { automatic: true, width: "90%" } },
+  options: {
+    skipHtmlTags: ['script','noscript','style','textarea','pre','code'],
+    processHtmlClass: 'math-content'
+  },
+  startup: {
+    ready() {
+      MathJax.startup.defaultReady();
+      MathJax.startup.promise.then(() => {
+        MathJax.typesetPromise().catch(err => console.warn('MathJax typeset error:', err));
+      });
+    }
+  }
+};
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <script>
+  /* Inherit theme from opener admin panel — must run before CSS paints */
+  (function(){
+    var t = 'dark';
+    try {
+      if(window.opener && !window.opener.closed){
+        t = window.opener.localStorage.getItem('adminTheme') || 'dark';
+      } else {
+        t = localStorage.getItem('adminTheme') || 'dark';
+      }
+    } catch(e){ t = 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+  </script>
+  <style>
+    [data-theme="dark"] {
+      --bg:#0a0a0f; --card-bg:#111118; --card-border:rgba(255,255,255,0.07);
+      --input-bg:rgba(255,255,255,0.05); --input-border:rgba(255,255,255,0.1);
+      --text-primary:#e6eef8; --text-secondary:rgba(255,255,255,0.55); --text-muted:rgba(255,255,255,0.28);
+      --accent:#2d5be3; --accent-subtle:rgba(45,91,227,0.15); --accent-border:rgba(45,91,227,0.3);
+      --table-head-bg:rgba(255,255,255,0.03); --table-border:rgba(255,255,255,0.05);
+      --toolbar-bg:#0d0d12; --q-head-bg:rgba(255,255,255,0.02);
+    }
+    [data-theme="light"] {
+      --bg:#f0f2f8; --card-bg:#ffffff; --card-border:#e2e8f0;
+      --input-bg:#ffffff; --input-border:#cbd5e0;
+      --text-primary:#1a202c; --text-secondary:#4a5568; --text-muted:#718096;
+      --accent:#2d5be3; --accent-subtle:rgba(45,91,227,0.08); --accent-border:rgba(45,91,227,0.25);
+      --table-head-bg:#f8faff; --table-border:#e8edf5;
+      --toolbar-bg:#f8faff; --q-head-bg:#f8faff;
+    }
+    *{box-sizing:border-box;}
+    body{background:var(--bg);font-family:'Segoe UI',sans-serif;min-height:100vh;margin:0;padding:0;color:var(--text-primary);transition:background .2s,color .2s;}
+
+    .toolbar{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;gap:.5rem;background:var(--toolbar-bg);border-bottom:1px solid var(--card-border);padding:.6rem 1.25rem;}
+    .toolbar-title{font-size:.88rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;flex:1;}
+    .toolbar-title span{color:var(--text-muted);font-weight:400;}
+    .tb-btn{display:inline-flex;align-items:center;gap:.4rem;padding:6px 14px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;border:1px solid var(--card-border);transition:all .15s;}
+    .tb-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+    .tb-btn.primary:hover{background:#2450c8;}
+    .tb-btn.secondary{background:var(--input-bg);color:var(--text-secondary);}
+    .tb-btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+
+    .page-wrap{max-width:960px;margin:0 auto;padding:4.5rem 1rem 2rem;}
+
+    .summary-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem;}
+    .sum-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;padding:.85rem 1rem;text-align:center;}
+    .sum-num{font-size:1.35rem;font-weight:800;color:var(--accent);margin:0;}
+    .sum-lbl{font-size:.72rem;color:var(--text-muted);margin:2px 0 0;text-transform:uppercase;letter-spacing:.4px;}
+    @media(max-width:560px){.summary-strip{grid-template-columns:1fr 1fr;}}
+
+    .filter-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;padding:.6rem 1rem;margin-bottom:1.25rem;}
+    .filter-bar span{font-size:.78rem;color:var(--text-muted);font-weight:600;margin-right:.25rem;}
+    .flt-btn{padding:4px 13px;border-radius:20px;font-size:.75rem;font-weight:700;cursor:pointer;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text-secondary);transition:all .15s;}
+    .flt-btn:hover{border-color:var(--accent);color:var(--accent);}
+    .flt-btn.active{background:var(--accent-subtle);border-color:var(--accent-border);color:var(--accent);}
+    .flt-btn.f-correct.active{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.35);color:#10b981;}
+    .flt-btn.f-incorrect.active{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444;}
+    .flt-btn.f-unanswered.active{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#f59e0b;}
+
+    /* overflow:visible so inner scroll containers are not clipped by the card */
+    .q-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;margin-bottom:1rem;overflow:visible;}
+    .q-card.correct{border-left:3px solid #10b981;}
+    .q-card.incorrect{border-left:3px solid #ef4444;}
+    .q-card.unanswered{border-left:3px solid #f59e0b;}
+
+    /* border-radius on q-head restores rounded top corners lost when card overflow changed */
+    .q-head{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1rem;background:var(--q-head-bg);border-bottom:1px solid var(--table-border);gap:.75rem;flex-wrap:wrap;border-radius:12px 12px 0 0;}
+    .q-num{display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;font-weight:700;color:var(--text-secondary);}
+    .q-num i{color:var(--accent);}
+
+    .status-pill{padding:3px 11px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.3px;display:inline-flex;align-items:center;gap:.3rem;}
+    .sp-correct{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.25);}
+    .sp-incorrect{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+    .sp-unanswered{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2);}
+
+    .q-body{padding:1rem;}
+    /* min-width:0 + overflow-x:auto lets wide equations scroll instead of breaking layout */
+    .q-text{background:var(--input-bg);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:.75rem 1rem;margin-bottom:1rem;font-size:.88rem;line-height:1.6;min-width:0;max-width:100%;overflow-x:auto;}
+
+    /* min-width:0 on grid and children prevents CSS grid blowout from wide equations */
+    .ans-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;min-width:0;}
+    @media(max-width:600px){.ans-grid{grid-template-columns:1fr;}}
+
+    .ans-box{border-radius:8px;padding:.75rem;border:1px solid var(--input-border);background:var(--input-bg);min-width:0;max-width:100%;overflow-x:auto;}
+    .ans-box.user-ans{border-color:rgba(45,91,227,.35);background:rgba(45,91,227,.07);}
+    .ans-box.user-ans.correct{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.08);}
+    .ans-box.user-ans.incorrect{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.07);}
+    .ans-box.correct-ans{border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.07);}
+
+    .ans-lbl{font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem;display:flex;align-items:center;gap:.3rem;}
+    .ans-val{font-size:.85rem;color:var(--text-primary);margin:0;line-height:1.5;}
+    .ans-val em{color:var(--text-muted);font-style:italic;}
+
+    .expl-box{background:rgba(45,91,227,.07);border:1px solid rgba(45,91,227,.2);border-radius:8px;padding:.75rem 1rem;margin-top:.5rem;min-width:0;max-width:100%;overflow-x:auto;}
+    .expl-lbl{font-size:.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.35rem;display:flex;align-items:center;gap:.35rem;}
+    .expl-val{font-size:.84rem;color:var(--text-secondary);margin:0;line-height:1.6;}
+
+    .math-content{line-height:1.6;overflow-wrap:break-word;min-width:0;overflow-x:auto;overflow-y:hidden;}
+    .math-content mjx-container{max-width:100%!important;overflow-x:auto!important;}
+    .math-content mjx-container[display="true"]{display:block!important;margin:.3rem 0!important;}
+    mjx-container{max-width:100%!important;}
+    mjx-math{white-space:normal!important;}
+
+    .empty-state{text-align:center;padding:3rem 1rem;color:var(--text-muted);}
+    .empty-state i{font-size:2.5rem;opacity:.2;display:block;margin-bottom:.75rem;}
+    .empty-state p{font-size:.88rem;margin:0;}
+    #noResultsMsg{display:none;text-align:center;padding:2rem;color:var(--text-muted);font-size:.85rem;}
+
+    @media print{
+      .toolbar{display:none!important;}
+      .page-wrap{padding-top:.5rem;}
+      .q-card{page-break-inside:avoid;overflow:visible;}
+    }
+
+    /* Discussion action buttons */
+    .disc-action-btn{background:none;border:1px solid var(--card-border);border-radius:6px;color:var(--text-muted);font-size:.72rem;font-weight:600;padding:.2rem .55rem;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:.25rem;}
+    .disc-action-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-subtle);}
+    .disc-action-btn.danger:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08);}
+
+    /* Discussion input area (inside disc-body) */
+    .disc-post-wrap{margin-bottom:.6rem;}
+    .disc-char-count{font-size:.7rem;color:var(--text-muted);text-align:right;margin:.2rem 0 .45rem;}    
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="toolbar-title">
+    <i class="fas fa-clipboard-list" style="color:var(--accent)"></i>
+    Detailed Responses
+    {% if user and exam %}
+    <span>— {{ user.username }} · {{ exam.name }}</span>
+    {% endif %}
+  </div>
+  <button class="tb-btn primary" onclick="doPrint()"><i class="fas fa-print"></i> Print</button>
+  <button class="tb-btn secondary" onclick="closeWindow()"><i class="fas fa-times"></i> Close</button>
+</div>
+
+<div class="page-wrap">
+  {% if responses and result and exam and user %}
+
+  <div class="summary-strip">
+    <div class="sum-card">
+      <p class="sum-num">{{ result.score }}/{{ result.max_score }}</p>
+      <p class="sum-lbl">Score</p>
+    </div>
+    <div class="sum-card">
+      <p class="sum-num">{{ "%.1f"|format(result.percentage|float) }}%</p>
+      <p class="sum-lbl">Percentage</p>
+    </div>
+    <div class="sum-card">
+      <p class="sum-num">{{ result.grade }}</p>
+      <p class="sum-lbl">Grade</p>
+    </div>
+    <div class="sum-card">
+      <p class="sum-num">{{ responses|length }}</p>
+      <p class="sum-lbl">Questions</p>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <span>Filter:</span>
+    <button class="flt-btn active"         onclick="flt(this,'all')">All</button>
+    <button class="flt-btn f-correct"      onclick="flt(this,'correct')"><i class="fas fa-check me-1"></i>Correct</button>
+    <button class="flt-btn f-incorrect"    onclick="flt(this,'incorrect')"><i class="fas fa-times me-1"></i>Incorrect</button>
+    <button class="flt-btn f-unanswered"   onclick="flt(this,'unanswered')"><i class="fas fa-question me-1"></i>Unanswered</button>
+  </div>
+
+  <div id="qList">
+    {% for response in responses %}
+    <div class="q-card {{ response.status }}" data-status="{{ response.status }}">
+      <div class="q-head">
+        <div class="q-num">
+          <i class="fas fa-circle-question"></i>
+          Question {{ loop.index }}
+        </div>
+        {% if response.status == 'correct' %}
+          <span class="status-pill sp-correct"><i class="fas fa-check-circle"></i>Correct</span>
+        {% elif response.status == 'incorrect' %}
+          <span class="status-pill sp-incorrect"><i class="fas fa-times-circle"></i>Incorrect</span>
+        {% else %}
+          <span class="status-pill sp-unanswered"><i class="fas fa-question-circle"></i>Unanswered</span>
+        {% endif %}
+      </div>
+
+      <div class="q-body">
+
+        {# ── Question text ── #}
+        <div class="q-text">
+          <div class="math-content">{{ response.question.question_text|safe }}</div>
+        </div>
+
+        {# ── Question image ── #}
+        {% if response.question.has_image and response.question.image_url %}
+        <div class="mb-3 text-center">
+          <img src="{{ response.question.image_url }}"
+               alt="Question image"
+               style="max-width:100%;max-height:420px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.4);cursor:pointer;"
+               onclick="openImgModal(this.src)"
+               onerror="this.parentElement.style.display='none'">
+          <div style="font-size:.72rem;color:var(--text-muted);margin-top:.3rem;"><i class="fas fa-search-plus"></i> Click to open full size</div>
+        </div>
+        {% endif %}
+
+        {# ── MCQ ── #}
+        {% if response.question_type == 'MCQ' %}
+          {% set options = [
+            {'id': 'A', 'text': response.question.option_a},
+            {'id': 'B', 'text': response.question.option_b},
+            {'id': 'C', 'text': response.question.option_c},
+            {'id': 'D', 'text': response.question.option_d}
+          ] %}
+          <div style="margin-bottom:.75rem;">
+            {% for opt in options %}
+              {% if opt.text and opt.text != 'nan' and opt.text|string|trim != '' and opt.text != 'None' %}
+                {% set is_given   = response.is_attempted and opt.id == response.given_answer %}
+                {% set is_correct = opt.id == response.correct_answer %}
+                <div class="ans-box {% if is_given and is_correct %}user-ans correct{% elif is_given and not is_correct %}user-ans incorrect{% elif is_correct %}correct-ans{% endif %}"
+                     style="margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                  <strong style="min-width:1.2rem;">{{ opt.id }}.</strong>
+                  <span class="math-content" style="flex:1;">{{ opt.text|safe }}</span>
+                  {% if is_given %}
+                    <span style="font-size:.7rem;background:rgba(45,91,227,.15);color:#93c5fd;border-radius:4px;padding:.1rem .4rem;font-weight:700;">Your Choice</span>
+                  {% endif %}
+                  {% if is_correct %}
+                    <span style="font-size:.7rem;background:rgba(16,185,129,.15);color:#10b981;border-radius:4px;padding:.1rem .4rem;font-weight:700;">✓ Correct</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+
+        {# ── MSQ ── #}
+        {% elif response.question_type == 'MSQ' %}
+          {% set options = [
+            {'id': 'A', 'text': response.question.option_a},
+            {'id': 'B', 'text': response.question.option_b},
+            {'id': 'C', 'text': response.question.option_c},
+            {'id': 'D', 'text': response.question.option_d}
+          ] %}
+          {% set given_list   = response.given_answer   if response.given_answer   is iterable and response.given_answer   is not string else [] %}
+          {% set correct_list = response.correct_answer if response.correct_answer is iterable and response.correct_answer is not string else [] %}
+          <div style="margin-bottom:.75rem;">
+            {% for opt in options %}
+              {% if opt.text and opt.text != 'nan' and opt.text|string|trim != '' and opt.text != 'None' %}
+                {% set is_given   = response.is_attempted and opt.id in given_list %}
+                {% set is_correct = opt.id in correct_list %}
+                <div class="ans-box {% if is_given and is_correct %}user-ans correct{% elif is_given and not is_correct %}user-ans incorrect{% elif is_correct %}correct-ans{% endif %}"
+                     style="margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                  <strong style="min-width:1.2rem;">{{ opt.id }}.</strong>
+                  <span class="math-content" style="flex:1;">{{ opt.text|safe }}</span>
+                  {% if is_given %}
+                    <span style="font-size:.7rem;background:rgba(45,91,227,.15);color:#93c5fd;border-radius:4px;padding:.1rem .4rem;font-weight:700;">Your Choice</span>
+                  {% endif %}
+                  {% if is_correct %}
+                    <span style="font-size:.7rem;background:rgba(16,185,129,.15);color:#10b981;border-radius:4px;padding:.1rem .4rem;font-weight:700;">✓ Correct</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+
+        {# ── NUMERIC ── #}
+        {% elif response.question_type == 'NUMERIC' %}
+          <div class="ans-grid">
+            <div class="ans-box user-ans {{ response.status }}">
+              <div class="ans-lbl"><i class="fas fa-user"></i>Your Answer</div>
+              <p class="ans-val math-content">
+                {% if response.is_attempted and response.given_answer and response.given_answer != 'Not Answered' %}
+                  {{ response.given_answer }}
+                {% else %}
+                  <em>Not answered</em>
+                {% endif %}
+              </p>
+            </div>
+            <div class="ans-box correct-ans">
+              <div class="ans-lbl"><i class="fas fa-check-circle"></i>Correct Answer</div>
+              <p class="ans-val math-content">{{ response.correct_answer }}</p>
+              {% if response.question.tolerance %}
+                <p class="ans-val" style="color:var(--text-muted);font-size:.75rem;">Tolerance: ±{{ response.question.tolerance }}</p>
+              {% endif %}
+            </div>
+          </div>
+
+        {# ── Fallback (simple ans grid) ── #}
+        {% else %}
+          <div class="ans-grid">
+            <div class="ans-box user-ans {{ response.status }}">
+              <div class="ans-lbl"><i class="fas fa-user"></i>Your Answer</div>
+              <p class="ans-val math-content">
+                {% if response.given_answer and response.given_answer != 'Not Answered' %}
+                  {{ response.given_answer|safe }}
+                {% else %}
+                  <em>Not answered</em>
+                {% endif %}
+              </p>
+            </div>
+            <div class="ans-box correct-ans">
+              <div class="ans-lbl"><i class="fas fa-check-circle"></i>Correct Answer</div>
+              <p class="ans-val math-content">{{ response.correct_answer|safe }}</p>
+            </div>
+          </div>
+        {% endif %}
+
+        {# ── Explanation ── #}
+        {% if response.question.explanation %}
+        <div class="expl-box">
+          <div class="expl-lbl"><i class="fas fa-lightbulb"></i>Explanation</div>
+          <p class="expl-val math-content">{{ response.question.explanation|safe }}</p>
+        </div>
+        {% endif %}
+
+        {# ── Discussion Forum ── #}
+        <div class="disc-section" style="margin-top:1rem;background:var(--accent-subtle);border:1px solid var(--accent-border);border-radius:10px;padding:.9rem 1rem;">
+          <div class="disc-header" style="display:flex;align-items:center;gap:.5rem;cursor:pointer;user-select:none;"
+               onclick="discToggle('{{ response.question_id }}', {{ result.exam_id }}, this)">
+            <i class="fas fa-comments" style="color:var(--accent);font-size:.88rem;"></i>
+            <span style="font-weight:700;font-size:.84rem;color:var(--text-primary);">Discussion</span>
+            <span class="disc-count-badge" id="disc-cnt-{{ response.question_id }}"
+                  style="background:var(--accent);color:#fff;font-size:.66rem;font-weight:700;padding:.12rem .42rem;border-radius:20px;min-width:1.3rem;text-align:center;">•••</span>
+            <i class="fas fa-chevron-down disc-chev" style="color:var(--text-muted);font-size:.72rem;margin-left:auto;transition:transform .25s;"></i>
+          </div>
+          <div class="disc-body" id="disc-body-{{ response.question_id }}" style="display:none;margin-top:.8rem;">
+            <div class="disc-post-wrap">
+              <div style="position:relative;">
+                <textarea id="disc-ta-{{ response.question_id }}" rows="2" maxlength="500"
+                  style="width:100%;background:var(--input-bg);border:1px solid var(--input-border);border-radius:9px;color:var(--text-primary);padding:.55rem 5.2rem .55rem .85rem;font-size:.84rem;resize:none;outline:none;line-height:1.45;min-height:2.5rem;"
+                  placeholder="Write a comment… (Enter to send)"
+                  oninput="discCharCount('{{ response.question_id }}')"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discPost('{{ response.question_id }}',{{ result.exam_id }});}"></textarea>
+                <div style="position:absolute;right:.4rem;bottom:.4rem;display:flex;gap:.25rem;align-items:center;">
+                  <div style="position:relative;">
+                    <button style="background:none;border:none;font-size:1.05rem;cursor:pointer;padding:.18rem .22rem;border-radius:6px;line-height:1;transition:background .15s;"
+                            onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'"
+                            onclick="discEmojiToggle(event,'{{ response.question_id }}')" type="button">😊</button>
+                    <div id="epop-{{ response.question_id }}"
+                         style="display:none;position:absolute;bottom:calc(100% + .4rem);right:0;z-index:1000;background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:.55rem;box-shadow:0 16px 50px rgba(0,0,0,0.7);width:272px;max-width:90vw;">
+                      <div id="egrid-{{ response.question_id }}"
+                           style="display:grid;grid-template-columns:repeat(7,1fr);gap:.3rem;"></div>
+                    </div>
+                  </div>
+                  <button style="background:var(--accent);border:none;border-radius:7px;color:#fff;width:1.8rem;height:1.8rem;display:flex;align-items:center;justify-content:center;cursor:pointer;"
+                          onclick="discPost('{{ response.question_id }}',{{ result.exam_id }})" title="Send">
+                    <i class="fas fa-paper-plane" style="font-size:.65rem;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="disc-char-count" id="disc-char-{{ response.question_id }}">0 / 500</div>
+            </div>
+            <div id="disc-list-{{ response.question_id }}" style="display:flex;flex-direction:column;gap:.5rem;max-height:340px;overflow-y:auto;padding-right:.3rem;">
+              <div style="text-align:center;color:var(--text-muted);font-size:.8rem;padding:.75rem;">
+                <i class="fas fa-circle-notch fa-spin"></i> Loading...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div id="noResultsMsg">No questions match this filter.</div>
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="fas fa-exclamation-triangle"></i>
+    <p><strong>Responses Not Found</strong><br>
+    <span style="font-size:.8rem">The data may be missing or you may not have permission.</span></p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function renderMath() {
+  if (window.MathJax && window.MathJax.typesetPromise) {
+    MathJax.typesetPromise().catch(err => console.warn('MathJax re-typeset:', err));
+  }
+}
+function flt(btn, status) {
+  document.querySelectorAll('.flt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  let vis = 0;
+  document.querySelectorAll('.q-card').forEach(c => {
+    const show = status === 'all' || c.dataset.status === status;
+    c.style.display = show ? '' : 'none';
+    if (show) vis++;
+  });
+  document.getElementById('noResultsMsg').style.display = vis === 0 ? 'block' : 'none';
+  setTimeout(renderMath, 50);
+}
+function doPrint() { setTimeout(() => window.print(), 80); }
+function closeWindow() {
+  try { window.close(); } catch(e) {}
+  try { history.back(); } catch(e) {}
+}
+
+// ── Discussion Forum ──────────────────────────────────────────────────────────
+
+const DISC_IS_ADMIN = true; // admin portal — always admin
+const DISC_EMOJIS = ['😊','😂','🤔','👍','👎','❤️','🔥','🎉','😮','😢','👏','💡','✅','❌','⭐','🙏','😅','🤣','😍','🥳','🤯','💪','🎯','📚','✏️','🧠','⚡','🌟','💯','🤝','😎'];
+const _discLastHash = {};
+
+function discEsc(t) {
+  return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function discTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.includes('Z') ? ts : ts + 'Z');
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return d.toLocaleDateString();
+}
+
+function _avatarHue(name) {
+  let h = 0;
+  for (let i = 0; i < (name||'').length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return h % 360;
+}
+
+async function discToggle(qid, examId, headerEl) {
+  const body = document.getElementById(`disc-body-${qid}`);
+  const chev = headerEl.querySelector('.disc-chev');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+  if (!isOpen) discLoad(qid, examId);
+}
+
+async function discLoad(qid, examId) {
+  const list = document.getElementById(`disc-list-${qid}`);
+  if (!list) return;
+  list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.8rem;padding:.75rem;"><i class="fas fa-circle-notch fa-spin"></i> Loading...</div>';
+  try {
+    const r = await fetch(`/api/discussion/${qid}`);
+    const d = await r.json();
+    if (!d.success) { list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.8rem;padding:.75rem;">Could not load comments.</div>'; return; }
+    const badge = document.getElementById(`disc-cnt-${qid}`);
+    if (badge) badge.textContent = d.count ?? 0;
+    if (!d.comments || !d.comments.length) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.78rem;padding:.6rem;">No comments yet.</div>';
+      return;
+    }
+    list.innerHTML = d.comments.map(c => discCard(c, qid, examId, false, null)).join('');
+    renderMath();
+  } catch(e) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.8rem;padding:.75rem;">Failed to load.</div>';
+  }
+}
+
+function discCard(c, qid, examId, isReply, pUname) {
+  const init     = (c.username||'U')[0].toUpperCase();
+  const hue      = _avatarHue(c.username);
+  const avatarBg = `hsl(${hue},55%,38%)`;
+
+  const editedBadge = c.is_edited      ? '<span style="font-size:.62rem;color:var(--text-muted);font-style:italic;">(edited)</span>' : '';
+  const pinBadge    = c.is_pinned      ? '<span style="font-size:.63rem;background:rgba(255,209,102,.14);color:#ffd166;border-radius:4px;padding:.06rem .32rem;font-weight:700;">📌 Pinned</span>' : '';
+  const bestBadge   = c.is_best_answer ? '<span style="font-size:.63rem;background:rgba(16,185,129,.14);color:#10b981;border-radius:4px;padding:.06rem .32rem;font-weight:700;">✅ Best Answer</span>' : '';
+
+  const replyChip = (isReply && pUname)
+    ? `<div style="font-size:.68rem;color:rgba(45,91,227,.8);background:rgba(45,91,227,.1);border-radius:4px;padding:.08rem .38rem;margin-bottom:.22rem;display:inline-flex;align-items:center;gap:.25rem;">↩ Replying to <strong>${discEsc(pUname)}</strong></div>`
+    : '';
+
+  // Admin action buttons
+  const pinLabel  = c.is_pinned      ? 'Unpin'       : 'Pin';
+  const bestLabel = c.is_best_answer ? 'Remove Best' : 'Best Answer';
+
+  const adminBtns = `
+    <button class="disc-action-btn" onclick="discAdminPin(${c.id},${qid},${examId})" title="${pinLabel}">
+      <i class="fas fa-thumbtack"></i> ${pinLabel}
+    </button>
+    <button class="disc-action-btn" onclick="discAdminBest(${c.id},${qid},${examId})" title="${bestLabel}">
+      <i class="fas fa-star"></i> ${bestLabel}
+    </button>
+    <button class="disc-action-btn danger" onclick="discDelete(${c.id},${qid},${examId})" title="Delete">
+      <i class="fas fa-trash"></i> Delete
+    </button>`;
+
+  const replyBtn = !isReply
+    ? `<button class="disc-action-btn" onclick="discReplyToggle(${c.id},${qid},${examId})"><i class="fas fa-reply"></i> Reply</button>`
+    : '';
+
+  const repliesHtml = (c.replies && c.replies.length)
+    ? `<div style="margin-top:.45rem;padding-left:.8rem;border-left:2px solid var(--accent-border);">
+        ${c.replies.map(r => discCard(r, qid, examId, true, c.username)).join('')}
+       </div>`
+    : '';
+
+  const replyBoxHtml = !isReply ? `
+    <div id="rbox-${c.id}" style="display:none;margin-top:.5rem;">
+      <div style="position:relative;">
+        <textarea id="rta-${c.id}" rows="2" maxlength="500"
+          style="width:100%;background:var(--input-bg);border:1px solid var(--input-border);border-radius:8px;color:var(--text-primary);padding:.5rem 3.2rem .5rem .75rem;font-size:.83rem;resize:none;outline:none;line-height:1.4;"
+          placeholder="Write a reply…"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discReplyPost(${c.id},${qid},${examId});}"></textarea>
+        <div style="position:absolute;right:.4rem;bottom:.4rem;display:flex;gap:.25rem;">
+          <button style="background:var(--accent);border:none;border-radius:6px;color:#fff;width:1.7rem;height:1.7rem;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.65rem;"
+                  onclick="discReplyPost(${c.id},${qid},${examId})">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>` : '';
+
+  const cardStyle = isReply
+    ? 'background:var(--input-bg);border:1px solid var(--input-border);border-radius:8px;padding:.6rem .8rem;margin-top:.35rem;'
+    : `background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;padding:.7rem .9rem;margin-bottom:.5rem;${c.is_pinned ? 'border-color:rgba(255,209,102,.35);background:rgba(255,209,102,.04);' : ''}${c.is_best_answer ? 'border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.04);' : ''}`;
+
+  const deletedStyle = c.is_deleted_account ? 'opacity:.65;' : '';
+
+  return `
+  <div id="ccard-${c.id}" style="${cardStyle}${deletedStyle}">
+    ${replyChip}
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.28rem;">
+      <div style="width:1.75rem;height:1.75rem;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.7rem;color:#fff;flex-shrink:0;">${init}</div>
+      <span style="font-weight:700;font-size:.81rem;color:var(--text-primary);">${discEsc(c.username||'User')}</span>
+      <span style="font-size:.68rem;color:var(--text-muted);">${discTime(c.created_at)}</span>
+      ${pinBadge}${bestBadge}${editedBadge}
+    </div>
+    <div id="ctext-${c.id}" style="color:var(--text-secondary);font-size:.84rem;word-break:break-word;white-space:pre-wrap;">${discEsc(c.message||'')}</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
+      ${replyBtn}
+      ${adminBtns}
+    </div>
+    ${replyBoxHtml}
+    ${repliesHtml}
+  </div>`;
+}
+
+async function discPost(qid, examId) {
+  const ta  = document.getElementById(`disc-ta-${qid}`);
+  if (!ta) return;
+  const msg = ta.value.trim();
+  if (!msg) { discToast('Message cannot be empty', 'err'); return; }
+  ta.disabled = true;
+  try {
+    const r = await fetch(`/api/discussion/${qid}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, exam_id: examId})
+    });
+    const d = await r.json();
+    if (d.success) {
+      ta.value = '';
+      document.getElementById(`disc-char-${qid}`).textContent = '0 / 500';
+      discLoad(qid, examId);
+    } else { discToast(d.message || 'Post failed', 'err'); ta.disabled = false; }
+  } catch(e) { discToast('Network error', 'err'); ta.disabled = false; }
+}
+
+function discCharCount(qid) {
+  const ta = document.getElementById(`disc-ta-${qid}`);
+  const cc = document.getElementById(`disc-char-${qid}`);
+  if (ta && cc) cc.textContent = `${ta.value.length} / 500`;
+}
+
+function discEmojiToggle(event, qid) {
+  event.stopPropagation();
+  const pop = document.getElementById(`epop-${qid}`);
+  if (!pop) return;
+  const isOpen = pop.style.display !== 'none';
+  // close all open pickers first
+  document.querySelectorAll('[id^="epop-"]').forEach(p => p.style.display = 'none');
+  if (isOpen) return;
+  // build grid lazily
+  const grid = document.getElementById(`egrid-${qid}`);
+  if (grid && !grid.dataset.built) {
+    grid.innerHTML = DISC_EMOJIS.map(e =>
+      `<button type="button"
+               style="background:none;border:none;font-size:1.15rem;cursor:pointer;border-radius:6px;padding:.12rem;line-height:1;transition:background .12s;"
+               onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='none'"
+               onclick="discEmojiInsert('${e}','${qid}')">${e}</button>`
+    ).join('');
+    grid.dataset.built = '1';
+  }
+  pop.style.display = 'block';
+}
+
+function discEmojiInsert(emoji, qid) {
+  const ta = document.getElementById(`disc-ta-${qid}`);
+  if (ta) {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + emoji + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + emoji.length;
+    ta.focus();
+    discCharCount(qid);
+  }
+  const pop = document.getElementById(`epop-${qid}`);
+  if (pop) pop.style.display = 'none';
+}
+
+// Close emoji pickers on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('[id^="epop-"]').forEach(p => p.style.display = 'none');
+});
+
+function discReplyToggle(parentId, qid, examId) {
+  const box = document.getElementById(`rbox-${parentId}`);
+  if (!box) return;
+  const isOpen = box.style.display !== 'none';
+  box.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) document.getElementById(`rta-${parentId}`)?.focus();
+}
+
+async function discReplyPost(parentId, qid, examId) {
+  const ta  = document.getElementById(`rta-${parentId}`);
+  if (!ta) return;
+  const msg = ta.value.trim();
+  if (!msg) { discToast('Reply cannot be empty', 'err'); return; }
+  ta.disabled = true;
+  try {
+    const r = await fetch(`/api/discussion/${qid}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, exam_id: examId, parent_id: parentId})
+    });
+    const d = await r.json();
+    if (d.success) {
+      ta.value = '';
+      document.getElementById(`rbox-${parentId}`).style.display = 'none';
+      discLoad(qid, examId);
+    } else { discToast(d.message || 'Reply failed', 'err'); ta.disabled = false; }
+  } catch(e) { discToast('Network error', 'err'); ta.disabled = false; }
+}
+
+async function discDelete(commentId, qid, examId) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+  overlay.innerHTML = `
+    <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;padding:1.4rem 1.6rem;width:min(300px,90vw);box-shadow:0 24px 60px rgba(0,0,0,0.7);">
+      <h6 style="color:var(--text-primary);font-weight:700;margin:0 0 .4rem;font-size:.93rem;">🗑️ Delete Comment?</h6>
+      <p style="color:var(--text-muted);font-size:.8rem;margin:0 0 1.2rem;">This action cannot be undone.</p>
+      <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+        <button id="dc-cancel" style="background:var(--input-bg);border:1px solid var(--input-border);border-radius:8px;color:var(--text-secondary);padding:.42rem .9rem;font-size:.82rem;font-weight:600;cursor:pointer;">Cancel</button>
+        <button id="dc-confirm" style="background:#dc2626;border:none;border-radius:8px;color:#fff;padding:.42rem .9rem;font-size:.82rem;font-weight:600;cursor:pointer;">Delete</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#dc-cancel').onclick  = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#dc-confirm').onclick = async () => {
+    overlay.remove();
+    try {
+      const r = await fetch(`/api/discussion/delete/${commentId}`, {method:'DELETE'});
+      const d = await r.json();
+      if (d.success) discLoad(qid, examId);
+      else discToast('Delete failed', 'err');
+    } catch(e) { discToast('Network error', 'err'); }
+  };
+}
+
+async function discAdminPin(commentId, qid, examId) {
+  try {
+    const r = await fetch(`/api/discussion/admin/pin/${commentId}`, {method:'PUT'});
+    const d = await r.json();
+    if (d.success) discLoad(qid, examId);
+    else discToast('Pin failed', 'err');
+  } catch(e) { discToast('Network error', 'err'); }
+}
+
+async function discAdminBest(commentId, qid, examId) {
+  try {
+    const r = await fetch(`/api/discussion/admin/best/${commentId}`, {method:'PUT'});
+    const d = await r.json();
+    if (d.success) discLoad(qid, examId);
+    else discToast('Best answer failed', 'err');
+  } catch(e) { discToast('Network error', 'err'); }
+}
+
+function discToast(msg, type) {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:1.4rem;right:1.4rem;z-index:9999;padding:.6rem 1rem;border-radius:10px;font-size:.83rem;font-weight:700;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,0.45);pointer-events:none;`;
+  t.style.background = type === 'err' ? '#ef4444' : type === 'warn' ? '#d97706' : '#2d5be3';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// Bulk-load counts on page init
+(async function initDiscCounts() {
+  const badges = document.querySelectorAll('[id^="disc-cnt-"]');
+  const qids   = [...badges].map(b => parseInt(b.id.replace('disc-cnt-', ''))).filter(Boolean);
+  if (!qids.length) return;
+  try {
+    const r = await fetch('/api/discussion/counts/bulk', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({question_ids: qids})
+    });
+    const d = await r.json();
+    if (d.success) badges.forEach(b => {
+      const q = b.id.replace('disc-cnt-', '');
+      b.textContent = d.counts[q] ?? '0';
+    });
+  } catch(e) { badges.forEach(b => b.textContent = '0'); }
+})();
+
+// ── Image modal ───────────────────────────────────────────────────────────────
+
+function openImgModal(src) {
+  document.getElementById('adminImgModalSrc').src = src;
+  var m = new bootstrap.Modal(document.getElementById('adminImgModal'));
+  m.show();
+}
+
+/* Listen for live theme changes broadcast from parent admin window */
+window.addEventListener('message', function(ev){
+  try{
+    if(ev.origin !== window.location.origin) return;
+    if(ev.data && ev.data.type === 'adminThemeChange'){
+      document.documentElement.setAttribute('data-theme', ev.data.theme);
+    }
+  }catch(e){}
+});
+</script>
+
+<!-- Image enlarge modal -->
+<div class="modal fade" id="adminImgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--card-border);">
+      <div class="modal-header" style="border-bottom:1px solid var(--card-border);padding:.6rem 1rem;">
+        <h6 class="modal-title" style="color:var(--text-primary);margin:0;font-size:.88rem;">
+          <i class="fas fa-image me-2" style="color:var(--accent);"></i>Question Image
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                style="filter:var(--bs-btn-close-filter,invert(1) brightness(0.7));"></button>
+      </div>
+      <div class="modal-body text-center p-3">
+        <img id="adminImgModalSrc" src="" alt="Question image"
+             class="img-fluid rounded"
+             style="max-height:82vh;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+
+
+

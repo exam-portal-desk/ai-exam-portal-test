@@ -1,0 +1,1499 @@
+{% extends "admin_base.html" %}
+{% block title %}Manage Questions{% endblock %}
+
+{% block content %}
+<style>
+  .page-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+  }
+  .page-top h1 { font-size: clamp(1.2rem,3vw,1.6rem); font-weight: 700; margin: 0; color: var(--text-primary); }
+  .page-top p  { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--text-muted); }
+
+  .control-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem;
+  }
+
+  .exam-info-pill {
+    margin-top: 1rem; padding: 0.6rem 1rem;
+    background: var(--accent-subtle); border: 1px solid var(--accent-border);
+    border-radius: 10px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .exam-info-pill span { font-size: 0.82rem; color: var(--text-primary); }
+  .exam-id-badge {
+    background: var(--accent); color: #ffffff !important;
+    padding: 3px 10px; border-radius: 7px; font-size: 0.78rem; font-weight: 700;
+  }
+
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--card-border); background: var(--card-bg);
+    color: var(--text-secondary); display: inline-flex; align-items: center;
+    justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 0.78rem;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+  .icon-btn.danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
+  .action-btns { display: flex; gap: 0.35rem; align-items: center; }
+
+  .question-id-badge {
+    background: var(--accent-subtle); border: 1px solid var(--accent-border);
+    color: var(--accent); padding: 3px 10px; border-radius: 7px;
+    font-size: 0.75rem; font-weight: 700; display: inline-block;
+  }
+  .question-type-badge {
+    padding: 3px 9px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;
+    display: inline-block;
+  }
+  .type-mcq  { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+  .type-msq  { background: rgba(245,158,11,0.12);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
+  .type-num  { background: rgba(99,102,241,0.12);  color: #818cf8; border: 1px solid rgba(99,102,241,0.2); }
+
+  .marks-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--table-head-bg); border: 1px solid var(--card-border);
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+  }
+  .marks-pos { color: #10b981; }
+  .marks-neg { color: #ef4444; }
+
+  .image-pill {
+    background: var(--table-head-bg); border: 1px solid var(--card-border);
+    color: var(--text-muted); padding: 2px 7px; border-radius: 5px;
+    font-size: 0.7rem; font-weight: 600; font-family: monospace;
+    display: inline-block; max-width: 150px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .question-text { max-width: 380px; white-space: pre-wrap; line-height: 1.5; font-size: 0.85rem; color: var(--text-primary); }
+
+  .search-bar {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+    display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;
+  }
+  .search-bar .form-control, .search-bar .form-select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 9px; font-size: 0.83rem; padding: 0.5rem 0.75rem;
+  }
+  .search-bar .form-control::placeholder { color: var(--input-placeholder); }
+  .search-bar .form-control:focus, .search-bar .form-select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); outline: none;
+    background: var(--input-bg);
+  }
+  .search-bar label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; display: block; }
+  .search-bar .form-select option { background: var(--card-bg); color: var(--text-primary); }
+  #exam-select option { background: #111118; color: #e6eef8; }
+
+  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; }
+  .card-header-flat {
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .card-header-flat h5 { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
+
+  .bulk-settings {
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--card-border);
+    background: var(--table-head-bg);
+  }
+  .bulk-settings label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; display: block; }
+  .bulk-settings .form-control, .bulk-settings .form-select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 8px; font-size: 0.82rem; padding: 0.45rem 0.7rem;
+  }
+  .bulk-settings .form-select option { background: var(--card-bg); color: var(--text-primary); }
+  .bulk-settings .form-control:focus, .bulk-settings .form-select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); outline: none;
+    background: var(--input-bg);
+  }
+
+  .table { --bs-table-bg: transparent; --bs-table-color: var(--text-primary); }
+  .table thead th {
+    background: var(--table-head-bg); color: var(--text-muted);
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; border-bottom: 1px solid var(--table-border); padding: 0.75rem 1rem;
+  }
+  .table tbody td { border-bottom: 1px solid var(--table-border); padding: 0.75rem 1rem; vertical-align: middle; }
+  .table tbody tr:last-child td { border-bottom: none; }
+  .table tbody tr:hover td { background: var(--table-row-hover); }
+
+  .enhanced-checkbox { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+  /* Pagination */
+  .pagination-wrap {
+    padding: 1rem 1.25rem; border-top: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;
+  }
+  .pagination-info { font-size: 0.8rem; color: var(--text-muted); }
+  .entries-selector { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); }
+  .entries-selector select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 7px; padding: 4px 8px; font-size: 0.8rem;
+  }
+  .page-nav { display: flex; align-items: center; gap: 0.3rem; }
+  .page-btn {
+    min-width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--card-border);
+    background: var(--card-bg); color: var(--text-secondary); font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 0.4rem;
+    transition: all 0.15s;
+  }
+  .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+  .page-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Batch section */
+  .batch-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 1.5rem; margin-top: 1.5rem;
+  }
+  .batch-card h5 { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.4rem; }
+  .batch-desc {
+    font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1.25rem;
+    padding: 0.75rem 1rem; background: var(--accent-subtle);
+    border: 1px solid var(--accent-border); border-radius: 9px;
+  }
+
+  .batch-row-item {
+    background: var(--table-head-bg); border: 1px solid var(--card-border);
+    border-radius: 11px; padding: 1rem; margin-bottom: 1rem;
+    transition: border-color 0.15s;
+  }
+  .batch-row-item:hover { border-color: var(--accent-border); }
+  .batch-row-item label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; display: block; }
+  .batch-row-item .form-control, .batch-row-item .form-select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 8px; font-size: 0.82rem; padding: 0.45rem 0.7rem;
+  }
+  .batch-row-item .form-control::placeholder { color: var(--input-placeholder); }
+  .batch-row-item .form-control:focus, .batch-row-item .form-select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); outline: none; background: var(--input-bg);
+  }
+  .batch-row-item .form-select option { background: var(--card-bg); color: var(--text-primary); }
+
+  .quick-apply {
+    background: var(--table-head-bg); border: 1px solid var(--card-border);
+    border-radius: 11px; padding: 1rem; margin-bottom: 1.25rem;
+  }
+  .quick-apply label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; display: block; }
+  .quick-apply .form-control, .quick-apply .form-select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 8px; font-size: 0.82rem; padding: 0.45rem 0.7rem;
+  }
+  .quick-apply .form-control:focus, .quick-apply .form-select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); outline: none; background: var(--input-bg);
+  }
+  .quick-apply .form-select option { background: var(--card-bg); color: var(--text-primary); }
+
+  .btn-flat {
+    border-radius: 9px; font-size: 0.82rem; font-weight: 600;
+    padding: 0.45rem 1rem; border: none; cursor: pointer; transition: all 0.15s;
+    display: inline-flex; align-items: center; text-decoration: none;
+  }
+  .btn-flat.primary   { background: var(--accent); color: white; }
+  .btn-flat.primary:hover { background: var(--accent-hover); color: white; }
+  .btn-flat.success   { background: var(--accent); color: white; }
+  .btn-flat.success:hover { background: var(--accent-hover); color: white; }
+  .btn-flat.danger-btn { background: var(--accent); color: white; }
+  .btn-flat.danger-btn:hover { background: var(--accent-hover); color: white; }
+  .btn-flat.secondary { background: var(--btn-secondary-bg); border: 1px solid var(--btn-secondary-border); color: var(--btn-secondary-color); }
+  .btn-flat.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-flat.warning   { background: var(--accent); color: white; }
+  .btn-flat.warning:hover { background: var(--accent-hover); color: white; }
+
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+  .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.25; display: block; }
+  .empty-state p { font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+
+  /* Modal overrides */
+  .modal-content { background: var(--modal-bg); border: 1px solid var(--card-border); border-radius: 14px; color: var(--text-primary); }
+  .modal-header { background: var(--card-bg); border-bottom: 1px solid var(--card-border); border-radius: 14px 14px 0 0; padding: 1rem 1.25rem; }
+  .modal-body { padding: 1.25rem; background: var(--modal-bg); }
+  .modal-footer { background: var(--modal-footer-bg); border-top: 1px solid var(--card-border); padding: 0.75rem 1.25rem; border-radius: 0 0 14px 14px; }
+  .modal-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+  [data-theme="dark"] .btn-close { filter: brightness(0) invert(1); opacity: 0.5; }
+  .modal-body .form-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; }
+  .modal-body .form-control, .modal-body .form-select {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    color: var(--input-text); border-radius: 9px; font-size: 0.85rem; padding: 0.5rem 0.75rem;
+  }
+  .modal-body .form-control::placeholder { color: var(--input-placeholder); }
+  .modal-body .form-control:focus, .modal-body .form-select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); outline: none; background: var(--input-bg);
+  }
+  .modal-body .form-select option { background: var(--card-bg); color: var(--text-primary); }
+  .modal-body textarea.form-control { resize: vertical; min-height: 70px; }
+  .modal-section-title {
+    font-size: 0.82rem; font-weight: 700; color: var(--text-secondary);
+    margin: 1rem 0 0.6rem; padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--card-border);
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .modal-section-title i { color: var(--accent); }
+  .form-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  /* q-toast */
+  #qToast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 99999;
+    padding: 0.7rem 1.2rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600;
+    color: #fff; display: none; align-items: center; gap: 0.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3); min-width: 240px;
+  }
+
+  @media (max-width: 768px) {
+    .page-top { flex-direction: column; align-items: flex-start; }
+    .search-bar { flex-direction: column; align-items: stretch; }
+    .search-bar > * { width: 100% !important; max-width: 100% !important; }
+    .card-header-flat { flex-direction: column; align-items: flex-start; }
+    .pagination-wrap { flex-direction: column; align-items: flex-start; }
+    /* Marks visible on mobile — prevent cell clipping */
+    .table thead th, .table tbody td { padding: 0.6rem 0.7rem; }
+    .marks-badge { font-size: 0.75rem; }
+  }
+</style>
+
+<!-- Page Top -->
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-question-circle me-2" style="color:var(--accent)"></i>Questions Management</h1>
+    <p>Manage, batch-add, and bulk-update exam questions.</p>
+  </div>
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+    <button class="btn-flat success" id="import-csv-btn"><i class="fas fa-file-upload me-1"></i>Import CSV</button>
+    <button class="btn-flat secondary" id="export-csv-btn"><i class="fas fa-file-download me-1"></i>Export CSV</button>
+    <button class="btn-flat primary" id="addQuestionBtn" onclick="openAddQuestionModal()">
+      <i class="fas fa-plus me-1"></i>Add Question
+    </button>
+    <a class="btn-flat secondary" href="{{ url_for('admin.questions_index') }}"><i class="fas fa-list me-1"></i>Back to List</a>
+  </div>
+</div>
+
+<!-- Exam Selector -->
+<div class="control-card">
+  <form id="exam-select-form" class="row g-3 align-items-end">
+    <div class="col-md-8">
+      <label class="form-label" style="font-size:0.8rem;font-weight:600;color:var(--text-muted)">
+        <i class="fas fa-graduation-cap me-1"></i>Select Exam
+      </label>
+      <select id="exam-select" class="form-control" name="exam_id"
+              style="background:var(--input-bg);border:1px solid var(--input-border);color:var(--input-text);border-radius:9px;font-size:0.85rem;color-scheme:dark">
+        {% for e in exams %}
+          <option value="{{ e.id }}" {% if selected_exam_id == e.id %}selected{% endif %} data-exam-name="{{ e.name }}">
+            {{ e.name }} (ID: {{ e.id }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <button id="reload-btn" type="button" class="btn-flat primary w-100" style="padding:0.55rem 1rem">
+        <i class="fas fa-sync-alt me-1"></i>Load Questions
+      </button>
+    </div>
+  </form>
+  {% if selected_exam_id %}
+  <div class="exam-info-pill">
+    <span><i class="fas fa-info-circle me-1"></i>Viewing questions for selected exam</span>
+    <span class="exam-id-badge"><i class="fas fa-hashtag me-1"></i>Exam ID: {{ selected_exam_id }}</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Search & Filter -->
+<div class="search-bar">
+  <div style="flex:1;min-width:200px">
+    <label>Search Questions</label>
+    <input type="text" id="search-input" class="form-control" placeholder="Search by text, ID, type...">
+  </div>
+  <div style="min-width:140px">
+    <label>Filter by Type</label>
+    <select id="type-filter" class="form-select">
+      <option value="">All Types</option>
+      <option value="MCQ">MCQ</option>
+      <option value="MSQ">MSQ</option>
+      <option value="NUMERIC">NUMERIC</option>
+    </select>
+  </div>
+  <div style="min-width:130px">
+    <label>Images</label>
+    <select id="image-filter" class="form-select">
+      <option value="">All</option>
+      <option value="with">With Images</option>
+      <option value="without">Without Images</option>
+    </select>
+  </div>
+  <div>
+    <label>&nbsp;</label>
+    <button id="clear-filters" class="btn-flat secondary" style="display:block">
+      <i class="fas fa-times me-1"></i>Clear
+    </button>
+  </div>
+</div>
+
+<!-- Questions Table -->
+<div class="card">
+  <div class="card-header-flat">
+    <h5><i class="fas fa-list-alt me-2" style="color:var(--accent)"></i>Questions List (<span id="total-count">{{ questions|length }}</span>)</h5>
+    <div style="display:flex;gap:0.4rem">
+      <button id="delete-selected" class="btn-flat danger-btn"><i class="fas fa-trash me-1"></i>Delete Selected</button>
+      <button id="select-none" class="btn-flat secondary"><i class="fas fa-times me-1"></i>Clear Selection</button>
+    </div>
+  </div>
+
+  <!-- Bulk Update Settings -->
+  <div class="bulk-settings">
+    <p style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.75rem">
+      <i class="fas fa-cogs me-1" style="color:var(--accent)"></i>Bulk Update Settings
+    </p>
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label>Question Type</label>
+        <select id="list-type" class="form-select">
+          <option value="MCQ">MCQ</option>
+          <option value="MSQ">MSQ</option>
+          <option value="NUMERIC">NUMERIC</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label>Positive Marks</label>
+        <input id="list-pos" class="form-control" placeholder="e.g. 4" style="width:90px">
+      </div>
+      <div class="col-auto">
+        <label>Negative Marks</label>
+        <input id="list-neg" class="form-control" placeholder="e.g. 1" style="width:90px">
+      </div>
+      <div class="col-auto">
+        <label>Tolerance</label>
+        <input id="list-tol" class="form-control" placeholder="NUMERIC" style="width:100px">
+      </div>
+      <div class="col-auto">
+        <button id="apply-list" class="btn-flat primary"><i class="fas fa-magic me-1"></i>Apply Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="questions-container">
+    {% if questions %}
+    <div class="table-responsive">
+      <table class="table mb-0" id="questions-table">
+        <thead>
+          <tr>
+            <th style="width:44px"><input id="select-all" type="checkbox" class="enhanced-checkbox"></th>
+            <th>ID</th>
+            <th>Question</th>
+            <th>Type</th>
+            <th>Image</th>
+            <th>Marks</th>
+            <th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="questions-tbody">
+          {% for q in questions %}
+          <tr class="question-row"
+              data-question-text="{{ q.question_text|lower }}"
+              data-question-type="{{ q.question_type }}"
+              data-has-image="{{ 'true' if q.image_path else 'false' }}"
+              data-question-id="{{ q.id }}">
+            <td><input class="row-checkbox enhanced-checkbox" data-id="{{ q.id }}" type="checkbox"></td>
+            <td><span class="question-id-badge">{{ q.id }}</span></td>
+            <td><div class="question-text">{{ q.question_text }}</div></td>
+            <td>
+              <span class="question-type-badge {% if q.question_type == 'MCQ' %}type-mcq{% elif q.question_type == 'MSQ' %}type-msq{% else %}type-num{% endif %}">
+                {{ q.question_type }}
+              </span>
+            </td>
+            <td>
+              {% if q.image_path %}
+                <span class="image-pill" title="{{ q.image_path }}">{{ q.image_path }}</span>
+              {% else %}
+                <span style="color:var(--text-muted);font-size:0.78rem">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="marks-badge">
+                <span class="marks-pos">+{{ q.positive_marks }}</span>
+                <span style="color:var(--text-muted)">/</span>
+                <span class="marks-neg">-{{ q.negative_marks }}</span>
+              </span>
+              {% if q.tolerance %}
+                <br><small style="color:var(--text-muted);font-size:0.7rem">tol: {{ q.tolerance }}</small>
+              {% endif %}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="icon-btn" title="Edit"
+                        onclick="openEditQuestionModal({{ q.id }})">
+                  <i class="fas fa-pencil-alt"></i>
+                </button>
+                <button class="icon-btn danger" title="Delete"
+                        onclick="showDeleteQuestionConfirm({{ q.id }}, '{{ q.question_text[:60] | replace("'", "\\'") | replace('"', '') }}')">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-wrap">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <div class="entries-selector">
+          Show
+          <select id="entries-per-page">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+          entries
+        </div>
+        <div class="pagination-info">
+          Showing <span id="start-entry">1</span>–<span id="end-entry">10</span> of
+          <span id="filtered-count">{{ questions|length }}</span>
+          <span id="filter-info"></span>
+        </div>
+      </div>
+      <div class="page-nav">
+        <button id="first-page" class="page-btn"><i class="fas fa-angle-double-left"></i></button>
+        <button id="prev-page" class="page-btn"><i class="fas fa-angle-left"></i></button>
+        <div id="page-numbers" style="display:flex;gap:0.3rem"></div>
+        <button id="next-page" class="page-btn"><i class="fas fa-angle-right"></i></button>
+        <button id="last-page" class="page-btn"><i class="fas fa-angle-double-right"></i></button>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <i class="fas fa-inbox"></i>
+      <p>No questions found for this exam.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Batch Add Panel -->
+<div class="batch-card">
+  <h5><i class="fas fa-layer-group me-2" style="color:var(--accent)"></i>Batch Add Questions</h5>
+  <div class="batch-desc">
+    <i class="fas fa-info-circle me-1"></i>
+    Add multiple questions at once. Create rows, fill in details, then click "Add All".
+  </div>
+
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem">
+    <button id="add-row" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Add Row</button>
+    <button id="clear-rows" class="btn btn-secondary btn-sm"><i class="fas fa-broom me-1"></i>Clear All</button>
+    <button id="batch-submit" class="btn btn-primary btn-sm"><i class="fas fa-upload me-1"></i>Add All Questions</button>
+    <button id="open-latex-editor" class="btn btn-secondary btn-sm"><span style="font-size:1rem">∫</span> LaTeX Editor</button>
+  </div>
+
+  <!-- Quick Apply -->
+  <div class="quick-apply">
+    <p style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.75rem">
+      <i class="fas fa-magic me-1" style="color:var(--accent)"></i>Quick Apply to Rows
+    </p>
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label>Apply to Type</label>
+        <select id="global-type" class="form-select">
+          <option value="MCQ">MCQ</option>
+          <option value="MSQ">MSQ</option>
+          <option value="NUMERIC">NUMERIC</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label>Positive Marks</label>
+        <input id="global-pos" class="form-control" placeholder="e.g. 4" style="width:90px">
+      </div>
+      <div class="col-auto">
+        <label>Negative Marks</label>
+        <input id="global-neg" class="form-control" placeholder="e.g. 1" style="width:90px">
+      </div>
+      <div class="col-auto">
+        <label>Tolerance</label>
+        <input id="global-tol" class="form-control" placeholder="NUMERIC" style="width:100px">
+      </div>
+      <div class="col-auto">
+        <button id="apply-global" class="btn-flat secondary"><i class="fas fa-wand-magic-sparkles me-1"></i>Apply to Rows</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="batch-rows"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ADD / EDIT QUESTION MODAL
+     ═══════════════════════════════════════════════ -->
+<div class="modal fade" id="questionFormModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" id="qModalHeader">
+        <h5 class="modal-title" id="qModalTitle"><i class="fas fa-plus-circle me-2"></i>Add Question</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="qModalForm" novalidate>
+          <input type="hidden" id="qModalQuestionId" value="">
+
+          <!-- Basic Info -->
+          <div class="modal-section-title"><i class="fas fa-cog"></i>Basic Information</div>
+          <div class="mb-3">
+            <label class="form-label">Select Exam <span style="color:#ef4444">*</span></label>
+            <select name="exam_id" id="qf-exam-id" class="form-select" required>
+              <option value="" disabled selected>Choose an exam...</option>
+              {% for e in exams %}
+              <option value="{{ e.id }}">{{ e.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Question Content -->
+          <div class="modal-section-title"><i class="fas fa-question-circle"></i>Question Content</div>
+          <div class="mb-3">
+            <label class="form-label">Question Text <span style="color:#ef4444">*</span></label>
+            <textarea name="question_text" id="qf-question-text" class="form-control" rows="3"
+                      placeholder="Enter your question here..." required></textarea>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Option A</label>
+              <textarea name="option_a" id="qf-option-a" class="form-control" rows="2" placeholder="Option A..."></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Option B</label>
+              <textarea name="option_b" id="qf-option-b" class="form-control" rows="2" placeholder="Option B..."></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Option C</label>
+              <textarea name="option_c" id="qf-option-c" class="form-control" rows="2" placeholder="Option C..."></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Option D</label>
+              <textarea name="option_d" id="qf-option-d" class="form-control" rows="2" placeholder="Option D..."></textarea>
+            </div>
+          </div>
+
+          <!-- Answer & Settings -->
+          <div class="modal-section-title"><i class="fas fa-check-circle" style="color:#10b981"></i>Answer &amp; Settings</div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Correct Answer <span style="color:#ef4444">*</span></label>
+              <input name="correct_answer" id="qf-correct-answer" class="form-control"
+                     placeholder="e.g. A, B, C, D or numeric" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Question Type</label>
+              <select name="question_type" id="qf-question-type" class="form-select">
+                <option value="MCQ">Multiple Choice (MCQ)</option>
+                <option value="MSQ">Multiple Select (MSQ)</option>
+                <option value="NUMERIC">Numerical Answer</option>
+              </select>
+            </div>
+            <div class="col-md-4" id="qf-tolerance-wrap">
+              <label class="form-label">Tolerance <span style="font-weight:400;color:var(--text-muted)">(NUMERIC)</span></label>
+              <input name="tolerance" id="qf-tolerance" class="form-control" placeholder="e.g. 0.1">
+            </div>
+          </div>
+
+          <!-- Scoring & Media -->
+          <div class="modal-section-title"><i class="fas fa-star" style="color:#f59e0b"></i>Scoring &amp; Media</div>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">Positive Marks</label>
+              <input name="positive_marks" id="qf-positive-marks" class="form-control" placeholder="e.g. 4" value="4">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Negative Marks</label>
+              <input name="negative_marks" id="qf-negative-marks" class="form-control" placeholder="e.g. 1" value="1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Image Path <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+              <input name="image_path" id="qf-image-path" class="form-control" placeholder="e.g. physics/ph-1.png">
+              <div class="form-hint"><i class="fas fa-info-circle"></i> Format: SubjectName/filename.ext</div>
+            </div>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between;align-items:center">
+        <span id="qModalError" style="color:#ef4444;font-size:0.82rem;display:none"></span>
+        <div style="display:flex;gap:0.5rem;margin-left:auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm" id="qModalSaveBtn" onclick="submitQuestionModal()">
+            <i class="fas fa-save me-1"></i>Save Question
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Question Modal -->
+<div class="modal fade" id="deleteQuestionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#ef4444;border-radius:14px 14px 0 0">
+        <h5 class="modal-title" style="color:white"><i class="fas fa-trash me-2"></i>Delete Question</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:brightness(0) invert(1)"></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:0.5rem">You are about to delete:</p>
+        <p id="questionTextToDelete" style="color:#ef4444;font-weight:700;font-size:0.88rem;margin-bottom:1rem;word-break:break-word"></p>
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:0.9rem 1rem;margin-bottom:0.75rem">
+          <p style="color:#ef4444;font-weight:600;font-size:0.82rem;margin:0 0 0.4rem">This will permanently delete:</p>
+          <ul style="color:var(--text-secondary);font-size:0.8rem;margin:0;padding-left:1.2rem">
+            <li>The question and all its options</li>
+            <li>All student responses for this question</li>
+            <li>All discussion messages for this question</li>
+          </ul>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.76rem;margin:0;text-align:center">
+          <i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmQuestionDeleteBtn">
+          <i class="fas fa-trash me-1"></i>Delete Question
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="qToast"><i class="fas fa-check-circle"></i><span id="qToastMsg"></span></div>
+
+<!-- ── Shared utility modals (info / confirm) ─────────────────────── -->
+<!-- Info/Alert Modal -->
+<div class="modal fade" id="qInfoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:440px">
+    <div class="modal-content">
+      <div class="modal-header" id="qInfoModalHeader">
+        <h5 class="modal-title" id="qInfoModalTitle"><i class="fas fa-info-circle me-2"></i>Notice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="qInfoModalBody" style="color:var(--text-secondary);font-size:0.88rem;margin:0;line-height:1.6"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">
+          <i class="fas fa-check me-1"></i>OK
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal fade" id="qConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
+    <div class="modal-content">
+      <div class="modal-header" id="qConfirmModalHeader">
+        <h5 class="modal-title" id="qConfirmModalTitle"><i class="fas fa-question-circle me-2"></i>Confirm</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="qConfirmModalBody" style="color:var(--text-secondary);font-size:0.88rem;margin:0;line-height:1.6"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="qConfirmModalOkBtn">
+          <i class="fas fa-check me-1"></i><span id="qConfirmModalOkLabel">Confirm</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  /* ── Modal helpers (replace all alert/confirm) ── */
+  function showInfo(title, message, isError) {
+    const header  = document.getElementById('qInfoModalHeader');
+    const titleEl = document.getElementById('qInfoModalTitle');
+    const bodyEl  = document.getElementById('qInfoModalBody');
+    const closeBtn = document.querySelector('#qInfoModal .btn-close');
+    header.style.background = isError ? 'linear-gradient(135deg,#ef4444,#dc2626)' : '';
+    titleEl.style.color     = isError ? 'white' : '';
+    if (closeBtn) closeBtn.style.filter = isError ? 'brightness(0) invert(1)' : '';
+    titleEl.innerHTML = isError
+      ? '<i class="fas fa-exclamation-circle me-2"></i>' + title
+      : '<i class="fas fa-info-circle me-2"></i>' + title;
+    bodyEl.innerHTML = message;
+    new bootstrap.Modal(document.getElementById('qInfoModal')).show();
+  }
+
+  function showConfirmModal(title, message, okLabel, isDanger, onConfirm) {
+    const header  = document.getElementById('qConfirmModalHeader');
+    const titleEl = document.getElementById('qConfirmModalTitle');
+    const bodyEl  = document.getElementById('qConfirmModalBody');
+    const closeBtn = document.querySelector('#qConfirmModal .btn-close');
+
+    header.style.background = isDanger ? 'linear-gradient(135deg,#ef4444,#dc2626)' : '';
+    titleEl.style.color     = isDanger ? 'white' : '';
+    if (closeBtn) closeBtn.style.filter = isDanger ? 'brightness(0) invert(1)' : '';
+    titleEl.innerHTML = isDanger
+      ? '<i class="fas fa-exclamation-triangle me-2"></i>' + title
+      : '<i class="fas fa-question-circle me-2"></i>' + title;
+    bodyEl.innerHTML = message;
+
+    /* Replace the OK button with a fresh clone to wipe all stale listeners */
+    const oldBtn = document.getElementById('qConfirmModalOkBtn');
+    const fresh  = oldBtn.cloneNode(false); // shallow clone — no children
+    fresh.id        = 'qConfirmModalOkBtn';
+    fresh.className = isDanger ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm';
+    fresh.innerHTML = '<i class="fas fa-check me-1"></i>' + okLabel;
+    oldBtn.replaceWith(fresh);
+
+    const modal = new bootstrap.Modal(document.getElementById('qConfirmModal'));
+    fresh.addEventListener('click', function() {
+      modal.hide();
+      onConfirm();
+    });
+    modal.show();
+  }
+
+  /* ── Pagination ── */
+  let currentPage  = 1;
+  let itemsPerPage = 10;
+  let filteredRows = [];
+  let allRows      = [];
+
+  function initializePagination() {
+    allRows      = Array.from(document.querySelectorAll('.question-row'));
+    filteredRows = [...allRows];
+    updatePagination();
+  }
+
+  function applyFilters() {
+    const searchTerm  = document.getElementById('search-input').value.toLowerCase();
+    const typeFilter  = document.getElementById('type-filter').value;
+    const imageFilter = document.getElementById('image-filter').value;
+    filteredRows = allRows.filter(row => {
+      const matchesSearch = !searchTerm ||
+        row.dataset.questionText.includes(searchTerm) ||
+        row.dataset.questionId.includes(searchTerm) ||
+        row.dataset.questionType.toLowerCase().includes(searchTerm);
+      const matchesType  = !typeFilter  || row.dataset.questionType === typeFilter;
+      const hasImage     = row.dataset.hasImage === 'true';
+      let   matchesImage = true;
+      if (imageFilter === 'with')    matchesImage = hasImage;
+      else if (imageFilter === 'without') matchesImage = !hasImage;
+      return matchesSearch && matchesType && matchesImage;
+    });
+    currentPage = 1;
+    updatePagination();
+    updateFilterInfo();
+  }
+
+  function updateFilterInfo() {
+    const totalCount   = document.getElementById('total-count');
+    const filteredCount= document.getElementById('filtered-count');
+    const filterInfo   = document.getElementById('filter-info');
+    if (totalCount)    totalCount.textContent    = allRows.length;
+    if (filteredCount) filteredCount.textContent = filteredRows.length;
+    if (filterInfo)    filterInfo.textContent    = filteredRows.length < allRows.length ? ` (filtered from ${allRows.length})` : '';
+  }
+
+  function updatePagination() {
+    const totalItems = filteredRows.length;
+    const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+    let startEntry, endEntry;
+    if (itemsPerPage === 'all') { startEntry = totalItems > 0 ? 1 : 0; endEntry = totalItems; }
+    else {
+      startEntry = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+      endEntry   = Math.min(currentPage * itemsPerPage, totalItems);
+    }
+    const s = document.getElementById('start-entry');
+    const e = document.getElementById('end-entry');
+    if (s) s.textContent = startEntry;
+    if (e) e.textContent = endEntry;
+    allRows.forEach(row => row.style.display = 'none');
+    if (itemsPerPage === 'all') { filteredRows.forEach(row => row.style.display = ''); }
+    else {
+      const si = (currentPage - 1) * itemsPerPage;
+      filteredRows.slice(si, si + itemsPerPage).forEach(row => row.style.display = '');
+    }
+    const firstBtn = document.getElementById('first-page');
+    const prevBtn  = document.getElementById('prev-page');
+    const nextBtn  = document.getElementById('next-page');
+    const lastBtn  = document.getElementById('last-page');
+    if (firstBtn) firstBtn.disabled = currentPage === 1 || itemsPerPage === 'all';
+    if (prevBtn)  prevBtn.disabled  = currentPage === 1 || itemsPerPage === 'all';
+    if (nextBtn)  nextBtn.disabled  = currentPage === totalPages || itemsPerPage === 'all';
+    if (lastBtn)  lastBtn.disabled  = currentPage === totalPages || itemsPerPage === 'all';
+    generatePageNumbers(totalPages);
+  }
+
+  function generatePageNumbers(totalPages) {
+    const container = document.getElementById('page-numbers');
+    if (!container) return;
+    container.innerHTML = '';
+    if (itemsPerPage === 'all' || totalPages <= 1) return;
+    const max = 5;
+    let start = Math.max(1, currentPage - Math.floor(max / 2));
+    let end   = Math.min(totalPages, start + max - 1);
+    if (end - start < max - 1) start = Math.max(1, end - max + 1);
+    if (start > 1) { addPageBtn(container, 1); if (start > 2) addEllipsis(container); }
+    for (let i = start; i <= end; i++) addPageBtn(container, i);
+    if (end < totalPages) { if (end < totalPages - 1) addEllipsis(container); addPageBtn(container, totalPages); }
+  }
+
+  function addEllipsis(container) {
+    const span = document.createElement('span');
+    span.textContent = '…';
+    span.style.cssText = 'padding:0 4px;color:var(--text-muted);font-size:0.82rem;align-self:center';
+    container.appendChild(span);
+  }
+
+  function addPageBtn(container, num) {
+    const btn = document.createElement('button');
+    btn.textContent = num;
+    btn.className   = 'page-btn' + (num === currentPage ? ' active' : '');
+    btn.addEventListener('click', () => { currentPage = num; updatePagination(); });
+    container.appendChild(btn);
+  }
+
+  const searchInput  = document.getElementById('search-input');
+  const typeFilter   = document.getElementById('type-filter');
+  const imageFilter  = document.getElementById('image-filter');
+  const clearFilters = document.getElementById('clear-filters');
+  const entriesSelect= document.getElementById('entries-per-page');
+  const firstBtn     = document.getElementById('first-page');
+  const prevBtn      = document.getElementById('prev-page');
+  const nextBtn      = document.getElementById('next-page');
+  const lastBtn      = document.getElementById('last-page');
+
+  if (searchInput)   searchInput.addEventListener('input',  applyFilters);
+  if (typeFilter)    typeFilter.addEventListener('change',  applyFilters);
+  if (imageFilter)   imageFilter.addEventListener('change', applyFilters);
+  if (clearFilters)  clearFilters.addEventListener('click', () => {
+    if (searchInput)  searchInput.value = '';
+    if (typeFilter)   typeFilter.value  = '';
+    if (imageFilter)  imageFilter.value = '';
+    applyFilters();
+  });
+  if (entriesSelect) entriesSelect.addEventListener('change', (ev) => {
+    itemsPerPage = ev.target.value === 'all' ? 'all' : parseInt(ev.target.value);
+    currentPage  = 1; updatePagination();
+  });
+  if (firstBtn) firstBtn.addEventListener('click', () => { currentPage = 1; updatePagination(); });
+  if (prevBtn)  prevBtn.addEventListener('click',  () => { if (currentPage > 1) { currentPage--; updatePagination(); } });
+  if (nextBtn)  nextBtn.addEventListener('click',  () => {
+    const tp = Math.ceil(filteredRows.length / itemsPerPage);
+    if (currentPage < tp) { currentPage++; updatePagination(); }
+  });
+  if (lastBtn)  lastBtn.addEventListener('click',  () => {
+    currentPage = Math.ceil(filteredRows.length / itemsPerPage); updatePagination();
+  });
+
+  if (document.querySelectorAll('.question-row').length > 0) initializePagination();
+
+  const examSelect = document.getElementById('exam-select');
+  const reloadBtn  = document.getElementById('reload-btn');
+  if (reloadBtn) reloadBtn.addEventListener('click', () => {
+    const id = examSelect.value;
+    reloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+    window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(id);
+  });
+
+  /* ── Batch UI ── */
+  const addRowBtn    = document.getElementById('add-row');
+  const clearRowsBtn = document.getElementById('clear-rows');
+  const rowsDiv      = document.getElementById('batch-rows');
+  const submitBtn    = document.getElementById('batch-submit');
+
+  function makeRow() {
+    const div = document.createElement('div');
+    div.className = 'batch-row-item';
+    div.innerHTML = `
+      <div class="row g-2 align-items-start">
+        <div class="col-md-6">
+          <label>Question Text</label>
+          <textarea class="form-control q-text" placeholder="Enter question..." rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+          <div class="row g-2">
+            <div class="col-6"><label>Option A</label><textarea class="form-control q-a" rows="1" placeholder="Option A"></textarea></div>
+            <div class="col-6"><label>Option B</label><textarea class="form-control q-b" rows="1" placeholder="Option B"></textarea></div>
+            <div class="col-6"><label>Option C</label><textarea class="form-control q-c" rows="1" placeholder="Option C"></textarea></div>
+            <div class="col-6"><label>Option D</label><textarea class="form-control q-d" rows="1" placeholder="Option D"></textarea></div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-2 align-items-end mt-1">
+        <div class="col-md-2"><label>Correct Ans</label><input class="form-control q-corr" placeholder="A/B/C/D"></div>
+        <div class="col-md-2">
+          <label>Type</label>
+          <select class="form-select q-type">
+            <option value="MCQ">MCQ</option>
+            <option value="MSQ">MSQ</option>
+            <option value="NUMERIC">NUMERIC</option>
+          </select>
+        </div>
+        <div class="col-md-3"><label>Image Path</label><input class="form-control q-img" placeholder="e.g. physics/q1.png"></div>
+        <div class="col-md-1"><label>Pos.</label><input class="form-control q-pos" placeholder="4" value="4"></div>
+        <div class="col-md-1"><label>Neg.</label><input class="form-control q-neg" placeholder="1" value="1"></div>
+        <div class="col-md-2"><label>Tolerance</label><input class="form-control q-tol" placeholder="NUMERIC"></div>
+        <div class="col-md-1">
+          <label>&nbsp;</label>
+          <button type="button" class="btn btn-secondary btn-sm w-100 remove-row" style="display:block">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    div.querySelector('.remove-row').addEventListener('click', () => div.remove());
+    return div;
+  }
+
+  if (addRowBtn) addRowBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    rowsDiv.appendChild(makeRow());
+    setTimeout(() => {
+      const last = rowsDiv.querySelector('.batch-row-item:last-child');
+      if (last) last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  });
+
+  if (clearRowsBtn) clearRowsBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    if (rowsDiv.children.length === 0) return;
+    showConfirmModal(
+      'Clear All Rows',
+      'This will remove all unsaved batch rows. This action cannot be undone.',
+      'Clear All',
+      true,
+      () => { rowsDiv.innerHTML = ''; }
+    );
+  });
+
+  const applyGlobalBtn = document.getElementById('apply-global');
+  if (applyGlobalBtn) applyGlobalBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    const selType = document.getElementById('global-type').value;
+    const pos = document.getElementById('global-pos').value.trim();
+    const neg = document.getElementById('global-neg').value.trim();
+    const tol = document.getElementById('global-tol').value.trim();
+    Array.from(rowsDiv.querySelectorAll('.batch-row-item')).forEach(r => {
+      if (r.querySelector('.q-type').value === selType) {
+        if (pos) r.querySelector('.q-pos').value = pos;
+        if (neg) r.querySelector('.q-neg').value = neg;
+        if (tol) r.querySelector('.q-tol').value = tol;
+      }
+    });
+    applyGlobalBtn.innerHTML = '<i class="fas fa-check me-1"></i>Applied ✓';
+    setTimeout(() => applyGlobalBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles me-1"></i>Apply to Rows', 1500);
+  });
+
+  if (submitBtn) submitBtn.addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    const exam_id = examSelect.value;
+    if (!exam_id) {
+      showInfo('No Exam Selected', 'Please select an exam before adding questions.');
+      return;
+    }
+    const rows = Array.from(rowsDiv.querySelectorAll('.batch-row-item'));
+    if (rows.length === 0) {
+      showInfo('No Rows', 'Please add at least one question row first.');
+      return;
+    }
+    const payload = { exam_id: parseInt(exam_id, 10), questions: [] };
+    for (const r of rows) {
+      const q = {
+        question_text:  (r.querySelector('.q-text')?.value  || '').trim(),
+        option_a:       (r.querySelector('.q-a')?.value     || '').trim(),
+        option_b:       (r.querySelector('.q-b')?.value     || '').trim(),
+        option_c:       (r.querySelector('.q-c')?.value     || '').trim(),
+        option_d:       (r.querySelector('.q-d')?.value     || '').trim(),
+        correct_answer: (r.querySelector('.q-corr')?.value  || '').trim(),
+        question_type:  (r.querySelector('.q-type')?.value  || 'MCQ'),
+        image_path:     (r.querySelector('.q-img')?.value   || '').trim(),
+        positive_marks: (r.querySelector('.q-pos')?.value   || '4').toString(),
+        negative_marks: (r.querySelector('.q-neg')?.value   || '1').toString(),
+        tolerance:      (r.querySelector('.q-tol')?.value   || '').toString()
+      };
+      if (!q.question_text && !q.option_a && !q.option_b) continue;
+      payload.questions.push(q);
+    }
+    if (payload.questions.length === 0) {
+      showInfo('No Valid Rows', 'No rows had enough data to add. Please fill in at least the question text.');
+      return;
+    }
+    submitBtn.disabled  = true;
+    const prev = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
+    try {
+      const resp = await fetch("{{ url_for('admin.questions_batch_add') }}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        showInfo('Batch Add Failed', data.message || 'An unknown error occurred.', true);
+      } else {
+        showInfo('Success', `Successfully added <strong>${data.added}</strong> question(s). The page will reload shortly.`);
+        setTimeout(() => {
+          window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(exam_id);
+        }, 1800);
+      }
+    } catch (err) {
+      showInfo('Error', 'A network error occurred: ' + err.message, true);
+    } finally {
+      submitBtn.disabled  = false;
+      submitBtn.innerHTML = prev;
+    }
+  });
+
+  /* ── Multi-delete ── */
+  const selectAll       = document.getElementById('select-all');
+  const deleteSelectedBtn = document.getElementById('delete-selected');
+  const clearSelectionBtn = document.getElementById('select-none');
+
+  if (selectAll) selectAll.addEventListener('change', () => {
+    const visible = Array.from(document.querySelectorAll('.row-checkbox'))
+      .filter(cb => cb.closest('tr').style.display !== 'none');
+    visible.forEach(cb => cb.checked = selectAll.checked);
+  });
+  if (clearSelectionBtn) clearSelectionBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    if (selectAll) selectAll.checked = false;
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+  });
+  if (deleteSelectedBtn) deleteSelectedBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    const checked = Array.from(document.querySelectorAll('.row-checkbox:checked'));
+    if (checked.length === 0) {
+      showInfo('No Questions Selected', 'Please select at least one question to delete.');
+      return;
+    }
+    showConfirmModal(
+      'Delete Selected Questions',
+      `You are about to permanently delete <strong>${checked.length}</strong> selected question(s).<br><br>
+       This will also remove all associated student responses and discussion messages.<br>
+       <span style="color:#ef4444;font-size:0.82rem"><i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.</span>`,
+      'Delete ' + checked.length + ' Question' + (checked.length > 1 ? 's' : ''),
+      true,
+      async () => {
+        const ids = checked.map(cb => parseInt(cb.dataset.id, 10));
+        deleteSelectedBtn.disabled  = true;
+        deleteSelectedBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+        try {
+          const resp = await fetch("{{ url_for('admin.delete_multiple_questions') }}", {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
+          });
+          const data = await resp.json();
+          if (!data.success) {
+            showInfo('Delete Failed', data.message || 'An unknown error occurred.', true);
+          } else {
+            showInfo('Deleted', `Successfully deleted <strong>${data.deleted}</strong> question(s). The page will reload shortly.`);
+            setTimeout(() => {
+              window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(examSelect.value);
+            }, 1800);
+          }
+        } catch (err) {
+          showInfo('Error', 'A network error occurred: ' + err.message, true);
+        } finally {
+          deleteSelectedBtn.disabled  = false;
+          deleteSelectedBtn.innerHTML = '<i class="fas fa-trash me-1"></i>Delete Selected';
+        }
+      }
+    );
+  });
+
+  /* ── Apply bulk list ── */
+  const applyListBtn = document.getElementById('apply-list');
+  if (applyListBtn) applyListBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    const exam_id = document.getElementById('exam-select').value;
+    if (!exam_id) {
+      showInfo('No Exam Selected', 'Please select an exam first.');
+      return;
+    }
+    const qtype = document.getElementById('list-type').value;
+    const pos   = document.getElementById('list-pos').value.trim();
+    const neg   = document.getElementById('list-neg').value.trim();
+    const tol   = document.getElementById('list-tol').value;
+    showConfirmModal(
+      'Apply Bulk Changes',
+      `This will update marks/settings for <strong>all ${qtype} questions</strong> in the selected exam.<br><br>
+       <span style="color:#ef4444;font-size:0.82rem"><i class="fas fa-exclamation-circle me-1"></i>This will overwrite existing values.</span>`,
+      'Apply Changes',
+      false,
+      async () => {
+        applyListBtn.disabled  = true;
+        const prev = applyListBtn.innerHTML;
+        applyListBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Applying...';
+        try {
+          const resp = await fetch("{{ url_for('admin.questions_bulk_update') }}", {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exam_id: parseInt(exam_id, 10), question_type: qtype, positive_marks: pos || null, negative_marks: neg || null, tolerance: tol || null })
+          });
+          const data = await resp.json();
+          if (!data.success) {
+            showInfo('Update Failed', data.message || 'An unknown error occurred.', true);
+          } else {
+            showInfo('Success', `Updated <strong>${data.updated}</strong> question(s). The page will reload shortly.`);
+            setTimeout(() => {
+              window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(exam_id);
+            }, 1800);
+          }
+        } catch (err) {
+          showInfo('Error', 'A network error occurred: ' + err.message, true);
+        } finally {
+          applyListBtn.disabled  = false;
+          applyListBtn.innerHTML = prev;
+        }
+      }
+    );
+  });
+
+})();
+</script>
+
+<script>
+/* ── Add / Edit Question Modal ── */
+/* These must be on window scope because onclick= attributes reference them */
+
+function _qField(id) { return document.getElementById(id); }
+
+function _toggleToleranceField() {
+  const tw = _qField('qf-tolerance-wrap');
+  if (tw) tw.style.display = (_qField('qf-question-type').value === 'NUMERIC') ? '' : 'none';
+}
+
+function _qResetForm() {
+  _qField('qf-exam-id').value         = '';
+  _qField('qf-question-text').value   = '';
+  _qField('qf-option-a').value        = '';
+  _qField('qf-option-b').value        = '';
+  _qField('qf-option-c').value        = '';
+  _qField('qf-option-d').value        = '';
+  _qField('qf-correct-answer').value  = '';
+  _qField('qf-question-type').value   = 'MCQ';
+  _qField('qf-tolerance').value       = '';
+  _qField('qf-positive-marks').value  = '4';
+  _qField('qf-negative-marks').value  = '1';
+  _qField('qf-image-path').value      = '';
+  _qField('qModalError').style.display = 'none';
+  _toggleToleranceField();
+  /* Pre-select the currently loaded exam */
+  const examSel = document.getElementById('exam-select');
+  if (examSel && examSel.value) _qField('qf-exam-id').value = examSel.value;
+}
+
+let _qModalMode = 'add';
+let _qEditId    = null;
+let _qIdToDelete = null;
+
+function showDeleteQuestionConfirm(id, text) {
+  _qIdToDelete = id;
+  const el = document.getElementById('questionTextToDelete');
+  if (el) el.textContent = text || ('Question #' + id);
+  const modal = new bootstrap.Modal(document.getElementById('deleteQuestionModal'));
+  modal.show();
+}
+
+function openAddQuestionModal() {
+  _qModalMode = 'add';
+  _qEditId    = null;
+  _qResetForm();
+  _qField('qModalTitle').innerHTML   = '<i class="fas fa-plus-circle me-2" style="color:#10b981"></i>Add New Question';
+  _qField('qModalHeader').style.background = '';
+  _qField('qModalSaveBtn').innerHTML = '<i class="fas fa-save me-1"></i>Save Question';
+  _qField('qModalSaveBtn').disabled  = false;
+  new bootstrap.Modal(_qField('questionFormModal')).show();
+}
+
+async function openEditQuestionModal(questionId) {
+  _qModalMode = 'edit';
+  _qEditId    = questionId;
+  _qResetForm();
+  _qField('qModalTitle').innerHTML   = '<i class="fas fa-pencil-alt me-2" style="color:var(--accent)"></i>Edit Question'
+    + ' <span style="background:var(--accent-subtle);border:1px solid var(--accent-border);color:var(--accent);'
+    + 'padding:2px 8px;border-radius:6px;font-size:0.78rem;font-weight:700;margin-left:4px">#' + questionId + '</span>';
+  _qField('qModalHeader').style.background = '';
+  _qField('qModalSaveBtn').innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+  _qField('qModalSaveBtn').disabled  = true;
+
+  const modal = new bootstrap.Modal(_qField('questionFormModal'));
+  modal.show();
+
+  try {
+    const resp = await fetch('/admin/questions/get/' + questionId);
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.message || 'Failed to load question');
+    const q = data.question;
+    _qField('qf-exam-id').value        = q.exam_id        || '';
+    _qField('qf-question-text').value  = q.question_text  || '';
+    _qField('qf-option-a').value       = q.option_a       || '';
+    _qField('qf-option-b').value       = q.option_b       || '';
+    _qField('qf-option-c').value       = q.option_c       || '';
+    _qField('qf-option-d').value       = q.option_d       || '';
+    _qField('qf-correct-answer').value = q.correct_answer || '';
+    _qField('qf-question-type').value  = q.question_type  || 'MCQ';
+    _qField('qf-tolerance').value      = q.tolerance      != null ? q.tolerance : '';
+    _qField('qf-positive-marks').value = q.positive_marks != null ? q.positive_marks : '4';
+    _qField('qf-negative-marks').value = q.negative_marks != null ? q.negative_marks : '1';
+    _qField('qf-image-path').value     = q.image_path     || '';
+    _toggleToleranceField();
+  } catch (err) {
+    _qField('qModalError').textContent    = err.message;
+    _qField('qModalError').style.display  = 'block';
+  } finally {
+    _qField('qModalSaveBtn').innerHTML = '<i class="fas fa-save me-1"></i>Save Changes';
+    _qField('qModalSaveBtn').disabled  = false;
+  }
+}
+
+async function submitQuestionModal() {
+  const saveBtn = _qField('qModalSaveBtn');
+  const errEl   = _qField('qModalError');
+  errEl.style.display = 'none';
+
+  const examId  = _qField('qf-exam-id').value;
+  const qText   = _qField('qf-question-text').value.trim();
+  const correct = _qField('qf-correct-answer').value.trim();
+  if (!examId)  { errEl.textContent = 'Please select an exam.';      errEl.style.display = 'block'; return; }
+  if (!qText)   { errEl.textContent = 'Question text is required.';  errEl.style.display = 'block'; return; }
+  if (!correct) { errEl.textContent = 'Correct answer is required.'; errEl.style.display = 'block'; return; }
+
+  const prev = saveBtn.innerHTML;
+  saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+  saveBtn.disabled  = true;
+
+  const form = new FormData();
+  form.append('exam_id',        _qField('qf-exam-id').value);
+  form.append('question_text',  _qField('qf-question-text').value);
+  form.append('option_a',       _qField('qf-option-a').value);
+  form.append('option_b',       _qField('qf-option-b').value);
+  form.append('option_c',       _qField('qf-option-c').value);
+  form.append('option_d',       _qField('qf-option-d').value);
+  form.append('correct_answer', _qField('qf-correct-answer').value);
+  form.append('question_type',  _qField('qf-question-type').value);
+  form.append('tolerance',      _qField('qf-tolerance').value);
+  form.append('positive_marks', _qField('qf-positive-marks').value);
+  form.append('negative_marks', _qField('qf-negative-marks').value);
+  form.append('image_path',     _qField('qf-image-path').value);
+
+  const url = _qModalMode === 'add'
+    ? '/admin/questions/add-ajax'
+    : '/admin/questions/edit-ajax/' + _qEditId;
+
+  try {
+    const resp = await fetch(url, { method: 'POST', body: form });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.message || 'Save failed');
+    bootstrap.Modal.getInstance(_qField('questionFormModal')).hide();
+    _showQToast(data.message, 'success');
+    setTimeout(() => {
+      const examSel = document.getElementById('exam-select');
+      window.location = "{{ url_for('admin.questions_index') }}"
+        + (examSel?.value ? '?exam_id=' + encodeURIComponent(examSel.value) : '');
+    }, 900);
+  } catch (err) {
+    errEl.textContent   = err.message;
+    errEl.style.display = 'block';
+    saveBtn.innerHTML   = prev;
+    saveBtn.disabled    = false;
+  }
+}
+
+function _showQToast(msg, type) {
+  const t  = document.getElementById('qToast');
+  const tm = document.getElementById('qToastMsg');
+  t.style.background = type === 'success' ? '#10b981' : '#ef4444';
+  tm.textContent = msg;
+  t.style.display = 'flex';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+/* Tolerance field toggle — wire up on DOM ready */
+document.addEventListener('DOMContentLoaded', function() {
+  const qTypeEl = document.getElementById('qf-question-type');
+  if (qTypeEl) qTypeEl.addEventListener('change', _toggleToleranceField);
+  _toggleToleranceField();
+
+  /* Delete single question modal */
+  const confirmDelBtn = document.getElementById('confirmQuestionDeleteBtn');
+  if (confirmDelBtn) {
+    confirmDelBtn.addEventListener('click', function() {
+      if (!_qIdToDelete) return;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/admin/questions/delete/' + _qIdToDelete;
+      document.body.appendChild(form);
+      form.submit();
+    });
+  }
+});
+
+/* LaTeX editor popup */
+(function(){
+  const btn = document.getElementById('open-latex-editor');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const w    = Math.max(Math.round(window.innerWidth  * 0.6), 900);
+    const h    = Math.max(Math.round(window.innerHeight * 0.75), 600);
+    const left = Math.round(window.screenX + (window.innerWidth  - w) / 2);
+    const top  = Math.round(window.screenY + (window.innerHeight - h) / 2);
+    window.open('/admin/latex_editor', 'latexEditor',
+      `width=${w},height=${h},left=${left},top=${top},resizable=yes`);
+  });
+  window.addEventListener('message', function(ev) {
+    try {
+      if (ev.origin !== window.location.origin) return;
+      const data = ev.data || {};
+      if (data.type === 'latex-selected' && typeof data.latex === 'string') {
+        const latex  = data.latex;
+        const target = document.querySelector('textarea[name="question_text"], textarea');
+        if (target) {
+          const s = target.selectionStart || target.value.length;
+          const e = target.selectionEnd   || s;
+          target.value = target.value.slice(0, s) + latex + target.value.slice(e);
+          target.focus();
+          target.selectionStart = target.selectionEnd = s + latex.length;
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+        } else alert('LaTeX received. Paste manually:\n\n' + latex);
+      }
+    } catch(e) { console.error(e); }
+  }, false);
+})();
+
+/* CSV Import/Export */
+(function(){
+  const importBtn  = document.getElementById('import-csv-btn');
+  const exportBtn  = document.getElementById('export-csv-btn');
+  const examSelect = document.getElementById('exam-select');
+
+  function getExamInfo() {
+    if (!examSelect?.value) return null;
+    return { id: examSelect.value, name: examSelect.options[examSelect.selectedIndex].text };
+  }
+
+  function showCsvAlert(title, message, type) {
+    const colors = { success:'#10b981', error:'#ef4444', warning:'#f59e0b', info:'#2d5be3' };
+    const icons  = { success:'fa-check-circle', error:'fa-times-circle', warning:'fa-exclamation-triangle', info:'fa-info-circle' };
+    const modal  = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center';
+    modal.innerHTML = `
+      <div style="background:var(--modal-bg);border:1px solid var(--card-border);border-radius:16px;max-width:480px;width:90%;overflow:hidden">
+        <div style="background:${colors[type]};padding:1.25rem;text-align:center;color:white">
+          <i class="fas ${icons[type]} fa-2x mb-2 d-block"></i>
+          <h5 style="margin:0;font-weight:700">${title}</h5>
+        </div>
+        <div style="padding:1.25rem;color:var(--text-secondary);font-size:0.85rem;line-height:1.6">${message}</div>
+        <div style="padding:0 1.25rem 1.25rem;text-align:center">
+          <button style="background:${colors[type]};color:white;border:none;border-radius:9px;padding:0.5rem 1.5rem;font-weight:600;cursor:pointer"
+                  onclick="this.closest('[style*=position]').remove()">
+            <i class="fas fa-check me-1"></i>Got it
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+
+  function showCsvConfirm(title, message, examInfo, onConfirm) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center';
+    const examHTML = examInfo
+      ? `<div style="background:var(--accent-subtle);border:1px solid var(--accent-border);border-radius:9px;padding:0.75rem;margin:0.75rem 0;font-size:0.82rem;color:var(--text-secondary)">
+           <strong>${examInfo.name}</strong>
+           <span style="background:var(--accent);color:white;padding:2px 8px;border-radius:5px;font-size:0.72rem;margin-left:0.5rem">ID: ${examInfo.id}</span>
+         </div>` : '';
+    modal.innerHTML = `
+      <div style="background:var(--modal-bg);border:1px solid var(--card-border);border-radius:16px;max-width:500px;width:90%;overflow:hidden">
+        <div style="background:#2d5be3;padding:1.25rem;text-align:center;color:white">
+          <i class="fas fa-question-circle fa-2x mb-2 d-block"></i>
+          <h5 style="margin:0;font-weight:700">${title}</h5>
+        </div>
+        <div style="padding:1.25rem;color:var(--text-secondary);font-size:0.85rem">${message}${examHTML}</div>
+        <div style="padding:0 1.25rem 1.25rem;display:flex;gap:0.5rem;justify-content:flex-end">
+          <button class="cancel-btn" style="background:var(--btn-secondary-bg);border:1px solid var(--btn-secondary-border);color:var(--btn-secondary-color);border-radius:9px;padding:0.45rem 1rem;font-weight:600;cursor:pointer">Cancel</button>
+          <button class="confirm-btn" style="background:#2d5be3;color:white;border:none;border-radius:9px;padding:0.45rem 1rem;font-weight:600;cursor:pointer"><i class="fas fa-check me-1"></i>Confirm</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.cancel-btn').onclick  = () => modal.remove();
+    modal.querySelector('.confirm-btn').onclick = () => { modal.remove(); onConfirm(); };
+    modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
+  }
+
+  if (exportBtn) exportBtn.addEventListener('click', function(ev) {
+    ev.preventDefault();
+    const examInfo = getExamInfo();
+    if (!examInfo) { showCsvAlert('No Exam Selected', 'Please select an exam first.', 'warning'); return; }
+    const tbody = document.getElementById('questions-tbody');
+    if (!tbody || tbody.children.length === 0) {
+      showCsvAlert('No Questions', `No questions to export for <strong>${examInfo.name}</strong>.`, 'info'); return;
+    }
+    showCsvConfirm('Export Questions to CSV', 'This will download all questions for the selected exam.', examInfo, () => {
+      exportBtn.disabled  = true;
+      exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Exporting...';
+      window.location.href = `/admin/questions/export-csv/${examInfo.id}`;
+      setTimeout(() => {
+        exportBtn.disabled  = false;
+        exportBtn.innerHTML = '<i class="fas fa-file-download me-1"></i>Export CSV';
+        showCsvAlert('Exported!', `Questions from <strong>${examInfo.name}</strong> downloaded.`, 'success');
+      }, 2000);
+    });
+  });
+
+  if (importBtn) importBtn.addEventListener('click', function(ev) {
+    ev.preventDefault();
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file'; fileInput.accept = '.csv'; fileInput.style.display = 'none';
+    fileInput.addEventListener('change', async function(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      if (!file.name.endsWith('.csv')) { showCsvAlert('Invalid File', 'Please select a .csv file.', 'error'); return; }
+      showCsvConfirm('Import Questions from CSV',
+        `<p><strong>File:</strong> ${file.name}</p>
+         <div style="background:var(--table-head-bg);border:1px solid var(--card-border);border-radius:8px;padding:0.75rem;font-family:monospace;font-size:0.78rem;margin-top:0.5rem">
+           exam_id, question_text, option_a, option_b, option_c, option_d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance
+         </div>
+         <p style="color:#ef4444;font-size:0.8rem;margin-top:0.75rem"><i class="fas fa-exclamation-triangle me-1"></i>exam_id must exist in database!</p>`,
+        null,
+        async () => {
+          const formData = new FormData();
+          formData.append('csv_file', file);
+          importBtn.disabled  = true;
+          importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing...';
+          try {
+            const resp = await fetch('/admin/questions/import-csv', { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (data.success) {
+              showCsvAlert('Import Complete',
+                `Successfully imported <strong>${data.inserted}</strong> question(s).`
+                + (data.skipped > 0 ? ` Skipped ${data.skipped} row(s).` : ''), 'success');
+              if (data.inserted > 0)
+                setTimeout(() => { window.location.href = `/admin/questions?exam_id=${examSelect?.value || ''}`; }, 3000);
+            } else {
+              showCsvAlert('Import Failed', data.message || 'Unknown error.', 'error');
+            }
+          } catch (err) {
+            showCsvAlert('System Error', err.message, 'error');
+          } finally {
+            importBtn.disabled  = false;
+            importBtn.innerHTML = '<i class="fas fa-file-upload me-1"></i>Import CSV';
+          }
+        }
+      );
+    });
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
+  });
+})();
+</script>
+
+{% endblock %}
+
+
+

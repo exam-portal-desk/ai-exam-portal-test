@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Select Category – ExamPortal{% endblock %}
+{% block content %}
+<style>
+.cat-page{min-height:80vh;padding:2.5rem 1.5rem;max-width:1100px;margin:0 auto}
+.cat-header{text-align:center;margin-bottom:2.5rem}
+.cat-header h1{font-family:'DM Serif Display',serif;font-size:1.9rem;color:var(--text-primary);margin-bottom:.4rem}
+.cat-header p{color:var(--text-secondary);font-size:.88rem}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1.2rem}
+.cat-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:1.6rem 1rem 1.2rem;text-align:center;cursor:pointer;transition:all .22s ease;text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:.85rem}
+.cat-card:hover{transform:translateY(-6px);border-color:var(--accent);box-shadow:0 12px 32px rgba(45,91,227,.18);text-decoration:none}
+.cat-img-wrap{width:80px;height:80px;border-radius:14px;overflow:hidden;background:rgba(45,91,227,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cat-img-wrap img{width:100%;height:100%;object-fit:cover}
+.cat-fallback-icon{font-size:2rem;color:var(--accent)}
+.cat-name{font-weight:700;font-size:.95rem;color:var(--text-primary)}
+.cat-chip{font-size:.7rem;background:rgba(45,91,227,.12);color:var(--accent);border:1px solid rgba(45,91,227,.2);padding:.18rem .6rem;border-radius:20px;font-weight:600}
+.cat-empty{text-align:center;padding:4rem 2rem;color:var(--text-muted)}
+.cat-empty i{font-size:2.5rem;margin-bottom:1rem;display:block}
+@media(max-width:500px){.cat-grid{grid-template-columns:repeat(2,1fr);gap:.85rem}.cat-header h1{font-size:1.3rem}}
+</style>
+
+<div class="cat-page">
+    <div class="cat-header">
+        <h1><i class="fas fa-layer-group me-2" style="color:var(--accent)"></i>Select an Exam</h1>
+        <p>Choose the exam category you want to prepare for</p>
+    </div>
+
+    {% if categories %}
+    <div class="cat-grid">
+        {% for cat in categories %}
+        <a class="cat-card" href="{{ url_for('categories.set_category', id=cat.id) }}">
+            <div class="cat-img-wrap">
+                {% if cat.image_url %}
+                <img src="{{ cat.image_url }}"
+                     alt="{{ cat.name }}"
+                     onerror="this.style.display='none';this.parentElement.querySelector('.cat-fallback-icon').style.display='block'">
+                <i class="fas fa-graduation-cap cat-fallback-icon" style="display:none"></i>
+                {% else %}
+                <i class="fas fa-graduation-cap cat-fallback-icon"></i>
+                {% endif %}
+            </div>
+            <div class="cat-name">{{ cat.name }}</div>
+            <span class="cat-chip">View Exams</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="cat-empty">
+        <i class="fas fa-folder-open"></i>
+        <h4 style="color:var(--text-secondary)">No Categories Yet</h4>
+        <p>An admin needs to add exam categories first.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}Result Pending - ExamPortal{% endblock %}
+
+{% block content %}
+<style>
+.pending-body {
+  min-height: calc(100vh - 120px);
+  background: #0a0a0f;
+  display: flex; align-items: center; justify-content: center;
+  padding: 2rem 1rem;
+  position: relative; overflow: hidden;
+}
+
+/* Subtle ambient particles */
+.pending-particles { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.pending-particle {
+  position: absolute; border-radius: 50%;
+  background: rgba(168,85,247,0.18);
+  animation: p-float 9s ease-in-out infinite;
+}
+@keyframes p-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }
+
+.pending-wrap {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 520px;
+  text-align: center;
+}
+
+/* Main card */
+.pending-card {
+  background: #111118;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 2.75rem 2rem 2.25rem;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.55);
+  position: relative; overflow: hidden;
+}
+.pending-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168,85,247,0.45), transparent);
+}
+
+/* Icon ring */
+.pending-icon-ring {
+  width: 84px; height: 84px; border-radius: 50%;
+  background: rgba(168,85,247,0.1);
+  border: 1px solid rgba(168,85,247,0.25);
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 1.5rem;
+  animation: ring-pulse 3s ease-in-out infinite;
+}
+@keyframes ring-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.25); }
+  50%      { box-shadow: 0 0 0 12px rgba(168,85,247,0); }
+}
+.pending-icon-ring i { font-size: 2rem; color: #a855f7; }
+
+/* Headings */
+.pending-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.65rem; font-weight: 400;
+  color: #fff; margin-bottom: .4rem;
+}
+.pending-exam-name {
+  color: rgba(255,255,255,0.45);
+  font-size: .875rem; margin-bottom: 1.5rem;
+}
+
+/* Reason box */
+.pending-reason {
+  background: rgba(168,85,247,0.07);
+  border: 1px solid rgba(168,85,247,0.18);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  color: rgba(255,255,255,0.75);
+  font-size: .875rem; line-height: 1.6;
+  margin-bottom: 1.75rem;
+  text-align: left;
+  display: flex; align-items: flex-start; gap: .75rem;
+}
+.pending-reason i { color: #a855f7; flex-shrink: 0; margin-top: 2px; }
+
+/* Submitted badge */
+.submitted-badge {
+  display: inline-flex; align-items: center; gap: .45rem;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.2);
+  border-radius: 50px; padding: .35rem .9rem;
+  color: #10b981; font-size: .8rem; font-weight: 600;
+  margin-bottom: 1.75rem;
+}
+.submitted-dot {
+  width: 7px; height: 7px; background: #10b981;
+  border-radius: 50%; animation: s-pulse 2s infinite;
+}
+@keyframes s-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.25)} }
+
+/* Action buttons */
+.pending-actions { display: flex; gap: .75rem; flex-wrap: wrap; justify-content: center; }
+.pending-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .65rem 1.3rem; border-radius: 10px;
+  font-size: .875rem; font-weight: 700;
+  text-decoration: none; transition: all .18s; border: none; cursor: pointer;
+}
+.pending-btn-primary {
+  background: rgba(168,85,247,0.15);
+  border: 1px solid rgba(168,85,247,0.3);
+  color: #a855f7;
+}
+.pending-btn-primary:hover {
+  background: rgba(168,85,247,0.25);
+  color: #c084fc; transform: translateY(-1px);
+}
+.pending-btn-secondary {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+}
+.pending-btn-secondary:hover {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.9); transform: translateY(-1px);
+}
+
+/* Auto-refresh note */
+.refresh-note {
+  margin-top: 1.5rem;
+  color: rgba(255,255,255,0.2);
+  font-size: .75rem;
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+}
+.refresh-note i { font-size: .7rem; }
+
+/* ── LIGHT THEME OVERRIDES ── */
+[data-theme="light"] body { background: #f0f2f8; color: #1a202c; }
+[data-theme="light"] .particles-container,
+[data-theme="light"] .pending-particles { opacity: 0.4; }
+[data-theme="light"] .minimal-btn { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
+[data-theme="light"] .minimal-btn:hover { background: #e2e8f0; color: #1a202c; border-color: #cbd5e0; }
+[data-theme="light"] .btn-label { background: rgba(0,0,0,0.75); }
+[data-theme="light"] .login-wrapper,
+[data-theme="light"] .reset-wrapper,
+[data-theme="light"] .request-wrapper { background: transparent; }
+[data-theme="light"] .login-container,
+[data-theme="light"] .reset-container,
+[data-theme="light"] .request-container,
+[data-theme="light"] .pending-card { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+[data-theme="light"] .login-container::before,
+[data-theme="light"] .reset-container::before,
+[data-theme="light"] .request-container::before,
+[data-theme="light"] .pending-card::before { background: linear-gradient(90deg, transparent, rgba(45,91,227,0.2), transparent); }
+[data-theme="light"] .brand-name { color: #1a202c; -webkit-text-fill-color: #1a202c; background: none; }
+[data-theme="light"] .welcome-text,
+[data-theme="light"] .success-title,
+[data-theme="light"] .pending-title { color: #1a202c; }
+[data-theme="light"] .welcome-subtitle,
+[data-theme="light"] .reset-subtitle,
+[data-theme="light"] .success-subtitle,
+[data-theme="light"] .pending-exam-name { color: #718096; }
+[data-theme="light"] .form-label { color: #4a5568 !important; }
+[data-theme="light"] .form-label i { color: #2d5be3; }
+[data-theme="light"] .input-icon { color: #a0aec0; }
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-control,
+[data-theme="light"] .form-select {
+    background: #f8faff !important;
+    border-color: #e2e8f0 !important;
+    color: #1a202c !important;
+}
+[data-theme="light"] .form-input::placeholder,
+[data-theme="light"] .form-control::placeholder { color: #a0aec0 !important; }
+[data-theme="light"] .form-input:-webkit-autofill,
+[data-theme="light"] .form-input:-webkit-autofill:hover,
+[data-theme="light"] .form-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
+    -webkit-text-fill-color: #1a202c !important;
+    caret-color: #1a202c !important;
+}
+[data-theme="light"] .form-select option { background: #ffffff; color: #1a202c; }
+[data-theme="light"] .toggle-password { color: #a0aec0; }
+[data-theme="light"] .toggle-password:hover { color: #4a5568; }
+[data-theme="light"] .help-card,
+[data-theme="light"] .step-section,
+[data-theme="light"] .user-details-card,
+[data-theme="light"] .request-history-section,
+[data-theme="light"] .new-request-section { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .help-header,
+[data-theme="light"] .card-title { color: #718096; }
+[data-theme="light"] .help-item { color: #4a5568; }
+[data-theme="light"] .help-item strong { color: #1a202c; }
+[data-theme="light"] .action-link.primary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .action-link.primary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .action-link.secondary { background: transparent; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .action-link.secondary:hover { background: #f1f5f9; color: #1a202c; }
+[data-theme="light"] .back-link { color: #a0aec0; }
+[data-theme="light"] .back-link:hover { color: #4a5568; }
+[data-theme="light"] .security-footer { color: #a0aec0; }
+[data-theme="light"] .step-title { color: #4a5568; }
+[data-theme="light"] .step-title i { color: #2d5be3; }
+[data-theme="light"] .request-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .table thead th { background: #f1f5f9 !important; color: #718096 !important; border-bottom-color: #e2e8f0 !important; }
+[data-theme="light"] .table tbody td { background: transparent !important; color: #4a5568 !important; border-bottom-color: #f1f5f9 !important; }
+[data-theme="light"] .table tbody tr:hover { background: rgba(45,91,227,0.04) !important; }
+[data-theme="light"] .table { background: transparent !important; }
+[data-theme="light"] .table-responsive { border-color: #e2e8f0; }
+[data-theme="light"] .text-muted { color: #718096 !important; }
+[data-theme="light"] .loading-state { color: #718096; }
+[data-theme="light"] .user-info-card { background: rgba(45,91,227,0.05); border-color: rgba(45,91,227,0.15); }
+[data-theme="light"] .user-name { color: #1a202c; }
+[data-theme="light"] .user-email { color: #718096; }
+[data-theme="light"] .input-note { color: #a0aec0; }
+[data-theme="light"] .username-display { color: #1a202c; }
+[data-theme="light"] .text-muted-improved { color: #a0aec0; }
+[data-theme="light"] .date-display { color: #718096; }
+[data-theme="light"] .reason-display { color: #4a5568; }
+[data-theme="light"] .user-email-display { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .password-requirements .requirement { color: #a0aec0; }
+[data-theme="light"] .requirement.valid { color: rgba(5,150,105,0.8); }
+[data-theme="light"] .setup-instructions-card { background: rgba(5,150,105,0.05); border-color: rgba(5,150,105,0.15); }
+[data-theme="light"] .setup-header { color: #059669; }
+[data-theme="light"] .setup-item { color: #4a5568; }
+[data-theme="light"] .setup-item strong { color: #059669; }
+[data-theme="light"] .instructions-panel { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .panel-header { color: #059669; }
+[data-theme="light"] .main-message { color: #4a5568; }
+[data-theme="light"] .step-details strong { color: #1a202c; }
+[data-theme="light"] .step-details span { color: #718096; }
+[data-theme="light"] .help-text { color: #a0aec0; }
+[data-theme="light"] .portal-card { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .portal-title { color: #1a202c; }
+[data-theme="light"] .portal-desc { color: #718096; }
+[data-theme="light"] .portal-arrow { color: #a0aec0; }
+[data-theme="light"] .portal-user:hover { border-color: rgba(45,91,227,0.3); background: rgba(45,91,227,0.05); }
+[data-theme="light"] .portal-admin:hover { border-color: rgba(217,119,6,0.3); background: rgba(217,119,6,0.05); }
+[data-theme="light"] .portal-card:hover .portal-arrow { color: #4a5568; }
+[data-theme="light"] .pending-body { background: #f0f2f8; }
+[data-theme="light"] .pending-reason { background: rgba(168,85,247,0.05); color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .refresh-note { color: #a0aec0; }
+[data-theme="light"] .success-container { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .success-header { border-bottom-color: #e2e8f0; }
+</style>
+
+<div class="pending-body">
+
+  <!-- Particles -->
+  <div class="pending-particles" aria-hidden="true">
+    <div class="pending-particle" style="top:12%;left:9%;width:5px;height:5px;"></div>
+    <div class="pending-particle" style="top:70%;left:80%;width:6px;height:6px;animation-delay:1.2s"></div>
+    <div class="pending-particle" style="top:40%;left:92%;width:4px;height:4px;animation-delay:2.5s"></div>
+    <div class="pending-particle" style="top:80%;left:15%;width:5px;height:5px;animation-delay:.7s"></div>
+    <div class="pending-particle" style="top:20%;left:75%;width:3px;height:3px;animation-delay:1.8s"></div>
+  </div>
+
+  <div class="pending-wrap">
+    <div class="pending-card">
+
+      <!-- Icon -->
+      <div class="pending-icon-ring">
+        <i class="fas fa-clock"></i>
+      </div>
+
+      <!-- Title -->
+      <div class="pending-title">Result Pending</div>
+      <div class="pending-exam-name">
+        <i class="fas fa-file-alt me-1" style="opacity:.5"></i>
+        {{ exam.name }}
+      </div>
+
+      <!-- Submitted confirmation -->
+      <div class="submitted-badge">
+        <span class="submitted-dot"></span>
+        Exam submitted successfully
+      </div>
+
+      <!-- Reason / timing message -->
+      <div class="pending-reason">
+        <i class="fas fa-info-circle"></i>
+        <span>{{ reason }}</span>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="pending-actions">
+        {% if result_id %}
+        <button onclick="checkNow()" class="pending-btn pending-btn-primary">
+          <i class="fas fa-sync-alt"></i> Check Now
+        </button>
+        {% endif %}
+        <a href="{{ url_for('dashboard.results_history') }}" class="pending-btn pending-btn-secondary">
+          <i class="fas fa-history"></i> Results History
+        </a>
+        <a href="{{ url_for('dashboard.dashboard') }}" class="pending-btn pending-btn-secondary">
+          <i class="fas fa-home"></i> Dashboard
+        </a>
+      </div>
+
+      <!-- Auto-refresh note -->
+      <div class="refresh-note" id="refreshNote">
+        <i class="fas fa-sync-alt fa-spin"></i>
+        <span id="refreshMsg">Page will auto-check in <span id="countdown">30</span>s</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ── Auto-refresh countdown ──────────────────────────────────────────────
+  var AUTO_REFRESH_SECS = 30;
+  var remaining = AUTO_REFRESH_SECS;
+  var countdownEl = document.getElementById('countdown');
+
+  var timer = setInterval(function () {
+    remaining--;
+    if (countdownEl) countdownEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      window.location.reload();
+    }
+  }, 1000);
+
+  // ── Particle animation ──────────────────────────────────────────────────
+  (function spawnParticles() {
+    function spawn() {
+      var el = document.createElement('div');
+      el.className = 'pending-particle';
+      el.style.width = el.style.height = (Math.random() * 5 + 2) + 'px';
+      el.style.background = 'rgba(168,85,247,0.15)';
+      el.style.left = (Math.random() * 100) + '%';
+      el.style.top  = (Math.random() * 100) + '%';
+      el.style.animationDuration = (Math.random() * 5 + 5) + 's';
+      el.style.animationDelay   = (Math.random() * 2) + 's';
+      var container = document.querySelector('.pending-particles');
+      if (container) {
+        container.appendChild(el);
+        setTimeout(function () { el.remove(); }, 12000);
+      }
+    }
+    for (var i = 0; i < 4; i++) spawn();
+    setInterval(spawn, 4000);
+  })();
+
+  // ── "Check Now" button ──────────────────────────────────────────────────
+  window.checkNow = function () {
+    clearInterval(timer);
+    if (countdownEl) countdownEl.textContent = '…';
+    var note = document.getElementById('refreshNote');
+    if (note) note.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>&nbsp;Checking…';
+    window.location.reload();
+  };
+})();
+</script>
+{% endblock %}
+
+
+

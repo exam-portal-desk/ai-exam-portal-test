@@ -1,0 +1,276 @@
+{% extends "admin_base.html" %}
+{% block title %}Manage Subjects{% endblock %}
+
+{% block content %}
+<style>
+  .subject-avatar {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: var(--accent-subtle); border: 1px solid var(--accent-border);
+    color: var(--accent); display: inline-flex; align-items: center;
+    justify-content: center; font-weight: 700; font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+
+  .subject-name-text { font-weight: 600; color: var(--text-primary); font-size: 0.875rem; }
+
+  .folder-pill {
+    background: var(--table-head-bg); border: 1px solid var(--card-border);
+    color: var(--text-muted); padding: 2px 8px; border-radius: 6px;
+    font-size: 0.72rem; font-weight: 600; font-family: monospace;
+    display: inline-block; max-width: 200px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
+    vertical-align: middle;
+  }
+  .folder-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+  .action-btns { display: flex; gap: 0.35rem; align-items: center; }
+
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--card-border); background: var(--card-bg);
+    color: var(--text-secondary); display: inline-flex; align-items: center;
+    justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 0.78rem;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+  .icon-btn.danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
+
+  .page-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+  }
+  .page-top h1 { font-size: clamp(1.2rem,3vw,1.6rem); font-weight: 700; margin: 0; color: var(--text-primary); }
+  .page-top p  { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--text-muted); }
+
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+  .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3; display: block; }
+  .empty-state p { font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+
+  .info-box {
+    background: var(--accent-subtle); border: 1px solid var(--accent-border);
+    border-radius: 10px; padding: 0.9rem 1rem; font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+  .info-box ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+  .info-box li { margin-bottom: 0.2rem; }
+
+  @media (max-width: 768px) {
+    .page-top { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-book me-2" style="color:var(--accent)"></i>Manage Subjects</h1>
+    <p>Organize question image folders by subject.</p>
+  </div>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+    <i class="fas fa-plus me-1"></i> Add Subject
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0" style="min-width:500px">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Subject Name</th>
+            <th>Folder ID</th>
+            <th>Created At</th>
+            <th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if subjects %}
+            {% for subject in subjects %}
+            <tr>
+              <td style="color:var(--text-muted);font-size:0.8rem;font-weight:600">{{ subject.id }}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:0.6rem">
+                  <div class="subject-avatar">{{ subject.subject_name[0].upper() }}</div>
+                  <span class="subject-name-text">{{ subject.subject_name }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="folder-pill" title="Click to copy: {{ subject.subject_folder_id }}" data-folder="{{ subject.subject_folder_id }}">
+                  {{ subject.subject_folder_id }}
+                </span>
+              </td>
+              <td style="color:var(--text-muted);font-size:0.8rem">{{ subject.subject_folder_created_at }}</td>
+              <td>
+                <div class="action-btns">
+                  <button class="icon-btn"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editSubjectModal{{ subject.id }}"
+                          title="Edit Subject">
+                    <i class="fas fa-pencil-alt"></i>
+                  </button>
+                  <button class="icon-btn danger"
+                          onclick="showDeleteConfirm({{ subject.id }}, '{{ subject.subject_name | replace("'", "\\'") }}')"
+                          title="Delete Subject">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5">
+                <div class="empty-state">
+                  <i class="fas fa-book-open"></i>
+                  <p>No subjects yet. Click <strong>Add Subject</strong> to create one.</p>
+                </div>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modals -->
+{% for subject in subjects %}
+<div class="modal fade" id="editSubjectModal{{ subject.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin.edit_subject', subject_id=subject.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-pencil-alt me-2"></i>Edit: {{ subject.subject_name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">Subject Name</label>
+          <input type="text" class="form-control" name="subject_name" value="{{ subject.subject_name }}" required>
+          <div class="form-text" style="margin-top:0.4rem;color:var(--text-muted);font-size:0.78rem">
+            <i class="fas fa-info-circle me-1"></i>Updating the name will create a new folder if needed.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Add Subject Modal -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin.subjects') }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New Subject</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Subject Name</label>
+            <input type="text" class="form-control" name="subject_name" placeholder="e.g. Physics, Mathematics, Chemistry" required>
+          </div>
+          <div class="info-box">
+            <strong style="color:var(--text-primary)">What happens when you add a subject?</strong>
+            <ul>
+              <li>A new folder is created in Google Drive</li>
+              <li>You can upload images for this subject</li>
+              <li>Reference images as <code>SubjectName/image.png</code> in questions</li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Create Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+let _subjectIdToDelete = null;
+
+function showDeleteConfirm(id, name) {
+  _subjectIdToDelete = id;
+  document.getElementById('subjectNameToDelete').textContent = name;
+  new bootstrap.Modal(document.getElementById('deleteSubjectModal')).show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function() {
+      const btn = this.querySelector('button[type="submit"]');
+      if (btn && !btn.disabled) {
+        btn.dataset.orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+        btn.disabled = true;
+      }
+    });
+  });
+
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('hidden.bs.modal', function() {
+      this.querySelectorAll('button[type="submit"]').forEach(btn => {
+        btn.disabled = false;
+        if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig;
+      });
+    });
+  });
+
+  document.querySelectorAll('.folder-pill').forEach(el => {
+    el.addEventListener('click', function() {
+      const text = this.dataset.folder;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = this.textContent;
+          this.textContent = 'Copied!';
+          setTimeout(() => this.textContent = orig, 1000);
+        });
+      }
+    });
+  });
+});
+</script>
+<div class="modal fade" id="deleteSubjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#ef4444">
+        <h5 class="modal-title" style="color:white"><i class="fas fa-trash me-2"></i>Delete Subject</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:brightness(0) invert(1)"></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:0.5rem">You are about to delete:</p>
+        <p id="subjectNameToDelete" style="color:#ef4444;font-weight:700;font-size:1rem;margin-bottom:1rem"></p>
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:0.9rem 1rem;margin-bottom:0.75rem">
+          <p style="color:#ef4444;font-weight:600;font-size:0.85rem;margin:0 0 0.4rem">This will permanently delete:</p>
+          <ul style="color:var(--text-secondary);font-size:0.82rem;margin:0;padding-left:1.2rem">
+            <li>The subject and its folder reference</li>
+            <li>All associated image links</li>
+          </ul>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.78rem;margin:0;text-align:center"><i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmSubjectDeleteBtn">
+          <i class="fas fa-trash me-1"></i>Delete Subject
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('confirmSubjectDeleteBtn').addEventListener('click', function() {
+  if (!_subjectIdToDelete) return;
+  window.location.href = '/admin/subjects/delete/' + _subjectIdToDelete;
+});
+</script>
+{% endblock %}
+
+
+

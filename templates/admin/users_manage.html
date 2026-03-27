@@ -1,0 +1,448 @@
+{% extends "admin_base.html" %}
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+<style>
+  .page-top { display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem; }
+  .page-top h1 { font-size:clamp(1.2rem,3vw,1.6rem);font-weight:700;margin:0;color:var(--text-primary); }
+  .page-top p  { margin:0.15rem 0 0;font-size:0.82rem;color:var(--text-muted); }
+  .user-stats  { display:flex;gap:0.5rem;flex-wrap:wrap; }
+  .ustat-pill  { display:inline-flex;align-items:center;gap:0.35rem;padding:5px 12px;border-radius:20px;font-size:0.75rem;font-weight:700;background:var(--table-head-bg);border:1px solid var(--card-border);color:var(--text-secondary); }
+  .controls-bar { background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:0.85rem 1.1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap; }
+  .controls-bar label { font-size:0.78rem;font-weight:600;color:var(--text-muted);white-space:nowrap; }
+  .form-select-sm { background:var(--input-bg);border:1px solid var(--input-border);color:var(--input-text);border-radius:8px;font-size:0.82rem;padding:0.4rem 0.7rem; }
+  .form-select-sm:focus { border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-subtle);outline:none;background:var(--input-bg); }
+  .form-select-sm option { background:#111118;color:#e6eef8; }
+  .search-wrap { position:relative;flex:1;min-width:180px;max-width:300px; }
+  .search-wrap i { position:absolute;left:0.7rem;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:0.75rem; }
+  .search-wrap input { background:var(--input-bg);border:1px solid var(--input-border);color:var(--input-text);border-radius:20px;font-size:0.82rem;padding:0.45rem 0.8rem 0.45rem 2rem;width:100%; }
+  .search-wrap input:focus { border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-subtle);outline:none;background:var(--input-bg); }
+  .search-wrap input::placeholder { color:var(--input-placeholder); }
+  .card { background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px; }
+  .table { --bs-table-bg:transparent;--bs-table-color:var(--text-primary); }
+  .table thead th { background:var(--table-head-bg);color:var(--text-muted);font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--table-border);padding:0.75rem 1rem; }
+  .table tbody td { border-bottom:1px solid var(--table-border);padding:0.75rem 1rem;vertical-align:middle; }
+  .table tbody tr:last-child td { border-bottom:none; }
+  .table tbody tr:hover td { background:var(--table-row-hover); }
+  .user-row.selected td { background:var(--accent-subtle) !important; }
+  .avatar-chip { width:30px;height:30px;border-radius:50%;background:var(--accent-subtle);border:1px solid var(--accent-border);color:var(--accent);font-size:0.72rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .access-badge { padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem; }
+  .ab-user  { background:rgba(45,91,227,0.12);color:#7b9ef7;border:1px solid rgba(45,91,227,0.2); }
+  .ab-admin { background:rgba(239,68,68,0.1);color:#f87171;border:1px solid rgba(239,68,68,0.2); }
+  .ab-both  { background:rgba(139,92,246,0.1);color:#a78bfa;border:1px solid rgba(139,92,246,0.2); }
+  .e-checkbox { width:15px;height:15px;accent-color:var(--accent);cursor:pointer; }
+  .update-btn { background:var(--accent);color:white;border:none;border-radius:7px;padding:4px 12px;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap; }
+  .update-btn:hover { background:var(--accent-hover); }
+  .update-btn:disabled { opacity:0.35;cursor:not-allowed; }
+  .update-btn.changed { background:#f59e0b;color:#000; }
+  .btn-flat { border-radius:8px;font-size:0.8rem;font-weight:600;padding:0.4rem 0.9rem;border:none;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:0.3rem; }
+  .btn-flat.primary   { background:var(--accent);color:white; }
+  .btn-flat.primary:hover { background:var(--accent-hover); }
+  .btn-flat.secondary { background:var(--btn-secondary-bg);border:1px solid var(--btn-secondary-border);color:var(--btn-secondary-color); }
+  .btn-flat.secondary:hover { border-color:var(--accent);color:var(--accent); }
+  .btn-flat:disabled { opacity:0.4;cursor:not-allowed; }
+  .paginator { display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1rem;border-top:1px solid var(--card-border);flex-wrap:wrap;gap:0.5rem; }
+  .pg-btn { cursor:pointer;padding:3px 9px;border-radius:6px;border:1px solid var(--card-border);background:var(--card-bg);color:var(--text-secondary);font-size:0.78rem;font-weight:600; }
+  .pg-btn.active { border-color:var(--accent);background:var(--accent);color:#fff; }
+  .pg-btn:disabled { opacity:0.4;cursor:not-allowed; }
+  .skeleton-row td { padding:0.75rem 1rem; }
+  .skeleton { background:linear-gradient(90deg,var(--table-head-bg) 25%,var(--card-border) 50%,var(--table-head-bg) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:6px;height:14px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .empty-state { text-align:center;padding:3rem 1rem;color:var(--text-muted); }
+  .empty-state i { font-size:2.5rem;opacity:0.2;display:block;margin-bottom:0.75rem; }
+
+  /* Ghost row */
+  .ghost-row { opacity:0.6; }
+  .ghost-row:hover td { background:rgba(239,68,68,0.04) !important; }
+
+  /* Modal */
+  .modal-overlay { display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);align-items:center;justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:var(--card-bg,#1e1e2e);border-radius:18px;padding:2rem;max-width:440px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.55);animation:modalIn 0.22s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes modalIn { from{opacity:0;transform:scale(0.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
+  .modal-icon { width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.6rem; }
+
+  /* Toast */
+  #toastContainer { position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none; }
+  .toast-item { display:flex;align-items:center;gap:0.65rem;padding:0.75rem 1.1rem;border-radius:12px;font-size:0.83rem;font-weight:600;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.35);min-width:240px;max-width:340px;pointer-events:all;animation:toastIn 0.25s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes toastIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+  .toast-item.removing { animation:toastOut 0.22s ease forwards; }
+  @keyframes toastOut { to{opacity:0;transform:translateX(40px)} }
+  .toast-success { background:linear-gradient(135deg,#059669,#10b981); }
+  .toast-danger  { background:linear-gradient(135deg,#dc2626,#ef4444); }
+  .toast-warning { background:linear-gradient(135deg,#d97706,#f59e0b); }
+  .toast-close { margin-left:auto;background:none;border:none;color:#fff;opacity:0.7;cursor:pointer;font-size:0.85rem;padding:0;flex-shrink:0; }
+  .toast-close:hover { opacity:1; }
+</style>
+
+<!-- Toast Container -->
+<div id="toastContainer"></div>
+
+<!-- Ghost Warning Modal -->
+<div id="ghostModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <div class="modal-icon" style="background:rgba(239,68,68,0.15);">
+      <i class="fas fa-ghost" style="color:#ef4444"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;color:#ef4444;font-size:1.1rem;font-weight:700;">System Account — Protected</h3>
+    <p style="text-align:center;margin:0 0 1rem;color:var(--text-muted);font-size:0.84rem;line-height:1.6;">
+      This is an internal <strong style="color:var(--text-primary);">Ghost / Tombstone</strong> account used by the system to preserve content from deleted users (discussions, chat messages).<br><br>
+      Modifying this account will <strong style="color:#ef4444;">break data integrity</strong>.
+    </p>
+    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;font-size:0.8rem;color:var(--text-muted);display:flex;align-items:flex-start;gap:0.5rem;">
+      <i class="fas fa-shield-alt" style="color:#ef4444;margin-top:2px;flex-shrink:0;"></i>
+      <span><strong>Do not change role, delete, or modify this account.</strong> It is managed automatically by the system.</span>
+    </div>
+    <button onclick="document.getElementById('ghostModal').classList.remove('open')"
+      style="width:100%;padding:0.7rem;background:#ef4444;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.9rem;">
+      <i class="fas fa-check me-1"></i> Understood, Go Back
+    </button>
+  </div>
+</div>
+
+<!-- Bulk Confirm Modal -->
+<div id="bulkModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <div class="modal-icon" style="background:rgba(45,91,227,0.12);">
+      <i class="fas fa-users-cog" style="color:var(--accent)"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;color:var(--text-primary);font-size:1.1rem;font-weight:700;">Confirm Bulk Role Update</h3>
+    <p id="bulkModalMsg" style="text-align:center;margin:0 0 1.25rem;color:var(--text-muted);font-size:0.85rem;line-height:1.5;"></p>
+    <div style="display:flex;gap:0.75rem;">
+      <button onclick="document.getElementById('bulkModal').classList.remove('open')"
+        style="flex:1;padding:0.65rem;background:var(--btn-secondary-bg,#2a2a3a);color:var(--text-primary);border:1px solid var(--card-border);border-radius:10px;font-weight:600;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-times me-1"></i> Cancel
+      </button>
+      <button id="bulkConfirmBtn" onclick="executeBulkUpdate()"
+        style="flex:1;padding:0.65rem;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-check me-1"></i> Yes, Update
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-users-cog me-2" style="color:var(--accent)"></i>User Management</h1>
+    <p>Update roles and manage user access.</p>
+  </div>
+  <div class="user-stats">
+    <span class="ustat-pill"><i class="fas fa-users" style="color:var(--accent)"></i>Total: <strong id="totalUsers">—</strong></span>
+    <span class="ustat-pill"><i class="fas fa-user" style="color:#7b9ef7"></i>Users: <strong id="userCount">—</strong></span>
+    <span class="ustat-pill"><i class="fas fa-user-shield" style="color:#f87171"></i>Admins: <strong id="adminCount">—</strong></span>
+    <span class="ustat-pill"><i class="fas fa-user-plus" style="color:#a78bfa"></i>Both: <strong id="bothCount">—</strong></span>
+  </div>
+</div>
+
+<div class="controls-bar">
+  <label>Filter:</label>
+  <select class="form-select-sm" id="roleFilter" style="min-width:130px" onchange="fetchUsers(1)">
+    <option value="">All Roles</option>
+    <option value="user">User</option>
+    <option value="admin">Admin</option>
+    <option value="both">Both</option>
+  </select>
+  <label>Bulk Role:</label>
+  <select class="form-select-sm" id="bulkRoleSelect" style="min-width:150px" onchange="updateBulkState()">
+    <option value="">Select Role…</option>
+    <option value="user">User</option>
+    <option value="admin">Admin</option>
+    <option value="user,admin">User &amp; Admin</option>
+  </select>
+  <button class="btn-flat primary" id="applyBulkBtn" disabled onclick="doBulkUpdate()">
+    <i class="fas fa-users-cog"></i>Apply to Selected
+  </button>
+  <button class="btn-flat secondary" onclick="doSelectAll()"><i class="fas fa-check-square"></i>Select All</button>
+  <button class="btn-flat secondary" onclick="doClearAll()"><i class="fas fa-square"></i>Clear</button>
+  <div class="search-wrap ms-auto">
+    <i class="fas fa-search"></i>
+    <input type="text" id="userSearch" placeholder="Search username, email…" oninput="debounceSearch()">
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th style="width:44px"><input type="checkbox" id="selectAllChk" class="e-checkbox" onchange="handleSelectAll(this)"></th>
+          <th>User</th><th>Email</th><th>Current Role</th>
+          <th>New Role</th><th>Update</th><th>Last Updated</th>
+        </tr>
+      </thead>
+      <tbody id="usersTbody">
+        <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:60%"></div></td></tr>
+        <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:80%"></div></td></tr>
+        <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:70%"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="paginator" id="paginatorWrap"></div>
+</div>
+
+<script>
+let _searchTimer = null;
+let _currentPage = 1;
+let _selectedIds = new Set();
+let _pendingBulkRole = '';
+
+function isGhostUser(u) {
+  return u.role === 'ghost' || u.username === 'deleted_user' || String(u.id) === '-1';
+}
+
+function debounceSearch() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => fetchUsers(1), 400);
+}
+
+function fetchUsers(page) {
+  _currentPage = page;
+  const q    = document.getElementById('userSearch').value.trim();
+  const role = document.getElementById('roleFilter').value;
+  const tbody = document.getElementById('usersTbody');
+  tbody.innerHTML = Array(5).fill(0).map(() =>
+    `<tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
+  ).join('');
+  fetch(`/admin/api/users/search?${new URLSearchParams({page,q,role})}`)
+    .then(r=>r.json())
+    .then(data => { renderTable(data.users||[]); renderPaginator(data.page,data.total_pages,data.total); })
+    .catch(()=>{
+      tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:2rem;color:#ef4444">
+        <i class="fas fa-exclamation-circle me-2"></i>Error loading users.</td></tr>`;
+    });
+}
+
+function renderTable(users) {
+  const tbody = document.getElementById('usersTbody');
+  if (!users.length) {
+    tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><i class="fas fa-users"></i>
+      <p><strong>No Users Found</strong></p></div></td></tr>`;
+    return;
+  }
+  const roleMap = {
+    'user':       ['ab-user',  'fa-user',        'User'],
+    'admin':      ['ab-admin', 'fa-user-shield', 'Admin'],
+    'user,admin': ['ab-both',  'fa-user-plus',   'User &amp; Admin'],
+  };
+  tbody.innerHTML = users.map(u => {
+    const ghost = isGhostUser(u);
+    if (ghost) {
+      return `
+      <tr class="user-row ghost-row" data-user-id="${u.id}">
+        <td><input type="checkbox" class="e-checkbox" disabled style="opacity:0.3;cursor:not-allowed;"></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.6rem">
+            <div class="avatar-chip" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#ef4444;">
+              <i class="fas fa-ghost"></i>
+            </div>
+            <div>
+              <div style="font-size:0.83rem;font-weight:600;color:#ef4444">${u.username||''}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);font-style:italic">System Account — Read Only</div>
+            </div>
+          </div>
+        </td>
+        <td><span style="font-size:0.8rem;color:var(--text-muted);font-style:italic">${u.email||''}</span></td>
+        <td><span class="access-badge" style="background:rgba(239,68,68,0.1);color:#f87171;border:1px solid rgba(239,68,68,0.2);"><i class="fas fa-ghost"></i> System</span></td>
+        <td><span style="font-size:0.78rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;"><i class="fas fa-lock" style="color:#ef4444;font-size:0.7rem"></i>Protected</span></td>
+        <td>
+          <button onclick="document.getElementById('ghostModal').classList.add('open')"
+            style="background:#ef4444;color:white;border:none;border-radius:7px;padding:4px 12px;font-size:0.75rem;font-weight:600;cursor:pointer;">
+            <i class="fas fa-lock me-1"></i>Locked
+          </button>
+        </td>
+        <td><span style="font-size:0.75rem;color:var(--text-muted)">${u.updated_at||u.created_at||'—'}</span></td>
+      </tr>`;
+    }
+    const [rcls,rico,rlbl] = roleMap[u.role]||['ab-user','fa-user',u.role||'?'];
+    const isSel = _selectedIds.has(String(u.id));
+    const opts = ['user','admin','user,admin'].filter(r=>r!==u.role)
+      .map(r=>`<option value="${r}">${r==='user,admin'?'User &amp; Admin':r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('');
+    return `
+    <tr class="user-row${isSel?' selected':''}" data-user-id="${u.id}">
+      <td><input type="checkbox" class="e-checkbox user-chk" value="${u.id}" ${isSel?'checked':''} onchange="onChkChange(this)"></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:0.6rem">
+          <div class="avatar-chip"><i class="fas fa-user"></i></div>
+          <div>
+            <div style="font-size:0.83rem;font-weight:600;color:var(--text-primary)">${u.username||''}</div>
+            ${u.full_name&&u.full_name!==u.username?`<div style="font-size:0.75rem;color:var(--text-muted)">${u.full_name}</div>`:''}
+          </div>
+        </div>
+      </td>
+      <td><span style="font-size:0.8rem;color:var(--text-muted)">${u.email||''}</span></td>
+      <td><span class="access-badge ${rcls}"><i class="fas ${rico}"></i>${rlbl}</span></td>
+      <td>
+        <select class="form-select-sm role-sel" data-uid="${u.id}" style="min-width:150px" onchange="onRoleChange(this)">
+          <option value="">Keep Current</option>${opts}
+        </select>
+      </td>
+      <td>
+        <button class="update-btn" data-uid="${u.id}" disabled onclick="doUpdateRole(this)">
+          <i class="fas fa-save me-1"></i>Update
+        </button>
+      </td>
+      <td><span style="font-size:0.75rem;color:var(--text-muted)">${u.updated_at||u.created_at||'—'}</span></td>
+    </tr>`;
+  }).join('');
+  syncSelectAll();
+}
+
+function renderPaginator(page,totalPages,total) {
+  const wrap=document.getElementById('paginatorWrap');
+  if(!total){wrap.innerHTML='';return;}
+  if(totalPages<=1){wrap.innerHTML=`<span style="font-size:0.78rem;color:var(--text-muted)">${total} users</span>`;return;}
+  const start=(page-1)*50+1,end=Math.min(page*50,total);
+  let pages=[];
+  if(totalPages<=7){pages=Array.from({length:totalPages},(_,i)=>i+1);}
+  else{pages=[1];const s=Math.max(2,page-2),e=Math.min(totalPages-1,page+2);if(s>2)pages.push('…');for(let i=s;i<=e;i++)pages.push(i);if(e<totalPages-1)pages.push('…');pages.push(totalPages);}
+  wrap.innerHTML=`
+    <span style="font-size:0.78rem;color:var(--text-muted)">Showing ${start}–${end} of ${total} users</span>
+    <div style="display:flex;gap:0.3rem;flex-wrap:wrap">
+      <button class="pg-btn" ${page===1?'disabled':''} onclick="fetchUsers(${page-1})">‹</button>
+      ${pages.map(p=>p==='…'?`<span style="color:var(--text-muted);padding:0 4px">…</span>`:`<button class="pg-btn${p===page?' active':''}" onclick="fetchUsers(${p})">${p}</button>`).join('')}
+      <button class="pg-btn" ${page===totalPages?'disabled':''} onclick="fetchUsers(${page+1})">›</button>
+    </div>`;
+}
+
+function onRoleChange(sel) {
+  const btn=sel.closest('tr').querySelector('.update-btn');
+  if(sel.value){btn.disabled=false;btn.classList.add('changed');}
+  else{btn.disabled=true;btn.classList.remove('changed');}
+}
+
+function doUpdateRole(btn) {
+  const uid=btn.dataset.uid;
+  const sel=btn.closest('tr').querySelector('.role-sel');
+  if(!sel.value) return;
+  const orig=btn.innerHTML; btn.disabled=true;
+  btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>';
+  fetch('/admin/users/update-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,new_role:sel.value})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){toast(d.message||'Role updated successfully.','success');loadStats();fetchUsers(_currentPage);}
+      else toast(d.message||'Update failed.','danger');
+    }).catch(()=>toast('Network error.','danger'))
+    .finally(()=>{btn.innerHTML=orig;btn.disabled=true;btn.classList.remove('changed');});
+}
+
+function handleSelectAll(chk) {
+  document.querySelectorAll('#usersTbody .user-chk').forEach(cb=>{
+    cb.checked=chk.checked;cb.closest('tr').classList.toggle('selected',chk.checked);
+    if(chk.checked)_selectedIds.add(cb.value);else _selectedIds.delete(cb.value);
+  });
+  updateBulkState();
+}
+
+function onChkChange(cb) {
+  cb.closest('tr').classList.toggle('selected',cb.checked);
+  if(cb.checked)_selectedIds.add(cb.value);else _selectedIds.delete(cb.value);
+  syncSelectAll();updateBulkState();
+}
+
+function syncSelectAll() {
+  const all=document.querySelectorAll('#usersTbody .user-chk');
+  const chk=document.querySelectorAll('#usersTbody .user-chk:checked');
+  const sa=document.getElementById('selectAllChk');if(!sa)return;
+  if(!all.length){sa.indeterminate=false;sa.checked=false;}
+  else if(!chk.length){sa.indeterminate=false;sa.checked=false;}
+  else if(chk.length===all.length){sa.indeterminate=false;sa.checked=true;}
+  else{sa.indeterminate=true;}
+}
+
+function doSelectAll() {
+  document.querySelectorAll('#usersTbody .user-chk').forEach(cb=>{
+    cb.checked=true;cb.closest('tr').classList.add('selected');_selectedIds.add(cb.value);
+  });
+  const sa=document.getElementById('selectAllChk');if(sa){sa.checked=true;sa.indeterminate=false;}
+  updateBulkState();
+}
+
+function doClearAll() {
+  document.querySelectorAll('#usersTbody .user-chk').forEach(cb=>{
+    cb.checked=false;cb.closest('tr').classList.remove('selected');_selectedIds.delete(cb.value);
+  });
+  const sa=document.getElementById('selectAllChk');if(sa){sa.checked=false;sa.indeterminate=false;}
+  updateBulkState();
+}
+
+function updateBulkState() {
+  const role=document.getElementById('bulkRoleSelect').value;
+  const btn=document.getElementById('applyBulkBtn');if(!btn)return;
+  const safeCount=[..._selectedIds].filter(id=>{
+    const row=document.querySelector(`tr[data-user-id="${id}"]`);
+    return row&&!row.classList.contains('ghost-row');
+  }).length;
+  btn.disabled=!(safeCount&&role);
+  btn.innerHTML=safeCount
+    ?`<i class="fas fa-users-cog me-1"></i>Apply to ${safeCount} Selected`
+    :'<i class="fas fa-users-cog me-1"></i>Apply to Selected';
+}
+
+function doBulkUpdate() {
+  const role=document.getElementById('bulkRoleSelect').value;
+  if(!_selectedIds.size||!role)return;
+  const safeIds=[..._selectedIds].filter(id=>{
+    const row=document.querySelector(`tr[data-user-id="${id}"]`);
+    return row&&!row.classList.contains('ghost-row');
+  });
+  if(!safeIds.length){toast('No eligible users selected.','warning');return;}
+  _pendingBulkRole=role;
+  const lbl=role==='user,admin'?'User & Admin':role.charAt(0).toUpperCase()+role.slice(1);
+  document.getElementById('bulkModalMsg').innerHTML=
+    `You are about to update <strong>${safeIds.length} user(s)</strong> to role <strong style="color:var(--accent)">"${lbl}"</strong>.<br><br>This will take effect immediately.`;
+  document.getElementById('bulkModal').classList.add('open');
+}
+
+function executeBulkUpdate() {
+  const role=_pendingBulkRole;
+  const safeIds=[..._selectedIds].filter(id=>{
+    const row=document.querySelector(`tr[data-user-id="${id}"]`);
+    return row&&!row.classList.contains('ghost-row');
+  });
+  document.getElementById('bulkModal').classList.remove('open');
+  if(!safeIds.length||!role)return;
+  const btn=document.getElementById('applyBulkBtn');
+  const orig=btn.innerHTML;btn.disabled=true;
+  btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Updating…';
+  fetch('/admin/users/bulk-update-roles',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({updates:safeIds.map(id=>({user_id:id,new_role:role}))})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){
+        toast(d.message||`${safeIds.length} user(s) updated successfully.`,'success');
+        _selectedIds.clear();document.getElementById('bulkRoleSelect').value='';
+        loadStats();fetchUsers(_currentPage);
+      } else toast(d.message||'Bulk update failed.','danger');
+    }).catch(()=>toast('Network error.','danger'))
+    .finally(()=>{btn.innerHTML=orig;updateBulkState();});
+}
+
+/* ── HTML Toast ── */
+function toast(msg,type='success') {
+  const icons={success:'fa-check-circle',danger:'fa-times-circle',warning:'fa-exclamation-triangle'};
+  const el=document.createElement('div');
+  el.className=`toast-item toast-${type}`;
+  el.innerHTML=`<i class="fas ${icons[type]||'fa-info-circle'}" style="flex-shrink:0"></i>
+    <span style="flex:1;line-height:1.4">${msg}</span>
+    <button class="toast-close" onclick="removeToast(this.parentElement)"><i class="fas fa-times"></i></button>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(()=>removeToast(el),4000);
+}
+function removeToast(el){
+  if(!el||el._removing)return;el._removing=true;
+  el.classList.add('removing');setTimeout(()=>el.remove(),220);
+}
+
+function loadStats() {
+  fetch('/admin/api/users/stats').then(r=>r.json()).then(d=>{
+    document.getElementById('totalUsers').textContent=d.total_users??'—';
+    document.getElementById('userCount').textContent=d.user_role??'—';
+    document.getElementById('adminCount').textContent=d.admin_role??'—';
+    document.getElementById('bothCount').textContent=d.both_roles??'—';
+  }).catch(()=>{});
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadStats();fetchUsers(1);
+  setInterval(()=>{if(document.visibilityState==='visible')loadStats();},30000);
+});
+</script>
+{% endblock %}

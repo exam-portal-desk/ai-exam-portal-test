@@ -1,0 +1,778 @@
+{% extends "base.html" %}
+
+{% block title %}Exam Instructions - ExamPortal{% endblock %}
+
+{% block content %}
+<style>
+    [data-theme="dark"] .dashboard-body{ background:#0a0a0f; color:rgba(255,255,255,0.7); }
+    .dashboard-body{ min-height:100vh; position:relative; overflow-x:hidden; padding-top:1.5rem; }
+    .particles{ position:fixed; top:0; left:0; width:100%; height:100%; overflow:hidden; z-index:1; pointer-events:none; }
+    .particle{ position:absolute; background:rgba(45,91,227,0.25); border-radius:50%; animation:float 8s ease-in-out infinite; }
+    .particle:nth-child(1){width:3px;height:3px;top:20%;left:10%;animation-delay:0s}
+    .particle:nth-child(2){width:2px;height:2px;top:60%;left:80%;animation-delay:1s}
+    .particle:nth-child(3){width:3px;height:3px;top:80%;left:20%;animation-delay:2s}
+    .particle:nth-child(4){width:2px;height:2px;top:40%;left:60%;animation-delay:3s}
+    .particle:nth-child(5){width:3px;height:3px;top:30%;left:90%;animation-delay:4s}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+
+    .container-wrap{ position:relative; z-index:2; max-width:1400px; margin:0 auto; padding:0 1.5rem; }
+
+    .welcome-section{ border-radius:14px; padding:1.2rem 1.6rem; margin-bottom:1.4rem; position:relative; overflow:hidden; }
+    .welcome-section::before{ content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(45,91,227,0.4),transparent); }
+    .welcome-section h2{ font-family:'DM Serif Display',serif; font-size:1.4rem; font-weight:400; margin-bottom:0.3rem; }
+    .welcome-section p{ font-size:0.82rem; margin:0; }
+    [data-theme="dark"] .welcome-section{ background:#111118; border:1px solid rgba(255,255,255,0.07); }
+    [data-theme="dark"] .welcome-section h2{ color:white; }
+    [data-theme="dark"] .welcome-section p{ color:rgba(255,255,255,0.35); }
+
+    .modern-card{ border-radius:14px; overflow:hidden; position:relative; }
+    .modern-card::before{ content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(45,91,227,0.2),transparent); }
+    .card-header{ padding:1rem 1.2rem 0.8rem; display:flex; align-items:center; gap:0.8rem; }
+    .card-header h3{ margin:0; font-weight:600; font-size:1rem; }
+    .card-body{ padding:1rem 1.2rem; font-size:0.85rem; }
+    [data-theme="dark"] .modern-card{ background:#111118; border:1px solid rgba(255,255,255,0.07); }
+    [data-theme="dark"] .card-header{ border-bottom:1px solid rgba(255,255,255,0.05); }
+    [data-theme="dark"] .card-header h3{ color:#fff; }
+    [data-theme="dark"] .card-body{ color:rgba(255,255,255,0.65); }
+
+    .status-badge{ padding:0.28rem 0.7rem; border-radius:20px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; border:1px solid; display:inline-flex; align-items:center; }
+    .status-badge.live{ background:rgba(16,185,129,0.15); color:#34d399; border-color:rgba(16,185,129,0.3); animation:pulse 2s infinite; }
+    .status-badge.upcoming{ background:rgba(251,191,36,0.1); color:#fbbf24; border-color:rgba(251,191,36,0.3); }
+    .status-badge.completed{ background:rgba(16,185,129,0.1); color:#34d399; border-color:rgba(16,185,129,0.2); }
+    .status-badge.pending{ background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.4); border-color:rgba(255,255,255,0.07); }
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.3)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+
+    .exam-meta{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.6rem; margin-bottom:1rem; }
+    .exam-meta-item{ padding:0.55rem 0.7rem; border-radius:8px; display:flex; gap:0.5rem; align-items:center; font-size:0.8rem; }
+    .exam-meta-item i{ color:#2d5be3; font-size:0.8rem; }
+    [data-theme="dark"] .exam-meta-item{ background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); color:rgba(255,255,255,0.6); }
+
+    .action-btn{ padding:0.65rem 1rem; border-radius:10px; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; position:relative; overflow:hidden; text-decoration:none; font-size:0.82rem; font-family:inherit; transition:all 0.2s; }
+    .action-btn.start-exam{ background:#059669; color:#fff; box-shadow:0 4px 14px rgba(5,150,105,0.3); }
+    .action-btn.start-exam:hover{ background:#10b981; transform:translateY(-1px); color:#fff; text-decoration:none; }
+    .action-btn.view-result{ background:#2d5be3; color:#fff; box-shadow:0 4px 14px rgba(45,91,227,0.3); }
+    .action-btn.view-result:hover{ background:#3d6bf3; transform:translateY(-1px); color:#fff; text-decoration:none; }
+    .action-btn.disabled{ cursor:not-allowed; }
+    [data-theme="dark"] .action-btn.disabled{ background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.25); border:1px solid rgba(255,255,255,0.07); }
+
+    .modern-table{ border-radius:10px; overflow:hidden; }
+    .modern-table table{ width:100%; }
+    .modern-table th,.modern-table td{ padding:0.75rem 1rem; font-size:0.83rem; }
+    [data-theme="dark"] .modern-table{ background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
+    [data-theme="dark"] .modern-table table{ color:#fff; }
+    [data-theme="dark"] .modern-table th,[data-theme="dark"] .modern-table td{ border-bottom:1px solid rgba(255,255,255,0.04); }
+
+    .marking-scheme{ display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .mark-box{ padding:0.75rem; border-radius:10px; min-width:150px; font-size:0.83rem; }
+    [data-theme="dark"] .mark-box{ background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); }
+
+    #preloadingAlert { border-radius: 10px; padding: 14px; box-shadow: none; }
+    [data-theme="dark"] #preloadingAlert { background: #16161f; border: 1px solid rgba(255,255,255,0.07); }
+    #loadingTitle { font-weight: 700; text-shadow: none; }
+    #loadingSubtitle { font-weight: 500; text-shadow: none; }
+    #loadingDetails { font-weight: 500; }
+    [data-theme="dark"] #loadingTitle { color: rgba(255,255,255,0.85) !important; }
+    [data-theme="dark"] #loadingSubtitle { color: rgba(255,255,255,0.5) !important; }
+    [data-theme="dark"] #loadingDetails { color: rgba(255,255,255,0.4) !important; }
+    #preloadProgress.bg-success { background: #059669; animation: none; box-shadow: none; }
+    #loadingPercentage { font-weight: 700; text-shadow: none; }
+    [data-theme="dark"] #loadingPercentage { color: #34d399 !important; }
+
+    .color-indicator-section { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; padding: 1rem; border-radius: 12px; }
+    .color-indicator { display: flex; gap: 0.5rem; align-items: center; padding: 0.5rem 0.8rem; border-radius: 8px; transition: all 0.3s ease; }
+    .color-indicator:hover { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.2); box-shadow: 0 0 15px rgba(16,185,129,0.15); }
+    .color-box { width: 36px; height: 20px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s ease; }
+    [data-theme="dark"] .color-indicator-section { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
+    [data-theme="dark"] .color-indicator { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
+
+    .loading-active .color-indicator-section { background: rgba(16,185,129,0.05); border-color: rgba(16,185,129,0.12); box-shadow: 0 0 20px rgba(16,185,129,0.08); }
+    .loading-active .color-indicator { background: rgba(16,185,129,0.04); border-color: rgba(16,185,129,0.15); color: rgba(255,255,255,0.95); }
+    .loading-active .color-box { box-shadow: 0 0 8px rgba(16,185,129,0.3); }
+
+    @media(max-width:768px){ .container-wrap{padding:0 1rem;} .welcome-section h2{font-size:1.6rem;} }
+
+    /* ── LIGHT THEME OVERRIDES ─────────────────────────────── */
+    [data-theme="light"] .dashboard-body { background: #f0f2f8; color: #4a5568; }
+    [data-theme="light"] .particle { background: rgba(45,91,227,0.1); }
+
+    [data-theme="light"] .welcome-section { background: #ffffff; border-color: #e2e8f0; }
+    [data-theme="light"] .welcome-section h2 { color: #1a202c; }
+    [data-theme="light"] .welcome-section p { color: #718096; }
+
+    [data-theme="light"] .modern-card { background: #ffffff; border-color: #e2e8f0; }
+    [data-theme="light"] .modern-card::before { background: linear-gradient(90deg, transparent, rgba(45,91,227,0.15), transparent); }
+    [data-theme="light"] .card-header { border-bottom-color: #e2e8f0; }
+    [data-theme="light"] .card-header h3 { color: #1a202c; }
+    [data-theme="light"] .card-body { color: #4a5568; }
+
+    [data-theme="light"] .card-body .modern-card { background: #f8faff !important; border-color: #e2e8f0; }
+    [data-theme="light"] .card-body .modern-card div[style*="font-weight:800"] { color: #1a202c !important; }
+    [data-theme="light"] .card-body .modern-card .small { color: #718096 !important; }
+
+    [data-theme="light"] .card-body h5 { color: #1a202c !important; }
+
+    [data-theme="light"] .card-body ol { color: #1a202c !important; }
+    [data-theme="light"] .card-body ol li { color: #1a202c !important; }
+    [data-theme="light"] .card-body ol li strong { color: #1a202c !important; }
+
+    [data-theme="light"] .card-body > div[style*="color:rgba(255,255,255"] { color: #4a5568 !important; }
+
+    [data-theme="light"] .card-body hr { border-top-color: #e2e8f0 !important; }
+
+    [data-theme="light"] .card-body div[style*="color:rgba(255,255,255,0.85)"] { color: #4a5568 !important; }
+    [data-theme="light"] .card-body div[style*="color:#ffb4b4"] { color: #dc2626 !important; }
+
+    [data-theme="light"] .mark-box div[style*="color:rgba(255,255,255,0.85)"] { color: #4a5568 !important; }
+
+    [data-theme="light"] .exam-meta-item { background: #f8faff; border-color: #e2e8f0; color: #4a5568; }
+
+    [data-theme="light"] .status-badge.pending { background: #f1f5f9; color: #718096; border-color: #e2e8f0; }
+
+    [data-theme="light"] .action-btn.disabled { background: #f1f5f9; color: #a0aec0; border-color: #e2e8f0; }
+
+    [data-theme="light"] .modern-table { background: #f8faff; border-color: #e2e8f0; }
+    [data-theme="light"] .modern-table table { color: #1a202c; }
+    [data-theme="light"] .modern-table th,
+    [data-theme="light"] .modern-table td { border-bottom-color: #f1f5f9; }
+
+    [data-theme="light"] .mark-box { background: #f8faff; border-color: #e2e8f0; color: #4a5568; }
+
+    [data-theme="light"] .color-indicator-section { background: #f8faff; border-color: #e2e8f0; }
+    [data-theme="light"] .color-indicator { background: #ffffff; border-color: #e2e8f0; color: #4a5568; }
+    [data-theme="light"] .color-indicator span:not(.color-box) { color: #4a5568 !important; }
+    [data-theme="light"] .color-indicator:hover { background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.2); box-shadow: none; }
+
+    [data-theme="light"] #preloadingAlert { background: #ffffff; border-color: #e2e8f0; }
+    [data-theme="light"] #loadingTitle    { color: #1a202c !important; }
+    [data-theme="light"] #loadingSubtitle { color: #718096 !important; }
+    [data-theme="light"] #loadingDetails  { color: #a0aec0 !important; }
+
+    [data-theme="light"] .progress { background: #e2e8f0 !important; }
+
+    [data-theme="light"] .card-body [style*="color:rgba(255,255,255"] { color: #4a5568 !important; }
+</style>
+
+<div class="dashboard-body">
+    <div class="particles" aria-hidden="true">
+        <div class="particle"></div><div class="particle"></div><div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    </div>
+
+    <div class="container-wrap">
+        <div class="welcome-section">
+            <h2><i class="fas fa-info-circle"></i> Exam Instructions</h2>
+            <p>Please read the following instructions carefully before proceeding with the examination.</p>
+        </div>
+
+        <div class="modern-card">
+            <div class="card-header">
+                <h3>{{ exam.name }}</h3>
+                <div style="margin-left:auto; display:flex; align-items:center; gap:0.6rem;">
+                    {% if exam.status == 'ongoing' %}
+                        <span class="status-badge live">LIVE</span>
+                    {% elif exam.status == 'upcoming' %}
+                        <span class="status-badge upcoming">Upcoming</span>
+                    {% elif exam.status == 'completed' %}
+                        <span class="status-badge completed">Completed</span>
+                    {% else %}
+                        <span class="status-badge pending">Status</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="exam-meta">
+                    <div class="exam-meta-item"><i class="fas fa-calendar"></i><div>{{ exam.date }}</div></div>
+                    <div class="exam-meta-item"><i class="fas fa-clock"></i><div>{{ exam.start_time }}</div></div>
+                    <div class="exam-meta-item"><i class="fas fa-stopwatch"></i><div>{{ exam.duration }} mins</div></div>
+                    <div class="exam-meta-item"><i class="fas fa-question-circle"></i><div>{{ exam.total_questions }} questions</div></div>
+                </div>
+
+                <!-- Marking Scheme -->
+                <div class="marking-scheme">
+                    <div class="mark-box">
+                        <div style="font-weight:800;">Correct Answer</div>
+                        <div style="color:#34d399; font-weight:700;">{{ exam.positive_marks }} Mark(s)</div>
+                    </div>
+                    <div class="mark-box">
+                        <div style="font-weight:800;">Wrong Answer</div>
+                        <div style="color:#fb7185; font-weight:700;">{{ exam.negative_marks }} Mark(s) deduction</div>
+                    </div>
+                    <div class="mark-box">
+                        <div style="font-weight:800;">Unanswered</div>
+                        <div style="color:rgba(255,255,255,0.85);">0 Marks</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:1rem; color:rgba(255,255,255,0.85);">{{ exam.instructions }}</div>
+
+                <hr style="border:none; border-top:1px solid rgba(255,255,255,0.04); margin:1rem 0;">
+
+                <h5 style="margin:0 0 0.6rem 0;">Question Types</h5>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1rem;">
+                    <div class="modern-card" style="padding:0.8rem; background:rgba(255,255,255,0.02);">
+                        <div style="font-weight:800;">MCQ</div>
+                        <div class="small">Single correct choice. Select one option.</div>
+                    </div>
+                    <div class="modern-card" style="padding:0.8rem; background:rgba(255,255,255,0.02);">
+                        <div style="font-weight:800;">MSQ</div>
+                        <div class="small">Multiple correct choices. Select all correct options to score.</div>
+                    </div>
+                    <div class="modern-card" style="padding:0.8rem; background:rgba(255,255,255,0.02);">
+                        <div style="font-weight:800;">NUMERIC</div>
+                        <div class="small">Enter a numerical value. Decimals allowed.</div>
+                    </div>
+                </div>
+
+                <h5 style="margin-bottom:0.6rem;">General Instructions</h5>
+                <ol style="margin:0 0 1rem 1.1rem; color:rgba(255,255,255,0.9);">
+                    <li><strong>Secure Exam Environment:</strong> The exam opens in a secure, maximized window. Do not minimize or navigate away.</li>
+                    <li><strong>Do not refresh or close the browser</strong> once the exam starts — you may lose progress.</li>
+                    <li><strong>Time Management:</strong> The timer will auto-submit when it expires.</li>
+                    <li><strong>Navigation:</strong> Use the palette to jump between questions.</li>
+                    <li><strong>Answer Selection:</strong> MCQ-radio, MSQ-checkboxes, Numeric-input.</li>
+                    <li><strong>Review System:</strong> Mark for review to revisit questions later.</li>
+                    <li><strong>Submission:</strong> Confirm before final submit. Reports available after submission.</li>
+                </ol>
+
+                <h5 style="margin-bottom:0.6rem;">Question Status Indicators</h5>
+                <div class="color-indicator-section" id="colorIndicatorSection">
+                    <div class="color-indicator">
+                        <span class="color-box" style="background:#6b7280;"></span> 
+                        <span>Not Visited</span>
+                    </div>
+                    <div class="color-indicator">
+                        <span class="color-box" style="background:#17a2b8;"></span> 
+                        <span>Visited</span>
+                    </div>
+                    <div class="color-indicator">
+                        <span class="color-box" style="background:#10b981;"></span> 
+                        <span>Answered</span>
+                    </div>
+                    <div class="color-indicator">
+                        <span class="color-box" style="background:#f59e0b;"></span> 
+                        <span>Marked for Review</span>
+                    </div>
+                </div>
+
+<div style="margin-top:0.8rem; display:flex; gap:0.6rem; align-items:center;">
+    {% if attempts_exhausted %}
+        <!-- ✅ NO ATTEMPTS LEFT -->
+        <div class="action-btn disabled" title="Attempts exhausted">
+            <i class="fas fa-ban"></i> Attempts Exhausted
+        </div>
+    {% elif active_attempt %}
+        <!-- ✅ ACTIVE ATTEMPT EXISTS - SHOW RESUME -->
+        <a id="resumeBtn" href="{{ url_for('exam.exam_page', exam_id=exam.id) }}?secure=1&resume=1" class="action-btn start-exam">
+            <i class="fas fa-redo"></i> Resume Exam
+        </a>
+    {% elif can_start %}
+        <!-- ✅ CAN START NEW ATTEMPT -->
+        <button id="startExamBtn" class="action-btn start-exam" type="button">
+            <i class="fas fa-play"></i> Start Exam Now
+        </button>
+    {% else %}
+        <!-- ✅ FALLBACK -->
+        <div class="action-btn disabled">
+            <i class="fas fa-info-circle"></i> Exam Not Available
+        </div>
+    {% endif %}
+
+    <a href="{{ url_for('dashboard.dashboard') }}" class="action-btn view-result">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+{% if attempts_left is not none and attempts_left >= 0 %}
+    <div style="margin-top:0.4rem; color:rgba(255,255,255,0.85);">
+        Attempts left: <strong>{{ attempts_left }}</strong> / {{ max_attempts }}
+    </div>
+{% elif max_attempts == 0 %}
+    <div style="margin-top:0.4rem; color:rgba(255,255,255,0.85);">
+        Attempts: <strong>Unlimited</strong>
+    </div>
+{% endif %}
+{% if attempts_message %}
+    <div style="margin-top:0.4rem; color:#ffb4b4;">{{ attempts_message }}</div>
+{% endif %}
+
+
+                <!-- Preloading UI -->
+                <div class="modern-card" id="preloadingAlert" style="display:none; margin-top:1rem; padding:0.8rem;">
+                    <div style="display:flex; align-items:center; gap:0.8rem;">
+                        <div class="spinner-border spinner-border-sm text-success" role="status"><span class="visually-hidden">Loading...</span></div>
+                        <div style="flex:1;">
+                            <div id="loadingTitle" style="font-weight:700;">Preparing Your Exam...</div>
+                            <div id="loadingSubtitle" class="small">Please wait while we load your questions and resources</div>
+                        </div>
+                        <div id="loadingPercentage" style="font-weight:700; color:var(--success);">0%</div>
+                    </div>
+                    <div class="progress mt-2" style="height:10px; border-radius:6px; background:rgba(255,255,255,0.03); overflow:hidden; margin-top:0.6rem;">
+                        <div id="preloadProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width:0%; transition:width 0.3s ease;"></div>
+                    </div>
+                    <div id="loadingDetails" class="small text-muted" style="margin-top:0.5rem;">Initializing exam environment...</div>
+                </div>
+
+                <div id="successAlert" class="modern-card" style="display:none; margin-top:0.8rem; padding:0.9rem; color:var(--success);"><i class="fas fa-check-circle"></i> Exam Ready!</div>
+                <div id="errorAlert" class="modern-card" style="display:none; margin-top:0.8rem; padding:0.9rem; color:#ef4444;"></div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // ── Inline style overrides for light theme (CSS !important can't beat inline styles) ──
+    function applyInlineLightFixes() {
+        const cardBody = document.querySelector('.card-body');
+        if (!cardBody) return;
+        const ol = cardBody.querySelector('ol');
+        if (ol) {
+            ol.style.color = '#1a202c';
+            ol.querySelectorAll('li').forEach(li => li.style.color = '#1a202c');
+        }
+        cardBody.querySelectorAll('h5').forEach(h => h.style.color = '#1a202c');
+        cardBody.querySelectorAll('[style]').forEach(el => {
+            const s = el.getAttribute('style') || '';
+            if (s.includes('rgba(255,255,255') || s.includes('color:#fff')) {
+                if (!el.classList.contains('status-badge') && !el.classList.contains('action-btn')) {
+                    el.style.color = '#4a5568';
+                }
+            }
+        });
+        document.querySelectorAll('.mark-box [style]').forEach(el => {
+            const s = el.getAttribute('style') || '';
+            if (s.includes('color:rgba(255,255,255,0.85)')) el.style.color = '#4a5568';
+        });
+        const instrDiv = cardBody.querySelector('div[style*="margin-bottom:1rem"]');
+        if (instrDiv) instrDiv.style.color = '#4a5568';
+        const progressWrap = document.querySelector('.progress');
+        if (progressWrap) progressWrap.style.background = '#e2e8f0';
+        document.querySelectorAll('.color-indicator span:not(.color-box)').forEach(s => s.style.color = '#4a5568');
+    }
+
+    // ── Reset all inline styles written by light-fix so dark theme CSS can apply cleanly ──
+    function applyInlineDarkReset() {
+        const cardBody = document.querySelector('.card-body');
+        if (!cardBody) return;
+        const ol = cardBody.querySelector('ol');
+        if (ol) {
+            ol.style.color = '';
+            ol.querySelectorAll('li').forEach(li => li.style.color = '');
+        }
+        cardBody.querySelectorAll('h5').forEach(h => h.style.color = '');
+        cardBody.querySelectorAll('[style]').forEach(el => {
+            if (!el.classList.contains('status-badge') && !el.classList.contains('action-btn')) {
+                el.style.color = '';
+            }
+        });
+        document.querySelectorAll('.mark-box [style]').forEach(el => { el.style.color = ''; });
+        const instrDiv = cardBody.querySelector('div[style*="margin-bottom:1rem"]');
+        if (instrDiv) instrDiv.style.color = '';
+        const progressWrap = document.querySelector('.progress');
+        if (progressWrap) progressWrap.style.background = '';
+        document.querySelectorAll('.color-indicator span:not(.color-box)').forEach(s => s.style.color = '');
+    }
+
+    function syncThemeInlineStyles() {
+        if (document.documentElement.getAttribute('data-theme') === 'light') {
+            applyInlineLightFixes();
+        } else {
+            applyInlineDarkReset();
+        }
+    }
+
+    syncThemeInlineStyles();
+
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(m) {
+            if (m.attributeName === 'data-theme') syncThemeInlineStyles();
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+    // ── Existing exam logic ──
+    const startBtn = document.getElementById('startExamBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const preloadingAlert = document.getElementById('preloadingAlert');
+    const successAlert = document.getElementById('successAlert');
+    const errorAlert = document.getElementById('errorAlert');
+    const progressBar = document.getElementById('preloadProgress');
+    const loadingTitle = document.getElementById('loadingTitle');
+    const loadingSubtitle = document.getElementById('loadingSubtitle');
+    const loadingDetails = document.getElementById('loadingDetails');
+    const loadingPercentage = document.getElementById('loadingPercentage');
+    const colorIndicatorSection = document.getElementById('colorIndicatorSection');
+
+    const examId = {{ exam.id|tojson }};
+    const POLL_INTERVAL = 30000;
+    let startInProgress = false;
+    
+    // ✅ CRITICAL: Track initial state from server
+    const INITIAL_STATE = {
+        hasActiveAttempt: {{ 'true' if active_attempt else 'false' }},
+        attemptsExhausted: {{ 'true' if attempts_exhausted else 'false' }},
+        canStart: {{ 'true' if can_start else 'false' }}
+    };
+
+    function showError(message) {
+        if (preloadingAlert) preloadingAlert.style.display = 'none';
+        if (errorAlert) {
+            errorAlert.style.display = 'block';
+            errorAlert.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + message;
+        }
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.classList.remove('disabled');
+            startBtn.innerHTML = startBtn.dataset.origHtml || '<i class="fas fa-play"></i> Start Exam Now';
+        }
+        if (colorIndicatorSection && colorIndicatorSection.parentElement) {
+            colorIndicatorSection.parentElement.classList.remove('loading-active');
+        }
+    }
+
+    function startUiPrepare() {
+        if (colorIndicatorSection && colorIndicatorSection.parentElement) {
+            colorIndicatorSection.parentElement.classList.add('loading-active');
+        }
+        if (successAlert) successAlert.style.display = 'none';
+        if (errorAlert) { errorAlert.style.display = 'none'; errorAlert.innerHTML = ''; }
+        if (preloadingAlert) preloadingAlert.style.display = 'block';
+        if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.classList.add('disabled');
+            startBtn.dataset.origHtml = startBtn.innerHTML;
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+        }
+        if (progressBar) progressBar.style.width = '10%';
+        if (loadingPercentage) loadingPercentage.textContent = '10%';
+        if (loadingTitle) loadingTitle.textContent = 'Connecting to Server...';
+        if (loadingDetails) loadingDetails.textContent = 'Initializing exam session';
+    }
+
+    function buildFeatures() {
+        const screenWidth = screen.availWidth || window.screen.width;
+        const screenHeight = screen.availHeight || window.screen.height;
+        const features = [
+            'width=' + screenWidth, 'height=' + screenHeight,
+            'top=0', 'left=0', 'resizable=no', 'scrollbars=yes',
+            'menubar=no', 'toolbar=no', 'location=no', 'status=no',
+            'directories=no', 'copyhistory=no', 'fullscreen=yes'
+        ].join(',');
+        return {screenWidth, screenHeight, features};
+    }
+
+    // ✅ FIXED: Only update UI if state actually changed
+    function renderAttemptUI(info) {
+        try {
+            const attemptsLeft = Number(info.attempts_remaining);
+            const maxAttempts = Number(info.max_attempts);
+            const activeAttempt = !!info.has_active_attempt;
+
+            console.log('📊 Attempt Status:', {
+                activeAttempt, 
+                attemptsLeft, 
+                maxAttempts,
+                initialState: INITIAL_STATE
+            });
+
+            // ✅ CRITICAL: Don't change UI if server state matches initial state
+            if (INITIAL_STATE.hasActiveAttempt === activeAttempt) {
+                console.log('ℹ️ State unchanged - keeping current UI');
+                return;
+            }
+
+            // Priority 1: Exhausted
+            if (maxAttempts > 0 && attemptsLeft <= 0) {
+                if (startBtn) startBtn.style.display = 'none';
+                if (resumeBtn) resumeBtn.style.display = 'none';
+                
+                let exhaustedMsg = document.getElementById('attemptsExhaustedMsg');
+                if (!exhaustedMsg) {
+                    const container = (startBtn || resumeBtn)?.parentElement;
+                    if (container) {
+                        exhaustedMsg = document.createElement('div');
+                        exhaustedMsg.id = 'attemptsExhaustedMsg';
+                        exhaustedMsg.className = 'action-btn disabled';
+                        exhaustedMsg.innerHTML = '<i class="fas fa-ban"></i> Attempts Exhausted';
+                        container.insertBefore(exhaustedMsg, container.firstChild);
+                    }
+                }
+                return;
+            }
+
+            const existingMsg = document.getElementById('attemptsExhaustedMsg');
+            if (existingMsg) existingMsg.remove();
+
+            // Priority 2: Active attempt → Show Resume
+            if (activeAttempt) {
+                if (resumeBtn) {
+                    resumeBtn.style.display = 'inline-flex';
+                    // ✅ Update initial state to prevent toggling
+                    INITIAL_STATE.hasActiveAttempt = true;
+                }
+                if (startBtn) startBtn.style.display = 'none';
+                console.log('✅ Showing RESUME button (state locked)');
+                return;
+            }
+
+            // Priority 3: Can start → Show Start
+            if (startBtn) {
+                startBtn.style.display = 'inline-flex';
+                // ✅ Update initial state
+                INITIAL_STATE.hasActiveAttempt = false;
+            }
+            if (resumeBtn) resumeBtn.style.display = 'none';
+            console.log('✅ Showing START button (state locked)');
+
+        } catch (e) {
+            console.error('❌ renderAttemptUI error:', e);
+        }
+    }
+
+    async function fetchAttemptStatus() {
+        try {
+            const r = await fetch(`/api/exam-attempts-status/${examId}`, { 
+                cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!r.ok) {
+                console.warn('Attempt status fetch failed:', r.status);
+                return null;
+            }
+            const data = await r.json();
+            return data;
+        } catch (e) {
+            console.warn('fetchAttemptStatus error:', e);
+            return null;
+        }
+    }
+
+    async function startActualPreloading() {
+        if (loadingTitle) loadingTitle.textContent = 'Connecting to Server...';
+        if (loadingSubtitle) loadingSubtitle.textContent = 'Establishing secure connection';
+        if (loadingDetails) loadingDetails.textContent = 'Initializing exam session';
+        if (progressBar) progressBar.style.width = '10%';
+        if (loadingPercentage) loadingPercentage.textContent = '10%';
+
+        try {
+            const response = await fetch(`/preload-exam/${examId}`, { 
+                method: 'GET', 
+                headers: { 'Content-Type': 'application/json' },
+                cache: 'no-store'
+            });
+
+            if (loadingTitle) loadingTitle.textContent = 'Loading Exam Data...';
+            if (loadingSubtitle) loadingSubtitle.textContent = 'Downloading questions and resources';
+            if (loadingDetails) loadingDetails.textContent = 'Processing exam configuration';
+            if (progressBar) progressBar.style.width = '50%';
+            if (loadingPercentage) loadingPercentage.textContent = '50%';
+
+            const data = await response.json();
+
+            if (loadingTitle) loadingTitle.textContent = 'Processing Questions...';
+            if (loadingSubtitle) loadingSubtitle.textContent = 'Preparing exam interface';
+            if (loadingDetails) loadingDetails.textContent = 'Loading images and media content';
+            if (progressBar) progressBar.style.width = '80%';
+            if (loadingPercentage) loadingPercentage.textContent = '80%';
+
+            if (data && data.success) {
+                if (loadingTitle) loadingTitle.textContent = 'Finalizing Setup...';
+                if (loadingSubtitle) loadingSubtitle.textContent = 'Preparing secure exam environment';
+                if (loadingDetails) loadingDetails.textContent = 'Setting up question navigation';
+                if (progressBar) progressBar.style.width = '95%';
+                if (loadingPercentage) loadingPercentage.textContent = '95%';
+
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                if (progressBar) progressBar.style.width = '100%';
+                if (loadingPercentage) loadingPercentage.textContent = '100%';
+                if (loadingTitle) loadingTitle.textContent = 'Exam Ready!';
+                if (loadingSubtitle) loadingSubtitle.textContent = 'Opening secure exam window...';
+                if (loadingDetails) loadingDetails.textContent = 'Launching exam interface';
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (preloadingAlert) preloadingAlert.style.display = 'none';
+                if (successAlert) successAlert.style.display = 'block';
+                
+                return true;
+            } else {
+                throw new Error((data && data.message) || 'Failed to load exam data');
+            }
+        } catch (err) {
+            console.error('Preload error:', err);
+            throw err;
+        }
+    }
+
+    async function unifiedStartHandler(event) {
+        event && event.preventDefault();
+        if (startInProgress) return;
+        startInProgress = true;
+
+        startUiPrepare();
+
+        try {
+            await startActualPreloading();
+            
+            const resp = await fetch(`/start-exam/${examId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_ts: Date.now() })
+            });
+
+            let data;
+            try {
+                data = await resp.json();
+            } catch (err) {
+                const text = await resp.text().catch(()=>null);
+                throw new Error(text || 'Server error');
+            }
+
+            if (!resp.ok || !data || !data.success) {
+                const msg = (data && data.message) ? data.message : 'Failed to start exam';
+                showError(msg);
+                startInProgress = false;
+                return;
+            }
+
+            const { features } = buildFeatures();
+            let examWindow = null;
+            try {
+                examWindow = window.open('about:blank', '_blank', features);
+                if (examWindow) examWindow.focus();
+            } catch (e) {
+                examWindow = null;
+            }
+
+            const redirectUrl = data.redirect_url || (`/exam/${examId}`);
+            if (examWindow) {
+                try {
+                    examWindow.location.href = redirectUrl + '?secure=1&from_instructions=1';
+                } catch (e) {
+                    try { examWindow.location.replace(redirectUrl); } catch (e2) {}
+                }
+            } else {
+                if (errorAlert) {
+                    errorAlert.style.display = 'block';
+                    errorAlert.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Popup blocked';
+                }
+                window.location.href = redirectUrl;
+            }
+
+            setTimeout(() => {
+                if (preloadingAlert) preloadingAlert.style.display = 'none';
+                if (successAlert) successAlert.style.display = 'block';
+            }, 400);
+
+            // ✅ Update initial state to show Resume next time
+            INITIAL_STATE.hasActiveAttempt = true;
+            INITIAL_STATE.canStart = false;
+
+            setTimeout(async () => {
+                await refreshAttemptStatusAndRender();
+            }, 700);
+
+        } catch (err) {
+            console.error('Start error:', err);
+            showError(err.message || 'Error starting exam');
+        } finally {
+            startInProgress = false;
+            if (colorIndicatorSection && colorIndicatorSection.parentElement) {
+                colorIndicatorSection.parentElement.classList.remove('loading-active');
+            }
+        }
+    }
+
+    function resumeHandler(e) {
+        e.preventDefault();
+        const { features } = buildFeatures();
+        let w = null;
+        try {
+            w = window.open('about:blank', '_blank', features);
+            if (w) w.focus();
+        } catch (e) {
+            w = null;
+        }
+        const resumeUrl = resumeBtn ? resumeBtn.href : (`/exam/${examId}`);
+        if (w) {
+            try { 
+                w.location.href = resumeUrl + '?secure=1&resume=1'; 
+            } catch (e) { 
+                try { w.location.replace(resumeUrl); } catch (e2) {} 
+            }
+        } else {
+            alert('Popup blocked. Opening in current tab.');
+            window.location.href = resumeUrl;
+        }
+    }
+
+    let pollHandle = null;
+    async function refreshAttemptStatusAndRender() {
+        try {
+            const info = await fetchAttemptStatus();
+            if (info) {
+                renderAttemptUI(info);
+            }
+        } catch (e) {
+            console.warn('Refresh error:', e);
+        }
+    }
+
+    let pollErrors = 0;
+    function startPolling() {
+        if (pollHandle) clearInterval(pollHandle);
+        const pollInterval = Math.min(POLL_INTERVAL * Math.pow(1.5, pollErrors), 120000);
+        pollHandle = setInterval(async () => {
+            try {
+                await refreshAttemptStatusAndRender();
+                pollErrors = 0;
+            } catch (e) {
+                pollErrors = Math.min(pollErrors + 1, 5);
+                console.warn('Poll error:', e);
+            }
+        }, pollInterval);
+    }
+
+    function stopPolling() {
+        if (pollHandle) clearInterval(pollHandle);
+        pollHandle = null;
+    }
+
+    if (startBtn) {
+        startBtn.addEventListener('click', unifiedStartHandler);
+    }
+    if (resumeBtn) {
+        resumeBtn.addEventListener('click', resumeHandler);
+    }
+
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            refreshAttemptStatusAndRender();
+            startPolling();
+        } else {
+            stopPolling();
+        }
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+        const pre = document.getElementById('preloadingAlert');
+        if (pre && pre.style.display === 'block') {
+            const msg = 'Exam loading. Leave?';
+            e.returnValue = msg;
+            return msg;
+        }
+    });
+
+    // ✅ FIXED: Only fetch status on visibility change, NOT on load
+    // Initial UI is already correct from server-side rendering
+    console.log('✅ Initial state:', INITIAL_STATE);
+    startPolling();
+});
+</script>
+{% endblock %}
+
+
+

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Result Details</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+  /* Inherit theme from opener (admin panel) — runs before CSS paints */
+  (function(){
+    var t = 'dark';
+    try {
+      /* Try reading from opener's localStorage first */
+      if(window.opener && !window.opener.closed){
+        t = window.opener.localStorage.getItem('adminTheme') || 'dark';
+      } else {
+        t = localStorage.getItem('adminTheme') || 'dark';
+      }
+    } catch(e) { t = 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+  </script>
+  <style>
+    /* Dark theme (default) */
+    [data-theme="dark"] {
+      --bg:#0a0a0f; --card:#111118; --border:rgba(255,255,255,0.07);
+      --accent:#2d5be3; --accent-s:rgba(45,91,227,0.15);
+      --t1:#e6eef8; --t2:rgba(255,255,255,0.55); --t3:rgba(255,255,255,0.28);
+      --section-bg:rgba(255,255,255,.03); --stat-bg:rgba(255,255,255,.03);
+    }
+    /* Light theme */
+    [data-theme="light"] {
+      --bg:#f0f2f8; --card:#ffffff; --border:#e2e8f0;
+      --accent:#2d5be3; --accent-s:rgba(45,91,227,0.08);
+      --t1:#1a202c; --t2:#4a5568; --t3:#718096;
+      --section-bg:#f8faff; --stat-bg:#f8faff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:1.5rem;transition:background .2s,color .2s;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;max-width:820px;margin:0 auto;}
+    .card-hdr{background:var(--accent);padding:1.5rem 1.75rem;}
+    .card-hdr h1{font-size:1.35rem;font-weight:700;color:#fff;margin:0;}
+    .card-hdr p{font-size:.82rem;color:rgba(255,255,255,.75);margin:.3rem 0 0;}
+    .card-body{padding:1.5rem 1.75rem;}
+    .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+    .tbtn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--stat-bg);color:var(--t1);transition:all .15s;text-decoration:none;}
+    .tbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-s);}
+    .tbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+    .tbtn.primary:hover{background:#2450c8;}
+    .section{background:var(--section-bg);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1rem;}
+    .section h6{font-size:.78rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.75rem;}
+    .info-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.84rem;}
+    .info-row:last-child{border-bottom:none;padding-bottom:0;}
+    .info-row .lbl{color:var(--t2);font-weight:600;}
+    .info-row .val{color:var(--t1);}
+    .score-box{text-align:center;background:var(--accent-s);border:1px solid rgba(45,91,227,.2);border-radius:12px;padding:1.5rem;margin:1rem 0;}
+    .score-num{font-size:2.6rem;font-weight:800;color:var(--t1);}
+    .score-pct{font-size:1.2rem;color:var(--t2);margin:.25rem 0;}
+    .grade-pill{display:inline-flex;align-items:center;padding:.4rem 1.2rem;border-radius:20px;font-size:.95rem;font-weight:700;margin-top:.75rem;}
+    .gp-ex{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.2);}
+    .gp-gd{background:rgba(45,91,227,.15);color:#7b9ef7;border:1px solid rgba(45,91,227,.2);}
+    .gp-av{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.2);}
+    .gp-pr{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-top:.5rem;}
+    @media(max-width:500px){.stat-grid{grid-template-columns:1fr 1fr;}}
+    .stat-box{background:var(--stat-bg);border:1px solid var(--border);border-radius:8px;padding:.75rem;text-align:center;}
+    .stat-box .sv{font-size:1.4rem;font-weight:800;color:var(--t1);}
+    .stat-box .sl{font-size:.7rem;color:var(--t3);margin-top:.15rem;}
+    @media print{.toolbar{display:none!important;}body{background:#fff;color:#000;}
+      .card{border:none;}.section{border:1px solid #ddd;background:#f9f9f9;}
+      .info-row .lbl,.info-row .val{color:#333!important;}.score-box{background:#eef;}}
+    @media(max-width:600px){
+      body{padding:1rem;}
+      .card-hdr{padding:1.1rem 1.2rem;}
+      .card-body{padding:1.1rem 1.2rem;}
+      .score-num{font-size:2rem;}
+      .info-row{flex-direction:column;align-items:flex-start;gap:.25rem;}
+    }
+  </style>
+</head>
+<body>
+{% if result and exam and user %}
+<div class="card">
+  <div class="card-hdr">
+    <h1><i class="fas fa-trophy me-2"></i>Exam Result</h1>
+    <p>{{ exam.name|default('Exam') }} — Detailed performance report</p>
+  </div>
+  <div class="card-body">
+    <div class="toolbar">
+      <button class="tbtn" onclick="openResponses()"><i class="fas fa-list"></i>Responses</button>
+      <a class="tbtn" href="/admin/users-analytics/download-result/{{ result.id }}" target="_blank"><i class="fas fa-download"></i>PDF</a>
+      <button class="tbtn primary" onclick="window.print()"><i class="fas fa-print"></i>Print</button>
+      <button class="tbtn" onclick="window.close()"><i class="fas fa-times"></i>Close</button>
+    </div>
+
+    <div class="section">
+      <h6><i class="fas fa-user me-1"></i>Student</h6>
+      <div class="info-row"><span class="lbl">Username</span><span class="val">{{ user.username|default('Unknown') }}</span></div>
+      <div class="info-row"><span class="lbl">Full Name</span><span class="val">{{ user.full_name|default('Unknown') }}</span></div>
+      <div class="info-row"><span class="lbl">Email</span><span class="val">{{ user.email|default('—') }}</span></div>
+    </div>
+
+    <div class="section">
+      <h6><i class="fas fa-file-alt me-1"></i>Exam Info</h6>
+      <div class="info-row"><span class="lbl">Exam</span><span class="val">{{ exam.name|default('Unknown') }}</span></div>
+      <div class="info-row"><span class="lbl">Duration Taken</span><span class="val">{% if result.time_taken_minutes %}{{ "%.1f"|format(result.time_taken_minutes) }} min{% else %}—{% endif %}</span></div>
+      <div class="info-row"><span class="lbl">Completed At</span><span class="val">{{ result.completed_at|default('—') }}</span></div>
+    </div>
+
+    <div class="score-box">
+      <div class="score-num">{{ "%.2f"|format(result.score|default(0.0)) }}/{{ "%.2f"|format(result.max_score|default(0.0)) }}</div>
+      <div class="score-pct">{{ "%.1f"|format(result.percentage|default(0.0)) }}%</div>
+      {% set pct = result.percentage|default(0)|float %}
+      <span class="grade-pill {% if pct>=90 %}gp-ex{% elif pct>=75 %}gp-gd{% elif pct>=60 %}gp-av{% else %}gp-pr{% endif %}">
+        Grade: {{ result.grade|default('N/A') }}
+      </span>
+    </div>
+
+    <div class="section">
+      <h6><i class="fas fa-chart-bar me-1"></i>Breakdown</h6>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="sv">{{ result.total_questions|default('—') }}</div><div class="sl">Total Qs</div></div>
+        <div class="stat-box"><div class="sv" style="color:#10b981">{{ result.correct_answers|default('—') }}</div><div class="sl">Correct</div></div>
+        <div class="stat-box"><div class="sv" style="color:#ef4444">{{ result.incorrect_answers|default('—') }}</div><div class="sl">Incorrect</div></div>
+        <div class="stat-box"><div class="sv" style="color:#f59e0b">{{ result.unanswered_questions|default('—') }}</div><div class="sl">Unanswered</div></div>
+        <div class="stat-box"><div class="sv">{{ result.attempted_questions|default('—') }}</div><div class="sl">Attempted</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:3rem">
+    <i class="fas fa-exclamation-triangle" style="font-size:2.5rem;color:#ef4444;opacity:.5;display:block;margin-bottom:1rem"></i>
+    <h5 style="color:var(--t1)">Result Not Found</h5>
+    <p style="color:var(--t2);font-size:.85rem">The result could not be loaded.</p>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function openResponses() {
+  window.open('/admin/users-analytics/view-responses/{{ result.id }}/{{ exam.id }}',
+    '_blank', 'width=1100,height=800,scrollbars=yes,resizable=yes');
+}
+/* Listen for live theme changes from the parent admin window */
+window.addEventListener('message', function(ev){
+  try {
+    if(ev.origin !== window.location.origin) return;
+    if(ev.data && ev.data.type === 'adminThemeChange'){
+      document.documentElement.setAttribute('data-theme', ev.data.theme);
+    }
+  } catch(e){}
+});
+</script>
+</body>
+</html>
+
+
+

@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+{% block title %}Registration Complete - ExamPortal{% endblock %}
+{% block content %}
+<!-- Same particles background -->
+<div class="particles-container">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+</div>
+
+<div class="request-wrapper">
+    <div class="request-container success-container">
+                    <div class="success-header">
+                        <div class="logo-section">
+                            <div class="success-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <h1 class="brand-name">ExamPortal</h1>
+                        </div>
+                        <h2 class="success-title">Registration Complete</h2>
+                        <p class="success-subtitle">Your account setup is ready to be completed</p>
+                    </div>
+                    
+                    <div class="instructions-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-envelope-open-text"></i>
+                            <span>Setup Instructions</span>
+                        </div>
+                        
+                        <div class="instruction-content">
+                            <p class="main-message">A secure setup link has been sent to your email address. Please follow the steps below to complete your registration:</p>
+                            
+                            <div class="steps-list">
+                                <div class="step-item">
+                                    <div class="step-number">1</div>
+                                    <div class="step-details">
+                                        <strong>Check your email</strong>
+                                        <span>Look in both inbox and spam folder</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">2</div>
+                                    <div class="step-details">
+                                        <strong>Click the setup link</strong>
+                                        <span>Opens secure password creation form</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">3</div>
+                                    <div class="step-details">
+                                        <strong>Create your password</strong>
+                                        <span>Choose a strong, secure password</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">4</div>
+                                    <div class="step-details">
+                                        <strong>Access your account</strong>
+                                        <span>Login and start using ExamPortal</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-section">
+                        <a href="{{ url_for('auth.login') }}" class="login-btn">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>Go to Login</span>
+                        </a>
+                        
+                        <div class="help-text">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Didn't receive the email? Check your spam folder or contact support</span>
+                        </div>
+                    </div>
+                        </div>
+    </div>
+</div>
+
+<style>
+body{
+background:#0a0a0f;
+font-family:'DM Sans','Inter',-apple-system,sans-serif;
+overflow-x:hidden;
+min-height:100vh;
+color:#e2e8f0
+}
+
+.particles-container{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+overflow:hidden;
+z-index:1;
+pointer-events:none
+}
+
+.particle{
+position:absolute;
+background:rgba(45,91,227,0.3);
+border-radius:50%;
+animation:float 10s ease-in-out infinite
+}
+
+.particle:nth-child(1){width:3px;height:3px;top:10%;left:15%;animation-delay:0s}
+.particle:nth-child(2){width:2px;height:2px;top:70%;left:85%;animation-delay:2s}
+.particle:nth-child(3){width:4px;height:4px;top:30%;left:5%;animation-delay:4s}
+.particle:nth-child(4){width:2px;height:2px;top:80%;left:20%;animation-delay:6s}
+.particle:nth-child(5){width:3px;height:3px;top:20%;left:90%;animation-delay:8s}
+.particle:nth-child(6){width:2px;height:2px;top:60%;left:70%;animation-delay:10s}
+.particle:nth-child(7){width:3px;height:3px;top:45%;left:25%;animation-delay:1s}
+.particle:nth-child(8){width:2px;height:2px;top:85%;left:60%;animation-delay:3s}
+
+@keyframes float{
+0%,100%{transform:translateY(0)}
+50%{transform:translateY(-20px)}
+}
+
+.request-wrapper{
+position:relative;
+z-index:2;
+min-height:100vh;
+display:flex;
+align-items:flex-start;
+justify-content:center;
+padding:60px 16px 40px
+}
+
+.request-container{
+background:#111118;
+border:1px solid rgba(255,255,255,0.07);
+border-radius:18px;
+padding:36px 32px;
+width:100%;
+max-width:720px;
+position:relative;
+box-shadow:0 24px 64px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04)
+}
+
+.request-container::before{
+content:'';
+position:absolute;
+top:0;
+left:0;
+right:0;
+height:1px;
+background:linear-gradient(90deg,transparent,rgba(45,91,227,0.4),transparent)
+}
+
+.success-header{
+text-align:center;
+margin-bottom:28px;
+padding-bottom:20px;
+border-bottom:1px solid rgba(255,255,255,0.06)
+}
+
+.logo-section{
+display:flex;
+align-items:center;
+justify-content:center;
+gap:10px;
+margin-bottom:8px
+}
+
+.success-icon{
+width:58px;
+height:58px;
+border-radius:14px;
+background:#059669;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:1.8rem;
+color:white;
+box-shadow:0 8px 24px rgba(5,150,105,0.35)
+}
+
+.brand-name{
+font-family:'DM Serif Display',serif;
+font-size:1.6rem;
+font-weight:400;
+color:white;
+margin:0;
+letter-spacing:-0.01em
+}
+
+.success-title{
+font-size:1.7rem;
+font-weight:600;
+color:white;
+margin-top:10px
+}
+
+.success-subtitle{
+color:rgba(255,255,255,0.45);
+font-size:0.9rem;
+margin-top:6px
+}
+
+.instructions-panel{
+background:rgba(255,255,255,0.02);
+border:1px solid rgba(255,255,255,0.06);
+border-radius:12px;
+padding:20px;
+margin-top:22px
+}
+
+.panel-header{
+display:flex;
+align-items:center;
+gap:10px;
+margin-bottom:14px;
+color:#34d399;
+font-weight:600;
+font-size:0.95rem
+}
+
+.main-message{
+color:rgba(255,255,255,0.75);
+font-size:0.9rem;
+margin-bottom:16px;
+line-height:1.6
+}
+
+.steps-list{
+display:flex;
+flex-direction:column;
+gap:12px
+}
+
+.step-item{
+display:flex;
+align-items:flex-start;
+gap:12px
+}
+
+.step-number{
+width:28px;
+height:28px;
+background:#059669;
+color:white;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:700;
+font-size:0.85rem;
+flex-shrink:0
+}
+
+.step-details{
+display:flex;
+flex-direction:column;
+gap:2px
+}
+
+.step-details strong{
+color:white;
+font-size:0.9rem
+}
+
+.step-details span{
+color:rgba(255,255,255,0.5);
+font-size:0.82rem
+}
+
+.action-section{
+text-align:center;
+margin-top:28px
+}
+
+.login-btn{
+display:inline-flex;
+align-items:center;
+gap:10px;
+padding:13px 24px;
+background:#2d5be3;
+color:white;
+text-decoration:none;
+border-radius:10px;
+font-weight:600;
+font-size:0.9rem;
+transition:all .2s;
+box-shadow:0 4px 16px rgba(45,91,227,0.35)
+}
+
+.login-btn:hover{
+background:#3d6bf3;
+transform:translateY(-1px);
+box-shadow:0 8px 24px rgba(45,91,227,0.45);
+color:white
+}
+
+.help-text{
+display:flex;
+align-items:center;
+justify-content:center;
+gap:8px;
+color:rgba(255,255,255,0.35);
+font-size:0.8rem;
+margin-top:16px;
+text-align:center
+}
+
+@media(max-width:600px){
+.request-wrapper{
+padding:56px 12px 32px
+}
+
+.request-container{
+padding:24px 18px;
+border-radius:16px
+}
+
+.success-title{
+font-size:1.4rem
+}
+
+.brand-name{
+font-size:1.3rem
+}
+}
+
+/* ── LIGHT THEME OVERRIDES ── */
+[data-theme="light"] body { background: #f0f2f8; color: #1a202c; }
+[data-theme="light"] .particles-container,
+[data-theme="light"] .pending-particles { opacity: 0.4; }
+[data-theme="light"] .minimal-btn { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
+[data-theme="light"] .minimal-btn:hover { background: #e2e8f0; color: #1a202c; border-color: #cbd5e0; }
+[data-theme="light"] .btn-label { background: rgba(0,0,0,0.75); }
+[data-theme="light"] .login-wrapper,
+[data-theme="light"] .reset-wrapper,
+[data-theme="light"] .request-wrapper { background: transparent; }
+[data-theme="light"] .login-container,
+[data-theme="light"] .reset-container,
+[data-theme="light"] .request-container,
+[data-theme="light"] .pending-card { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+[data-theme="light"] .login-container::before,
+[data-theme="light"] .reset-container::before,
+[data-theme="light"] .request-container::before,
+[data-theme="light"] .pending-card::before { background: linear-gradient(90deg, transparent, rgba(45,91,227,0.2), transparent); }
+[data-theme="light"] .brand-name { color: #1a202c; -webkit-text-fill-color: #1a202c; background: none; }
+[data-theme="light"] .welcome-text,
+[data-theme="light"] .success-title,
+[data-theme="light"] .pending-title { color: #1a202c; }
+[data-theme="light"] .welcome-subtitle,
+[data-theme="light"] .reset-subtitle,
+[data-theme="light"] .success-subtitle,
+[data-theme="light"] .pending-exam-name { color: #718096; }
+[data-theme="light"] .form-label { color: #4a5568 !important; }
+[data-theme="light"] .form-label i { color: #2d5be3; }
+[data-theme="light"] .input-icon { color: #a0aec0; }
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-control,
+[data-theme="light"] .form-select {
+    background: #f8faff !important;
+    border-color: #e2e8f0 !important;
+    color: #1a202c !important;
+}
+[data-theme="light"] .form-input::placeholder,
+[data-theme="light"] .form-control::placeholder { color: #a0aec0 !important; }
+[data-theme="light"] .form-input:-webkit-autofill,
+[data-theme="light"] .form-input:-webkit-autofill:hover,
+[data-theme="light"] .form-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
+    -webkit-text-fill-color: #1a202c !important;
+    caret-color: #1a202c !important;
+}
+[data-theme="light"] .form-select option { background: #ffffff; color: #1a202c; }
+[data-theme="light"] .toggle-password { color: #a0aec0; }
+[data-theme="light"] .toggle-password:hover { color: #4a5568; }
+[data-theme="light"] .help-card,
+[data-theme="light"] .step-section,
+[data-theme="light"] .user-details-card,
+[data-theme="light"] .request-history-section,
+[data-theme="light"] .new-request-section { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .help-header,
+[data-theme="light"] .card-title { color: #718096; }
+[data-theme="light"] .help-item { color: #4a5568; }
+[data-theme="light"] .help-item strong { color: #1a202c; }
+[data-theme="light"] .action-link.primary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .action-link.primary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .action-link.secondary { background: transparent; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .action-link.secondary:hover { background: #f1f5f9; color: #1a202c; }
+[data-theme="light"] .back-link { color: #a0aec0; }
+[data-theme="light"] .back-link:hover { color: #4a5568; }
+[data-theme="light"] .security-footer { color: #a0aec0; }
+[data-theme="light"] .step-title { color: #4a5568; }
+[data-theme="light"] .step-title i { color: #2d5be3; }
+[data-theme="light"] .request-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .table thead th { background: #f1f5f9 !important; color: #718096 !important; border-bottom-color: #e2e8f0 !important; }
+[data-theme="light"] .table tbody td { background: transparent !important; color: #4a5568 !important; border-bottom-color: #f1f5f9 !important; }
+[data-theme="light"] .table tbody tr:hover { background: rgba(45,91,227,0.04) !important; }
+[data-theme="light"] .table { background: transparent !important; }
+[data-theme="light"] .table-responsive { border-color: #e2e8f0; }
+[data-theme="light"] .text-muted { color: #718096 !important; }
+[data-theme="light"] .loading-state { color: #718096; }
+[data-theme="light"] .user-info-card { background: rgba(45,91,227,0.05); border-color: rgba(45,91,227,0.15); }
+[data-theme="light"] .user-name { color: #1a202c; }
+[data-theme="light"] .user-email { color: #718096; }
+[data-theme="light"] .input-note { color: #a0aec0; }
+[data-theme="light"] .username-display { color: #1a202c; }
+[data-theme="light"] .text-muted-improved { color: #a0aec0; }
+[data-theme="light"] .date-display { color: #718096; }
+[data-theme="light"] .reason-display { color: #4a5568; }
+[data-theme="light"] .user-email-display { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .password-requirements .requirement { color: #a0aec0; }
+[data-theme="light"] .requirement.valid { color: rgba(5,150,105,0.8); }
+[data-theme="light"] .setup-instructions-card { background: rgba(5,150,105,0.05); border-color: rgba(5,150,105,0.15); }
+[data-theme="light"] .setup-header { color: #059669; }
+[data-theme="light"] .setup-item { color: #4a5568; }
+[data-theme="light"] .setup-item strong { color: #059669; }
+[data-theme="light"] .instructions-panel { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .panel-header { color: #059669; }
+[data-theme="light"] .main-message { color: #4a5568; }
+[data-theme="light"] .step-details strong { color: #1a202c; }
+[data-theme="light"] .step-details span { color: #718096; }
+[data-theme="light"] .help-text { color: #a0aec0; }
+[data-theme="light"] .portal-card { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .portal-title { color: #1a202c; }
+[data-theme="light"] .portal-desc { color: #718096; }
+[data-theme="light"] .portal-arrow { color: #a0aec0; }
+[data-theme="light"] .portal-user:hover { border-color: rgba(45,91,227,0.3); background: rgba(45,91,227,0.05); }
+[data-theme="light"] .portal-admin:hover { border-color: rgba(217,119,6,0.3); background: rgba(217,119,6,0.05); }
+[data-theme="light"] .portal-card:hover .portal-arrow { color: #4a5568; }
+[data-theme="light"] .pending-body { background: #f0f2f8; }
+[data-theme="light"] .pending-reason { background: rgba(168,85,247,0.05); color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .refresh-note { color: #a0aec0; }
+[data-theme="light"] .success-container { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .success-header { border-bottom-color: #e2e8f0; }
+</style>
+{% endblock %}
+
+
+

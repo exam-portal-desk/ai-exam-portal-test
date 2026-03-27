@@ -1,0 +1,141 @@
+Folder PATH listing for volume New Volume
+Volume serial number is 9C0D-8C3A
+G:.
+¦   .env
+¦   ai_question_generator.py
+¦   chat.py
+¦   client_secret_web_local.json
+¦   config.py
+¦   discussion.py
+¦   email_utils.py
+¦   folder_structure.txt
+¦   google_drive_service.py
+¦   latex_editor.py
+¦   login_attempts_cache.py
+¦   main.py
+¦   requirements.txt
+¦   service_account.json
+¦   sessions.py
+¦   structure.txt
+¦   supabase_db.py
+¦   supabase_schema.txt
+¦   token.json
+¦   
++---app
+¦   ¦   __init__.py
+¦   ¦   
+¦   +---db
+¦   ¦       ai.py
+¦   ¦       attempts.py
+¦   ¦       auth.py
+¦   ¦       categories.py
+¦   ¦       exams.py
+¦   ¦       misc.py
+¦   ¦       questions.py
+¦   ¦       results.py
+¦   ¦       sessions.py
+¦   ¦       users.py
+¦   ¦       __init__.py
+¦   ¦       
+¦   +---middleware
+¦   ¦       session_guard.py
+¦   ¦       
+¦   +---routes
+¦   ¦   ¦   ai_assistant.py
+¦   ¦   ¦   auth.py
+¦   ¦   ¦   categories.py
+¦   ¦   ¦   dashboard.py
+¦   ¦   ¦   exam.py
+¦   ¦   ¦   misc.py
+¦   ¦   ¦   result.py
+¦   ¦   ¦   
+¦   ¦   +---admin
+¦   ¦           ai_centre.py
+¦   ¦           attempts.py
+¦   ¦           auth.py
+¦   ¦           categories.py
+¦   ¦           dashboard.py
+¦   ¦           exams.py
+¦   ¦           images.py
+¦   ¦           questions.py
+¦   ¦           requests.py
+¦   ¦           results.py
+¦   ¦           subjects.py
+¦   ¦           users.py
+¦   ¦           __init__.py
+¦   ¦           
+¦   +---services
+¦   ¦       ai_service.py
+¦   ¦       auth_service.py
+¦   ¦       drive_service.py
+¦   ¦       email_service.py
+¦   ¦       exam_service.py
+¦   ¦       pdf_service.py
+¦   ¦       result_service.py
+¦   ¦       user_deletion_service.py
+¦   ¦       
+¦   +---utils
+¦           cache.py
+¦           helpers.py
+¦           latex.py
+¦           sanitize.py
+¦           
++---static
+¦       favicon.png
+¦       
++---templates
+    ¦   about.html
+    ¦   admin_base.html
+    ¦   ai_assistant.html
+    ¦   base.html
+    ¦   categories.html
+    ¦   chat.html
+    ¦   contact.html
+    ¦   create_account.html
+    ¦   dashboard.html
+    ¦   error.html
+    ¦   exam_instructions.html
+    ¦   exam_page.html
+    ¦   index.html
+    ¦   login.html
+    ¦   logout_redirect.html
+    ¦   password_reset.html
+    ¦   password_reset_form.html
+    ¦   password_setup_form.html
+    ¦   privacy_policy.html
+    ¦   registration_success.html
+    ¦   request_admin_access.html
+    ¦   response.html
+    ¦   result.html
+    ¦   results_history.html
+    ¦   result_pending.html
+    ¦   select_portal.html
+    ¦   student_analytics.html
+    ¦   support.html
+    ¦   terms_of_service.html
+    ¦   
+    +---admin
+            admin_login.html
+            ai_command_centre.html
+            attempts.html
+            backup-admin_base.html
+            categories.html
+            csv_upload.html
+            dashboard.html
+            exams.html
+            latex_editor.html
+            new_requests.html
+            questions.html
+            requests.html
+            requests_history.html
+            subjects.html
+            upload_images.html
+            users_analytics.html
+            users_analytics_analytics.html
+            users_analytics_responses.html
+            users_analytics_results.html
+            users_analytics_results_table.html
+            users_manage.html
+            view_responses_popup.html
+            view_result_popup.html
+            

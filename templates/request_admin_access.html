@@ -1,0 +1,933 @@
+{% extends "base.html" %}
+
+{% block title %}Request Admin Access - ExamPortal{% endblock %}
+
+{% block content %}
+<!-- Floating Particles Background -->
+<div class="particles-container">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+</div>
+
+<!-- Top Navigation -->
+<div class="top-navigation-minimal">
+    <a href="{{ url_for('misc.home') }}" class="minimal-btn" title="Home">
+        <i class="fas fa-home"></i>
+        <span class="btn-label">Home</span>
+    </a>
+    <a href="{{ url_for('auth.login') }}" class="minimal-btn" title="Login">
+        <i class="fas fa-sign-in-alt"></i>
+        <span class="btn-label">Login</span>
+    </a>
+</div>
+
+<div class="request-wrapper">
+    <div class="request-container">
+                    <!-- Header Section -->
+                    <div class="request-header">
+                        <div class="logo-section">
+                            <div class="logo-icon">
+                                <i class="fas fa-user-shield"></i>
+                            </div>
+                            <h1 class="brand-name">Request Admin Access</h1>
+                        </div>
+                        <p class="welcome-subtitle">Submit a request for additional system access</p>
+                    </div>
+
+                    <!-- Step 1: User Validation -->
+                    <div id="step1" class="step-section">
+                        <h3 class="step-title">
+                            <i class="fas fa-user-check me-2"></i>Step 1: User Validation
+                        </h3>
+                        <form id="validateUserForm" class="validation-form">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Username</label>
+                                    <div class="input-wrapper">
+                                        <div class="input-icon">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <input type="text" class="form-input" id="username" name="username" 
+                                               placeholder="Enter your username" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email Address</label>
+                                    <div class="input-wrapper">
+                                        <div class="input-icon">
+                                            <i class="fas fa-envelope"></i>
+                                        </div>
+                                        <input type="email" class="form-input" id="email" name="email" 
+                                               placeholder="Enter your email address" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end mt-4">
+                                <button type="submit" class="btn btn-primary validate-btn">
+                                    <i class="fas fa-search me-2"></i>Validate User
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Step 2: User Details & Requests (Hidden initially) -->
+                    <div id="step2" class="step-section" style="display: none;">
+                        <h3 class="step-title">
+                            <i class="fas fa-info-circle me-2"></i>Step 2: Current Status & Request History
+                        </h3>
+                        
+                        <!-- User Details Card -->
+                        <div class="user-details-card">
+                            <h4 class="card-title">User Information</h4>
+                            <div class="table-responsive">
+                                <table class="table user-details-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>Current Access</th>
+                                            <th>Any Requests Raised?</th>
+                                            <th>Latest Request</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="userDetailsTableBody">
+                                        <!-- Will be populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Request History (if any) -->
+                        <div id="requestHistorySection" class="request-history-section" style="display: none;">
+                            <h4 class="card-title">Request History</h4>
+                            <div class="table-responsive">
+                                <table class="table request-history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Request ID</th>
+                                            <th>Requested Access</th>
+                                            <th>Request Date</th>
+                                            <th>Status</th>
+                                            <th>Reason/Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requestHistoryTableBody">
+                                        <!-- Will be populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- New Request Section -->
+                        <div id="newRequestSection" class="new-request-section">
+                            <h4 class="card-title">Raise New Request</h4>
+                            <div id="requestFormContainer">
+                                <!-- Will be populated based on user's current access -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="loadingState" class="loading-state" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Processing your request...</p>
+                    </div>
+
+                    <!-- Success/Error Messages -->
+                    <div id="alertContainer"></div>
+                </div>
+</div>
+
+<style>
+body {
+    background: #0a0a0f;
+    font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+    overflow-x: hidden; min-height: 100vh; color: #e2e8f0;
+}
+.particles-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    overflow: hidden; z-index: 1; pointer-events: none;
+}
+.particle {
+    position: absolute; background: rgba(45,91,227,0.3);
+    border-radius: 50%; animation: float 10s ease-in-out infinite;
+}
+.particle:nth-child(1){width:3px;height:3px;top:10%;left:15%;animation-delay:0s}
+.particle:nth-child(2){width:2px;height:2px;top:70%;left:85%;animation-delay:2s}
+.particle:nth-child(3){width:4px;height:4px;top:30%;left:5%;animation-delay:4s}
+.particle:nth-child(4){width:2px;height:2px;top:80%;left:20%;animation-delay:6s}
+.particle:nth-child(5){width:3px;height:3px;top:20%;left:90%;animation-delay:8s}
+.particle:nth-child(6){width:2px;height:2px;top:60%;left:70%;animation-delay:10s}
+.particle:nth-child(7){width:3px;height:3px;top:45%;left:25%;animation-delay:1s}
+.particle:nth-child(8){width:2px;height:2px;top:85%;left:60%;animation-delay:3s}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+
+.top-navigation-minimal {
+    position: fixed; top: 24px; right: 24px;
+    z-index: 1000; display: flex; gap: 10px;
+}
+.minimal-btn {
+    width: 40px; height: 40px; display: flex; align-items: center;
+    justify-content: center; background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.5); text-decoration: none; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08); font-size: 0.95rem;
+    transition: all 0.2s; position: relative;
+}
+.minimal-btn:hover {
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85);
+    border-color: rgba(255,255,255,0.15);
+}
+.btn-label {
+    position: absolute; right: 48px; background: rgba(0,0,0,0.9);
+    color: white; padding: 6px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s; white-space: nowrap;
+}
+.minimal-btn:hover .btn-label { opacity: 1; }
+
+.request-wrapper {
+    position: relative; z-index: 2; min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 60px 16px 40px;
+}
+.request-container {
+    background: #111118; border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 18px; padding: 36px 32px;
+    width: 100%; max-width: 820px; position: relative;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.request-container::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(45,91,227,0.4), transparent);
+}
+
+.request-header {
+    text-align: center; margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.logo-section {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin-bottom: 8px;
+}
+.logo-icon {
+    width: 38px; height: 38px; border-radius: 10px; background: #2d5be3;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; color: white;
+}
+.brand-name {
+    font-family: 'DM Serif Display', serif; font-size: 1.4rem;
+    font-weight: 400; color: white; margin: 0; letter-spacing: -0.01em;
+}
+.welcome-subtitle { color: rgba(255,255,255,0.35); font-size: 0.85rem; margin: 0; }
+
+.step-section {
+    margin-bottom: 20px; background: rgba(255,255,255,0.02);
+    border-radius: 12px; padding: 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.step-title {
+    color: rgba(255,255,255,0.7); font-size: 0.95rem; font-weight: 600;
+    margin-bottom: 16px; display: flex; align-items: center;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.step-title i { color: #2d5be3; margin-right: 8px; }
+
+.form-label {
+    display: block; color: rgba(255,255,255,0.5) !important; font-weight: 500;
+    margin-bottom: 7px; font-size: 0.8rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+}
+.input-wrapper { position: relative; margin-bottom: 12px; }
+.input-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: rgba(255,255,255,0.2); z-index: 2; font-size: 0.85rem;
+}
+.form-input {
+    width: 100%; padding: 11px 14px 11px 40px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; color: white; font-size: 0.88rem;
+    font-family: inherit; transition: all 0.2s; outline: none;
+}
+.form-input::placeholder { color: rgba(255,255,255,0.2); }
+        .form-input:-webkit-autofill,
+        .form-input:-webkit-autofill:hover,
+        .form-input:-webkit-autofill:focus,
+        .form-input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 1000px #111118 inset !important;
+            -webkit-text-fill-color: white !important;
+            caret-color: white;
+            border-color: rgba(255,255,255,0.08) !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+.form-input:focus {
+    border-color: rgba(45,91,227,0.5); background: rgba(45,91,227,0.05);
+    box-shadow: 0 0 0 3px rgba(45,91,227,0.1);
+}
+.form-select {
+    width: 100%; padding: 11px 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; color: white; font-size: 0.88rem;
+    font-family: inherit; transition: all 0.2s; outline: none;
+}
+.form-select option { background: #1a1a2e; color: white; }
+.form-select:focus {
+    border-color: rgba(45,91,227,0.5); box-shadow: 0 0 0 3px rgba(45,91,227,0.1);
+}
+.form-control {
+    width: 100%;
+    padding: 11px 14px;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    color: #ffffff !important;
+    font-size: 0.88rem;
+    font-family: inherit;
+    transition: all 0.2s;
+    outline: none;
+    box-sizing: border-box;
+    caret-color: #ffffff;
+}
+
+.form-control:focus {
+    color: #ffffff !important;
+}
+.form-control::placeholder { color: rgba(255,255,255,0.2); }
+.form-control:focus {
+    border-color: rgba(45,91,227,0.5); background: rgba(45,91,227,0.05);
+    box-shadow: 0 0 0 3px rgba(45,91,227,0.1);
+}
+.text-muted { color: rgba(255,255,255,0.25) !important; font-size: 0.75rem; }
+.text-danger { color: #f87171 !important; }
+
+.btn {
+    padding: 11px 20px; border-radius: 10px; font-weight: 600;
+    font-size: 0.88rem; border: none; transition: all 0.2s;
+    text-decoration: none; display: inline-flex; align-items: center;
+    cursor: pointer; font-family: inherit;
+}
+.btn-primary {
+    background: #2d5be3; color: white;
+    box-shadow: 0 4px 16px rgba(45,91,227,0.3);
+}
+.btn-primary:hover {
+    background: #3d6bf3; color: white; transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(45,91,227,0.4);
+}
+.btn-success {
+    background: #059669; color: white;
+    box-shadow: 0 4px 16px rgba(5,150,105,0.3);
+}
+.btn-success:hover {
+    background: #10b981; color: white; transform: translateY(-1px);
+}
+.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+.w-100 { width: 100%; justify-content: center; }
+
+/* Cards */
+.user-details-card, .request-history-section, .new-request-section {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 16px; margin-bottom: 16px;
+}
+.card-title {
+    color: rgba(255,255,255,0.6); font-size: 0.8rem; font-weight: 600;
+    margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+/* Mobile-first table replacement — stacked cards on small screens */
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table { width: 100%; border-collapse: collapse; min-width: 480px; }
+.table thead th {
+    background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4);
+    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 10px 12px; border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06); white-space: nowrap;
+}
+.table tbody td {
+    padding: 10px 12px; border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle; color: rgba(255,255,255,0.7);
+    font-size: 0.85rem;
+}
+.table tbody tr:last-child td { border-bottom: none; }
+
+/* Badges */
+.status-badge {
+    padding: 3px 10px; border-radius: 20px; font-size: 0.72rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.status-pending { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.status-completed { background: rgba(16,185,129,0.15); color: #34d399; }
+.status-denied { background: rgba(239,68,68,0.15); color: #f87171; }
+
+.access-badge {
+    padding: 3px 10px; border-radius: 20px; font-size: 0.75rem;
+    font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
+}
+.access-user { background: rgba(59,130,246,0.15); color: #93c5fd; }
+.access-admin { background: rgba(236,72,153,0.15); color: #f9a8d4; }
+.access-both { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+
+.username-display { color: white; font-weight: 600; font-size: 0.9rem; }
+.text-muted-improved { color: rgba(255,255,255,0.3); font-size: 0.85rem; }
+.request-indicator.has-requests { color: #fbbf24; font-weight: 600; }
+.request-indicator.no-requests { color: rgba(255,255,255,0.3); }
+.request-id-badge {
+    background: rgba(45,91,227,0.2); color: #93c5fd;
+    padding: 3px 8px; border-radius: 8px; font-size: 0.78rem; font-weight: 700;
+}
+.date-display { color: rgba(255,255,255,0.45); font-size: 0.82rem; white-space: nowrap; }
+.reason-display {
+    color: rgba(255,255,255,0.55); font-size: 0.82rem;
+    max-width: 180px; word-break: break-word; line-height: 1.4;
+}
+
+/* Alerts */
+.alert {
+    border-radius: 10px; border: 1px solid; margin: 12px 0;
+    padding: 12px 14px; font-size: 0.85rem; font-weight: 500;
+    display: flex; align-items: center; gap: 10px;
+}
+.alert-success { background: rgba(16,185,129,0.1); color: #6ee7b7; border-color: rgba(16,185,129,0.2); }
+.alert-danger { background: rgba(239,68,68,0.1); color: #fca5a5; border-color: rgba(239,68,68,0.2); }
+.alert-warning { background: rgba(245,158,11,0.1); color: #fcd34d; border-color: rgba(245,158,11,0.2); }
+.alert-info { background: rgba(45,91,227,0.1); color: #93c5fd; border-color: rgba(45,91,227,0.2); }
+.btn-close-improved {
+    background: none; border: none; color: inherit; font-size: 1rem;
+    cursor: pointer; opacity: 0.5; margin-left: auto; padding: 2px 6px; border-radius: 4px;
+}
+.btn-close-improved:hover { opacity: 1; }
+
+.loading-state { text-align: center; padding: 32px; color: rgba(255,255,255,0.5); }
+.spinner-border {
+    width: 2rem; height: 2rem; border: 2px solid rgba(45,91,227,0.3);
+    border-top-color: #2d5be3; border-radius: 50%; animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fade-in { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* Bootstrap grid kept minimal */
+.row { display: flex; flex-wrap: wrap; margin: 0 -8px; }
+.col-md-6 { padding: 0 8px; flex: 0 0 50%; max-width: 50%; box-sizing: border-box; }
+.col-12 { padding: 0 8px; flex: 0 0 100%; max-width: 100%; box-sizing: border-box; }
+.g-3 { gap: 0; row-gap: 0; }
+.mt-3 { margin-top: 12px !important; }
+.mt-4 { margin-top: 16px !important; }
+.d-flex { display: flex; }
+.justify-content-end { justify-content: flex-end; }
+.me-2 { margin-right: 6px; }
+.me-1 { margin-right: 4px; }
+
+@media (max-width: 600px) {
+    .top-navigation-minimal { top: 16px; right: 16px; }
+    .request-wrapper { padding: 56px 12px 32px; }
+    .request-container { padding: 24px 16px; border-radius: 16px; }
+    .col-md-6 { flex: 0 0 100%; max-width: 100%; }
+    .logo-section { flex-direction: column; gap: 6px; }
+    .brand-name { font-size: 1.2rem; }
+    .step-section { padding: 14px; }
+    /* Table scrolls horizontally on mobile */
+    .table-responsive { border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); }
+}
+
+/* FIX: Bootstrap table white background issue */
+
+.table {
+    background: transparent !important;
+}
+
+.table tbody tr {
+    background: transparent !important;
+}
+
+.table tbody td {
+    background: transparent !important;
+    color: rgba(255,255,255,0.75) !important;
+}
+
+.table thead th {
+    background: rgba(255,255,255,0.05) !important;
+    color: rgba(255,255,255,0.6) !important;
+}
+
+.table tbody tr:hover{
+    background: rgba(255,255,255,0.03);
+}
+
+/* ── LIGHT THEME OVERRIDES ── */
+[data-theme="light"] body { background: #f0f2f8; color: #1a202c; }
+[data-theme="light"] .particles-container,
+[data-theme="light"] .pending-particles { opacity: 0.4; }
+[data-theme="light"] .minimal-btn { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
+[data-theme="light"] .minimal-btn:hover { background: #e2e8f0; color: #1a202c; border-color: #cbd5e0; }
+[data-theme="light"] .btn-label { background: rgba(0,0,0,0.75); }
+[data-theme="light"] .login-wrapper,
+[data-theme="light"] .reset-wrapper,
+[data-theme="light"] .request-wrapper { background: transparent; }
+[data-theme="light"] .login-container,
+[data-theme="light"] .reset-container,
+[data-theme="light"] .request-container,
+[data-theme="light"] .pending-card { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+[data-theme="light"] .login-container::before,
+[data-theme="light"] .reset-container::before,
+[data-theme="light"] .request-container::before,
+[data-theme="light"] .pending-card::before { background: linear-gradient(90deg, transparent, rgba(45,91,227,0.2), transparent); }
+[data-theme="light"] .brand-name { color: #1a202c; -webkit-text-fill-color: #1a202c; background: none; }
+[data-theme="light"] .welcome-text,
+[data-theme="light"] .success-title,
+[data-theme="light"] .pending-title { color: #1a202c; }
+[data-theme="light"] .welcome-subtitle,
+[data-theme="light"] .reset-subtitle,
+[data-theme="light"] .success-subtitle,
+[data-theme="light"] .pending-exam-name { color: #718096; }
+[data-theme="light"] .form-label { color: #4a5568 !important; }
+[data-theme="light"] .form-label i { color: #2d5be3; }
+[data-theme="light"] .input-icon { color: #a0aec0; }
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-control,
+[data-theme="light"] .form-select {
+    background: #f8faff !important;
+    border-color: #e2e8f0 !important;
+    color: #1a202c !important;
+}
+[data-theme="light"] .form-input::placeholder,
+[data-theme="light"] .form-control::placeholder { color: #a0aec0 !important; }
+[data-theme="light"] .form-input:-webkit-autofill,
+[data-theme="light"] .form-input:-webkit-autofill:hover,
+[data-theme="light"] .form-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
+    -webkit-text-fill-color: #1a202c !important;
+    caret-color: #1a202c !important;
+}
+[data-theme="light"] .form-select option { background: #ffffff; color: #1a202c; }
+[data-theme="light"] .toggle-password { color: #a0aec0; }
+[data-theme="light"] .toggle-password:hover { color: #4a5568; }
+[data-theme="light"] .help-card,
+[data-theme="light"] .step-section,
+[data-theme="light"] .user-details-card,
+[data-theme="light"] .request-history-section,
+[data-theme="light"] .new-request-section { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .help-header,
+[data-theme="light"] .card-title { color: #718096; }
+[data-theme="light"] .help-item { color: #4a5568; }
+[data-theme="light"] .help-item strong { color: #1a202c; }
+[data-theme="light"] .action-link.primary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .action-link.primary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .action-link.secondary { background: transparent; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .action-link.secondary:hover { background: #f1f5f9; color: #1a202c; }
+[data-theme="light"] .back-link { color: #a0aec0; }
+[data-theme="light"] .back-link:hover { color: #4a5568; }
+[data-theme="light"] .security-footer { color: #a0aec0; }
+[data-theme="light"] .step-title { color: #4a5568; }
+[data-theme="light"] .step-title i { color: #2d5be3; }
+[data-theme="light"] .request-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .table thead th { background: #f1f5f9 !important; color: #718096 !important; border-bottom-color: #e2e8f0 !important; }
+[data-theme="light"] .table tbody td { background: transparent !important; color: #4a5568 !important; border-bottom-color: #f1f5f9 !important; }
+[data-theme="light"] .table tbody tr:hover { background: rgba(45,91,227,0.04) !important; }
+[data-theme="light"] .table { background: transparent !important; }
+[data-theme="light"] .table-responsive { border-color: #e2e8f0; }
+[data-theme="light"] .text-muted { color: #718096 !important; }
+[data-theme="light"] .loading-state { color: #718096; }
+[data-theme="light"] .user-info-card { background: rgba(45,91,227,0.05); border-color: rgba(45,91,227,0.15); }
+[data-theme="light"] .user-name { color: #1a202c; }
+[data-theme="light"] .user-email { color: #718096; }
+[data-theme="light"] .input-note { color: #a0aec0; }
+[data-theme="light"] .username-display { color: #1a202c; }
+[data-theme="light"] .text-muted-improved { color: #a0aec0; }
+[data-theme="light"] .date-display { color: #718096; }
+[data-theme="light"] .reason-display { color: #4a5568; }
+[data-theme="light"] .user-email-display { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
+[data-theme="light"] .password-requirements .requirement { color: #a0aec0; }
+[data-theme="light"] .requirement.valid { color: rgba(5,150,105,0.8); }
+[data-theme="light"] .setup-instructions-card { background: rgba(5,150,105,0.05); border-color: rgba(5,150,105,0.15); }
+[data-theme="light"] .setup-header { color: #059669; }
+[data-theme="light"] .setup-item { color: #4a5568; }
+[data-theme="light"] .setup-item strong { color: #059669; }
+[data-theme="light"] .instructions-panel { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .panel-header { color: #059669; }
+[data-theme="light"] .main-message { color: #4a5568; }
+[data-theme="light"] .step-details strong { color: #1a202c; }
+[data-theme="light"] .step-details span { color: #718096; }
+[data-theme="light"] .help-text { color: #a0aec0; }
+[data-theme="light"] .portal-card { background: #f8faff; border-color: #e2e8f0; }
+[data-theme="light"] .portal-title { color: #1a202c; }
+[data-theme="light"] .portal-desc { color: #718096; }
+[data-theme="light"] .portal-arrow { color: #a0aec0; }
+[data-theme="light"] .portal-user:hover { border-color: rgba(45,91,227,0.3); background: rgba(45,91,227,0.05); }
+[data-theme="light"] .portal-admin:hover { border-color: rgba(217,119,6,0.3); background: rgba(217,119,6,0.05); }
+[data-theme="light"] .portal-card:hover .portal-arrow { color: #4a5568; }
+[data-theme="light"] .pending-body { background: #f0f2f8; }
+[data-theme="light"] .pending-reason { background: rgba(168,85,247,0.05); color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
+[data-theme="light"] .pending-btn-secondary:hover { background: #e2e8f0; color: #1a202c; }
+[data-theme="light"] .refresh-note { color: #a0aec0; }
+[data-theme="light"] .success-container { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .success-header { border-bottom-color: #e2e8f0; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const validateForm = document.getElementById('validateUserForm');
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const loadingState = document.getElementById('loadingState');
+    const alertContainer = document.getElementById('alertContainer');
+
+    let currentUserData = null;
+
+    // Form submission handler
+    validateForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value.trim();
+        const email = document.getElementById('email').value.trim();
+
+        if (!username || !email) {
+            showAlert('Please enter both username and email', 'danger');
+            return;
+        }
+
+        clearStep2Data();
+        validateUser(username, email);
+    });
+
+    function validateUser(username, email) {
+        showLoading(true);
+        
+        fetch('/api/validate-user-for-request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            showLoading(false);
+            
+            if (data.success) {
+                currentUserData = data;
+                displayUserDetails(data);
+                step2.style.display = 'block';
+                step2.classList.add('fade-in');
+                step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                step2.style.display = 'none';
+                showAlert(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showLoading(false);
+            step2.style.display = 'none';
+            console.error('Error:', error);
+            showAlert('System error occurred. Please try again.', 'danger');
+        });
+    }
+
+    function clearStep2Data() {
+        step2.style.display = 'none';
+        step2.classList.remove('fade-in');
+        
+        const userTableBody = document.getElementById('userDetailsTableBody');
+        const historySection = document.getElementById('requestHistorySection');
+        const historyTableBody = document.getElementById('requestHistoryTableBody');
+        const formContainer = document.getElementById('requestFormContainer');
+        
+        if (userTableBody) userTableBody.innerHTML = '';
+        if (historySection) historySection.style.display = 'none';
+        if (historyTableBody) historyTableBody.innerHTML = '';
+        if (formContainer) formContainer.innerHTML = '';
+        
+        currentUserData = null;
+    }
+
+    function displayUserDetails(data) {
+        const user = data.user;
+        const requests = data.requests || [];
+
+        const userTableBody = document.getElementById('userDetailsTableBody');
+        const hasRequests = requests.length > 0;
+        const latestRequest = hasRequests ? requests[0] : null;
+
+        userTableBody.innerHTML = `
+            <tr>
+                <td><strong class="username-display">${user.username}</strong></td>
+                <td><span class="access-badge access-${getAccessClass(user.current_access)}">${formatAccess(user.current_access)}</span></td>
+                <td><span class="request-indicator ${hasRequests ? 'has-requests' : 'no-requests'}">${hasRequests ? 'Yes' : 'No'}</span></td>
+                <td>${latestRequest ? `<span class="access-badge access-${getAccessClass(latestRequest.requested_access)}">${formatAccess(latestRequest.requested_access)}</span>` : '<span class="text-muted-improved">-</span>'}</td>
+                <td>${latestRequest ? `<span class="status-badge status-${latestRequest.status.toLowerCase()}">${formatStatus(latestRequest.status)}</span>` : '<span class="text-muted-improved">-</span>'}</td>
+            </tr>
+        `;
+
+        if (hasRequests) {
+            displayRequestHistory(requests);
+        } else {
+            document.getElementById('requestHistorySection').style.display = 'none';
+        }
+
+        displayNewRequestForm(data);
+    }
+
+    function displayRequestHistory(requests) {
+        const historySection = document.getElementById('requestHistorySection');
+        const historyTableBody = document.getElementById('requestHistoryTableBody');
+
+        let historyRows = '';
+        requests.forEach(request => {
+            historyRows += `
+                <tr>
+                    <td><span class="request-id-badge">#${request.request_id}</span></td>
+                    <td><span class="access-badge access-${getAccessClass(request.requested_access)}">${formatAccess(request.requested_access)}</span></td>
+                    <td><span class="date-display">${request.request_date}</span></td>
+                    <td><span class="status-badge status-${request.status.toLowerCase()}">${formatStatus(request.status)}</span></td>
+                    <td><span class="reason-display">${request.reason || '-'}</span></td>
+                </tr>
+            `;
+        });
+
+        historyTableBody.innerHTML = historyRows;
+        historySection.style.display = 'block';
+    }
+
+    function displayNewRequestForm(data) {
+        const formContainer = document.getElementById('requestFormContainer');
+        const availableRequests = data.available_requests || [];
+        const canRequest = data.can_request;
+
+        if (!canRequest) {
+            if (availableRequests.length === 0) {
+                formContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You already have both User and Admin access. No additional requests can be raised.
+                    </div>
+                `;
+            } else if (data.has_pending_request) {
+                formContainer.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-clock me-2"></i>
+                        You have a pending request. Please wait for admin approval before raising a new request.
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        let optionsHtml = '';
+        availableRequests.forEach(access => {
+            optionsHtml += `<option value="${access}">${formatAccess(access)}</option>`;
+        });
+
+formContainer.innerHTML = `
+    <form id="submitRequestForm">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Select Requested Access</label>
+                <select class="form-select" id="requestedAccess" required>
+                    <option value="">Choose access level...</option>
+                    ${optionsHtml}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Reason for Request <span class="text-danger">*</span></label>
+                <textarea 
+                    class="form-control" 
+                    id="userReason" 
+                    rows="3" 
+                    placeholder="Please explain why you need this access level..."
+                    required
+                    maxlength="500"
+                    style="resize: vertical; min-height: 80px;"></textarea>
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Max 500 characters
+                </small>
+            </div>
+            <div class="col-12 mt-3">
+                <button type="submit" class="btn btn-success w-100">
+                    <i class="fas fa-paper-plane me-2"></i>Submit Request
+                </button>
+            </div>
+        </div>
+    </form>
+`;
+
+        // Add form submission handler
+// Add form submission handler
+const submitForm = document.getElementById('submitRequestForm');
+submitForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const requestedAccess = document.getElementById('requestedAccess').value;
+    const userReason = document.getElementById('userReason').value.trim();
+    
+    if (!requestedAccess) {
+        showAlert('Please select an access level', 'danger');
+        return;
+    }
+    
+    if (!userReason) {
+        showAlert('Please provide a reason for your request', 'danger');
+        return;
+    }
+    
+    if (userReason.length < 10) {
+        showAlert('Reason must be at least 10 characters long', 'warning');
+        return;
+    }
+    
+    submitAccessRequest(requestedAccess, userReason);
+});
+    }
+
+function submitAccessRequest(requestedAccess, userReason) {
+    showLoading(true);
+    
+    const requestData = {
+        username: currentUserData.user.username,
+        email: currentUserData.user.email,
+        current_access: currentUserData.user.current_access,
+        requested_access: requestedAccess,
+        user_reason: userReason
+    };
+
+        fetch('/api/submit-access-request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            showLoading(false);
+            
+            if (data.success) {
+                showAlert(data.message, 'success');
+                // Refresh user data to show the new request
+                setTimeout(() => {
+                    validateUser(currentUserData.user.username, currentUserData.user.email);
+                }, 1500);
+            } else {
+                showAlert(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showLoading(false);
+            console.error('Error:', error);
+            showAlert('System error occurred. Please try again.', 'danger');
+        });
+    }
+
+    function showLoading(show) {
+        if (show) {
+            loadingState.style.display = 'block';
+            step1.style.opacity = '0.5';
+            step2.style.opacity = '0.5';
+        } else {
+            loadingState.style.display = 'none';
+            step1.style.opacity = '1';
+            step2.style.opacity = '1';
+        }
+    }
+
+    function showAlert(message, type) {
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} fade-in`;
+        alert.innerHTML = `
+            <i class="fas fa-${getAlertIcon(type)} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close-improved" onclick="this.parentElement.remove()">&times;</button>
+        `;
+        
+        alertContainer.innerHTML = '';
+        alertContainer.appendChild(alert);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alert.parentElement) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+
+    function getAlertIcon(type) {
+        switch(type) {
+            case 'success': return 'check-circle';
+            case 'danger': return 'exclamation-triangle';
+            case 'warning': return 'exclamation-triangle';
+            case 'info': return 'info-circle';
+            default: return 'info-circle';
+        }
+    }
+
+    function getAccessClass(access) {
+        if (access.includes(',') || (access.includes('admin') && access.includes('user'))) {
+            return 'both';
+        } else if (access.includes('admin')) {
+            return 'admin';
+        } else {
+            return 'user';
+        }
+    }
+
+    function formatAccess(access) {
+        if (access.includes(',')) {
+            return 'User & Admin';
+        } else if (access.toLowerCase() === 'admin') {
+            return 'Admin';
+        } else {
+            return 'User';
+        }
+    }
+
+    function formatStatus(status) {
+        switch(status.toLowerCase()) {
+            case 'pending': return 'Pending';
+            case 'completed': return 'Approved';
+            case 'denied': return 'Denied';
+            default: return status;
+        }
+    }
+
+    // Add entrance animation
+    setTimeout(() => {
+        step1.classList.add('fade-in');
+    }, 300);
+
+    // Add input event listeners to clear previous data when user starts typing
+    document.getElementById('username').addEventListener('input', function() {
+        if (this.value.trim() === '') {
+            clearStep2Data();
+        }
+    });
+
+    document.getElementById('email').addEventListener('input', function() {
+        if (this.value.trim() === '') {
+            clearStep2Data();
+        }
+    });
+});
+</script>
+
+{% endblock %}
+
+
+

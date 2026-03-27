@@ -1,0 +1,756 @@
+{% extends "admin_base.html" %}
+{% block title %}Manage Exams{% endblock %}
+
+{% block content %}
+<style>
+  .exam-id-badge {
+    background: rgba(102,126,234,0.15);
+    color: var(--brand1);
+    padding: 3px 10px; border-radius: 6px;
+    font-weight: 700; font-size: 0.75rem;
+    display: inline-block;
+  }
+
+  .exam-name-text {
+    font-weight: 600; color: var(--text-primary); font-size: 0.875rem;
+  }
+
+  .meta-pill {
+    background: var(--table-head-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    padding: 3px 9px; border-radius: 6px;
+    font-weight: 600; font-size: 0.75rem;
+    display: inline-block; white-space: nowrap;
+  }
+
+  .status-badge {
+    padding: 3px 10px; border-radius: 20px;
+    font-weight: 700; font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    display: inline-block;
+  }
+  .status-upcoming  { background: rgba(102,126,234,0.12); color: #667eea; }
+  .status-ongoing   { background: rgba(16,185,129,0.12);  color: #10b981; }
+  .status-completed { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+
+  [data-theme="light"] .status-completed { background: rgba(0,0,0,0.06); color: #6b7280; }
+
+  .marks-pos { color: #10b981; font-weight: 700; font-size: 0.82rem; }
+  .marks-neg { color: #ef4444; font-weight: 700; font-size: 0.82rem; }
+
+  .instructions-text {
+    max-width: 180px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-muted); font-size: 0.8rem; font-style: italic;
+  }
+
+  .action-btns { display: flex; gap: 0.35rem; align-items: center; }
+
+  .icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px; border: 1px solid var(--card-border);
+    background: var(--card-bg); color: var(--text-secondary);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s; font-size: 0.78rem;
+  }
+  .icon-btn:hover { border-color: var(--brand1); color: var(--brand1); background: rgba(102,126,234,0.08); }
+  .icon-btn.danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
+
+  /* Page header */
+  .page-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+  }
+  .page-top h1 { font-size: clamp(1.2rem,3vw,1.6rem); font-weight: 700; margin: 0; color: var(--text-primary); }
+  .page-top p  { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--text-muted); }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+  .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3; display: block; }
+  .empty-state p { font-size: 0.9rem; margin: 0; }
+
+  /* Delete modal warning box */
+  .delete-warning {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 10px; padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .delete-warning ul { margin: 0.5rem 0 0; padding-left: 1.2rem; color: var(--text-secondary); font-size: 0.85rem; }
+  .delete-warning li { margin-bottom: 0.2rem; }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .page-top { flex-direction: column; align-items: flex-start; }
+    .instructions-text { display: none; }
+    .table-responsive { border-radius: 12px; }
+  }
+
+  .delay-field { display:none; }
+  .release-btn {
+    padding:3px 10px; border-radius:8px; font-size:0.72rem; font-weight:700;
+    background:rgba(16,185,129,0.12); color:#10b981;
+    border:1px solid rgba(16,185,129,0.25); cursor:pointer;
+    display:inline-flex; align-items:center; gap:5px; transition:all .15s;
+  }
+  .release-btn:hover { background:rgba(16,185,129,0.2); }
+  .result-mode-badge {
+    display:inline-block; padding:2px 8px; border-radius:5px;
+    font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .mode-instant  { background:rgba(45,91,227,0.1);  color:#667eea; }
+  .mode-delayed  { background:rgba(245,158,11,0.1); color:#f59e0b; }
+  .mode-manual   { background:rgba(168,85,247,0.1); color:#a855f7; }
+
+  /* ── Modal scroll fix ──────────────────────────────────────────────────
+     ROOT CAUSE: The <form> element sits between .modal-content and the
+     .modal-header / .modal-body / .modal-footer trio. Bootstrap's
+     modal-dialog-scrollable only constrains .modal-content, so the <form>
+     grows to full natural height and .modal-body never gets a ceiling to
+     scroll against.
+     FIX: make .modal-content a constrained flex column, then make any
+     direct <form> child ALSO a flex column that fills that space.
+     .modal-body then gets flex:1 + overflow-y:auto and scrolls correctly. */
+
+  /* Step 1 – constrain and flex the modal content box */
+  .modal-dialog-scrollable .modal-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* max-height is intentionally NOT set here.
+       Bootstrap sets it on .modal-dialog via JS; we inherit from that. */
+  }
+
+  /* Step 2 – the <form> wrapper must mirror modal-content's flex layout */
+  .modal-dialog-scrollable .modal-content > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;   /* allows the flex child to shrink below content size */
+    overflow: hidden;
+  }
+
+  /* Step 3 – header and footer never shrink */
+  .modal-dialog-scrollable .modal-header,
+  .modal-dialog-scrollable .modal-footer {
+    flex-shrink: 0;
+  }
+
+  /* Step 4 – only the body scrolls */
+  .modal-dialog-scrollable .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;   /* critical: without this, overflow-y:auto has no effect */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Dropdown (select) contrast fix ──────────────────────────────────── */
+  .modal .form-select,
+  .modal select.form-control {
+    background-color: var(--select-bg, var(--input-bg));
+    color: var(--input-text);
+    border-color: var(--input-border);
+  }
+  .modal .form-select option,
+  .modal select.form-control option {
+    background-color: var(--select-bg, var(--input-bg));
+    color: var(--input-text);
+  }
+  [data-theme="dark"] .modal .form-select,
+  [data-theme="dark"] .modal select.form-control {
+    background-color: #111118;
+    color: #e6eef8;
+    border-color: rgba(255,255,255,0.1);
+  }
+  [data-theme="dark"] .modal .form-select option,
+  [data-theme="dark"] .modal select.form-control option {
+    background-color: #111118;
+    color: #e6eef8;
+  }
+  [data-theme="light"] .modal .form-select,
+  [data-theme="light"] .modal select.form-control {
+    background-color: #ffffff;
+    color: #1a202c;
+    border-color: #cbd5e0;
+  }
+  [data-theme="light"] .modal .form-select option,
+  [data-theme="light"] .modal select.form-control option {
+    background-color: #ffffff;
+    color: #1a202c;
+  }
+
+  /* ── Mobile responsiveness fixes ─────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .modal-body .row {
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-body .col-md-6,
+    .modal-body .col-md-4,
+    .modal-body .col-md-3,
+    .modal-body .col-sm-6,
+    .modal-body .col-12 {
+      width: 100% !important;
+      max-width: 100% !important;
+      flex: 0 0 100% !important;
+    }
+    .modal .result-visibility-row {
+      flex-direction: column !important;
+    }
+    .modal-dialog.modal-lg {
+      margin: 0.5rem;
+      max-width: calc(100vw - 1rem);
+    }
+  }
+</style>
+
+<!-- Page header -->
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-file-alt me-2" style="color:var(--brand1)"></i>Manage Exams</h1>
+    <p>Create, edit and manage all exams on the portal.</p>
+  </div>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addExamModal">
+    <i class="fas fa-plus me-1"></i> Add Exam
+  </button>
+</div>
+
+<!-- Table card -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive" style="overflow-x:auto">
+      <table class="table mb-0" style="min-width:1100px;white-space:nowrap">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Exam Name</th>
+            <th>Category</th>
+            <th>Date &amp; Time</th>
+            <th>Duration</th>
+            <th>Questions</th>
+            <th>Status</th>
+            <th>Instructions</th>
+            <th>Marks</th>
+            <th>Result Mode</th>
+            <th style="width:130px;white-space:nowrap">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if exams %}
+            {% for exam in exams %}
+            <tr>
+              <td><span class="exam-id-badge">{{ exam.id }}</span></td>
+              <td><div class="exam-name-text">{{ exam.name }}</div></td>
+              <td>
+                {% set cat = namespace(found=None) %}
+                {% for c in categories %}
+                  {% if exam.get('category_id') and c.id | int == exam.get('category_id') | int %}
+                    {% set cat.found = c %}
+                  {% endif %}
+                {% endfor %}
+                {% if cat.found %}
+                  <span class="meta-pill" style="background:rgba(45,91,227,0.1);color:#667eea;border-color:rgba(45,91,227,0.2)">{{ cat.found.name }}</span>
+                {% else %}
+                  <span style="color:var(--text-muted);font-size:0.78rem">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="meta-pill">{{ exam.date }}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px">{{ exam.start_time }}</div>
+              </td>
+              <td><span class="meta-pill">{{ exam.duration }} min</span></td>
+              <td>
+                <span class="meta-pill">{{ exam.total_questions }}Q</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">
+                  Max: <strong style="color:var(--text-secondary)">{{ exam.max_attempts if exam.max_attempts else '∞' }}</strong>
+                </div>
+              </td>
+              <td><span class="status-badge status-{{ exam.status }}">{{ exam.status }}</span></td>
+              <td>
+                <div class="instructions-text" title="{{ exam.instructions }}">
+                  {{ exam.instructions or '—' }}
+                </div>
+              </td>
+              <td>
+                <span class="marks-pos">+{{ exam.positive_marks }}</span>
+                <span style="color:var(--text-muted);margin:0 2px">/</span>
+                <span class="marks-neg">−{{ exam.negative_marks }}</span>
+              </td>
+              <td>
+                {% set rmode = exam.result_mode or 'instant' %}
+                <span class="result-mode-badge mode-{{ rmode }}">{{ rmode }}</span>
+                {% if rmode == 'manual' and not exam.results_released %}
+                  <br><button class="release-btn mt-1"
+                    onclick="releaseResults({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', false)"
+                    title="Release results to students">
+                    <i class="fas fa-unlock-alt"></i> Release
+                  </button>
+                {% elif rmode == 'manual' and exam.results_released %}
+                  <br><button class="release-btn mt-1"
+                    onclick="releaseResults({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', true)"
+                    title="Unrelease results"
+                    style="background:rgba(239,68,68,0.12);color:#f87171;border-color:rgba(239,68,68,0.25);">
+                    <i class="fas fa-lock"></i> Unrelease
+                  </button>
+                {% elif rmode == 'delayed' %}
+                  <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">
+                    {{ exam.result_delay or 0 }} min delay
+                  </div>
+                {% endif %}
+              </td>
+              <td style="white-space:nowrap">
+                <div class="action-btns">
+                  <button class="icon-btn"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editExamModal{{ exam.id }}"
+                          title="Edit Exam">
+                    <i class="fas fa-pencil-alt"></i>
+                  </button>
+                  <button class="icon-btn danger"
+                          onclick="showDeleteConfirm({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}')"
+                          title="Delete Exam">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="10">
+                <div class="empty-state">
+                  <i class="fas fa-file-alt"></i>
+                  <p>No exams found. Click <strong>Add Exam</strong> to create one.</p>
+                </div>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Modals ──────────────────────────────────── -->
+{% for exam in exams %}
+<div class="modal fade" id="editExamModal{{ exam.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin.edit_exam', exam_id=exam.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-pencil-alt me-2"></i>Edit: {{ exam.name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Exam Name</label>
+              <input type="text" class="form-control" name="name" value="{{ exam.name }}" required>
+            </div>
+            <div class="col-md-3 col-sm-6 col-12">
+              <label class="form-label">Date</label>
+              <input type="date" class="form-control" name="date" value="{{ exam.date }}" required>
+            </div>
+            <div class="col-md-3 col-sm-6 col-12">
+              <label class="form-label">Start Time</label>
+              <input type="time" class="form-control" name="start_time" value="{{ exam.start_time }}" required>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Duration (min)</label>
+              <input type="number" class="form-control" name="duration" value="{{ exam.duration }}" required>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Total Questions</label>
+              <input type="number" class="form-control" name="total_questions" value="{{ exam.total_questions }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select class="form-select" name="status">
+                <option value="upcoming"  {% if exam.status == "upcoming"  %}selected{% endif %}>Upcoming</option>
+                <option value="ongoing"   {% if exam.status == "ongoing"   %}selected{% endif %}>Ongoing</option>
+                <option value="completed" {% if exam.status == "completed" %}selected{% endif %}>Completed</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Category</label>
+              <select name="category_id" class="form-select">
+                <option value="">Select Category</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if exam.category_id == cat.id %}selected{% endif %}>
+                  {{ cat.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Instructions</label>
+              <textarea class="form-control" name="instructions" rows="3">{{ exam.instructions }}</textarea>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Positive Marks</label>
+              <input type="text" class="form-control" name="positive_marks" value="{{ exam.positive_marks }}">
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Negative Marks</label>
+              <input type="text" class="form-control" name="negative_marks" value="{{ exam.negative_marks }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Max Attempts <span style="color:var(--text-muted);font-weight:400">(blank = unlimited)</span></label>
+              <input type="number" class="form-control" name="max_attempts" min="0" step="1" value="{{ exam.max_attempts or '' }}" placeholder="e.g. 3">
+            </div>
+            <div class="col-12">
+              <hr style="border-color:var(--card-border);margin:.25rem 0;">
+              <label class="form-label" style="font-size:.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;">Result Visibility</label>
+              <div class="d-flex gap-3 flex-wrap mt-1 result-visibility-row">
+                <div style="flex:1;min-width:150px;">
+                  <label class="form-label" style="font-size:.82rem;">Result Mode</label>
+                  <select class="form-select" name="result_mode"
+                    onchange="toggleDelayField(this, 'edit-delay-field-{{ exam.id }}')">
+                    <option value="instant"  {% if (exam.result_mode or 'instant') == 'instant'  %}selected{% endif %}>Instant (show immediately)</option>
+                    <option value="delayed"  {% if exam.result_mode == 'delayed'  %}selected{% endif %}>Delayed (show after X mins)</option>
+                    <option value="manual"   {% if exam.result_mode == 'manual'   %}selected{% endif %}>Manual (admin releases)</option>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:150px;{% if exam.result_mode != 'delayed' %}display:none;{% endif %}"
+                     id="edit-delay-field-{{ exam.id }}">
+                  <label class="form-label" style="font-size:.82rem;">Delay (minutes)</label>
+                  <input type="number" class="form-control" name="result_delay"
+                    min="1" value="{{ exam.result_delay or 30 }}" placeholder="e.g. 30">
+                  <small class="text-muted">Time after submission before result is visible</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-save me-1"></i>Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- ── Add Exam Modal ───────────────────────────────── -->
+<div class="modal fade" id="addExamModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin.exams') }}" id="addExamForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New Exam</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Exam Name</label>
+              <input type="text" class="form-control" name="name" placeholder="Enter exam name" required>
+            </div>
+            <div class="col-md-3 col-sm-6 col-12">
+              <label class="form-label">Date</label>
+              <input type="date" class="form-control" name="date" required>
+            </div>
+            <div class="col-md-3 col-sm-6 col-12">
+              <label class="form-label">Start Time</label>
+              <input type="time" class="form-control" name="start_time" required>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Duration (min)</label>
+              <input type="number" class="form-control" name="duration" placeholder="e.g. 180" required>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Total Questions</label>
+              <input type="number" class="form-control" name="total_questions" placeholder="e.g. 100" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select class="form-select" name="status">
+                <option value="upcoming" selected>Upcoming</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Category</label>
+              <select name="category_id" class="form-select">
+                <option value="">Select Category</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Instructions</label>
+              <textarea class="form-control" name="instructions" rows="3" placeholder="Enter exam instructions..."></textarea>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Positive Marks</label>
+              <input type="text" class="form-control" name="positive_marks" placeholder="e.g. 4" value="4">
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Negative Marks</label>
+              <input type="text" class="form-control" name="negative_marks" placeholder="e.g. 1" value="1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Max Attempts <span style="color:var(--text-muted);font-weight:400">(blank = unlimited)</span></label>
+              <input type="number" class="form-control" name="max_attempts" min="0" step="1" placeholder="e.g. 3">
+            </div>
+            <div class="col-12">
+              <hr style="border-color:var(--card-border);margin:.25rem 0;">
+              <label class="form-label" style="font-size:.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;">Result Visibility</label>
+              <div class="d-flex gap-3 flex-wrap mt-1 result-visibility-row">
+                <div style="flex:1;min-width:150px;">
+                  <label class="form-label" style="font-size:.82rem;">Result Mode</label>
+                  <select class="form-select" name="result_mode" onchange="toggleDelayField(this, 'add-delay-field')">
+                    <option value="instant" selected>Instant (show immediately)</option>
+                    <option value="delayed">Delayed (show after X mins)</option>
+                    <option value="manual">Manual (admin releases)</option>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:150px;display:none;" id="add-delay-field">
+                  <label class="form-label" style="font-size:.82rem;">Delay (minutes)</label>
+                  <input type="number" class="form-control" name="result_delay" min="1" value="30" placeholder="e.g. 30">
+                  <small class="text-muted">Time after submission before result is visible</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i>Add Exam
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Release/Unrelease Confirm Modal ──────────────── -->
+<div class="modal fade" id="releaseResultsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" id="releaseModalHeader">
+        <h5 class="modal-title" id="releaseModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:brightness(0) invert(1)"></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary);margin-bottom:0.75rem;font-size:0.9rem">
+          You are about to update results visibility for:
+        </p>
+        <p id="releaseExamName" style="font-weight:700;font-size:1rem;margin-bottom:1rem"></p>
+        <div id="releaseWarningBox" style="border-radius:10px;padding:1rem;margin-bottom:1rem;">
+          <p id="releaseWarningText" style="font-weight:600;font-size:0.85rem;margin:0 0 0.4rem"></p>
+          <p id="releaseWarningDesc" style="font-size:0.82rem;margin:0;color:var(--text-secondary)"></p>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin:0;text-align:center">
+          <i class="fas fa-exclamation-circle me-1"></i><span id="releaseWarningFooter"></span>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm" id="confirmReleaseBtn" style="min-width:110px"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Confirm Modal ─────────────────────────── -->
+<div class="modal fade" id="deleteExamModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#ef4444,#dc2626)">
+        <h5 class="modal-title"><i class="fas fa-trash me-2"></i>Delete Exam</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:brightness(0) invert(1)"></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary);margin-bottom:0.75rem;font-size:0.9rem">
+          You are about to permanently delete:
+        </p>
+        <p id="examNameToDelete" style="color:#ef4444;font-weight:700;font-size:1rem;margin-bottom:1rem"></p>
+        <div class="delete-warning">
+          <p style="color:#ef4444;font-weight:600;font-size:0.85rem;margin:0">This will permanently delete:</p>
+          <ul>
+            <li>All questions for this exam</li>
+            <li>All student results &amp; responses</li>
+            <li>All exam attempts</li>
+          </ul>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin:0;text-align:center">
+          <i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">
+          <i class="fas fa-trash me-1"></i>Delete Everything
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _examIdToDelete = null;
+
+function showDeleteConfirm(id, name) {
+  _examIdToDelete = id;
+  document.getElementById('examNameToDelete').textContent = name;
+  new bootstrap.Modal(document.getElementById('deleteExamModal')).show();
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+  if (!_examIdToDelete) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+
+  fetch('/admin/exams/delete/' + _examIdToDelete, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    bootstrap.Modal.getInstance(document.getElementById('deleteExamModal')).hide();
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash me-1"></i>Delete Everything';
+    if (data.success) {
+      setTimeout(() => window.location.reload(), 600);
+    } else {
+      alert('Error: ' + data.message);
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash me-1"></i>Delete Everything';
+    alert('Error deleting exam. Please try again.');
+  });
+});
+
+/* Form submit spinner + max_attempts validation */
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      const ma = this.querySelector('input[name="max_attempts"]');
+      if (ma && ma.value.trim() !== '' && !/^\d+$/.test(ma.value.trim())) {
+        e.preventDefault();
+        alert('Max Attempts must be a whole non-negative number');
+        ma.focus();
+        return;
+      }
+      const btn = this.querySelector('button[type="submit"]');
+      if (btn && !btn.disabled) {
+        btn.dataset.orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+        btn.disabled = true;
+      }
+    });
+  });
+
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('hidden.bs.modal', function() {
+      this.querySelectorAll('button[type="submit"]').forEach(btn => {
+        btn.disabled = false;
+        if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig;
+      });
+    });
+  });
+});
+
+/* Result mode: toggle delay field visibility */
+function toggleDelayField(select, delayFieldId) {
+  const field = document.getElementById(delayFieldId);
+  if (!field) return;
+  field.style.display = select.value === 'delayed' ? 'block' : 'none';
+}
+
+let _releaseExamId = null;
+let _releaseIsCurrently = false;
+
+function releaseResults(examId, examName, isCurrentlyReleased) {
+  _releaseExamId = examId;
+  _releaseIsCurrently = isCurrentlyReleased;
+
+  const header  = document.getElementById('releaseModalHeader');
+  const title   = document.getElementById('releaseModalTitle');
+  const nameEl  = document.getElementById('releaseExamName');
+  const wBox    = document.getElementById('releaseWarningBox');
+  const wText   = document.getElementById('releaseWarningText');
+  const wDesc   = document.getElementById('releaseWarningDesc');
+  const wFooter = document.getElementById('releaseWarningFooter');
+  const btn     = document.getElementById('confirmReleaseBtn');
+
+  nameEl.textContent = examName;
+
+  if (isCurrentlyReleased) {
+    header.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+    title.innerHTML  = '<i class="fas fa-lock me-2"></i>Unrelease Results';
+    nameEl.style.color = '#f59e0b';
+    wBox.style.background = 'rgba(245,158,11,0.08)';
+    wBox.style.border = '1px solid rgba(245,158,11,0.25)';
+    wText.style.color = '#f59e0b';
+    wText.textContent = 'Results will be hidden from students.';
+    wDesc.textContent = 'Students will no longer be able to view their scores, grades, or analytics for this exam until results are released again.';
+    wFooter.textContent = 'You can re-release results at any time.';
+    btn.className = 'btn btn-warning btn-sm';
+    btn.innerHTML = '<i class="fas fa-lock me-1"></i>Unrelease';
+  } else {
+    header.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    title.innerHTML  = '<i class="fas fa-unlock-alt me-2"></i>Release Results';
+    nameEl.style.color = '#10b981';
+    wBox.style.background = 'rgba(16,185,129,0.08)';
+    wBox.style.border = '1px solid rgba(16,185,129,0.25)';
+    wText.style.color = '#10b981';
+    wText.textContent = 'Results will become visible to all students.';
+    wDesc.textContent = 'Students will immediately be able to view their scores, grades, and analytics for this exam.';
+    wFooter.textContent = 'You can unrelease results later if needed.';
+    btn.className = 'btn btn-success btn-sm';
+    btn.innerHTML = '<i class="fas fa-unlock-alt me-1"></i>Release';
+  }
+
+  new bootstrap.Modal(document.getElementById('releaseResultsModal')).show();
+}
+
+document.getElementById('confirmReleaseBtn').addEventListener('click', function() {
+  if (!_releaseExamId) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+
+  fetch('/admin/exams/' + _releaseExamId + '/release-results', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    bootstrap.Modal.getInstance(document.getElementById('releaseResultsModal')).hide();
+    btn.disabled = false;
+    btn.innerHTML = _releaseIsCurrently ? '<i class="fas fa-lock me-1"></i>Unrelease' : '<i class="fas fa-unlock-alt me-1"></i>Release';
+    if (data.success) {
+      setTimeout(() => window.location.reload(), 400);
+    } else {
+      alert('Error: ' + data.message);
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = _releaseIsCurrently ? '<i class="fas fa-lock me-1"></i>Unrelease' : '<i class="fas fa-unlock-alt me-1"></i>Release';
+    alert('Server error. Please try again.');
+  });
+});
+</script>
+{% endblock %}
+
+
+

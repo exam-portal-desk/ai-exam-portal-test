@@ -1,0 +1,813 @@
+{% extends "admin_base.html" %}
+{% block title %}Requests & User Management{% endblock %}
+
+{% block content %}
+<style>
+  .page-top { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+  .page-top h1 { font-size:clamp(1.2rem,3vw,1.6rem); font-weight:700; margin:0; color:var(--text-primary); }
+  .page-top p  { margin:0.15rem 0 0; font-size:0.82rem; color:var(--text-muted); }
+  .stat-pills  { display:flex; gap:0.5rem; flex-wrap:wrap; }
+  .stat-pill   { display:inline-flex; align-items:center; gap:0.4rem; padding:5px 12px; border-radius:20px; font-size:0.78rem; font-weight:700; border:1px solid; white-space:nowrap; }
+  .pill-pending  { background:rgba(245,158,11,0.1);  color:#f59e0b; border-color:rgba(245,158,11,0.25); }
+  .pill-approved { background:rgba(16,185,129,0.1);  color:#10b981; border-color:rgba(16,185,129,0.25); }
+  .pill-denied   { background:rgba(239,68,68,0.1);   color:#ef4444; border-color:rgba(239,68,68,0.25); }
+
+  /* Tabs */
+  .tabs-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; overflow:hidden; }
+  .tabs-nav  { display:flex; border-bottom:1px solid var(--card-border); background:var(--table-head-bg); padding:0 1rem; overflow-x:auto; gap:0; }
+  .tab-btn   { background:none; border:none; border-bottom:3px solid transparent; color:var(--text-muted); font-size:0.83rem; font-weight:600; padding:0.85rem 1.1rem; cursor:pointer; white-space:nowrap; transition:all 0.15s; display:inline-flex; align-items:center; gap:0.4rem; margin-bottom:-1px; }
+  .tab-btn:hover  { color:var(--text-primary); }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-cnt { background:var(--accent); color:#fff; font-size:0.65rem; padding:2px 7px; border-radius:10px; }
+  .tab-pane { display:none; padding:1.25rem; }
+  .tab-pane.active { display:block; }
+
+  /* Table */
+  .table { --bs-table-bg:transparent; --bs-table-color:var(--text-primary); }
+  .table thead th { background:var(--table-head-bg); color:var(--text-muted); font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--table-border); padding:.7rem 1rem; white-space:nowrap; }
+  .table tbody td { border-bottom:1px solid var(--table-border); padding:.75rem 1rem; vertical-align:middle; }
+  .table tbody tr:last-child td { border-bottom:none; }
+  .table tbody tr:hover td { background:var(--table-row-hover); }
+
+  /* Badges */
+  .avatar-chip { width:28px; height:28px; border-radius:50%; background:var(--accent-subtle); border:1px solid var(--accent-border); color:var(--accent); font-size:.68rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .access-badge { padding:3px 9px; border-radius:20px; font-size:.72rem; font-weight:700; display:inline-flex; align-items:center; gap:.25rem; }
+  .ab-user   { background:rgba(45,91,227,.12); color:#7b9ef7; border:1px solid rgba(45,91,227,.2); }
+  .ab-admin  { background:rgba(239,68,68,.1);  color:#f87171; border:1px solid rgba(239,68,68,.2); }
+  .ab-both   { background:rgba(139,92,246,.1); color:#a78bfa; border:1px solid rgba(139,92,246,.2); }
+  .status-badge { padding:3px 9px; border-radius:20px; font-size:.7rem; font-weight:700; text-transform:uppercase; display:inline-flex; align-items:center; gap:.25rem; }
+  .sb-pending   { background:rgba(245,158,11,.1); color:#f59e0b; border:1px solid rgba(245,158,11,.2); }
+  .sb-completed { background:rgba(16,185,129,.1); color:#10b981; border:1px solid rgba(16,185,129,.2); }
+  .sb-denied    { background:rgba(239,68,68,.1);  color:#ef4444; border:1px solid rgba(239,68,68,.2); }
+
+  /* Action icon btns */
+  .icon-btn { width:30px; height:30px; border-radius:7px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:.75rem; transition:all .15s; }
+  .icon-btn.approve:hover { border-color:#10b981; color:#10b981; background:rgba(16,185,129,.08); }
+  .icon-btn.deny:hover    { border-color:#ef4444; color:#ef4444; background:rgba(239,68,68,.08); }
+
+  /* User management tab */
+  .um-controls { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; padding-bottom:1rem; margin-bottom:1rem; border-bottom:1px solid var(--card-border); }
+  .um-label    { font-size:.78rem; font-weight:600; color:var(--text-muted); white-space:nowrap; }
+  .um-select   { background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:8px; font-size:.82rem; padding:.4rem .7rem; }
+  .um-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; background:var(--input-bg); }
+  .um-select option { background:#111118; color:#e6eef8; }
+  .search-wrap { position:relative; flex:1; min-width:180px; max-width:280px; margin-left:auto; }
+  .search-wrap i { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:.75rem; }
+  .search-wrap input { background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:20px; font-size:.82rem; padding:.45rem .8rem .45rem 2rem; width:100%; }
+  .search-wrap input::placeholder { color:var(--input-placeholder); }
+  .search-wrap input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; background:var(--input-bg); }
+
+  .user-stats  { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+  .ustat       { display:inline-flex; align-items:center; gap:.35rem; padding:4px 12px; border-radius:20px; font-size:.75rem; font-weight:700; background:var(--table-head-bg); border:1px solid var(--card-border); color:var(--text-secondary); }
+
+  .update-btn { background:var(--accent); color:#fff; border:none; border-radius:7px; padding:4px 12px; font-size:.75rem; font-weight:600; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .update-btn:hover   { background:var(--accent-hover); }
+  .update-btn:disabled { opacity:.35; cursor:not-allowed; }
+  .update-btn.changed { background:#f59e0b; color:#000; }
+  .user-row.selected td { background:var(--accent-subtle) !important; }
+  .e-checkbox { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
+  .reason-text { max-width:200px; font-size:.79rem; color:var(--text-secondary); word-break:break-word; line-height:1.4; }
+
+  /* Flat buttons */
+  .btn-flat { border-radius:8px; font-size:.8rem; font-weight:600; padding:.4rem .9rem; border:none; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:.3rem; white-space:nowrap; }
+  .btn-flat.primary   { background:var(--accent);           color:#fff; }
+  .btn-flat.primary:hover   { background:var(--accent-hover); }
+  .btn-flat.success   { background:#10b981; color:#fff; }
+  .btn-flat.success:hover   { background:#059669; }
+  .btn-flat.danger    { background:#ef4444; color:#fff; }
+  .btn-flat.danger:hover    { background:#dc2626; }
+  .btn-flat.secondary { background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-color); }
+  .btn-flat.secondary:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-flat:disabled  { opacity:.4; cursor:not-allowed; }
+
+  /* Skeleton */
+  .skeleton { background:linear-gradient(90deg,var(--table-head-bg) 25%,var(--card-border) 50%,var(--table-head-bg) 75%); background-size:200% 100%; animation:shimmer 1.2s infinite; border-radius:6px; height:14px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* Modals */
+  .modal-content { background:var(--modal-bg); border:1px solid var(--card-border); border-radius:14px; }
+  .modal-header  { background:var(--card-bg); border-bottom:1px solid var(--card-border); border-radius:14px 14px 0 0; padding:1rem 1.25rem; }
+  .modal-body    { padding:1.25rem; }
+  .modal-footer  { background:var(--modal-footer-bg); border-top:1px solid var(--card-border); padding:.75rem 1.25rem; border-radius:0 0 14px 14px; }
+  .modal-title   { font-size:.95rem; font-weight:700; color:var(--text-primary); margin:0; }
+  .btn-close     { filter:invert(1) brightness(.6); }
+  .modal-body .form-label   { font-size:.8rem; font-weight:600; color:var(--text-muted); }
+  .modal-body .form-control,
+  .modal-body .form-select  { background:var(--input-bg); border:1px solid var(--input-border); color:var(--input-text); border-radius:9px; font-size:.85rem; }
+  .modal-body .form-control:focus,
+  .modal-body .form-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); outline:none; background:var(--input-bg); }
+  .modal-body .form-select option { background:#111118; color:#e6eef8; }
+  .modal-body .form-control::placeholder { color:var(--input-placeholder); }
+
+  .empty-state   { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+  .empty-state i { font-size:2.5rem; opacity:.2; display:block; margin-bottom:.75rem; }
+  .empty-state p { font-size:.88rem; margin:0; }
+
+  .paginator-wrap { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 1rem; border-top:1px solid var(--card-border); flex-wrap:wrap; gap:0.5rem; }
+
+  @media (max-width:768px) {
+    .page-top { flex-direction:column; align-items:flex-start; }
+    .um-controls { flex-direction:column; align-items:flex-start; }
+    .search-wrap { margin-left:0; max-width:100%; width:100%; }
+  }
+</style>
+<!-- Bulk Confirm Modal -->
+<div id="bulkModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card-bg,#1e1e2e);border-radius:18px;padding:2rem;max-width:420px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.5);animation:bulkModalIn 0.22s cubic-bezier(.34,1.56,.64,1)">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(45,91,227,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.5rem;">
+      <i class="fas fa-users-cog" style="color:var(--accent)"></i>
+    </div>
+    <h3 style="text-align:center;margin:0 0 0.5rem;font-size:1.1rem;font-weight:700;color:var(--text-primary)">Confirm Bulk Role Update</h3>
+    <p id="bulkModalMsg" style="text-align:center;margin:0 0 1.25rem;color:var(--text-muted);font-size:0.85rem;line-height:1.6"></p>
+    <div style="display:flex;gap:0.75rem">
+      <button onclick="document.getElementById('bulkModal').style.display='none'"
+        style="flex:1;padding:0.65rem;background:var(--btn-secondary-bg,#2a2a3a);color:var(--btn-secondary-color,#fff);border:1px solid var(--card-border);border-radius:10px;font-weight:600;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-times me-1"></i>Cancel
+      </button>
+      <button onclick="executeBulkUpdate()"
+        style="flex:1;padding:0.65rem;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        <i class="fas fa-check me-1"></i>Yes, Update
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes bulkModalIn { from{opacity:0;transform:scale(0.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
+</style>
+
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-user-plus me-2" style="color:var(--accent)"></i>Requests &amp; User Management</h1>
+    <p>Manage access requests and update user roles.</p>
+  </div>
+  <div class="stat-pills">
+    <span class="stat-pill pill-pending"><i class="fas fa-clock"></i><span id="hdrPending">—</span> Pending</span>
+    <span class="stat-pill pill-approved"><i class="fas fa-check"></i><span id="hdrApproved">—</span> Approved</span>
+    <span class="stat-pill pill-denied"><i class="fas fa-times"></i><span id="hdrDenied">—</span> Denied</span>
+  </div>
+</div>
+
+<div class="tabs-card">
+  <div class="tabs-nav">
+    <button class="tab-btn active" id="tabBtnNew" onclick="switchTab('new',this)">
+      <i class="fas fa-bell"></i>New Requests
+      <span class="tab-cnt" id="pendingTabCnt" style="display:none">0</span>
+    </button>
+    <button class="tab-btn" id="tabBtnHistory" onclick="switchTab('history',this)">
+      <i class="fas fa-history"></i>History
+    </button>
+    <button class="tab-btn" id="tabBtnUsers" onclick="switchTab('users',this)">
+      <i class="fas fa-users-cog"></i>User Management
+    </button>
+  </div>
+
+  {# ── TAB 1: New Requests (AJAX) ── #}
+  <div id="pane-new" class="tab-pane active">
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>#</th><th>User</th><th>Email</th><th>Current</th><th>Requested</th>
+            <th>Date</th><th>Reason</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="pendingTbody">
+          <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-muted)">
+            <i class="fas fa-spinner fa-spin me-2"></i>Loading…
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="paginator-wrap" id="pendingPaginator"></div>
+  </div>
+
+  {# ── TAB 2: History (AJAX) ── #}
+  <div id="pane-history" class="tab-pane">
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>#</th><th>User</th><th>Email</th><th>Current</th><th>Requested</th>
+            <th>Date</th><th>Status</th><th>Processed By</th><th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="historyTbody">
+          <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-muted)">
+            <i class="fas fa-spinner fa-spin me-2"></i>Loading…
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="paginator-wrap" id="historyPaginator"></div>
+  </div>
+
+  {# ── TAB 3: User Management (FULLY AJAX — no Jinja data) ── #}
+  <div id="pane-users" class="tab-pane">
+
+    <div class="user-stats">
+      <span class="ustat"><i class="fas fa-users" style="color:var(--accent)"></i>Total: <strong id="umTotal">—</strong></span>
+      <span class="ustat"><i class="fas fa-user" style="color:#7b9ef7"></i>Users: <strong id="umUsers">—</strong></span>
+      <span class="ustat"><i class="fas fa-user-shield" style="color:#f87171"></i>Admins: <strong id="umAdmins">—</strong></span>
+      <span class="ustat"><i class="fas fa-user-plus" style="color:#a78bfa"></i>Both: <strong id="umBoth">—</strong></span>
+    </div>
+
+    <div class="um-controls">
+      <span class="um-label">Filter:</span>
+      <select class="um-select" id="umRoleFilter" style="min-width:130px" onchange="umFetch(1)">
+        <option value="">All Roles</option>
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+        <option value="both">Both</option>
+      </select>
+      <span class="um-label">Bulk Role:</span>
+      <select class="um-select" id="bulkRoleSelect" style="min-width:160px" onchange="updateBulkBtn()">
+        <option value="">Select Role…</option>
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+        <option value="user,admin">User &amp; Admin</option>
+      </select>
+      <button class="btn-flat primary" id="applyBulkBtn" disabled onclick="doBulkUpdate()">
+        <i class="fas fa-users-cog"></i>Apply to Selected
+      </button>
+      <button class="btn-flat secondary" onclick="doSelectAll()"><i class="fas fa-check-square"></i>Select All</button>
+      <button class="btn-flat secondary" onclick="doClearAll()"><i class="fas fa-square"></i>Clear</button>
+      <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" id="umSearch" placeholder="Search users…" oninput="umDebounce()">
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table mb-0" id="usersTable">
+        <thead>
+          <tr>
+            <th style="width:44px">
+              <input type="checkbox" id="selectAllChk" class="e-checkbox" onchange="handleSelectAll(this)">
+            </th>
+            <th>User</th><th>Email</th><th>Current Role</th>
+            <th>New Role</th><th>Update</th><th>Last Updated</th>
+          </tr>
+        </thead>
+        <tbody id="usersTbody">
+          <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+          <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:80%"></div></td></tr>
+          <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:65%"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="paginator-wrap" id="usersPaginator"></div>
+  </div>
+</div>
+
+{# ── Approve Modal ── #}
+<div class="modal fade" id="approvalModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-check-circle me-2" style="color:#10b981"></i>Approve Request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:1rem">
+          Approving request for <strong id="approvalUname"></strong>
+        </p>
+        <label class="form-label">Grant Access Level</label>
+        <select class="form-select" id="approvedAccess">
+          <option value="">Choose…</option>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+          <option value="user,admin">User &amp; Admin</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-flat success" id="confirmApproval" onclick="handleApprove()">
+          <i class="fas fa-check me-1"></i>Approve
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Deny Modal ── #}
+<div class="modal fade" id="denialModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#ef4444">
+        <h5 class="modal-title" style="color:#fff"><i class="fas fa-times-circle me-2"></i>Deny Request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:brightness(0) invert(1)"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:1rem">
+          Denying request for <strong id="denialUname"></strong>
+        </p>
+        <label class="form-label">Reason</label>
+        <textarea class="form-control" id="denialReason" rows="3" placeholder="Enter reason…"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-flat danger" id="confirmDenial" onclick="handleDeny()">
+          <i class="fas fa-times me-1"></i>Deny
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+let _reqId       = null;
+let _pendingPage = 1;
+let _historyPage = 1;
+let _umPage      = 1;
+let _umTimer     = null;
+let _selectedIds = new Set();   // persists across pages
+
+/* ═══════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════ */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pane-' + name).classList.add('active');
+
+  // Lazy-load history tab on first open
+  if (name === 'history' && !document.getElementById('historyTbody').dataset.loaded) {
+    document.getElementById('historyTbody').dataset.loaded = '1';
+    fetchRequests('history', 1);
+  }
+  // Lazy-load users tab on first open
+  if (name === 'users' && !document.getElementById('usersTbody').dataset.loaded) {
+    document.getElementById('usersTbody').dataset.loaded = '1';
+    umLoadStats();
+    umFetch(1);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   REQUESTS — PENDING (TAB 1)
+═══════════════════════════════════════════════ */
+function fetchRequests(status, page) {
+  const isP   = status === 'pending';
+  const tbody = document.getElementById(isP ? 'pendingTbody' : 'historyTbody');
+  const pgDiv = document.getElementById(isP ? 'pendingPaginator' : 'historyPaginator');
+  if (isP) _pendingPage = page; else _historyPage = page;
+
+  tbody.innerHTML = skeletonRows(9);
+  pgDiv.innerHTML = '';
+
+  fetch(`/admin/api/requests/list?status=${status}&page=${page}`)
+    .then(r => r.json())
+    .then(d => {
+      isP ? renderPendingRows(d.requests) : renderHistoryRows(d.requests);
+      renderPaginator(pgDiv, page, d.total_pages, d.total, 25,
+        p => fetchRequests(status, p));
+      // Update header pill counts after every pending fetch
+      if (isP) {
+        const cnt = document.getElementById('pendingTabCnt');
+        cnt.textContent = d.total;
+        cnt.style.display = d.total ? '' : 'none';
+      }
+    })
+    .catch(() => {
+      tbody.innerHTML = errRow(9, 'Error loading data');
+    });
+}
+
+function renderPendingRows(reqs) {
+  const tbody = document.getElementById('pendingTbody');
+  if (!reqs.length) {
+    tbody.innerHTML = `<tr><td colspan="9">${emptyState('fa-inbox','No Pending Requests','All caught up!')}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = reqs.map(r => `
+    <tr>
+      <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.request_id}</span></td>
+      <td>${userCell(r.username)}</td>
+      <td><span style="font-size:.8rem;color:var(--text-muted)">${r.email}</span></td>
+      <td>${accessBadge(r.current_access)}</td>
+      <td>${accessBadge(r.requested_access)}</td>
+      <td><span style="font-size:.78rem;color:var(--text-muted)">${r.request_date||'—'}</span></td>
+      <td><div style="max-width:180px;font-size:.79rem;color:var(--text-secondary);word-break:break-word">${r.reason||'<em style="color:var(--text-muted)">—</em>'}</div></td>
+      <td><span class="status-badge sb-pending"><i class="fas fa-clock"></i>Pending</span></td>
+      <td>
+        <div style="display:flex;gap:.35rem">
+          <button class="icon-btn approve" title="Approve" onclick="openApprove(${r.request_id},'${esc(r.username)}')"><i class="fas fa-check"></i></button>
+          <button class="icon-btn deny"    title="Deny"    onclick="openDeny(${r.request_id},'${esc(r.username)}')"><i class="fas fa-times"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   REQUESTS — HISTORY (TAB 2)
+═══════════════════════════════════════════════ */
+function renderHistoryRows(reqs) {
+  const tbody = document.getElementById('historyTbody');
+  if (!reqs.length) {
+    tbody.innerHTML = `<tr><td colspan="9">${emptyState('fa-history','No History Yet','No requests have been processed.')}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = reqs.map(r => {
+    const sbC = r.status==='completed' ? 'sb-completed' : 'sb-denied';
+    const sbL = r.status==='completed' ? 'Approved' : 'Denied';
+    const sbI = r.status==='completed' ? 'fa-check' : 'fa-times';
+    return `
+    <tr>
+      <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.request_id}</span></td>
+      <td>${userCell(r.username)}</td>
+      <td><span style="font-size:.8rem;color:var(--text-muted)">${r.email}</span></td>
+      <td>${accessBadge(r.current_access)}</td>
+      <td>${accessBadge(r.requested_access)}</td>
+      <td><span style="font-size:.78rem;color:var(--text-muted)">${r.request_date||'—'}</span></td>
+      <td><span class="status-badge ${sbC}"><i class="fas ${sbI}"></i>${sbL}</span></td>
+      <td>
+        <div style="font-size:.82rem;font-weight:600;color:var(--text-primary)">${r.processed_by||'Admin'}</div>
+        ${r.processed_date?`<div style="font-size:.75rem;color:var(--text-muted)">${r.processed_date}</div>`:''}
+      </td>
+      <td><div style="max-width:200px;font-size:.79rem;color:var(--text-secondary);word-break:break-word;white-space:pre-wrap">${r.reason||'<em style="color:var(--text-muted)">—</em>'}</div></td>
+    </tr>`}).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   APPROVE / DENY MODALS
+═══════════════════════════════════════════════ */
+function openApprove(id, uname) {
+  _reqId = id;
+  document.getElementById('approvalUname').textContent = uname;
+  document.getElementById('approvedAccess').value = '';
+  new bootstrap.Modal(document.getElementById('approvalModal')).show();
+}
+
+function openDeny(id, uname) {
+  _reqId = id;
+  document.getElementById('denialUname').textContent = uname;
+  document.getElementById('denialReason').value = '';
+  new bootstrap.Modal(document.getElementById('denialModal')).show();
+}
+
+function handleApprove() {
+  const access = document.getElementById('approvedAccess').value;
+  if (!access) { toast('Select an access level', 'warning'); return; }
+  const btn = document.getElementById('confirmApproval');
+  setLoading(btn, true);
+  fetch(`/admin/requests/approve/${_reqId}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({approved_access: access})
+  }).then(r=>r.json()).then(d => {
+    if (d.success) {
+      toast(d.message, 'success');
+      bootstrap.Modal.getInstance(document.getElementById('approvalModal'))?.hide();
+      fetchRequests('pending', _pendingPage);
+      loadHeaderStats();
+    } else toast(d.message, 'danger');
+  }).catch(() => toast('Network error', 'danger'))
+  .finally(() => setLoading(btn, false));
+}
+
+function handleDeny() {
+  const reason = document.getElementById('denialReason').value.trim();
+  if (!reason) { toast('Enter a reason', 'warning'); return; }
+  const btn = document.getElementById('confirmDenial');
+  setLoading(btn, true);
+  fetch(`/admin/requests/deny/${_reqId}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({reason})
+  }).then(r=>r.json()).then(d => {
+    if (d.success) {
+      toast(d.message, 'success');
+      bootstrap.Modal.getInstance(document.getElementById('denialModal'))?.hide();
+      fetchRequests('pending', _pendingPage);
+      loadHeaderStats();
+    } else toast(d.message, 'danger');
+  }).catch(() => toast('Network error', 'danger'))
+  .finally(() => setLoading(btn, false));
+}
+
+/* ═══════════════════════════════════════════════
+   HEADER STATS (pills top-right) — AJAX
+═══════════════════════════════════════════════ */
+function loadHeaderStats() {
+  fetch('/admin/api/requests/stats').then(r=>r.json()).then(d => {
+    document.getElementById('hdrPending').textContent  = d.pending   ?? '—';
+    document.getElementById('hdrApproved').textContent = d.completed ?? '—';
+    document.getElementById('hdrDenied').textContent   = d.denied    ?? '—';
+    const cnt = document.getElementById('pendingTabCnt');
+    cnt.textContent = d.pending;
+    cnt.style.display = d.pending ? '' : 'none';
+  }).catch(()=>{});
+}
+
+/* ═══════════════════════════════════════════════
+   USER MANAGEMENT TAB (TAB 3) — FULLY AJAX
+═══════════════════════════════════════════════ */
+function umDebounce() {
+  clearTimeout(_umTimer);
+  _umTimer = setTimeout(() => umFetch(1), 400);
+}
+
+function umFetch(page) {
+  _umPage = page;
+  const q    = (document.getElementById('umSearch')?.value||'').trim();
+  const role = document.getElementById('umRoleFilter')?.value || '';
+  const tbody = document.getElementById('usersTbody');
+
+  tbody.innerHTML = skeletonRows(7);
+
+  const params = new URLSearchParams({page, q, role});
+  fetch(`/admin/api/users/search?${params}`)
+    .then(r => r.json())
+    .then(d => {
+      renderUsers(d.users || []);
+      renderPaginator(
+        document.getElementById('usersPaginator'),
+        d.page, d.total_pages, d.total, 50,
+        p => umFetch(p)
+      );
+    })
+    .catch(() => {
+      tbody.innerHTML = errRow(7, 'Error loading users');
+    });
+}
+
+function renderUsers(users) {
+  const tbody = document.getElementById('usersTbody');
+  if (!users.length) {
+    tbody.innerHTML = `<tr><td colspan="7">${emptyState('fa-users','No Users Found','Try a different search or filter.')}</td></tr>`;
+    return;
+  }
+  const roleMap = {
+    'user':       ['ab-user',  'fa-user',        'User'],
+    'admin':      ['ab-admin', 'fa-user-shield', 'Admin'],
+    'user,admin': ['ab-both',  'fa-user-plus',   'User &amp; Admin'],
+  };
+  tbody.innerHTML = users.map(u => {
+    const [rcls, rico, rlbl] = roleMap[u.role] || ['ab-user','fa-user', u.role||'?'];
+    const opts = ['user','admin','user,admin']
+      .filter(r => r !== u.role)
+      .map(r => `<option value="${r}">${r==='user,admin'?'User &amp; Admin': cap(r)}</option>`)
+      .join('');
+    const isSel = _selectedIds.has(String(u.id));
+    return `
+    <tr class="user-row${isSel?' selected':''}" data-user-id="${u.id}">
+      <td><input type="checkbox" class="e-checkbox user-chk" value="${u.id}" ${isSel?'checked':''} onchange="onChkChange(this)"></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <div class="avatar-chip"><i class="fas fa-user"></i></div>
+          <div>
+            <div style="font-size:.83rem;font-weight:600;color:var(--text-primary)" class="uname">${u.username||''}</div>
+            ${u.full_name && u.full_name!==u.username?`<div style="font-size:.75rem;color:var(--text-muted)">${u.full_name}</div>`:''}
+          </div>
+        </div>
+      </td>
+      <td><span style="font-size:.8rem;color:var(--text-muted)" class="uemail">${u.email||''}</span></td>
+      <td><span class="access-badge ${rcls} cur-role" data-role="${u.role}"><i class="fas ${rico}"></i>${rlbl}</span></td>
+      <td>
+        <select class="um-select role-sel" data-uid="${u.id}" style="min-width:150px" onchange="onRoleChange(this)">
+          <option value="">Keep Current</option>
+          ${opts}
+        </select>
+      </td>
+      <td>
+        <button class="update-btn" data-uid="${u.id}" disabled onclick="doUpdateRole(this)">
+          <i class="fas fa-save me-1"></i>Update
+        </button>
+      </td>
+      <td><span class="ts" style="font-size:.75rem;color:var(--text-muted)">${u.updated_at||u.created_at||'—'}</span></td>
+    </tr>`;
+  }).join('');
+  syncSelectAll();
+}
+
+function umLoadStats() {
+  fetch('/admin/api/users/stats').then(r=>r.json()).then(d => {
+    document.getElementById('umTotal').textContent  = d.total_users ?? '—';
+    document.getElementById('umUsers').textContent  = d.user_role   ?? '—';
+    document.getElementById('umAdmins').textContent = d.admin_role  ?? '—';
+    document.getElementById('umBoth').textContent   = d.both_roles  ?? '—';
+  }).catch(()=>{});
+}
+
+/* ── Role update ── */
+function onRoleChange(sel) {
+  const btn = sel.closest('tr').querySelector('.update-btn');
+  if (sel.value) { btn.disabled=false; btn.classList.add('changed'); }
+  else           { btn.disabled=true;  btn.classList.remove('changed'); }
+}
+
+function doUpdateRole(btn) {
+  const uid = btn.dataset.uid;
+  const sel = btn.closest('tr').querySelector('.role-sel');
+  if (!sel.value) return;
+  const orig = btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>';
+  fetch('/admin/users/update-role', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({user_id:uid, new_role:sel.value})
+  }).then(r=>r.json()).then(d => {
+    if (d.success) {
+      toast(d.message,'success');
+      umLoadStats();
+      umFetch(_umPage);
+    } else toast(d.message,'danger');
+  }).catch(()=>toast('Error','danger'))
+  .finally(()=>{ btn.innerHTML=orig; btn.disabled=true; btn.classList.remove('changed'); });
+}
+
+/* ── Select / Bulk ── */
+function handleSelectAll(chk) {
+  document.querySelectorAll('#usersTbody .user-chk').forEach(cb => {
+    cb.checked = chk.checked;
+    cb.closest('tr').classList.toggle('selected', chk.checked);
+    if (chk.checked) _selectedIds.add(cb.value);
+    else _selectedIds.delete(cb.value);
+  });
+  updateBulkBtn();
+}
+
+function onChkChange(cb) {
+  cb.closest('tr').classList.toggle('selected', cb.checked);
+  if (cb.checked) _selectedIds.add(cb.value);
+  else _selectedIds.delete(cb.value);
+  syncSelectAll(); updateBulkBtn();
+}
+
+function syncSelectAll() {
+  const all = document.querySelectorAll('#usersTbody .user-chk');
+  const chk = document.querySelectorAll('#usersTbody .user-chk:checked');
+  const sa  = document.getElementById('selectAllChk'); if (!sa) return;
+  if (!all.length)              { sa.indeterminate=false; sa.checked=false; }
+  else if (!chk.length)         { sa.indeterminate=false; sa.checked=false; }
+  else if (chk.length===all.length){ sa.indeterminate=false; sa.checked=true; }
+  else                          { sa.indeterminate=true; }
+}
+
+function doSelectAll() {
+  document.querySelectorAll('#usersTbody .user-chk').forEach(cb=>{
+    cb.checked=true; cb.closest('tr').classList.add('selected'); _selectedIds.add(cb.value);
+  });
+  const sa=document.getElementById('selectAllChk'); if(sa){sa.checked=true;sa.indeterminate=false;}
+  updateBulkBtn();
+}
+
+function doClearAll() {
+  document.querySelectorAll('#usersTbody .user-chk').forEach(cb=>{
+    cb.checked=false; cb.closest('tr').classList.remove('selected'); _selectedIds.delete(cb.value);
+  });
+  const sa=document.getElementById('selectAllChk'); if(sa){sa.checked=false;sa.indeterminate=false;}
+  updateBulkBtn();
+}
+
+function updateBulkBtn() {
+  const role = document.getElementById('bulkRoleSelect')?.value;
+  const btn  = document.getElementById('applyBulkBtn'); if(!btn) return;
+  btn.disabled = !(_selectedIds.size && role);
+  btn.innerHTML = _selectedIds.size
+    ? `<i class="fas fa-users-cog me-1"></i>Apply to ${_selectedIds.size} Selected`
+    : '<i class="fas fa-users-cog me-1"></i>Apply to Selected';
+}
+
+let _pendingBulkRole = '';
+
+function doBulkUpdate() {
+  const role = document.getElementById('bulkRoleSelect').value;
+  if (!_selectedIds.size || !role) return;
+  const safeIds = [..._selectedIds].filter(id => {
+    const row = document.querySelector(`tr[data-user-id="${id}"]`);
+    return row && !row.classList.contains('ghost-row');
+  });
+  if (!safeIds.length) { toast('No eligible users selected.','warning'); return; }
+  _pendingBulkRole = role;
+  const lbl = role==='user,admin' ? 'User & Admin' : role.charAt(0).toUpperCase()+role.slice(1);
+  document.getElementById('bulkModalMsg').innerHTML =
+    `You are about to update <strong>${safeIds.length} user(s)</strong> to role <strong style="color:var(--accent)">"${lbl}"</strong>.<br><br><small style="color:var(--text-muted)">This will take effect immediately.</small>`;
+  document.getElementById('bulkModal').style.display = 'flex';
+}
+
+function executeBulkUpdate() {
+  document.getElementById('bulkModal').style.display = 'none';
+  const role = _pendingBulkRole;
+  const safeIds = [..._selectedIds].filter(id => {
+    const row = document.querySelector(`tr[data-user-id="${id}"]`);
+    return row && !row.classList.contains('ghost-row');
+  });
+  if (!safeIds.length || !role) return;
+  const btn  = document.getElementById('applyBulkBtn');
+  const orig = btn.innerHTML; btn.disabled=true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating…';
+  fetch('/admin/users/bulk-update-roles', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({updates: safeIds.map(id=>({user_id:id,new_role:role}))})
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){
+      toast(d.message || `${safeIds.length} user(s) updated successfully.`,'success');
+      _selectedIds.clear();
+      document.getElementById('bulkRoleSelect').value='';
+      umLoadStats(); umFetch(_umPage);
+    } else toast(d.message,'danger');
+  }).catch(()=>toast('Network error.','danger'))
+  .finally(()=>{ btn.innerHTML=orig; updateBulkBtn(); });
+}
+
+/* ═══════════════════════════════════════════════
+   SHARED PAGINATOR RENDERER
+═══════════════════════════════════════════════ */
+function renderPaginator(container, page, totalPages, total, perPage, goFn) {
+  if (!container) return;
+  if (!total) { container.innerHTML=''; return; }
+  if (totalPages <= 1) {
+    container.innerHTML = `<span style="font-size:.78rem;color:var(--text-muted)">${total} records</span>`;
+    return;
+  }
+  const start = (page-1)*perPage+1, end = Math.min(page*perPage, total);
+  const bs  = `cursor:pointer;padding:3px 9px;border-radius:6px;border:1px solid var(--card-border);background:var(--card-bg);color:var(--text-secondary);font-size:.78rem;font-weight:600;margin:0 1px;`;
+  const bas = `cursor:pointer;padding:3px 9px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:.78rem;font-weight:600;margin:0 1px;`;
+
+  let pages = [];
+  if (totalPages <= 7) { pages = Array.from({length:totalPages},(_,i)=>i+1); }
+  else {
+    pages = [1];
+    const s=Math.max(2,page-2), e=Math.min(totalPages-1,page+2);
+    if (s>2) pages.push('…');
+    for(let i=s;i<=e;i++) pages.push(i);
+    if (e<totalPages-1) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  // Serialize goFn to string safely via a global registry
+  const fnKey = 'pgFn_' + Math.random().toString(36).slice(2);
+  window[fnKey] = goFn;
+
+  container.innerHTML = `
+    <span style="font-size:.78rem;color:var(--text-muted)">Showing ${start}–${end} of ${total}</span>
+    <div style="display:flex;gap:.2rem;flex-wrap:wrap;align-items:center;">
+      <button style="${bs}" ${page===1?'disabled':''} onclick="window['${fnKey}'](${page-1})">‹</button>
+      ${pages.map(p=>p==='…'
+        ?`<span style="color:var(--text-muted);padding:0 4px">…</span>`
+        :`<button style="${p===page?bas:bs}" onclick="window['${fnKey}'](${p})">${p}</button>`
+      ).join('')}
+      <button style="${bs}" ${page===totalPages?'disabled':''} onclick="window['${fnKey}'](${page+1})">›</button>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════ */
+function skeletonRows(cols) {
+  return Array(4).fill(0).map(()=>
+    `<tr><td colspan="${cols}"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
+  ).join('');
+}
+function errRow(cols, msg) {
+  return `<tr><td colspan="${cols}" style="text-align:center;padding:2rem;color:#ef4444"><i class="fas fa-exclamation-circle me-2"></i>${msg}</td></tr>`;
+}
+function emptyState(icon, title, sub) {
+  return `<div class="empty-state"><i class="fas ${icon}"></i><p><strong>${title}</strong><br><span style="font-size:.8rem">${sub}</span></p></div>`;
+}
+function userCell(uname) {
+  return `<div style="display:flex;align-items:center;gap:.6rem"><div class="avatar-chip"><i class="fas fa-user"></i></div><span style="font-size:.83rem;font-weight:600;color:var(--text-primary)">${uname||'—'}</span></div>`;
+}
+function accessBadge(role) {
+  const cls = role==='user'?'ab-user':role==='admin'?'ab-admin':'ab-both';
+  const lbl = role==='user,admin'?'User &amp; Admin':cap(role||'?');
+  return `<span class="access-badge ${cls}">${lbl}</span>`;
+}
+function cap(s){ return s?s.charAt(0).toUpperCase()+s.slice(1):s; }
+function esc(s){ return (s||'').replace(/'/g,"\\'"); }
+
+function setLoading(btn, on) {
+  btn.disabled = on;
+  if (on) { btn._orig=btn.innerHTML; btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Processing…'; }
+  else if (btn._orig) btn.innerHTML = btn._orig;
+}
+
+function toast(msg, type) {
+  const colors = {success:'#10b981',danger:'#ef4444',warning:'#f59e0b',info:'var(--accent)'};
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;background:${colors[type]||colors.info};color:#fff;padding:.65rem 1.1rem;border-radius:10px;font-size:.83rem;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.35);max-width:320px;`;
+  t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  // Load header stat pills
+  loadHeaderStats();
+
+  // Auto-load pending requests (Tab 1 is default active)
+  document.getElementById('pendingTbody').dataset.loaded = '1';
+  fetchRequests('pending', 1);
+
+  // Refresh stats every 60s in background
+  setInterval(() => {
+    if (document.visibilityState === 'visible') loadHeaderStats();
+  }, 60000);
+});
+</script>
+{% endblock %}
