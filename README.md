@@ -653,10 +653,6 @@ The full schema with all constraints is in `supabase_schema.txt`. Run it once in
 
 ---
 
-## Database clone
-
-''' SQL
-
 -- =====================================================
 -- FULL DATABASE CLONE (TABLES + PK + FK + INDEXES)
 -- RLS / FUNCTIONS IGNORED AS REQUESTED
@@ -949,36 +945,19 @@ CREATE TABLE requests_raised (
 -- INDEXES (PERFORMANCE)
 -- =========================
 
--- USERS
 CREATE INDEX idx_users_username_lower ON users (username_lower);
 CREATE INDEX idx_users_email_lower ON users (email_lower);
-
--- EXAMS
 CREATE INDEX idx_exams_category_id ON exams (category_id);
-
--- QUESTIONS
 CREATE INDEX idx_questions_exam_id ON questions (exam_id);
-
--- RESULTS
 CREATE INDEX idx_results_student_id ON results (student_id);
 CREATE INDEX idx_results_exam_id ON results (exam_id);
-
--- RESPONSES
 CREATE INDEX idx_responses_result_id ON responses (result_id);
 CREATE INDEX idx_responses_question_id ON responses (question_id);
-
--- DISCUSSIONS
 CREATE INDEX idx_qd_question_id ON question_discussions (question_id);
 CREATE INDEX idx_qd_user_id ON question_discussions (user_id);
-
--- AI
 CREATE INDEX idx_ai_chat_user_id ON ai_chat_history (user_id);
 CREATE INDEX idx_ai_usage_user_date ON ai_usage_tracking (user_id, date);
-
--- SESSIONS
 CREATE INDEX idx_sessions_user_id ON sessions (user_id);
-
--- CHAT
 CREATE INDEX idx_chat_conv_created_by ON chat_conversations (created_by);
 CREATE INDEX idx_chat_conn_requester ON chat_connections (requester_id);
 CREATE INDEX idx_chat_conn_recipient ON chat_connections (recipient_id);
@@ -987,14 +966,11 @@ CREATE INDEX idx_chat_members_user ON chat_members (user_id);
 CREATE INDEX idx_chat_messages_conv ON chat_messages (conversation_id);
 CREATE INDEX idx_chat_messages_sender ON chat_messages (sender_id);
 CREATE INDEX idx_chat_unread_user_conv ON chat_unread (user_id, conversation_id);
-
--- LOGIN
 CREATE INDEX idx_login_identifier_ip ON login_attempts (identifier, ip_address);
 
 -- =====================================================
 -- END OF FULL DATABASE ARCHITECTURE
 -- =====================================================
-'''
 
 ## Security
 
