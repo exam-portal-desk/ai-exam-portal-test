@@ -139,173 +139,190 @@ Administrators have granular control over result visibility:
 
 ---
 
-> [!NOTE]
-> # Google Drive API Setup (Service Account + OAuth Token)
-> 
-> This guide explains how to set up Google Drive API authentication using both:
-> - Service Account (for backend/server use)
-> - OAuth Token (for user-based uploads)
->
-> ---
->
-> ## 1. Enable Google Drive API
->
-> 1. Go to Google Cloud Console  
->    https://console.cloud.google.com/
->
-> 2. Select or create a project
->
-> 3. Navigate to:  
->    **APIs & Services → Library**
->
-> 4. Search for:  
->    **Google Drive API**
->
-> 5. Click **Enable**
->
-> ---
->
-> ## 2. Create Service Account (service_account.json)
->
-> 1. Go to:  
->    **APIs & Services → Credentials**
->
-> 2. Click:  
->    **Create Credentials → Service Account**
->
-> 3. Enter:
->    - Name: any (e.g., drive-service-account)
->    - Click **Create and Continue**
->
-> 4. Skip optional steps → Click **Done**
->
-> 5. Open the created service account
->
-> 6. Go to:  
->    **Keys → Add Key → Create new key**
->
-> 7. Select:  
->    **JSON → Download**
->
-> 8. Rename file to:  
->    `service_account.json`
->
-> ---
->
-> ### Important (Service Account Access)
->
-> - Open Google Drive
-> - Create or select a folder
-> - Share that folder with service account email  
->   (e.g., `xyz@project-id.iam.gserviceaccount.com`)
->
-> ---
->
-> ## 3. Create OAuth Client (for token.json)
->
-> 1. Go to:  
->    **APIs & Services → Credentials**
->
-> 2. Click:  
->    **Create Credentials → OAuth Client ID**
->
-> 3. If prompted, configure OAuth consent screen:
->    - App name: anything
->    - User type: External
->    - Add your email under **Test Users**
->
-> 4. Choose application type:  
->    **Desktop App**
->
-> 5. Click **Create**
->
-> 6. Download JSON file
->
-> 7. Rename it to:  
->    `client_secret_web_local.json`
->
-> ---
->
-> ## 4. Install Required Library
->
-> ```bash
-> pip install google-auth-oauthlib
-> ```
->
-> ---
->
-> ## 5. Generate token.json
->
-> Create a Python file:
->
-> ### `generate_token.py`
->
-> ```python
-> from google_auth_oauthlib.flow import InstalledAppFlow
-> import os
->
-> SCOPES = ['https://www.googleapis.com/auth/drive.file']
->
-> creds = None
->
-> if os.path.exists('token.json'):
->     print("Token already exists")
-> else:
->     flow = InstalledAppFlow.from_client_secrets_file(
->         'client_secret_web_local.json', SCOPES)
->     creds = flow.run_local_server(port=0)
->
->     with open('token.json', 'w') as token:
->         token.write(creds.to_json())
->
->     print("token.json generated successfully")
-> ```
->
-> ---
->
-> ## 6. Run Script
->
-> ```bash
-> python generate_token.py
-> ```
->
-> ---
->
-> ## 7. What Happens
->
-> - Browser will open automatically
-> - Login with your Google account
-> - Grant permissions
-> - `token.json` will be generated
->
-> ---
->
-> ## 8. Final Project Structure
->
-> ```
-> project/
-> ├── service_account.json
-> ├── client_secret_web_local.json
-> ├── token.json
-> └── generate_token.py
-> ```
->
-> ---
->
-> ## 9. Notes
->
-> - `token.json` is reusable
-> - Do NOT commit credentials to public repositories
-> - If you get `access_denied`, add your email in Test Users
->
-> ---
->
-> ## 10. When to Use What
->
-> | Use Case            | Method           |
-> |--------------------|------------------|
-> | Backend automation | Service Account  |
-> | User uploads       | OAuth token.json |
+| [!NOTE]
+| # Google Drive API Setup (Service Account + OAuth Token)
+| 
+| This guide explains how to set up Google Drive API authentication using both:
+| - Service Account (for backend/server use)
+| - OAuth Token (for user-based uploads)
+|
+| ---
+|
+| ## 1. Enable Google Drive API
+|
+| 1. Go to Google Cloud Console  
+|    https://console.cloud.google.com/
+|
+| 2. Select or create a project
+|
+| 3. Navigate to:  
+|    **APIs & Services → Library**
+|
+| 4. Search for:  
+|    **Google Drive API**
+|
+| 5. Click **Enable**
+|
+| ---
+|
+| ## 2. Create Service Account (service_account.json)
+|
+| 1. Go to:  
+|    **APIs & Services → Credentials**
+|
+| 2. Click:  
+|    **Create Credentials → Service Account**
+|
+| 3. Enter:
+|    - Name: any (e.g., drive-service-account)
+|    - Click **Create and Continue**
+|
+| 4. Skip optional steps → Click **Done**
+|
+| 5. Open the created service account
+|
+| 6. Go to:  
+|    **Keys → Add Key → Create new key**
+|
+| 7. Select:  
+|    **JSON → Download**
+|
+| 8. Rename file to:  
+|    `service_account.json`
+|
+| ---
+|
+| ### Important (Service Account Access)
+|
+| - Open Google Drive
+| - Create or select a folder
+| - Share that folder with service account email  
+|   (e.g., `xyz@project-id.iam.gserviceaccount.com`)
+|
+| ---
+|
+| ## 3. Create OAuth Client (for token.json)
+|
+| 1. Go to:  
+|    **APIs & Services → Credentials**
+|
+| 2. Click:  
+|    **Create Credentials → OAuth Client ID**
+|
+| 3. If prompted, configure OAuth consent screen:
+|    - App name: anything
+|    - User type: External
+|    - Add your email under **Test Users**
+|
+| 4. Choose application type:  
+|    **Desktop App**
+|
+| 5. Click **Create**
+|
+| 6. Download JSON file
+|
+| 7. Rename it to:  
+|    `client_secret_web_local.json`
+|
+| ---
+|
+| ## 4. Install Required Library
+|
+| ```bash
+| pip install google-auth-oauthlib
+| ```
+|
+| ---
+|
+| ## 5. Generate token.json
+|
+| Create a Python file:
+|
+| ### `generate_token.py`
+|
+| ```python
+"""
+Google Drive OAuth Token Generator
+
+Description:
+This script generates a token.json file using Google OAuth 2.0.
+
+Requirements:
+- Google Drive API enabled
+- OAuth client_secret file (client_secret_web_local.json)
+- Library: google-auth-oauthlib
+
+Usage:
+Run this script and complete authentication in browser.
+"""
+
+from google_auth_oauthlib.flow import InstalledAppFlow
+import os
+
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+creds = None
+
+if os.path.exists('token.json'):
+    print("Token already exists")
+else:
+    flow = InstalledAppFlow.from_client_secrets_file(
+        'client_secret_web_local.json', SCOPES)
+
+    # ✅ FIX: use fixed port (NOT 0)
+    creds = flow.run_local_server(port=8080)
+
+    with open('token.json', 'w') as token:
+        token.write(creds.to_json())
+
+    print("token.json generated successfully")
+| ```
+|
+| ---
+|
+| ## 6. Run Script
+|
+| ```bash
+| python generate_token.py
+| ```
+|
+| ---
+|
+| ## 7. What Happens
+|
+| - Browser will open automatically
+| - Login with your Google account
+| - Grant permissions
+| - `token.json` will be generated
+|
+| ---
+|
+| ## 8. Final Project Structure
+|
+| ```
+| project/
+| ├── service_account.json
+| ├── client_secret_web_local.json
+| ├── token.json
+| └── generate_token.py
+| ```
+|
+| ---
+|
+| ## 9. Notes
+|
+| - `token.json` is reusable
+| - Do NOT commit credentials to public repositories
+| - If you get `access_denied`, add your email in Test Users
+|
+| ---
+|
+| ## 10. When to Use What
+|
+| | Use Case            | Method           |
+| |--------------------|------------------|
+| | Backend automation | Service Account  |
+| | User uploads       | OAuth token.json |
 
 ## Installation
 
