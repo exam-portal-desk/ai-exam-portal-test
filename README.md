@@ -298,7 +298,8 @@ Administrators have granular control over result visibility:
 > - Do NOT commit credentials to public repositories
 > - If you get `access_denied`, add your email in Test Users
 >
->``` Add URI in your web app cloud console 
+>  - Add the below URI in your web app cloud console for one time OAuth
+>```
 >http://localhost:8080/
 >```
 > ---
