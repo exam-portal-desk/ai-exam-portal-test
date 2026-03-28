@@ -29,23 +29,51 @@ from google.genai import types
 # LATEX SANITIZER
 # ========================
 
+def _is_pure_text_block(content: str) -> bool:
+    """
+    Returns True if a LaTeX block contains ONLY \text{...} with no real math.
+    These should be unwrapped to plain text instead of kept as LaTeX.
+    e.g.  \large \text{What is mortar?}  →  plain text, not LaTeX
+    e.g.  \large \frac{a}{b}             →  real math, keep as LaTeX
+    """
+    stripped = content.strip()
+    # Remove size commands temporarily
+    for s in ['\\large', '\\Large', '\\LARGE', '\\small', '\\normalsize', '\\huge', '\\Huge']:
+        stripped = stripped.replace(s, '').strip()
+    # If what remains is purely \text{...} (with nothing else), it's plain text
+    text_only = re.fullmatch(r'\\text\s*\{([^}]*)\}', stripped)
+    return text_only is not None
+
+
 def sanitize_latex(text: str) -> str:
-    """Safely cleans and ensures consistent \large sizing in mixed text."""
+    """
+    Cleans LaTeX in mixed text:
+    - Unwraps $\large \text{plain english}$ back to plain english
+    - Keeps genuine math blocks and adds \large to them
+    - Standardizes $$ and \[...\] to single $
+    """
     if not text:
         return text
-    
+
     # 1. Standardize wrappers
     text = text.replace('$$', '$').replace(r'\[', '$').replace(r'\]', '$')
-    
+
     def normalize_block(match):
         content = match.group(1).strip()
-        # Remove any existing size commands to prevent doubling
-        sizes = ['small', 'normalsize', 'large', 'Large', 'LARGE', 'huge', 'Huge']
-        for s in sizes:
-            content = content.replace(f'\\{s}', '')
-        return f'$\\large {content.strip()}$'
 
-    # Sirf $...$ ke andar ka content normalize karein
+        # Remove size commands to inspect real content
+        cleaned = content
+        for s in ['small', 'normalsize', 'large', 'Large', 'LARGE', 'huge', 'Huge']:
+            cleaned = re.sub(rf'\\{s}\b', '', cleaned).strip()
+
+        # If the entire block is just \text{some plain sentence}, unwrap it
+        text_only = re.fullmatch(r'\\text\s*\{([^}]*)\}', cleaned)
+        if text_only:
+            return text_only.group(1).strip()
+
+        # Otherwise it's real math — keep as LaTeX with \large
+        return f'$\\large {cleaned}$'
+
     text = re.sub(r'\$([^$]+)\$', normalize_block, text)
     return text.strip()
 
@@ -96,14 +124,28 @@ class QuestionModel(BaseModel):
 # ========================
 
 _LATEX_RULES = r"""
-MIXED CONTENT FORMATTING RULES:
-1. Use PLAIN TEXT for all regular English words and sentences.
-2. Use LaTeX ONLY for mathematical symbols, variables, equations, and chemical formulas.
-3. EVERY LaTeX block must start with \large inside the dollar signs.
-   - Correct: "Calculate the value of $\large x$ if $\large x+2=5$."
-   - Incorrect: "Calculate $x$..."
-4. DO NOT wrap the whole sentence in LaTeX.
-5. Ensure all LaTeX is valid. Use $\large \frac{a}{b}$ for fractions, etc.
+CRITICAL FORMATTING RULES — READ CAREFULLY:
+
+RULE 1 — PLAIN TEXT IS DEFAULT:
+  Write ALL question text, option text in PLAIN ENGLISH by default.
+  Do NOT wrap normal English words or sentences in LaTeX.
+
+RULE 2 — LaTeX ONLY for math/science symbols:
+  Use $...$ ONLY for: variables, equations, fractions, Greek letters,
+  units in formulas, chemical formulas, or mathematical expressions.
+  CORRECT:   "The moment of inertia is $\large I = \frac{MR^2}{2}$."
+  CORRECT:   "A block of mass $\large m$ slides with velocity $\large v$."
+  CORRECT:   "What is the primary function of mortar in construction?"  <- NO LaTeX needed here
+  WRONG:     "$\large \text{What is the primary function of mortar?}$"  <- NEVER do this
+
+RULE 3 — \text{} is FORBIDDEN:
+  NEVER use \text{} inside dollar signs. Plain English goes outside $...$.
+
+RULE 4 — Every LaTeX block needs \large:
+  CORRECT: $\large \frac{a}{b}$     WRONG: $\frac{a}{b}$
+
+RULE 5 — Zero-math questions use ZERO LaTeX.
+  If a question has no math/symbols, write it in 100% plain text.
 """
 
 _OUTPUT_RULES = r"""
@@ -138,20 +180,41 @@ def _count_line(config: Dict) -> str:
 
 
 def _schema_example(exam_id: int) -> str:
+    """
+    Two examples are shown:
+    1. A math-heavy question (correct LaTeX usage)
+    2. A theory/text question (zero LaTeX — plain text only)
+    This teaches the AI when to use LaTeX and when NOT to.
+    """
     return (
-        '[{\n'
-        f'  "exam_id": {exam_id},\n'
-        '  "question_text": "$\\\\large \\\\text{Your question here} $",\n'
-        '  "option_a": "$\\\\large \\\\text{Option A} $",\n'
-        '  "option_b": "$\\\\large \\\\text{Option B} $",\n'
-        '  "option_c": "$\\\\large \\\\text{Option C} $",\n'
-        '  "option_d": "$\\\\large \\\\text{Option D} $",\n'
-        '  "correct_answer": "A",\n'
-        '  "question_type": "MCQ",\n'
-        '  "positive_marks": 4.0,\n'
-        '  "negative_marks": 1.0,\n'
-        '  "tolerance": 0.0\n'
-        '}]'
+        '[\n'
+        '  {\n'
+        f'    "exam_id": {exam_id},\n'
+        '    "question_text": "A block of mass $\\large m$ slides with velocity $\\large v$ on a frictionless surface. Its kinetic energy is:",\n'
+        '    "option_a": "$\\large \\frac{1}{2}mv^2$",\n'
+        '    "option_b": "$\\large mv^2$",\n'
+        '    "option_c": "$\\large 2mv^2$",\n'
+        '    "option_d": "$\\large \\frac{mv^2}{4}$",\n'
+        '    "correct_answer": "A",\n'
+        '    "question_type": "MCQ",\n'
+        '    "positive_marks": 4.0,\n'
+        '    "negative_marks": 1.0,\n'
+        '    "tolerance": 0.0\n'
+        '  },\n'
+        '  {\n'
+        f'    "exam_id": {exam_id},\n'
+        '    "question_text": "Which of the following is NOT a primary ingredient of mortar?",\n'
+        '    "option_a": "Binder",\n'
+        '    "option_b": "Fine aggregate",\n'
+        '    "option_c": "Coarse aggregate",\n'
+        '    "option_d": "Water",\n'
+        '    "correct_answer": "C",\n'
+        '    "question_type": "MCQ",\n'
+        '    "positive_marks": 4.0,\n'
+        '    "negative_marks": 1.0,\n'
+        '    "tolerance": 0.0\n'
+        '  }\n'
+        ']'
     )
 
 
@@ -184,7 +247,11 @@ class AIQuestionGenerator:
     # ------------------------------------------------------------------
 
     def extract_pdf_text(self, pdf_path: str) -> str:
-        """Extract text from PDF using pypdf — fast, no embeddings needed."""
+        """
+        Extract text from PDF using pypdf.
+        Returns empty string if PDF is image-based (no text layer).
+        Caller should check and fall back to vision mode.
+        """
         try:
             reader = PdfReader(pdf_path)
             parts = []
@@ -198,6 +265,48 @@ class AIQuestionGenerator:
             return "\n\n".join(parts)[:_MAX_CONTEXT_CHARS]
         except Exception as e:
             raise Exception(f"PDF extraction failed: {str(e)}")
+
+    def is_image_pdf(self, pdf_path: str) -> bool:
+        """Returns True if PDF has no extractable text (scanned/image-based)."""
+        try:
+            reader = PdfReader(pdf_path)
+            for page in reader.pages:
+                if (page.extract_text() or "").strip():
+                    return False
+            return True
+        except Exception:
+            return True
+
+    def generate_text_with_pdf_vision(self, pdf_path: str, prompt_suffix: str) -> str:
+        """
+        Send PDF directly to Gemini using File API — works for image-based PDFs.
+        Gemini natively reads PDF images, so no OCR step needed.
+        """
+        import base64
+        try:
+            with open(pdf_path, "rb") as f:
+                pdf_bytes = f.read()
+            pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[
+                    types.Part(
+                        inline_data=types.Blob(
+                            mime_type="application/pdf",
+                            data=pdf_b64,
+                        )
+                    ),
+                    types.Part(text=prompt_suffix),
+                ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.3,
+                ),
+            )
+            return response.text
+        except Exception as e:
+            raise Exception(f"Gemini Vision PDF error: {str(e)}")
 
     # ------------------------------------------------------------------
     # Gemini API call
@@ -223,32 +332,62 @@ class AIQuestionGenerator:
     # ------------------------------------------------------------------
 
     def extract_from_pdf(self, pdf_path: str, config: Dict) -> List[Dict]:
-        """Card A: Extract existing questions from PDF."""
-        context = self.extract_pdf_text(pdf_path)
-        prompt = (
+        """Card A: Extract existing questions from PDF. Auto-detects image-based PDFs."""
+        base_prompt = (
             "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-            "Extract questions from the provided PDF content.\n\n"
-            f"PDF CONTENT:\n{context}\n\n"
+            "Extract questions ONLY from the content of this PDF. DO NOT generate unrelated questions.\n\n"
             f"{_config_block(config)}\n\n"
             f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
             f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_count_line(config)}"
         )
-        return self._parse_and_validate(self.generate_text(prompt), config)
+        if self.is_image_pdf(pdf_path):
+            print("Detected image-based PDF — using Gemini Vision mode.")
+            return self._parse_and_validate(
+                self.generate_text_with_pdf_vision(pdf_path, base_prompt), config
+            )
+        else:
+            context = self.extract_pdf_text(pdf_path)
+            prompt = (
+                "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                "Extract questions ONLY from the provided PDF content. DO NOT generate unrelated questions.\n\n"
+                f"PDF CONTENT:\n{context}\n\n"
+                f"{_config_block(config)}\n\n"
+                f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
+                f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_count_line(config)}"
+            )
+            return self._parse_and_validate(self.generate_text(prompt), config)
 
     def mine_concepts(self, pdf_path: str, config: Dict) -> List[Dict]:
-        """Card B: Generate new questions from theory/concepts."""
-        context = self.extract_pdf_text(pdf_path)
-        prompt = (
+        """Card B: Generate new questions from theory/concepts. Auto-detects image-based PDFs."""
+        base_prompt = (
             "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-            "Generate NEW, HIGH-QUALITY questions from the theory content below.\n\n"
-            f"THEORY CONTENT:\n{context}\n\n"
+            "Generate NEW, HIGH-QUALITY questions based ONLY on the topic/content in this PDF.\n"
+            "DO NOT generate questions about unrelated topics.\n\n"
             f"{_config_block(config)}\n\n"
             f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
             f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
             f"Match the '{config['difficulty']}' difficulty level.\n"
             f"{_count_line(config)}"
         )
-        return self._parse_and_validate(self.generate_text(prompt), config)
+        if self.is_image_pdf(pdf_path):
+            print("Detected image-based PDF — using Gemini Vision mode.")
+            return self._parse_and_validate(
+                self.generate_text_with_pdf_vision(pdf_path, base_prompt), config
+            )
+        else:
+            context = self.extract_pdf_text(pdf_path)
+            prompt = (
+                "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                "Generate NEW, HIGH-QUALITY questions from the theory content below.\n"
+                "DO NOT generate questions about unrelated topics.\n\n"
+                f"THEORY CONTENT:\n{context}\n\n"
+                f"{_config_block(config)}\n\n"
+                f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
+                f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
+                f"Match the '{config['difficulty']}' difficulty level.\n"
+                f"{_count_line(config)}"
+            )
+            return self._parse_and_validate(self.generate_text(prompt), config)
 
     def generate_from_topic(self, topic: str, config: Dict) -> List[Dict]:
         """Card C: Pure generation from topic name — no PDF needed."""
