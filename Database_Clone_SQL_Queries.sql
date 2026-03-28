@@ -1,4 +1,3 @@
-```sql
 -- ============================================================
 -- ExamPortal Complete Schema Migration
 -- Run this in NEW Supabase project SQL Editor
@@ -389,4 +388,3 @@ CREATE INDEX idx_sessions_user_id ON public.sessions USING btree (user_id) WHERE
 -- ============================================================
 -- DONE! Schema migration complete.
 -- ============================================================
-```
