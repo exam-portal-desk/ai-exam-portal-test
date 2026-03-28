@@ -1,124 +1,190 @@
--- =====================================================
--- FULL DATABASE CLONE (TABLES + PK + FK + INDEXES)
--- RLS / FUNCTIONS IGNORED AS REQUESTED
--- =====================================================
+```sql
+-- ============================================================
+-- ExamPortal Complete Schema Migration
+-- Run this in NEW Supabase project SQL Editor
+-- ============================================================
 
--- =========================
--- SEQUENCES
--- =========================
-CREATE SEQUENCE users_id_seq;
-CREATE SEQUENCE subjects_id_seq;
-CREATE SEQUENCE questions_id_seq;
-CREATE SEQUENCE results_id_seq;
-CREATE SEQUENCE ai_chat_history_id_seq;
-CREATE SEQUENCE login_attempts_id_seq;
-CREATE SEQUENCE ai_usage_tracking_id_seq;
-CREATE SEQUENCE categories_id_seq;
-CREATE SEQUENCE chat_connections_id_seq;
-CREATE SEQUENCE chat_conversations_id_seq;
-CREATE SEQUENCE chat_members_id_seq;
-CREATE SEQUENCE chat_messages_id_seq;
-CREATE SEQUENCE chat_unread_id_seq;
-CREATE SEQUENCE exam_attempts_id_seq;
-CREATE SEQUENCE exams_id_seq;
-CREATE SEQUENCE pw_tokens_id_seq;
-CREATE SEQUENCE question_discussions_id_seq;
-CREATE SEQUENCE requests_raised_request_id_seq;
-CREATE SEQUENCE responses_id_seq;
-CREATE SEQUENCE sessions_id_seq;
+-- ============================================================
+-- STEP 1: DROP EXISTING TABLES (fresh start)
+-- ============================================================
+DROP TABLE IF EXISTS public.chat_visibility CASCADE;
+DROP TABLE IF EXISTS public.chat_unread CASCADE;
+DROP TABLE IF EXISTS public.chat_messages CASCADE;
+DROP TABLE IF EXISTS public.chat_members CASCADE;
+DROP TABLE IF EXISTS public.chat_conversations CASCADE;
+DROP TABLE IF EXISTS public.chat_connections CASCADE;
+DROP TABLE IF EXISTS public.question_discussions CASCADE;
+DROP TABLE IF EXISTS public.discussion_counts CASCADE;
+DROP TABLE IF EXISTS public.responses CASCADE;
+DROP TABLE IF EXISTS public.results CASCADE;
+DROP TABLE IF EXISTS public.exam_attempts CASCADE;
+DROP TABLE IF EXISTS public.questions CASCADE;
+DROP TABLE IF EXISTS public.exams CASCADE;
+DROP TABLE IF EXISTS public.ai_chat_history CASCADE;
+DROP TABLE IF EXISTS public.ai_usage_tracking CASCADE;
+DROP TABLE IF EXISTS public.sessions CASCADE;
+DROP TABLE IF EXISTS public.pw_tokens CASCADE;
+DROP TABLE IF EXISTS public.login_attempts CASCADE;
+DROP TABLE IF EXISTS public.requests_raised CASCADE;
+DROP TABLE IF EXISTS public.subjects CASCADE;
+DROP TABLE IF EXISTS public.categories CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
 
--- =========================
--- CORE TABLES
--- =========================
-CREATE TABLE users (
-  id integer PRIMARY KEY DEFAULT nextval('users_id_seq'),
-  username varchar NOT NULL UNIQUE,
-  email varchar NOT NULL UNIQUE,
-  password varchar NOT NULL,
-  full_name varchar,
-  created_at timestamp DEFAULT now(),
-  role varchar DEFAULT 'user',
-  updated_at timestamp,
-  last_login timestamp,
-  username_lower varchar,
-  email_lower varchar
+-- ============================================================
+-- STEP 2: DROP EXISTING SEQUENCES (if any)
+-- ============================================================
+DROP SEQUENCE IF EXISTS public.ai_chat_history_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.ai_usage_tracking_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.categories_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_connections_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_conversations_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_members_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_messages_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_unread_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_visibility_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.exam_attempts_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.exams_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.login_attempts_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.pw_tokens_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.question_discussions_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.questions_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.requests_raised_request_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.responses_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.results_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.sessions_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.subjects_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.users_id_seq CASCADE;
+
+-- ============================================================
+-- STEP 3: CREATE SEQUENCES
+-- ============================================================
+CREATE SEQUENCE public.ai_chat_history_id_seq;
+CREATE SEQUENCE public.ai_usage_tracking_id_seq;
+CREATE SEQUENCE public.categories_id_seq;
+CREATE SEQUENCE public.chat_connections_id_seq;
+CREATE SEQUENCE public.chat_conversations_id_seq;
+CREATE SEQUENCE public.chat_members_id_seq;
+CREATE SEQUENCE public.chat_messages_id_seq;
+CREATE SEQUENCE public.chat_unread_id_seq;
+CREATE SEQUENCE public.chat_visibility_id_seq;
+CREATE SEQUENCE public.exam_attempts_id_seq;
+CREATE SEQUENCE public.exams_id_seq;
+CREATE SEQUENCE public.login_attempts_id_seq;
+CREATE SEQUENCE public.pw_tokens_id_seq;
+CREATE SEQUENCE public.question_discussions_id_seq;
+CREATE SEQUENCE public.questions_id_seq;
+CREATE SEQUENCE public.requests_raised_request_id_seq;
+CREATE SEQUENCE public.responses_id_seq;
+CREATE SEQUENCE public.results_id_seq;
+CREATE SEQUENCE public.sessions_id_seq;
+CREATE SEQUENCE public.subjects_id_seq;
+CREATE SEQUENCE public.users_id_seq;
+
+-- ============================================================
+-- STEP 4: CREATE TABLES
+-- ============================================================
+
+CREATE TABLE public.users (
+  id integer DEFAULT nextval('users_id_seq'::regclass) NOT NULL,
+  username character varying NOT NULL,
+  email character varying NOT NULL,
+  password character varying NOT NULL,
+  full_name character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  role character varying DEFAULT 'user'::character varying,
+  updated_at timestamp without time zone,
+  last_login timestamp without time zone,
+  username_lower character varying,
+  email_lower character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_username_key UNIQUE (username),
+  CONSTRAINT users_email_key UNIQUE (email)
 );
 
-CREATE TABLE categories (
-  id integer PRIMARY KEY DEFAULT nextval('categories_id_seq'),
-  name varchar NOT NULL UNIQUE,
-  drive_file_id varchar,
-  image_url varchar,
-  created_at timestamp DEFAULT now()
+CREATE TABLE public.categories (
+  id integer DEFAULT nextval('categories_id_seq'::regclass) NOT NULL,
+  name character varying(50) NOT NULL,
+  drive_file_id character varying(255) DEFAULT NULL::character varying,
+  image_url character varying(500) DEFAULT NULL::character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT categories_pkey PRIMARY KEY (id),
+  CONSTRAINT categories_name_key UNIQUE (name)
 );
 
-CREATE TABLE subjects (
-  id integer PRIMARY KEY DEFAULT nextval('subjects_id_seq'),
-  subject_name varchar NOT NULL,
-  subject_folder_id varchar,
-  subject_folder_created_at timestamp
+CREATE TABLE public.subjects (
+  id integer DEFAULT nextval('subjects_id_seq'::regclass) NOT NULL,
+  subject_name character varying NOT NULL,
+  subject_folder_id character varying,
+  subject_folder_created_at timestamp without time zone,
+  CONSTRAINT subjects_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE login_attempts (
-  id integer PRIMARY KEY DEFAULT nextval('login_attempts_id_seq'),
-  identifier varchar NOT NULL,
-  ip_address varchar NOT NULL,
-  failed_count integer DEFAULT 0,
-  first_failed_at timestamp DEFAULT now(),
-  last_failed_at timestamp DEFAULT now(),
-  blocked_until timestamp
-);
-
-CREATE TABLE pw_tokens (
-  id integer PRIMARY KEY DEFAULT nextval('pw_tokens_id_seq'),
-  token varchar NOT NULL UNIQUE,
-  email varchar NOT NULL,
-  expires_at timestamp NOT NULL,
-  used boolean DEFAULT false,
-  created_at timestamp DEFAULT now(),
-  type varchar
-);
-
--- =========================
--- EXAM SYSTEM
--- =========================
-CREATE TABLE exams (
-  id integer PRIMARY KEY DEFAULT nextval('exams_id_seq'),
-  name varchar NOT NULL,
-  date varchar,
-  start_time varchar,
+CREATE TABLE public.exams (
+  id integer DEFAULT nextval('exams_id_seq'::regclass) NOT NULL,
+  name character varying NOT NULL,
+  date character varying,
+  start_time character varying,
   duration integer DEFAULT 60,
   total_questions integer DEFAULT 0,
-  status varchar DEFAULT 'draft',
+  status character varying DEFAULT 'draft'::character varying,
   instructions text,
-  positive_marks varchar,
-  negative_marks varchar,
+  positive_marks character varying,
+  negative_marks character varying,
   max_attempts integer,
-  result_mode varchar DEFAULT 'instant',
+  result_mode character varying DEFAULT 'instant'::character varying,
   result_delay integer DEFAULT 0,
   results_released boolean DEFAULT false,
-  category_id integer REFERENCES categories(id)
+  category_id integer,
+  CONSTRAINT exams_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE questions (
-  id integer PRIMARY KEY DEFAULT nextval('questions_id_seq'),
-  exam_id integer REFERENCES exams(id),
+CREATE TABLE public.questions (
+  id integer DEFAULT nextval('questions_id_seq'::regclass) NOT NULL,
+  exam_id integer,
   question_text text NOT NULL,
   option_a text,
   option_b text,
   option_c text,
   option_d text,
   correct_answer text,
-  question_type varchar DEFAULT 'MCQ',
+  question_type character varying DEFAULT 'MCQ'::character varying,
   image_path text,
   positive_marks integer DEFAULT 1,
   negative_marks numeric DEFAULT 0,
-  tolerance numeric DEFAULT 0
+  tolerance numeric DEFAULT 0,
+  CONSTRAINT questions_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE results (
-  id integer PRIMARY KEY DEFAULT nextval('results_id_seq'),
-  student_id integer REFERENCES users(id),
+CREATE TABLE public.sessions (
+  id integer DEFAULT nextval('sessions_id_seq'::regclass) NOT NULL,
+  token character varying NOT NULL,
+  user_id integer,
+  device_info text,
+  last_seen timestamp without time zone DEFAULT now(),
+  is_exam_active boolean DEFAULT false,
+  exam_id integer,
+  result_id integer,
+  admin_session boolean DEFAULT false,
+  active boolean DEFAULT true,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_token_key UNIQUE (token)
+);
+
+CREATE TABLE public.exam_attempts (
+  id integer DEFAULT nextval('exam_attempts_id_seq'::regclass) NOT NULL,
+  student_id integer,
+  exam_id integer,
+  attempt_number integer DEFAULT 1,
+  status character varying DEFAULT 'in_progress'::character varying,
+  start_time timestamp without time zone,
+  end_time timestamp without time zone,
+  CONSTRAINT exam_attempts_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.results (
+  id integer DEFAULT nextval('results_id_seq'::regclass) NOT NULL,
+  student_id integer,
   exam_id integer,
   score integer DEFAULT 0,
   total_questions integer DEFAULT 0,
@@ -127,211 +193,200 @@ CREATE TABLE results (
   unanswered_questions integer DEFAULT 0,
   max_score integer DEFAULT 0,
   percentage numeric DEFAULT 0,
-  grade varchar,
+  grade character varying,
   time_taken_minutes integer DEFAULT 0,
-  completed_at timestamp DEFAULT now()
+  completed_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT results_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE responses (
-  id integer PRIMARY KEY DEFAULT nextval('responses_id_seq'),
-  result_id integer REFERENCES results(id),
+CREATE TABLE public.responses (
+  id integer DEFAULT nextval('responses_id_seq'::regclass) NOT NULL,
+  result_id integer,
   exam_id integer,
-  question_id integer REFERENCES questions(id),
+  question_id integer,
   given_answer text,
   correct_answer text,
   is_correct boolean DEFAULT false,
   marks_obtained numeric DEFAULT 0,
-  question_type varchar,
-  is_attempted boolean DEFAULT false
+  question_type character varying,
+  is_attempted boolean DEFAULT false,
+  CONSTRAINT responses_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE exam_attempts (
-  id integer PRIMARY KEY DEFAULT nextval('exam_attempts_id_seq'),
-  student_id integer REFERENCES users(id),
+CREATE TABLE public.login_attempts (
+  id integer DEFAULT nextval('login_attempts_id_seq'::regclass) NOT NULL,
+  identifier character varying NOT NULL,
+  ip_address character varying NOT NULL,
+  failed_count integer DEFAULT 0,
+  first_failed_at timestamp without time zone DEFAULT now(),
+  last_failed_at timestamp without time zone DEFAULT now(),
+  blocked_until timestamp without time zone,
+  CONSTRAINT login_attempts_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.pw_tokens (
+  id integer DEFAULT nextval('pw_tokens_id_seq'::regclass) NOT NULL,
+  token character varying NOT NULL,
+  email character varying NOT NULL,
+  expires_at timestamp without time zone NOT NULL,
+  used boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now(),
+  type character varying,
+  CONSTRAINT pw_tokens_pkey PRIMARY KEY (id),
+  CONSTRAINT pw_tokens_token_key UNIQUE (token)
+);
+
+CREATE TABLE public.requests_raised (
+  request_id integer DEFAULT nextval('requests_raised_request_id_seq'::regclass) NOT NULL,
+  username character varying,
+  email character varying,
+  current_access character varying,
+  requested_access character varying,
+  request_date timestamp without time zone DEFAULT now(),
+  request_status character varying DEFAULT 'pending'::character varying,
+  reason text,
+  processed_by character varying,
+  processed_date timestamp without time zone,
+  CONSTRAINT requests_raised_pkey PRIMARY KEY (request_id)
+);
+
+CREATE TABLE public.ai_chat_history (
+  id integer DEFAULT nextval('ai_chat_history_id_seq'::regclass) NOT NULL,
+  user_id integer,
+  message text NOT NULL,
+  is_user boolean DEFAULT true,
+  "timestamp" timestamp without time zone DEFAULT now(),
+  CONSTRAINT ai_chat_history_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.ai_usage_tracking (
+  id integer DEFAULT nextval('ai_usage_tracking_id_seq'::regclass) NOT NULL,
+  user_id integer,
+  date date DEFAULT CURRENT_DATE,
+  questions_used integer DEFAULT 0,
+  CONSTRAINT ai_usage_tracking_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.chat_connections (
+  id integer DEFAULT nextval('chat_connections_id_seq'::regclass) NOT NULL,
+  requester_id integer NOT NULL,
+  recipient_id integer NOT NULL,
+  status character varying DEFAULT 'pending'::character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT chat_connections_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.chat_conversations (
+  id integer DEFAULT nextval('chat_conversations_id_seq'::regclass) NOT NULL,
+  is_group boolean DEFAULT false,
+  group_name character varying,
+  created_by integer,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT chat_conversations_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.chat_members (
+  id integer DEFAULT nextval('chat_members_id_seq'::regclass) NOT NULL,
+  conversation_id integer NOT NULL,
+  user_id integer NOT NULL,
+  joined_at timestamp without time zone DEFAULT now(),
+  role character varying DEFAULT 'member'::character varying,
+  CONSTRAINT chat_members_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.chat_messages (
+  id integer DEFAULT nextval('chat_messages_id_seq'::regclass) NOT NULL,
+  conversation_id integer NOT NULL,
+  sender_id integer NOT NULL,
+  sender_name character varying NOT NULL,
+  message text NOT NULL,
+  is_deleted boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now(),
+  is_edited boolean DEFAULT false,
+  reply_to_id integer,
+  reply_to_text character varying,
+  reply_to_name character varying,
+  CONSTRAINT chat_messages_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.chat_unread (
+  id integer DEFAULT nextval('chat_unread_id_seq'::regclass) NOT NULL,
+  user_id integer NOT NULL,
+  conversation_id integer NOT NULL,
+  count integer DEFAULT 0,
+  CONSTRAINT chat_unread_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.chat_visibility (
+  id integer NOT NULL,
+  user_id integer NOT NULL,
+  conversation_id integer NOT NULL,
+  cleared_at timestamp without time zone DEFAULT now() NOT NULL,
+  CONSTRAINT chat_visibility_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.discussion_counts (
+  question_id integer NOT NULL,
+  count integer DEFAULT 0,
+  CONSTRAINT discussion_counts_pkey PRIMARY KEY (question_id)
+);
+
+CREATE TABLE public.question_discussions (
+  id integer DEFAULT nextval('question_discussions_id_seq'::regclass) NOT NULL,
+  question_id integer NOT NULL,
   exam_id integer,
-  attempt_number integer DEFAULT 1,
-  status varchar DEFAULT 'in_progress',
-  start_time timestamp,
-  end_time timestamp
-);
-
--- =========================
--- DISCUSSION SYSTEM
--- =========================
-CREATE TABLE discussion_counts (
-  question_id integer PRIMARY KEY REFERENCES questions(id),
-  count integer DEFAULT 0
-);
-
-CREATE TABLE question_discussions (
-  id integer PRIMARY KEY DEFAULT nextval('question_discussions_id_seq'),
-  question_id integer REFERENCES questions(id),
-  exam_id integer REFERENCES exams(id),
-  user_id integer REFERENCES users(id),
-  username varchar NOT NULL,
+  user_id integer NOT NULL,
+  username character varying NOT NULL,
   message text NOT NULL,
   parent_id integer,
   is_pinned boolean DEFAULT false,
   is_best_answer boolean DEFAULT false,
   is_deleted boolean DEFAULT false,
   is_edited boolean DEFAULT false,
-  created_at timestamp DEFAULT now(),
-  updated_at timestamp DEFAULT now()
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT question_discussions_pkey PRIMARY KEY (id)
 );
 
--- =========================
--- AI SYSTEM
--- =========================
-CREATE TABLE ai_chat_history (
-  id integer PRIMARY KEY DEFAULT nextval('ai_chat_history_id_seq'),
-  user_id integer REFERENCES users(id),
-  message text NOT NULL,
-  is_user boolean DEFAULT true,
-  timestamp timestamp DEFAULT now()
-);
+-- ============================================================
+-- STEP 5: CREATE INDEXES (non-primary, non-unique)
+-- ============================================================
 
-CREATE TABLE ai_usage_tracking (
-  id integer PRIMARY KEY DEFAULT nextval('ai_usage_tracking_id_seq'),
-  user_id integer REFERENCES users(id),
-  date date DEFAULT CURRENT_DATE,
-  questions_used integer DEFAULT 0
-);
+-- ai_chat_history
+CREATE INDEX idx_ai_chat_user_id ON public.ai_chat_history USING btree (user_id);
 
--- =========================
--- SESSION MANAGEMENT
--- =========================
-CREATE TABLE sessions (
-  id integer PRIMARY KEY DEFAULT nextval('sessions_id_seq'),
-  token varchar NOT NULL UNIQUE,
-  user_id integer REFERENCES users(id),
-  device_info text,
-  last_seen timestamp DEFAULT now(),
-  is_exam_active boolean DEFAULT false,
-  exam_id integer,
-  result_id integer,
-  admin_session boolean DEFAULT false,
-  active boolean DEFAULT true,
-  created_at timestamp DEFAULT now()
-);
+-- ai_usage_tracking
+CREATE INDEX idx_ai_usage_user_date ON public.ai_usage_tracking USING btree (user_id, date);
 
--- =========================
--- CHAT SYSTEM
--- =========================
-CREATE TABLE chat_conversations (
-  id integer PRIMARY KEY DEFAULT nextval('chat_conversations_id_seq'),
-  is_group boolean DEFAULT false,
-  group_name varchar,
-  created_by integer REFERENCES users(id),
-  created_at timestamp DEFAULT now()
-);
+-- exam_attempts
+CREATE INDEX idx_attempts_status ON public.exam_attempts USING btree (status);
+CREATE INDEX idx_attempts_student_exam ON public.exam_attempts USING btree (student_id, exam_id);
 
-CREATE TABLE chat_connections (
-  id integer PRIMARY KEY DEFAULT nextval('chat_connections_id_seq'),
-  requester_id integer REFERENCES users(id),
-  recipient_id integer REFERENCES users(id),
-  status varchar DEFAULT 'pending',
-  created_at timestamp DEFAULT now(),
-  updated_at timestamp DEFAULT now()
-);
+-- exams
+CREATE INDEX idx_exam_category_id ON public.exams USING btree (category_id);
 
-CREATE TABLE chat_members (
-  id integer PRIMARY KEY DEFAULT nextval('chat_members_id_seq'),
-  conversation_id integer REFERENCES chat_conversations(id),
-  user_id integer REFERENCES users(id),
-  joined_at timestamp DEFAULT now(),
-  role varchar DEFAULT 'member'
-);
+-- login_attempts
+CREATE INDEX idx_login_attempts_identifier ON public.login_attempts USING btree (identifier, ip_address);
 
-CREATE TABLE chat_messages (
-  id integer PRIMARY KEY DEFAULT nextval('chat_messages_id_seq'),
-  conversation_id integer REFERENCES chat_conversations(id),
-  sender_id integer REFERENCES users(id),
-  sender_name varchar NOT NULL,
-  message text NOT NULL,
-  is_deleted boolean DEFAULT false,
-  created_at timestamp DEFAULT now(),
-  is_edited boolean DEFAULT false,
-  reply_to_id integer,
-  reply_to_text varchar,
-  reply_to_name varchar
-);
+-- questions
+CREATE INDEX idx_questions_exam_id ON public.questions USING btree (exam_id);
 
-CREATE TABLE chat_unread (
-  id integer PRIMARY KEY DEFAULT nextval('chat_unread_id_seq'),
-  user_id integer REFERENCES users(id),
-  conversation_id integer REFERENCES chat_conversations(id),
-  count integer DEFAULT 0
-);
+-- responses
+CREATE INDEX idx_responses_exam_id ON public.responses USING btree (exam_id);
+CREATE INDEX idx_responses_question_id ON public.responses USING btree (question_id);
+CREATE INDEX idx_responses_result_id ON public.responses USING btree (result_id);
 
-CREATE TABLE chat_visibility (
-  id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id integer REFERENCES users(id),
-  conversation_id integer REFERENCES chat_conversations(id),
-  cleared_at timestamp DEFAULT now()
-);
+-- results
+CREATE INDEX idx_results_completed_at ON public.results USING btree (completed_at DESC);
+CREATE INDEX idx_results_exam_id ON public.results USING btree (exam_id);
+CREATE INDEX idx_results_student_id ON public.results USING btree (student_id);
 
--- =========================
--- MISC
--- =========================
-CREATE TABLE requests_raised (
-  request_id integer PRIMARY KEY DEFAULT nextval('requests_raised_request_id_seq'),
-  username varchar,
-  email varchar,
-  current_access varchar,
-  requested_access varchar,
-  request_date timestamp DEFAULT now(),
-  request_status varchar DEFAULT 'pending',
-  reason text,
-  processed_by varchar,
-  processed_date timestamp
-);
+-- sessions (partial indexes — only active sessions)
+CREATE INDEX idx_sessions_token ON public.sessions USING btree (token) WHERE (active = true);
+CREATE INDEX idx_sessions_user_id ON public.sessions USING btree (user_id) WHERE (active = true);
 
--- =========================
--- INDEXES (PERFORMANCE)
--- =========================
-
--- USERS
-CREATE INDEX idx_users_username_lower ON users (username_lower);
-CREATE INDEX idx_users_email_lower ON users (email_lower);
-
--- EXAMS
-CREATE INDEX idx_exams_category_id ON exams (category_id);
-
--- QUESTIONS
-CREATE INDEX idx_questions_exam_id ON questions (exam_id);
-
--- RESULTS
-CREATE INDEX idx_results_student_id ON results (student_id);
-CREATE INDEX idx_results_exam_id ON results (exam_id);
-
--- RESPONSES
-CREATE INDEX idx_responses_result_id ON responses (result_id);
-CREATE INDEX idx_responses_question_id ON responses (question_id);
-
--- DISCUSSIONS
-CREATE INDEX idx_qd_question_id ON question_discussions (question_id);
-CREATE INDEX idx_qd_user_id ON question_discussions (user_id);
-
--- AI
-CREATE INDEX idx_ai_chat_user_id ON ai_chat_history (user_id);
-CREATE INDEX idx_ai_usage_user_date ON ai_usage_tracking (user_id, date);
-
--- SESSIONS
-CREATE INDEX idx_sessions_user_id ON sessions (user_id);
-
--- CHAT
-CREATE INDEX idx_chat_conv_created_by ON chat_conversations (created_by);
-CREATE INDEX idx_chat_conn_requester ON chat_connections (requester_id);
-CREATE INDEX idx_chat_conn_recipient ON chat_connections (recipient_id);
-CREATE INDEX idx_chat_members_conv ON chat_members (conversation_id);
-CREATE INDEX idx_chat_members_user ON chat_members (user_id);
-CREATE INDEX idx_chat_messages_conv ON chat_messages (conversation_id);
-CREATE INDEX idx_chat_messages_sender ON chat_messages (sender_id);
-CREATE INDEX idx_chat_unread_user_conv ON chat_unread (user_id, conversation_id);
-
--- LOGIN
-CREATE INDEX idx_login_identifier_ip ON login_attempts (identifier, ip_address);
-
--- =====================================================
--- END OF FULL DATABASE ARCHITECTURE
--- =====================================================
+-- ============================================================
+-- DONE! Schema migration complete.
+-- ============================================================
+```
