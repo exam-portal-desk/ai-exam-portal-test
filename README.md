@@ -709,6 +709,289 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
+## Clone DB queries
+
+```sql
+-- ============================================================
+-- ExamPortal Complete Schema Migration
+-- Run this in NEW Supabase project SQL Editor
+-- ============================================================
+
+-- STEP 1: DROP TABLES
+DROP TABLE IF EXISTS public.chat_visibility CASCADE;
+DROP TABLE IF EXISTS public.chat_unread CASCADE;
+DROP TABLE IF EXISTS public.chat_messages CASCADE;
+DROP TABLE IF EXISTS public.chat_members CASCADE;
+DROP TABLE IF EXISTS public.chat_conversations CASCADE;
+DROP TABLE IF EXISTS public.chat_connections CASCADE;
+DROP TABLE IF EXISTS public.question_discussions CASCADE;
+DROP TABLE IF EXISTS public.discussion_counts CASCADE;
+DROP TABLE IF EXISTS public.responses CASCADE;
+DROP TABLE IF EXISTS public.results CASCADE;
+DROP TABLE IF EXISTS public.exam_attempts CASCADE;
+DROP TABLE IF EXISTS public.questions CASCADE;
+DROP TABLE IF EXISTS public.exams CASCADE;
+DROP TABLE IF EXISTS public.ai_chat_history CASCADE;
+DROP TABLE IF EXISTS public.ai_usage_tracking CASCADE;
+DROP TABLE IF EXISTS public.sessions CASCADE;
+DROP TABLE IF EXISTS public.pw_tokens CASCADE;
+DROP TABLE IF EXISTS public.login_attempts CASCADE;
+DROP TABLE IF EXISTS public.requests_raised CASCADE;
+DROP TABLE IF EXISTS public.subjects CASCADE;
+DROP TABLE IF EXISTS public.categories CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
+
+-- STEP 2: DROP SEQUENCES
+DROP SEQUENCE IF EXISTS public.ai_chat_history_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.ai_usage_tracking_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.categories_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_connections_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_conversations_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_members_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_messages_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_unread_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.chat_visibility_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.exam_attempts_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.exams_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.login_attempts_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.pw_tokens_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.question_discussions_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.questions_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.requests_raised_request_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.responses_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.results_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.sessions_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.subjects_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS public.users_id_seq CASCADE;
+
+-- STEP 3: CREATE SEQUENCES
+CREATE SEQUENCE public.ai_chat_history_id_seq;
+CREATE SEQUENCE public.ai_usage_tracking_id_seq;
+CREATE SEQUENCE public.categories_id_seq;
+CREATE SEQUENCE public.chat_connections_id_seq;
+CREATE SEQUENCE public.chat_conversations_id_seq;
+CREATE SEQUENCE public.chat_members_id_seq;
+CREATE SEQUENCE public.chat_messages_id_seq;
+CREATE SEQUENCE public.chat_unread_id_seq;
+CREATE SEQUENCE public.chat_visibility_id_seq;
+CREATE SEQUENCE public.exam_attempts_id_seq;
+CREATE SEQUENCE public.exams_id_seq;
+CREATE SEQUENCE public.login_attempts_id_seq;
+CREATE SEQUENCE public.pw_tokens_id_seq;
+CREATE SEQUENCE public.question_discussions_id_seq;
+CREATE SEQUENCE public.questions_id_seq;
+CREATE SEQUENCE public.requests_raised_request_id_seq;
+CREATE SEQUENCE public.responses_id_seq;
+CREATE SEQUENCE public.results_id_seq;
+CREATE SEQUENCE public.sessions_id_seq;
+CREATE SEQUENCE public.subjects_id_seq;
+CREATE SEQUENCE public.users_id_seq;
+
+-- STEP 4: TABLES
+
+CREATE TABLE public.users (
+  id integer DEFAULT nextval('users_id_seq') NOT NULL,
+  username varchar NOT NULL,
+  email varchar NOT NULL,
+  password varchar NOT NULL,
+  full_name varchar,
+  created_at timestamp DEFAULT now(),
+  role varchar DEFAULT 'user',
+  updated_at timestamp,
+  last_login timestamp,
+  username_lower varchar,
+  email_lower varchar,
+  PRIMARY KEY (id),
+  UNIQUE (username),
+  UNIQUE (email)
+);
+
+CREATE TABLE public.categories (
+  id integer DEFAULT nextval('categories_id_seq') NOT NULL,
+  name varchar(50) NOT NULL,
+  drive_file_id varchar(255),
+  image_url varchar(500),
+  created_at timestamp DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (name)
+);
+
+CREATE TABLE public.subjects (
+  id integer DEFAULT nextval('subjects_id_seq') NOT NULL,
+  subject_name varchar NOT NULL,
+  subject_folder_id varchar,
+  subject_folder_created_at timestamp,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.exams (
+  id integer DEFAULT nextval('exams_id_seq') NOT NULL,
+  name varchar NOT NULL,
+  date varchar,
+  start_time varchar,
+  duration integer DEFAULT 60,
+  total_questions integer DEFAULT 0,
+  status varchar DEFAULT 'draft',
+  instructions text,
+  positive_marks varchar,
+  negative_marks varchar,
+  max_attempts integer,
+  result_mode varchar DEFAULT 'instant',
+  result_delay integer DEFAULT 0,
+  results_released boolean DEFAULT false,
+  category_id integer,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.questions (
+  id integer DEFAULT nextval('questions_id_seq') NOT NULL,
+  exam_id integer,
+  question_text text NOT NULL,
+  option_a text,
+  option_b text,
+  option_c text,
+  option_d text,
+  correct_answer text,
+  question_type varchar DEFAULT 'MCQ',
+  image_path text,
+  positive_marks integer DEFAULT 1,
+  negative_marks numeric DEFAULT 0,
+  tolerance numeric DEFAULT 0,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.sessions (
+  id integer DEFAULT nextval('sessions_id_seq') NOT NULL,
+  token varchar NOT NULL,
+  user_id integer,
+  device_info text,
+  last_seen timestamp DEFAULT now(),
+  is_exam_active boolean DEFAULT false,
+  exam_id integer,
+  result_id integer,
+  admin_session boolean DEFAULT false,
+  active boolean DEFAULT true,
+  created_at timestamp DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (token)
+);
+
+CREATE TABLE public.exam_attempts (
+  id integer DEFAULT nextval('exam_attempts_id_seq') NOT NULL,
+  student_id integer,
+  exam_id integer,
+  attempt_number integer DEFAULT 1,
+  status varchar DEFAULT 'in_progress',
+  start_time timestamp,
+  end_time timestamp,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.results (
+  id integer DEFAULT nextval('results_id_seq') NOT NULL,
+  student_id integer,
+  exam_id integer,
+  score integer DEFAULT 0,
+  total_questions integer DEFAULT 0,
+  correct_answers integer DEFAULT 0,
+  incorrect_answers integer DEFAULT 0,
+  unanswered_questions integer DEFAULT 0,
+  max_score integer DEFAULT 0,
+  percentage numeric DEFAULT 0,
+  grade varchar,
+  time_taken_minutes integer DEFAULT 0,
+  completed_at timestamp DEFAULT now(),
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.responses (
+  id integer DEFAULT nextval('responses_id_seq') NOT NULL,
+  result_id integer,
+  exam_id integer,
+  question_id integer,
+  given_answer text,
+  correct_answer text,
+  is_correct boolean DEFAULT false,
+  marks_obtained numeric DEFAULT 0,
+  question_type varchar,
+  is_attempted boolean DEFAULT false,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.login_attempts (
+  id integer DEFAULT nextval('login_attempts_id_seq') NOT NULL,
+  identifier varchar NOT NULL,
+  ip_address varchar NOT NULL,
+  failed_count integer DEFAULT 0,
+  first_failed_at timestamp DEFAULT now(),
+  last_failed_at timestamp DEFAULT now(),
+  blocked_until timestamp,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.pw_tokens (
+  id integer DEFAULT nextval('pw_tokens_id_seq') NOT NULL,
+  token varchar NOT NULL,
+  email varchar NOT NULL,
+  expires_at timestamp NOT NULL,
+  used boolean DEFAULT false,
+  created_at timestamp DEFAULT now(),
+  type varchar,
+  PRIMARY KEY (id),
+  UNIQUE (token)
+);
+
+CREATE TABLE public.requests_raised (
+  request_id integer DEFAULT nextval('requests_raised_request_id_seq') NOT NULL,
+  username varchar,
+  email varchar,
+  current_access varchar,
+  requested_access varchar,
+  request_date timestamp DEFAULT now(),
+  request_status varchar DEFAULT 'pending',
+  reason text,
+  processed_by varchar,
+  processed_date timestamp,
+  PRIMARY KEY (request_id)
+);
+
+CREATE TABLE public.ai_chat_history (
+  id integer DEFAULT nextval('ai_chat_history_id_seq') NOT NULL,
+  user_id integer,
+  message text NOT NULL,
+  is_user boolean DEFAULT true,
+  timestamp timestamp DEFAULT now(),
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE public.ai_usage_tracking (
+  id integer DEFAULT nextval('ai_usage_tracking_id_seq') NOT NULL,
+  user_id integer,
+  date date DEFAULT CURRENT_DATE,
+  questions_used integer DEFAULT 0,
+  PRIMARY KEY (id)
+);
+
+-- STEP 5: INDEXES
+CREATE INDEX idx_ai_chat_user_id ON public.ai_chat_history(user_id);
+CREATE INDEX idx_ai_usage_user_date ON public.ai_usage_tracking(user_id, date);
+CREATE INDEX idx_attempts_status ON public.exam_attempts(status);
+CREATE INDEX idx_attempts_student_exam ON public.exam_attempts(student_id, exam_id);
+CREATE INDEX idx_exam_category_id ON public.exams(category_id);
+CREATE INDEX idx_login_attempts_identifier ON public.login_attempts(identifier, ip_address);
+CREATE INDEX idx_questions_exam_id ON public.questions(exam_id);
+CREATE INDEX idx_responses_exam_id ON public.responses(exam_id);
+CREATE INDEX idx_responses_question_id ON public.responses(question_id);
+CREATE INDEX idx_responses_result_id ON public.responses(result_id);
+CREATE INDEX idx_results_completed_at ON public.results(completed_at DESC);
+CREATE INDEX idx_results_exam_id ON public.results(exam_id);
+CREATE INDEX idx_results_student_id ON public.results(student_id);
+CREATE INDEX idx_sessions_token ON public.sessions(token) WHERE active = true;
+CREATE INDEX idx_sessions_user_id ON public.sessions(user_id) WHERE active = true;
+
+-- DONE
+```
+
 <div align="center">
 
 Built with Flask · Powered by Gemini AI · Backed by Supabase · Sessions on Redis
