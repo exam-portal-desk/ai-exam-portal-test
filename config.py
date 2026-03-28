@@ -46,6 +46,12 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 GOOGLE_SERVICE_TOKEN_JSON = os.environ.get("GOOGLE_SERVICE_TOKEN_JSON", "token.json")
 GOOGLE_OAUTH_CLIENT_JSON = os.environ.get("GOOGLE_OAUTH_CLIENT_JSON", "")
 
+# ─────────────────────────────────────────────
+# Google OAuth (Sign in with Google)
+# ─────────────────────────────────────────────
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+
 # Drive folder IDs
 ROOT_FOLDER_ID = os.environ.get("ROOT_FOLDER_ID", "")
 IMAGES_FOLDER_ID = os.environ.get("IMAGES_FOLDER_ID", "")

@@ -1,120 +1,138 @@
 Folder PATH listing for volume New Volume
 Volume serial number is 9C0D-8C3A
 G:.
-¦   .env
-¦   ai_question_generator.py
-¦   chat.py
-¦   client_secret_web_local.json
-¦   config.py
-¦   discussion.py
-¦   email_utils.py
-¦   folder_structure.txt
-¦   google_drive_service.py
-¦   latex_editor.py
-¦   login_attempts_cache.py
-¦   main.py
-¦   requirements.txt
-¦   service_account.json
-¦   sessions.py
-¦   structure.txt
-¦   supabase_db.py
-¦   supabase_schema.txt
-¦   token.json
-¦   
+|   .env
+|   ai_question_generator.py
+|   chat.py
+|   client_secret_web_local.json
+|   config.py
+|   DB_Clone_SQL_Queries.sql
+|   discussion.py
+|   email_utils.py
+|   folder_structure.txt
+|   generate_token.py
+|   google_drive_service.py
+|   latex_editor.py
+|   LICENSE
+|   login_attempts_cache.py
+|   main.py
+|   README.md
+|   requirements.txt
+|   service_account.json
+|   sessions.py
+|   supabase_db.py
+|   supabase_schema.txt.txt
+|   token.json
+|   
 +---app
-¦   ¦   __init__.py
-¦   ¦   
-¦   +---db
-¦   ¦       ai.py
-¦   ¦       attempts.py
-¦   ¦       auth.py
-¦   ¦       categories.py
-¦   ¦       exams.py
-¦   ¦       misc.py
-¦   ¦       questions.py
-¦   ¦       results.py
-¦   ¦       sessions.py
-¦   ¦       users.py
-¦   ¦       __init__.py
-¦   ¦       
-¦   +---middleware
-¦   ¦       session_guard.py
-¦   ¦       
-¦   +---routes
-¦   ¦   ¦   ai_assistant.py
-¦   ¦   ¦   auth.py
-¦   ¦   ¦   categories.py
-¦   ¦   ¦   dashboard.py
-¦   ¦   ¦   exam.py
-¦   ¦   ¦   misc.py
-¦   ¦   ¦   result.py
-¦   ¦   ¦   
-¦   ¦   +---admin
-¦   ¦           ai_centre.py
-¦   ¦           attempts.py
-¦   ¦           auth.py
-¦   ¦           categories.py
-¦   ¦           dashboard.py
-¦   ¦           exams.py
-¦   ¦           images.py
-¦   ¦           questions.py
-¦   ¦           requests.py
-¦   ¦           results.py
-¦   ¦           subjects.py
-¦   ¦           users.py
-¦   ¦           __init__.py
-¦   ¦           
-¦   +---services
-¦   ¦       ai_service.py
-¦   ¦       auth_service.py
-¦   ¦       drive_service.py
-¦   ¦       email_service.py
-¦   ¦       exam_service.py
-¦   ¦       pdf_service.py
-¦   ¦       result_service.py
-¦   ¦       user_deletion_service.py
-¦   ¦       
-¦   +---utils
-¦           cache.py
-¦           helpers.py
-¦           latex.py
-¦           sanitize.py
-¦           
+|   |   __init__.py
+|   |   
+|   +---db
+|   |       ai.py
+|   |       attempts.py
+|   |       auth.py
+|   |       categories.py
+|   |       exams.py
+|   |       misc.py
+|   |       questions.py
+|   |       results.py
+|   |       sessions.py
+|   |       users.py
+|   |       __init__.py
+|   |       
+|   +---middleware
+|   |       session_guard.py
+|   |       
+|   +---routes
+|   |   |   ai_assistant.py
+|   |   |   auth.py
+|   |   |   categories.py
+|   |   |   dashboard.py
+|   |   |   exam.py
+|   |   |   misc.py
+|   |   |   result.py
+|   |   |   
+|   |   \---admin
+|   |       |   ai_centre.py
+|   |       |   attempts.py
+|   |       |   auth.py
+|   |       |   categories.py
+|   |       |   dashboard.py
+|   |       |   exams.py
+|   |       |   images.py
+|   |       |   questions.py
+|   |       |   requests.py
+|   |       |   results.py
+|   |       |   subjects.py
+|   |       |   users.py
+|   |       |   __init__.py
+|   |       |   
+|   |       \---__pycache__
+|   |               ai_centre.cpython-311.pyc
+|   |               attempts.cpython-311.pyc
+|   |               auth.cpython-311.pyc
+|   |               categories.cpython-311.pyc
+|   |               dashboard.cpython-311.pyc
+|   |               exams.cpython-311.pyc
+|   |               images.cpython-311.pyc
+|   |               questions.cpython-311.pyc
+|   |               requests.cpython-311.pyc
+|   |               results.cpython-311.pyc
+|   |               subjects.cpython-311.pyc
+|   |               users.cpython-311.pyc
+|   |               __init__.cpython-311.pyc
+|   |               
+|   +---services
+|   |       ai_service.py
+|   |       auth_service.py
+|   |       drive_service.py
+|   |       email_service.py
+|   |       exam_service.py
+|   |       pdf_service.py
+|   |       result_service.py
+|   |       user_deletion_service.py
+|   |       
+|   \---utils
+|           cache.py
+|           helpers.py
+|           latex.py
+|           sanitize.py
+|           
 +---static
-¦       favicon.png
-¦       
-+---templates
-    ¦   about.html
-    ¦   admin_base.html
-    ¦   ai_assistant.html
-    ¦   base.html
-    ¦   categories.html
-    ¦   chat.html
-    ¦   contact.html
-    ¦   create_account.html
-    ¦   dashboard.html
-    ¦   error.html
-    ¦   exam_instructions.html
-    ¦   exam_page.html
-    ¦   index.html
-    ¦   login.html
-    ¦   logout_redirect.html
-    ¦   password_reset.html
-    ¦   password_reset_form.html
-    ¦   password_setup_form.html
-    ¦   privacy_policy.html
-    ¦   registration_success.html
-    ¦   request_admin_access.html
-    ¦   response.html
-    ¦   result.html
-    ¦   results_history.html
-    ¦   result_pending.html
-    ¦   select_portal.html
-    ¦   student_analytics.html
-    ¦   support.html
-    ¦   terms_of_service.html
-    ¦   
-    +---admin
+|       favicon.png
+|       
+\---templates
+    |   about.html
+    |   admin_base.html
+    |   ai_assistant.html
+    |   base.html
+    |   categories.html
+    |   chat.html
+    |   contact.html
+    |   create_account.html
+    |   dashboard.html
+    |   error.html
+    |   exam_instructions.html
+    |   exam_page.html
+    |   index.html
+    |   login.html
+    |   logout_redirect.html
+    |   password_reset.html
+    |   password_reset_form.html
+    |   password_setup_form.html
+    |   privacy_policy.html
+    |   registration_success.html
+    |   request_admin_access.html
+    |   response.html
+    |   result.html
+    |   results_history.html
+    |   result_pending.html
+    |   select_portal.html
+    |   student_analytics.html
+    |   support.html
+    |   terms_of_service.html
+    |   
+    \---admin
             admin_login.html
             ai_command_centre.html
             attempts.html

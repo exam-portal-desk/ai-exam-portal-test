@@ -7,6 +7,7 @@
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-Sessions-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Google Gemini](https://img.shields.io/badge/Gemini_API-AI_Engine-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![Google OAuth](https://img.shields.io/badge/Google_OAuth-Sign_In-4285F4?style=for-the-badge&logo=google&logoColor=white)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)
 
 **A production-grade, AI-powered examination platform built for modern educational institutions.**  
@@ -70,6 +71,12 @@ Administrators have granular control over result visibility:
 - Detailed response analysis per question
 - Admin analytics dashboard with cross-exam comparisons
 
+### Authentication
+- **Sign in with Google** — One-click OAuth login via Google accounts (Authlib + OpenID Connect)
+- Automatic account creation for new Google users with first-admin role logic
+- Seamless linking of existing email accounts to Google identity
+- Standard email/password login retained alongside OAuth
+
 ### Communication
 - Built-in peer-to-peer and group chat system with Socket.IO
 - Connection request / accept flow
@@ -127,6 +134,7 @@ Administrators have granular control over result visibility:
 | **Database** | Supabase (PostgreSQL), supabase-py 2.28.0 |
 | **Session Store** | Redis 5.0.1 (Flask-Session) |
 | **Auth & Sessions** | Flask-Session 0.8.0, bcrypt 5.0.0 |
+| **Google OAuth** | Authlib 1.3.2 (Sign in with Google, OpenID Connect) |
 | **AI — Question Generation** | Google Gemini API (google-genai 1.14.0) |
 | **AI — Study Assistant** | Groq API (LLaMA 3.3 70B) |
 | **Image Storage** | Google Drive API v3 |
@@ -412,9 +420,14 @@ GOOGLE_SERVICE_TOKEN_JSON=token.json
 GOOGLE_OAUTH_CLIENT_JSON=client_secret_web_local.json
 OAUTHLIB_INSECURE_TRANSPORT=1        # Set to 0 in production (HTTPS only)
 
+# ── Google Sign In (OAuth 2.0) ─────────────────────────────────────────────────
+GOOGLE_OAUTH_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+
 # ── Google Drive ───────────────────────────────────────────────────────────────
 ROOT_FOLDER_ID=your-root-drive-folder-id
 IMAGES_FOLDER_ID=your-images-drive-folder-id
+DRIVE_CATEGORY_FOLDER_ID=your-category-images-folder-id
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 EMAIL_ADDRESS=your-gmail@gmail.com
@@ -446,9 +459,12 @@ GEMINI_MODEL_NAME=gemini-2.5-flash
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | ✅ | Path to Google service account credentials JSON |
 | `GOOGLE_SERVICE_TOKEN_JSON` | ✅ | Path to cached OAuth token JSON |
 | `GOOGLE_OAUTH_CLIENT_JSON` | ✅ | Path to OAuth client secret JSON |
+| `GOOGLE_OAUTH_CLIENT_ID` | ✅ | Google OAuth 2.0 Client ID (Sign in with Google) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | ✅ | Google OAuth 2.0 Client Secret (Sign in with Google) |
 | `OAUTHLIB_INSECURE_TRANSPORT` | ✅ | `1` for local HTTP dev, `0` for HTTPS production |
 | `ROOT_FOLDER_ID` | ✅ | Google Drive root folder ID |
 | `IMAGES_FOLDER_ID` | ✅ | Google Drive folder for question images |
+| `DRIVE_CATEGORY_FOLDER_ID` | ✅ | Google Drive folder for category images |
 | `EMAIL_ADDRESS` | ✅ | Gmail address used for SMTP sending |
 | `FROM_EMAIL` | ✅ | Sender address shown in outgoing emails |
 | `MAILJET_API_KEY` | ✅ | Mailjet API key |
@@ -461,7 +477,7 @@ GEMINI_MODEL_NAME=gemini-2.5-flash
 | `GEMINI_API_KEY` | ✅ | Google Gemini API key for question generation |
 | `GEMINI_MODEL_NAME` | ✅ | Gemini model (default: `gemini-2.5-flash`) |
 
-> ⚠️ **Never commit** `.env`, `service_account.json`, `token.json`, or `client_secret_web_local.json`. All four must be in `.gitignore`.
+> ⚠️ **Never commit** `.env`, `service_account.json`, `token.json`, or `client_secret_web_local.json`. All four must be in `.gitignore`. `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` must also stay in `.env` only.
 
 ---
 
@@ -623,6 +639,7 @@ All dependencies are pinned in `requirements.txt`. Key packages:
 | `gevent-websocket` | 0.10.1 | gevent WebSocket worker for Gunicorn |
 | `redis` | 5.0.1 | Redis client (sessions + Socket.IO queue) |
 | `supabase` | 2.28.0 | Supabase Python client |
+| `authlib` | 1.3.2 | Google OAuth 2.0 / Sign in with Google |
 | `google-genai` | 1.14.0 | Google Gemini AI (question generation) |
 | `google-api-python-client` | 2.191.0 | Google Drive API |
 | `google-auth` | 2.34.0 | Google OAuth2 |
@@ -651,7 +668,7 @@ The platform uses PostgreSQL via Supabase. Core tables:
 
 | Table | Purpose |
 |---|---|
-| `users` | Student and admin accounts |
+| `users` | Student and admin accounts (includes `google_id`, `auth_provider` for OAuth) |
 | `exams` | Exam configuration and metadata |
 | `questions` | Question bank (MCQ, MSQ, Numeric) |
 | `exam_attempts` | Attempt tracking per student per exam |

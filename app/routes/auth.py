@@ -1,7 +1,8 @@
 """
 app/routes/auth.py
 Authentication routes:
-  login, logout, register, portal selection, password setup/reset.
+  login, logout, register, portal selection, password setup/reset,
+  Google OAuth (Sign in with Google).
 
 DELETE ACCOUNT: now delegates to app.services.user_deletion_service
   for a complete, safe, ordered deletion of all user data.
@@ -17,7 +18,7 @@ from flask import (
 
 from app.db.users import (
     get_user_by_username, get_user_by_email,
-    get_all_users, create_user,
+    get_user_by_google_id, get_all_users, create_user,
     update_user,
 )
 from app.db.sessions import create_session, invalidate_session, set_exam_active
@@ -521,6 +522,135 @@ def delete_account():
         return jsonify({"success": True})
     else:
         return jsonify({"success": False, "message": message}), 500
+
+
+# ─────────────────────────────────────────────
+# Google OAuth — Sign in with Google
+# ─────────────────────────────────────────────
+
+def _get_google_oauth():
+    """Return the registered Authlib Google client, or None if not configured."""
+    try:
+        from authlib.integrations.flask_client import OAuth
+        from flask import current_app
+        # Authlib stores the OAuth instance under this extension key
+        oauth = current_app.extensions.get("authlib.integrations.flask_client")
+        if oauth is None:
+            return None
+        client = oauth.google
+        return client
+    except Exception as e:
+        print(f"[auth] _get_google_oauth error: {e}")
+        return None
+
+
+@auth_bp.route("/auth/google")
+def google_login():
+    """Initiate Google OAuth flow."""
+    google = _get_google_oauth()
+    if google is None:
+        flash("Google login is not configured. Please use email/password.", "warning")
+        return redirect(url_for("auth.login"))
+
+    redirect_uri = url_for("auth.google_callback", _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+
+@auth_bp.route("/auth/google/callback")
+def google_callback():
+    """Handle Google OAuth callback."""
+    google = _get_google_oauth()
+    if google is None:
+        flash("Google login unavailable. Please use email/password.", "error")
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = google.authorize_access_token()
+        user_info = token.get("userinfo")
+        if not user_info:
+            user_info = google.userinfo()
+    except Exception as e:
+        print(f"[auth] Google OAuth callback error: {e}")
+        flash("Google login failed. Please try again or use email/password.", "error")
+        return redirect(url_for("auth.login"))
+
+    if not user_info:
+        flash("Could not retrieve your Google profile. Please try again.", "error")
+        return redirect(url_for("auth.login"))
+
+    google_id = str(user_info.get("sub", ""))
+    email = str(user_info.get("email", "")).strip().lower()
+    given_name = str(user_info.get("given_name", "")).strip()
+    family_name = str(user_info.get("family_name", "")).strip()
+    full_name = f"{given_name} {family_name}".strip() or str(user_info.get("name", "")).strip()
+
+    if not email or not google_id:
+        flash("Google did not provide required account information.", "error")
+        return redirect(url_for("auth.login"))
+
+    # ── Try to find existing user ──────────────────────────────────────────
+    user = get_user_by_google_id(google_id)
+
+    if not user:
+        # Fallback: email match (handles users who registered via email first)
+        user = get_user_by_email(email)
+        if user:
+            # Link Google ID to existing account
+            update_user(int(user["id"]), {
+                "google_id": google_id,
+                "auth_provider": "google",
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+    if not user:
+        # ── New user — create account ──────────────────────────────────────
+        all_users = get_all_users()
+        existing_usernames = {str(u.get("username", "")).lower() for u in all_users}
+        username = generate_username(full_name, existing_usernames)
+
+        # First-admin logic: same as create_account()
+        admin_exists = any("admin" in str(u.get("role", "")).lower() for u in all_users)
+        role = "user" if admin_exists else "admin"
+
+        user = create_user({
+            "username": username,
+            "email": email,
+            "full_name": full_name,
+            "password": "",               # No password for OAuth users
+            "role": role,
+            "google_id": google_id,
+            "auth_provider": "google",
+        })
+
+        if not user:
+            flash("Failed to create your account. Please try again.", "error")
+            return redirect(url_for("auth.login"))
+
+        print(f"[auth] New Google user created: {username} ({email})")
+
+    # ── Session handling — mirrors _create_user_session() ─────────────────
+    role = str(user.get("role", "")).lower()
+    has_user  = "user"  in role
+    has_admin = "admin" in role
+
+    if has_admin and has_user:
+        # Dual-role — show portal selection
+        session["pending_user_id"]   = int(user["id"])
+        session["pending_username"]  = user.get("username")
+        session["pending_full_name"] = user.get("full_name", user.get("username"))
+        session["pending_role"]      = role
+        return redirect(url_for("auth.select_portal"))
+
+    if has_admin and not has_user:
+        # Admin-only account — send to admin portal
+        _create_user_session(user, role, admin=True)
+        flash(f'Welcome {user.get("full_name")}!', "success")
+        return redirect(url_for("admin.dashboard"))
+
+    # Regular user session
+    _create_user_session(user, role, admin=False)
+    flash(f'Welcome {user.get("full_name")}!', "success")
+    return redirect(url_for("dashboard.dashboard"))
 
 
 # ─────────────────────────────────────────────

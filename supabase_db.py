@@ -16,6 +16,7 @@ from app.db.users import (           # noqa: F401
     get_user_by_username,
     get_user_by_email,
     get_user_by_id,
+    get_user_by_google_id,
     get_all_users,
     create_user,
     update_user,

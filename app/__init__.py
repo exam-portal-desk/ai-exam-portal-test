@@ -49,6 +49,9 @@ def create_app() -> Flask:
         manage_session=False,
     )
 
+    # ── Google OAuth (Authlib) ─────────────────────────────────────────────
+    _init_google_oauth(app)
+
     # ── GC tuning ──────────────────────────────────────────────────────────
     gc.set_threshold(700, 10, 10)
 
@@ -210,6 +213,31 @@ def _start_periodic_cleanup() -> None:
 
     t = threading.Thread(target=_loop, daemon=True)
     t.start()
+
+
+def _init_google_oauth(app: Flask) -> None:
+    """Register Google as an Authlib OAuth provider."""
+    try:
+        if not config.GOOGLE_OAUTH_CLIENT_ID or not config.GOOGLE_OAUTH_CLIENT_SECRET:
+            print("ℹ️  Google OAuth: GOOGLE_OAUTH_CLIENT_ID/SECRET not set — Sign in with Google disabled")
+            return
+
+        from authlib.integrations.flask_client import OAuth
+        oauth = OAuth()
+        oauth.init_app(app)
+        oauth.register(
+            name="google",
+            client_id=config.GOOGLE_OAUTH_CLIENT_ID,
+            client_secret=config.GOOGLE_OAUTH_CLIENT_SECRET,
+            server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+            client_kwargs={
+                "scope": "openid email profile",
+                "prompt": "select_account",
+            },
+        )
+        print("✅ Google OAuth: ACTIVE")
+    except Exception as e:
+        print(f"❌ Google OAuth init error: {e}")
 
 
 def _init_drive_at_startup() -> None:

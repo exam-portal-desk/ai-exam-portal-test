@@ -102,6 +102,15 @@ def delete_user(user_id: int) -> bool:
         return False
 
 
+def get_user_by_google_id(google_id: str) -> Optional[Dict]:
+    try:
+        res = supabase.table("users").select(_AUTH_COLS).eq("google_id", google_id).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"[db.users] get_user_by_google_id error: {e}")
+        return None
+
+
 def get_users_count() -> int:
     """Total user count via COUNT query — no data fetch"""
     try:

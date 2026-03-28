@@ -1,0 +1,241 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.ai_chat_history (
+  id integer NOT NULL DEFAULT nextval('ai_chat_history_id_seq'::regclass),
+  user_id integer,
+  message text NOT NULL,
+  is_user boolean DEFAULT true,
+  timestamp timestamp without time zone DEFAULT now(),
+  CONSTRAINT ai_chat_history_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.ai_usage_tracking (
+  id integer NOT NULL DEFAULT nextval('ai_usage_tracking_id_seq'::regclass),
+  user_id integer,
+  date date DEFAULT CURRENT_DATE,
+  questions_used integer DEFAULT 0,
+  CONSTRAINT ai_usage_tracking_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.categories (
+  id integer NOT NULL DEFAULT nextval('categories_id_seq'::regclass),
+  name character varying NOT NULL UNIQUE,
+  drive_file_id character varying DEFAULT NULL::character varying,
+  image_url character varying DEFAULT NULL::character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chat_connections (
+  id integer NOT NULL DEFAULT nextval('chat_connections_id_seq'::regclass),
+  requester_id integer NOT NULL,
+  recipient_id integer NOT NULL,
+  status character varying DEFAULT 'pending'::character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT chat_connections_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chat_conversations (
+  id integer NOT NULL DEFAULT nextval('chat_conversations_id_seq'::regclass),
+  is_group boolean DEFAULT false,
+  group_name character varying,
+  created_by integer,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT chat_conversations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chat_members (
+  id integer NOT NULL DEFAULT nextval('chat_members_id_seq'::regclass),
+  conversation_id integer NOT NULL,
+  user_id integer NOT NULL,
+  joined_at timestamp without time zone DEFAULT now(),
+  role character varying DEFAULT 'member'::character varying,
+  CONSTRAINT chat_members_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chat_messages (
+  id integer NOT NULL DEFAULT nextval('chat_messages_id_seq'::regclass),
+  conversation_id integer NOT NULL,
+  sender_id integer NOT NULL,
+  sender_name character varying NOT NULL,
+  message text NOT NULL,
+  is_deleted boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now(),
+  is_edited boolean DEFAULT false,
+  reply_to_id integer,
+  reply_to_text character varying,
+  reply_to_name character varying,
+  CONSTRAINT chat_messages_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chat_unread (
+  id integer NOT NULL DEFAULT nextval('chat_unread_id_seq'::regclass),
+  user_id integer NOT NULL,
+  conversation_id integer NOT NULL,
+  count integer DEFAULT 0,
+  CONSTRAINT chat_unread_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chat_visibility (
+  id integer NOT NULL,
+  user_id integer NOT NULL,
+  conversation_id integer NOT NULL,
+  cleared_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT chat_visibility_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.discussion_counts (
+  question_id integer NOT NULL,
+  count integer DEFAULT 0,
+  CONSTRAINT discussion_counts_pkey PRIMARY KEY (question_id)
+);
+CREATE TABLE public.exam_attempts (
+  id integer NOT NULL DEFAULT nextval('exam_attempts_id_seq'::regclass),
+  student_id integer,
+  exam_id integer,
+  attempt_number integer DEFAULT 1,
+  status character varying DEFAULT 'in_progress'::character varying,
+  start_time timestamp without time zone,
+  end_time timestamp without time zone,
+  CONSTRAINT exam_attempts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.exams (
+  id integer NOT NULL DEFAULT nextval('exams_id_seq'::regclass),
+  name character varying NOT NULL,
+  date character varying,
+  start_time character varying,
+  duration integer DEFAULT 60,
+  total_questions integer DEFAULT 0,
+  status character varying DEFAULT 'draft'::character varying,
+  instructions text,
+  positive_marks character varying,
+  negative_marks character varying,
+  max_attempts integer,
+  result_mode character varying DEFAULT 'instant'::character varying,
+  result_delay integer DEFAULT 0,
+  results_released boolean DEFAULT false,
+  category_id integer,
+  CONSTRAINT exams_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.login_attempts (
+  id integer NOT NULL DEFAULT nextval('login_attempts_id_seq'::regclass),
+  identifier character varying NOT NULL,
+  ip_address character varying NOT NULL,
+  failed_count integer DEFAULT 0,
+  first_failed_at timestamp without time zone DEFAULT now(),
+  last_failed_at timestamp without time zone DEFAULT now(),
+  blocked_until timestamp without time zone,
+  CONSTRAINT login_attempts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.pw_tokens (
+  id integer NOT NULL DEFAULT nextval('pw_tokens_id_seq'::regclass),
+  token character varying NOT NULL UNIQUE,
+  email character varying NOT NULL,
+  expires_at timestamp without time zone NOT NULL,
+  used boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now(),
+  type character varying,
+  CONSTRAINT pw_tokens_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.question_discussions (
+  id integer NOT NULL DEFAULT nextval('question_discussions_id_seq'::regclass),
+  question_id integer NOT NULL,
+  exam_id integer,
+  user_id integer NOT NULL,
+  username character varying NOT NULL,
+  message text NOT NULL,
+  parent_id integer,
+  is_pinned boolean DEFAULT false,
+  is_best_answer boolean DEFAULT false,
+  is_deleted boolean DEFAULT false,
+  is_edited boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT question_discussions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.questions (
+  id integer NOT NULL DEFAULT nextval('questions_id_seq'::regclass),
+  exam_id integer,
+  question_text text NOT NULL,
+  option_a text,
+  option_b text,
+  option_c text,
+  option_d text,
+  correct_answer text,
+  question_type character varying DEFAULT 'MCQ'::character varying,
+  image_path text,
+  positive_marks integer DEFAULT 1,
+  negative_marks numeric DEFAULT 0,
+  tolerance numeric DEFAULT 0,
+  CONSTRAINT questions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.requests_raised (
+  request_id integer NOT NULL DEFAULT nextval('requests_raised_request_id_seq'::regclass),
+  username character varying,
+  email character varying,
+  current_access character varying,
+  requested_access character varying,
+  request_date timestamp without time zone DEFAULT now(),
+  request_status character varying DEFAULT 'pending'::character varying,
+  reason text,
+  processed_by character varying,
+  processed_date timestamp without time zone,
+  CONSTRAINT requests_raised_pkey PRIMARY KEY (request_id)
+);
+CREATE TABLE public.responses (
+  id integer NOT NULL DEFAULT nextval('responses_id_seq'::regclass),
+  result_id integer,
+  exam_id integer,
+  question_id integer,
+  given_answer text,
+  correct_answer text,
+  is_correct boolean DEFAULT false,
+  marks_obtained numeric DEFAULT 0,
+  question_type character varying,
+  is_attempted boolean DEFAULT false,
+  CONSTRAINT responses_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.results (
+  id integer NOT NULL DEFAULT nextval('results_id_seq'::regclass),
+  student_id integer,
+  exam_id integer,
+  score integer DEFAULT 0,
+  total_questions integer DEFAULT 0,
+  correct_answers integer DEFAULT 0,
+  incorrect_answers integer DEFAULT 0,
+  unanswered_questions integer DEFAULT 0,
+  max_score integer DEFAULT 0,
+  percentage numeric DEFAULT 0,
+  grade character varying,
+  time_taken_minutes integer DEFAULT 0,
+  completed_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT results_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.sessions (
+  id integer NOT NULL DEFAULT nextval('sessions_id_seq'::regclass),
+  token character varying NOT NULL UNIQUE,
+  user_id integer,
+  device_info text,
+  last_seen timestamp without time zone DEFAULT now(),
+  is_exam_active boolean DEFAULT false,
+  exam_id integer,
+  result_id integer,
+  admin_session boolean DEFAULT false,
+  active boolean DEFAULT true,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT sessions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.subjects (
+  id integer NOT NULL DEFAULT nextval('subjects_id_seq'::regclass),
+  subject_name character varying NOT NULL,
+  subject_folder_id character varying,
+  subject_folder_created_at timestamp without time zone,
+  CONSTRAINT subjects_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.users (
+  id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+  username character varying NOT NULL UNIQUE,
+  email character varying NOT NULL UNIQUE,
+  password character varying NOT NULL,
+  full_name character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  role character varying DEFAULT 'user'::character varying,
+  updated_at timestamp without time zone,
+  last_login timestamp without time zone,
+  username_lower character varying,
+  email_lower character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);
