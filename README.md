@@ -272,7 +272,7 @@ else:
     flow = InstalledAppFlow.from_client_secrets_file(
         'client_secret_web_local.json', SCOPES)
 
-    # ✅ FIX: use fixed port (NOT 0)
+    # PORT = 8080 -> this will be addd in authentication URI in google cloud console while creating Web Application Consent
     creds = flow.run_local_server(port=8080)
 
     with open('token.json', 'w') as token:
