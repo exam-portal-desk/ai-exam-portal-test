@@ -552,7 +552,7 @@ def google_login():
         flash("Google login is not configured. Please use email/password.", "warning")
         return redirect(url_for("auth.login"))
 
-    redirect_uri = url_for("auth.google_callback", _external=True)
+    redirect_uri = url_for("auth.google_callback", _external=True, _scheme="https")
     return google.authorize_redirect(redirect_uri)
 
 
