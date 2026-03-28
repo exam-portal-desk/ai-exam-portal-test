@@ -1,5 +1,24 @@
-﻿venv/
+﻿# Sensitive credentials
+.env
+service_account.json
+client_secret_web_local.json
+token.json
+
+# Python cache
 __pycache__/
 *.pyc
-.env
-*.json
+*.pyo
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+DB_Clone_SQL_Queries.sql
