@@ -1,11 +1,9 @@
---only-binary=pandas,numpy
-
 flask==3.1.0
 flask_session==0.8.0
 bcrypt==5.0.0
 python-dotenv==1.0.1
 
-pandas==2.2.3
+pandas==2.3.3
 numpy==1.26.4
 
 google-genai==1.14.0
@@ -29,3 +27,5 @@ orjson==3.11.7
 flask-socketio==5.3.6
 gevent-websocket==0.10.1
 redis==5.0.1
+
+gunicorn==22.0.0
