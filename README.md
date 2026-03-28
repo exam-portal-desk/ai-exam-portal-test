@@ -241,24 +241,45 @@ Administrators have granular control over result visibility:
 > ### `generate_token.py`
 >
 > ```python
-> from google_auth_oauthlib.flow import InstalledAppFlow
-> import os
+>"""
+>Google Drive OAuth Token Generator
 >
-> SCOPES = ['https://www.googleapis.com/auth/drive.file']
+>Description:
+>This script generates a token.json file using Google OAuth 2.0.
 >
-> creds = None
+>Requirements:
+>- Google Drive API enabled
+>- OAuth client_secret file (client_secret_web_local.json)
+>- Library: google-auth-oauthlib
 >
-> if os.path.exists('token.json'):
->     print("Token already exists")
-> else:
->     flow = InstalledAppFlow.from_client_secrets_file(
->         'client_secret_web_local.json', SCOPES)
->     creds = flow.run_local_server(port=8080)
+>Usage:
+>Run this script and complete authentication in browser.
+>"""
 >
->     with open('token.json', 'w') as token:
->         token.write(creds.to_json())
+>from google_auth_oauthlib.flow import InstalledAppFlow
+>import os
 >
->     print("token.json generated successfully")
+>SCOPES = [
+>    'https://www.googleapis.com/auth/drive',
+>    'https://www.googleapis.com/auth/drive.file',
+>    'https://www.googleapis.com/auth/drive.readonly'
+>]
+>
+>creds = None
+>
+>if os.path.exists('token.json'):
+>    print("Token already exists")
+>else:
+>    flow = InstalledAppFlow.from_client_secrets_file(
+>        'client_secret_web_local.json', SCOPES)
+>
+>    # ✅ FIX: use fixed port (NOT 0)
+>    creds = flow.run_local_server(port=8080)
+>
+>    with open('token.json', 'w') as token:
+>        token.write(creds.to_json())
+>
+>    print("token.json generated successfully")
 > ```
 >
 > ---
