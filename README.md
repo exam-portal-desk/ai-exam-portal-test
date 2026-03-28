@@ -139,7 +139,7 @@ Administrators have granular control over result visibility:
 
 ---
 
- [!NOTE]
+ > [!NOTE]
  # Google Drive API Setup (Service Account + OAuth Token)
  
  This guide explains how to set up Google Drive API authentication using both:
