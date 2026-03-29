@@ -17,10 +17,10 @@
 <div class="reset-wrapper">
     <div class="reset-container">
         <div class="reset-header">
-            <div class="logo-section" style="margin-bottom:12px;">
+            <div class="logo-section" style="margin-bottom:12px;justify-content:center;">
                 <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:44px;width:auto;"></video>
             </div>
-            <p class="reset-subtitle">Your account has access to multiple portals</p>
+            <p class="reset-subtitle" style="text-align:center;">Your account has access to multiple portals</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
