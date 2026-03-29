@@ -33,10 +33,7 @@
     <!-- Success State -->
     <div class="login-header">
         <div class="logo-section">
-            <div class="logo-icon success">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <h1 class="brand-name">ExamPortal</h1>
+            <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:44px;width:auto;"></video>
         </div>
         <h2 class="welcome-text">Registration Successful!</h2>
         <p class="welcome-subtitle">A setup link has been sent to your email. Please check your inbox and spam folder.</p>
@@ -76,10 +73,7 @@
                         <!-- Registration Form State -->
                         <div class="login-header">
                             <div class="logo-section">
-                                <div class="logo-icon">
-                                    <i class="fas fa-user-plus"></i>
-                                </div>
-                                <h1 class="brand-name">ExamPortal</h1>
+                                <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:44px;width:auto;"></video>
                             </div>
                             <h2 class="welcome-text">Create Account</h2>
                             <p class="welcome-subtitle">Register for your exam portal account</p>

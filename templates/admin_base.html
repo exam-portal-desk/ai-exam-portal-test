@@ -184,11 +184,13 @@
   .sb-header {
     display: flex;
     align-items: center;
-    height: 60px;
-    padding: 0 12px;
+    min-height: 60px;
+    height: auto;
+    padding: 8px 12px;
     gap: 8px;
     border-bottom: 1px solid var(--sb-border);
     flex-shrink: 0;
+    flex-wrap: nowrap;
   }
   .is-collapsed .sb-header {
     justify-content: center;
@@ -213,6 +215,9 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   /* JS adds sb-hide to brand-text after collapse animation */
   .brand-text.sb-hide { display: none; }
@@ -684,6 +689,10 @@
     }
   }
 
+  /* Logo video — hidden when collapsed */
+  .sb-logo-video { display: block; }
+  .is-collapsed .sb-logo-video { display: none; }
+
   /* Mobile close button — hidden on desktop */
   .sb-mobile-close { display: none; }
 
@@ -704,13 +713,8 @@
 
       <!-- ── Header: Brand + Always-Visible Toggle ── -->
       <div class="sb-header">
-        <div class="brand-icon" aria-hidden="true">
-          <i class="fas fa-user-shield"></i>
-        </div>
-        <div class="brand-text">
-          <div class="brand-name">Admin Portal</div>
-          <div class="brand-sub">Control Panel</div>
-        </div>
+        <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline class="sb-logo-video" style="height:44px;width:auto;max-width:200px;flex-shrink:0;"></video>
+        <div class="brand-text" style="display:none;"></div>
         <button class="sb-toggle" id="sidebarToggleBtn"
                 aria-label="Collapse sidebar">
           <i class="fas fa-chevron-left" aria-hidden="true"></i>
@@ -876,7 +880,7 @@
   <div class="container-fluid px-4">
     <div class="footer-content">
       <div style="display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:600;color:rgba(255,255,255,0.4)">
-        <i class="fas fa-user-shield" style="color:rgba(45,91,227,0.7)"></i> AdminPortal
+        <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:22px;width:auto;"></video> AdminPortal
       </div>
       <div class="footer-links">
         <a href="{{ url_for('misc.privacy_policy') }}">Privacy</a>

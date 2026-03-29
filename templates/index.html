@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ExamPortal - Intelligent Examination Platform</title>
     <!-- ── Landing Page Theme init (isolated from Admin/User theme) ── -->
-    <script>(function(){var t=localStorage.getItem('landingTheme')||'paper';document.documentElement.setAttribute('data-landing-theme',t);})();</script>
+    <script>(function(){var t=localStorage.getItem('landingTheme')||'emerald';document.documentElement.setAttribute('data-landing-theme',t);})();</script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
     <style>
@@ -109,6 +109,55 @@
             --proof-item-border: rgba(255,255,255,0.07);
         }
 
+        /* Smart - lime green synced with logo */
+        [data-landing-theme="emerald"] {
+            --ink: #f0fce8;
+            --ink-60: rgba(240,252,232,0.65);
+            --ink-30: rgba(240,252,232,0.3);
+            --paper: #08120a;
+            --paper-dark: #0f1f12;
+            --accent: #7bc42a;
+            --accent-light: #96d94a;
+            --accent-pale: rgba(123,196,42,0.18);
+            --gold: #b8d400;
+            --gold-pale: rgba(184,212,0,0.12);
+            --success: #4ade80;
+            --surface: #0d1f10;
+            --border: rgba(123,196,42,0.2);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.45);
+            --shadow-lg: 0 20px 48px rgba(0,0,0,0.55);
+            --shadow-xl: 0 40px 80px rgba(0,0,0,0.65);
+            --nav-bg: rgba(8,18,10,0.94);
+            --nav-cta-bg: #7bc42a;
+            --nav-cta-hover: #69a822;
+            --hero-title-color: #f0fce8;
+            --hero-sub-color: rgba(240,252,232,0.65);
+            --section-bg: #08120a;
+            --proof-bg: #0d1f10;
+            --proof-border: rgba(123,196,42,0.15);
+            --footer-bg: #040a05;
+            --footer-text: rgba(240,252,232,0.3);
+            --footer-link: rgba(240,252,232,0.45);
+            --footer-link-hover: rgba(240,252,232,0.9);
+            --theme-selector-bg: rgba(13,31,16,0.97);
+            --theme-selector-border: rgba(123,196,42,0.3);
+            --how-bg: #061008;
+            --how-title-color: #f0fce8;
+            --how-sub-color: rgba(240,252,232,0.55);
+            --how-step-title: #f0fce8;
+            --how-step-desc: rgba(240,252,232,0.45);
+            --how-step-num-color: rgba(240,252,232,0.5);
+            --how-step-num-border: rgba(123,196,42,0.3);
+            --how-step-num-bg: rgba(123,196,42,0.1);
+            --how-connector: rgba(123,196,42,0.25);
+            --btn-primary-bg: #7bc42a;
+            --btn-primary-color: #061008;
+            --btn-primary-hover: #69a822;
+            --proof-item-bg: #0d1f10;
+            --proof-item-border: rgba(123,196,42,0.18);
+        }
+
         /* Midnight - deep blue/purple accent dark */
         [data-landing-theme="midnight"] {
             --ink: #dde4f5;
@@ -157,6 +206,7 @@
             --proof-item-bg: #0d1124;
             --proof-item-border: rgba(124,111,255,0.12);
         }
+        
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
         body {
@@ -578,6 +628,7 @@
         .dot-paper    { background: #f7f6f2; border: 1px solid #ccc; }
         .dot-dark     { background: #0a0a0f; border: 1px solid rgba(255,255,255,0.3); }
         .dot-midnight { background: #7c6fff; }
+        .dot-emerald  { background: #7bc42a; }
 
         /* ── ANIMATIONS ── */
         .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
@@ -628,8 +679,7 @@
 <!-- NAV -->
 <header class="nav" id="navWrap">
     <a href="/" class="nav-logo">
-        <div class="nav-logo-icon"><i class="fas fa-graduation-cap"></i></div>
-        ExamPortal
+        <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:34px;width:auto;"></video>
     </a>
     <nav class="nav-links" id="desktopNav">
         <a href="#features" class="nav-link">Features</a>
@@ -650,6 +700,9 @@
                 </button>
                 <button class="landing-theme-option" data-theme="midnight">
                     <span class="theme-dot dot-midnight"></span> Midnight
+                </button>
+                <button class="landing-theme-option" data-theme="emerald">
+                    <span class="theme-dot dot-emerald"></span> Ember
                 </button>
             </div>
         </div>
@@ -678,6 +731,9 @@
                     </button>
                     <button class="landing-theme-option" data-theme="midnight">
                         <span class="theme-dot dot-midnight"></span> Midnight
+                    </button>
+                    <button class="landing-theme-option" data-theme="emerald">
+                        <span class="theme-dot dot-emerald"></span> Emerald
                     </button>
                 </div>
             </div>
@@ -917,7 +973,7 @@
 <footer class="footer">
     <div class="footer-inner">
         <a href="/" class="footer-logo">
-            <i class="fas fa-graduation-cap"></i> ExamPortal
+            <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:26px;width:auto;"></video>
         </a>
         <div class="footer-links-row">
             <a href="{{ url_for('misc.privacy_policy') }}" class="footer-link">Privacy</a>
