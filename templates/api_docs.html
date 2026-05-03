@@ -650,21 +650,28 @@ const API_CONFIG = {
 
   <div class="sh">Quick Example</div>
   <div class="cb">
-    <div class="cb-header"><span class="cb-lang">javascript</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
-    <pre><span class="c">// Step 1: Login</span>
-<span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">'https://smartaiexam.in/api/auth/login'</span>, {
-  method: <span class="s">'POST'</span>,
-  headers: { <span class="s">'Content-Type'</span>: <span class="s">'application/json'</span> },
-  body: JSON.stringify({ username: <span class="s">'john.doe'</span>, password: <span class="s">'••••••'</span> })
-});
-<span class="k">const</span> { data } = <span class="k">await</span> res.json();
-<span class="k">const</span> { access_token, refresh_token, available_portals } = data;
+    <div class="cb-header"><span class="cb-lang">python</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+    <pre><span class="k">import</span> requests
 
-<span class="c">// Step 2: Use token on any API</span>
-<span class="k">const</span> convs = <span class="k">await</span> fetch(<span class="s">'https://smartaiexam.in/api/chat/conversations'</span>, {
-  headers: { <span class="n">'Authorization'</span>: <span class="s">`Bearer ${access_token}`</span> }
-});
-<span class="k">const</span> json = <span class="k">await</span> convs.json();</pre>
+<span class="c"># Step 1: Login</span>
+res = requests.post(
+    <span class="s">"https://smartaiexam.in/api/auth/login"</span>,
+    json={<span class="s">"username"</span>: <span class="s">"john.doe"</span>, <span class="s">"password"</span>: <span class="s">"MyPass@2025"</span>},
+)
+data = res.json()[<span class="s">"data"</span>]
+
+access_token      = data[<span class="s">"access_token"</span>]
+refresh_token     = data[<span class="s">"refresh_token"</span>]
+available_portals = data[<span class="s">"available_portals"</span>]  <span class="c"># e.g. ["user"] or ["user", "admin"]</span>
+
+<span class="c"># Step 2: Use token on any API</span>
+headers = {<span class="s">"Authorization"</span>: <span class="s">f"Bearer {access_token}"</span>}
+
+convs = requests.get(
+    <span class="s">"https://smartaiexam.in/api/chat/conversations"</span>,
+    headers=headers,
+)
+print(convs.json())</pre>
   </div>
 </section>
 
