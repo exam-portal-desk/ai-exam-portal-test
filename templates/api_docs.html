@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartAIExam - API Reference</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── CONFIG (update these if domain/version changes) ── */
+:root {
+  --api-base-url: "https://smartaiexam.in";
+  --api-version: "v1.1";
+}
+
+/* ── THEME ── */
+[data-theme="dark"] {
+  --bg:         #080b10;
+  --bg2:        #0d1117;
+  --bg3:        #111620;
+  --surface:    #161c27;
+  --surface2:   #1c2333;
+  --border:     #21293a;
+  --border2:    #2d3a50;
+  --text:       #e2e8f4;
+  --text2:      #8896b0;
+  --text3:      #49566a;
+  --shadow:     rgba(0,0,0,0.6);
+  --glow:       rgba(99,179,237,0.08);
+  --header-bg:  rgba(8,11,16,0.94);
+  --code-bg:    #060a0f;
+  --sidebar-bg: #0a0e16;
+}
+[data-theme="light"] {
+  --bg:         #f0f4f8;
+  --bg2:        #ffffff;
+  --bg3:        #e8edf5;
+  --surface:    #dde3ed;
+  --surface2:   #d0d8e8;
+  --border:     #c5cedc;
+  --border2:    #aab6cb;
+  --text:       #0f172a;
+  --text2:      #3d4f6a;
+  --text3:      #7a8fa8;
+  --shadow:     rgba(0,0,0,0.12);
+  --glow:       rgba(59,130,246,0.06);
+  --header-bg:  rgba(240,244,248,0.94);
+  --code-bg:    #e8edf5;
+  --sidebar-bg: #ffffff;
+}
+
+/* ── ACCENT PALETTE ── */
+:root {
+  --blue:    #63b3ed;
+  --green:   #68d391;
+  --amber:   #f6ad55;
+  --red:     #fc8181;
+  --purple:  #b794f4;
+  --cyan:    #76e4f7;
+  --pink:    #f687b3;
+  --sidebar-w: 280px;
+  --header-h:  58px;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  transition: background .2s, color .2s;
+}
+::selection { background: rgba(99,179,237,.2); color: var(--blue); }
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius:3px; }
+
+/* ── HEADER ── */
+.header {
+  position: fixed; top:0; left:0; right:0; height: var(--header-h);
+  background: var(--header-bg);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap:12px;
+  z-index: 300;
+}
+.hamburger {
+  width:36px; height:36px; border:1px solid var(--border);
+  border-radius:8px; background:none; cursor:pointer;
+  display:flex; flex-direction:column; justify-content:center;
+  align-items:center; gap:4px; padding:0; flex-shrink:0;
+  transition: background .15s, border-color .15s;
+}
+.hamburger:hover { background: var(--surface); border-color: var(--border2); }
+.hamburger span { display:block; width:16px; height:1.5px; background: var(--text2); border-radius:2px; transition: all .25s; }
+.sidebar-open .hamburger span:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+.sidebar-open .hamburger span:nth-child(2) { opacity:0; transform:scaleX(0); }
+.sidebar-open .hamburger span:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
+
+.logo {
+  font-family:'JetBrains Mono', monospace;
+  font-weight:600; font-size:15px; color:var(--text);
+  text-decoration:none; display:flex; align-items:center; gap:10px;
+}
+.logo-mark {
+  width:28px; height:28px; border-radius:7px;
+  background: linear-gradient(135deg, #63b3ed, #b794f4);
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; color:#fff; flex-shrink:0;
+}
+.logo-text { letter-spacing:-.3px; }
+.logo-badge {
+  font-size:9px; font-weight:600; letter-spacing:.5px;
+  background: rgba(99,179,237,.12); color: var(--blue);
+  border:1px solid rgba(99,179,237,.25); padding:2px 7px; border-radius:20px;
+}
+.header-gap { flex:1; }
+.base-url-pill {
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  color: var(--cyan); background: rgba(118,228,247,.07);
+  border:1px solid rgba(118,228,247,.18); padding:4px 12px; border-radius:20px;
+  cursor:pointer; transition: background .15s;
+  display:flex; align-items:center; gap:6px;
+}
+.base-url-pill:hover { background: rgba(118,228,247,.13); }
+.version-chip {
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  color: var(--text2); background: var(--surface);
+  border:1px solid var(--border); padding:4px 10px; border-radius:20px;
+}
+.nav-home-btn {
+  display:flex; align-items:center; gap:6px;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  color: var(--text2); background: var(--surface);
+  border:1px solid var(--border); padding:5px 12px; border-radius:8px;
+  text-decoration:none; cursor:pointer; transition: all .15s; flex-shrink:0;
+}
+.nav-home-btn:hover { background: var(--surface2); color:var(--text); border-color:var(--border2); }
+.nav-home-btn svg { width:13px; height:13px; }
+.theme-btn {
+  width:36px; height:36px; border:1px solid var(--border);
+  border-radius:8px; background:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  color: var(--text2); flex-shrink:0; transition: background .15s;
+}
+.theme-btn:hover { background: var(--surface); }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  position:fixed; top:var(--header-h); left:0; bottom:0;
+  width: var(--sidebar-w); overflow-y:auto;
+  background: var(--sidebar-bg); border-right:1px solid var(--border);
+  padding: 12px 0 40px; z-index:200;
+  transform: translateX(calc(-1 * var(--sidebar-w)));
+  transition: transform .28s cubic-bezier(.4,0,.2,1), box-shadow .28s;
+}
+.sidebar-open .sidebar { transform: translateX(0); box-shadow: 4px 0 32px var(--shadow); }
+.sidebar-overlay {
+  display:none; position:fixed; inset:0;
+  background: rgba(0,0,0,.45); z-index:190;
+  opacity:0; transition: opacity .25s;
+}
+.sidebar-open .sidebar-overlay { display:block; opacity:1; }
+
+.sidebar-search-wrap { padding: 10px 14px 14px; position:sticky; top:0; background:var(--sidebar-bg); z-index:1; border-bottom:1px solid var(--border); }
+.sidebar-search-inner { position:relative; }
+.sidebar-search-inner svg { position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text3); width:13px; height:13px; }
+.sidebar-search-inner input {
+  width:100%; background:var(--bg3); border:1px solid var(--border);
+  border-radius:7px; padding:7px 10px 7px 30px;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  color:var(--text); outline:none; transition:border-color .15s;
+}
+.sidebar-search-inner input:focus { border-color:var(--blue); }
+.sidebar-search-inner input::placeholder { color:var(--text3); }
+
+.sg { margin-bottom:2px; }
+.sg-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 14px; cursor:pointer; user-select:none;
+}
+.sg-header:hover { background:var(--surface); }
+.sg-label { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase; color:var(--text3); }
+.sg-arrow { color:var(--text3); font-size:10px; transition:transform .2s; }
+.sg.collapsed .sg-arrow { transform:rotate(-90deg); }
+.sg-items { overflow:hidden; max-height:999px; transition:max-height .25s ease; }
+.sg.collapsed .sg-items { max-height:0; }
+
+.sl {
+  display:flex; align-items:center; gap:8px;
+  padding:5px 14px 5px 18px; color:var(--text2);
+  text-decoration:none; font-size:12px;
+  border-left:2px solid transparent;
+  transition:all .12s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sl:hover { color:var(--text); background:var(--surface); border-left-color:var(--border2); }
+.sl.active { color:var(--blue); background:rgba(99,179,237,.07); border-left-color:var(--blue); }
+.sl.hidden { display:none; }
+.mdot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.mdot-get    { background:#68d391; }
+.mdot-post   { background:#63b3ed; }
+.mdot-put    { background:#f6ad55; }
+.mdot-delete { background:#fc8181; }
+.mdot-info   { background:#b794f4; }
+
+/* ── MAIN ── */
+.main {
+  padding-top: var(--header-h);
+  padding-left: 0;
+  transition: padding-left .28s cubic-bezier(.4,0,.2,1);
+}
+.sidebar-open .main { padding-left: var(--sidebar-w); }
+.main-inner { max-width:860px; margin:0 auto; padding:44px 40px 100px; }
+
+/* ── HERO ── */
+.hero {
+  border:1px solid var(--border); border-radius:16px;
+  padding:40px; margin-bottom:56px; position:relative; overflow:hidden;
+  background: linear-gradient(135deg, rgba(99,179,237,.06) 0%, rgba(183,148,244,.04) 100%);
+}
+.hero::before {
+  content:''; position:absolute; top:-60px; right:-60px;
+  width:280px; height:280px;
+  background: radial-gradient(circle, rgba(99,179,237,.1) 0%, transparent 70%);
+  pointer-events:none;
+}
+.hero::after {
+  content:''; position:absolute; bottom:-40px; left:30%;
+  width:200px; height:200px;
+  background: radial-gradient(circle, rgba(183,148,244,.07) 0%, transparent 70%);
+  pointer-events:none;
+}
+.hero-tag {
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  font-weight:600; letter-spacing:2px; text-transform:uppercase;
+  color:var(--blue); margin-bottom:12px; display:block;
+}
+.hero h1 {
+  font-size:36px; font-weight:800; letter-spacing:-1.5px;
+  line-height:1.15; margin-bottom:14px;
+  background: linear-gradient(135deg, var(--text) 30%, var(--blue));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.hero p { color:var(--text2); font-size:15px; max-width:500px; line-height:1.75; margin-bottom:28px; }
+.info-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.info-card {
+  background:rgba(255,255,255,.03); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px;
+}
+[data-theme="light"] .info-card { background:rgba(0,0,0,.02); }
+.ic-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+.ic-value { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); }
+.ic-value.copy-url { cursor:pointer; transition:color .15s; }
+.ic-value.copy-url:hover { color:var(--blue); }
+
+/* ── SECTION ── */
+.section { margin-bottom:72px; scroll-margin-top:calc(var(--header-h) + 24px); }
+.section-header { margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+.section-tag { font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--blue); margin-bottom:6px; display:block; }
+.section-title { font-size:24px; font-weight:700; letter-spacing:-.5px; margin-bottom:8px; }
+.section-desc { color:var(--text2); font-size:13.5px; max-width:600px; line-height:1.75; }
+.section-desc code { font-family:'JetBrains Mono',monospace; background:rgba(99,179,237,.1); color:var(--blue); padding:1px 5px; border-radius:3px; font-size:11.5px; }
+
+/* ── NOTE BOXES ── */
+.note {
+  border-radius:8px; padding:11px 14px; margin-bottom:14px;
+  display:flex; align-items:flex-start; gap:10px; font-size:12.5px; line-height:1.65;
+}
+.note-info  { background:rgba(99,179,237,.07); border:1px solid rgba(99,179,237,.2); color:#93c5fd; }
+.note-warn  { background:rgba(246,173,85,.07); border:1px solid rgba(246,173,85,.2); color:#fcd34d; }
+.note-green { background:rgba(104,211,145,.07); border:1px solid rgba(104,211,145,.2); color:#86efac; }
+.note-danger{ background:rgba(252,129,129,.07); border:1px solid rgba(252,129,129,.2); color:#fca5a5; }
+[data-theme="light"] .note-info  { color:#1d4ed8; }
+[data-theme="light"] .note-warn  { color:#92400e; }
+[data-theme="light"] .note-danger{ color:#991b1b; }
+.note-icon { flex-shrink:0; font-size:14px; margin-top:1px; }
+.note code,.section-desc code,.note a { font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+.note a { color:inherit; }
+
+/* ── AUTH BOX ── */
+.auth-box {
+  background:rgba(99,179,237,.06); border:1px solid rgba(99,179,237,.18);
+  border-radius:12px; padding:18px 20px; margin-bottom:18px;
+  display:flex; align-items:flex-start; gap:14px;
+}
+.auth-box-icon { font-size:22px; flex-shrink:0; margin-top:2px; }
+.auth-box-title { font-weight:600; color:var(--blue); margin-bottom:4px; font-size:13.5px; }
+.auth-box-desc { color:var(--text2); font-size:12.5px; line-height:1.7; }
+.auth-box-desc code { font-family:'JetBrains Mono',monospace; background:rgba(99,179,237,.12); color:var(--blue); padding:1px 5px; border-radius:3px; font-size:11px; }
+
+/* ── JWT FLOW ── */
+.jwt-flow { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0; }
+.jwt-step { background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:14px 16px; }
+.jwt-step-num { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--blue); margin-bottom:5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+.jwt-step-title { font-size:12.5px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.jwt-step-desc { font-size:11.5px; color:var(--text2); line-height:1.65; }
+.jwt-step-desc code { font-family:'JetBrains Mono',monospace; background:rgba(99,179,237,.1); color:var(--blue); padding:1px 4px; border-radius:3px; font-size:10.5px; }
+
+/* ── ENDPOINT CARD ── */
+.ep {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; margin-bottom:12px; overflow:hidden;
+  transition:border-color .2s; scroll-margin-top:calc(var(--header-h) + 24px);
+}
+.ep:hover { border-color:var(--border2); }
+.ep-header {
+  display:flex; align-items:center; gap:10px;
+  padding:13px 16px; cursor:pointer; user-select:none;
+  background:var(--bg2); transition:background .15s;
+}
+.ep-header:hover { background:var(--surface); }
+.mb  { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; flex-shrink:0; min-width:50px; text-align:center; letter-spacing:.3px; }
+.mb-GET    { background:rgba(104,211,145,.12); color:#68d391; border:1px solid rgba(104,211,145,.25); }
+.mb-POST   { background:rgba(99,179,237,.12);  color:#63b3ed; border:1px solid rgba(99,179,237,.25); }
+.mb-PUT    { background:rgba(246,173,85,.12);  color:#f6ad55; border:1px solid rgba(246,173,85,.25); }
+.mb-DELETE { background:rgba(252,129,129,.12); color:#fc8181; border:1px solid rgba(252,129,129,.25); }
+.ep-path { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text); flex:1; }
+.ep-path .param { color:var(--cyan); }
+.ep-summary { font-size:12px; color:var(--text2); flex:2; }
+.ep-expand { color:var(--text3); font-size:11px; transition:transform .2s; flex-shrink:0; }
+.ep.open .ep-expand { transform:rotate(180deg); }
+.badge-auth  { font-family:'JetBrains Mono',monospace; font-size:9.5px; background:rgba(183,148,244,.1); color:var(--purple); border:1px solid rgba(183,148,244,.25); padding:2px 8px; border-radius:5px; flex-shrink:0; }
+.badge-pub   { font-family:'JetBrains Mono',monospace; font-size:9.5px; background:rgba(104,211,145,.1); color:#68d391; border:1px solid rgba(104,211,145,.22); padding:2px 8px; border-radius:5px; flex-shrink:0; }
+.badge-admin { font-family:'JetBrains Mono',monospace; font-size:9.5px; background:rgba(246,173,85,.1); color:var(--amber); border:1px solid rgba(246,173,85,.25); padding:2px 8px; border-radius:5px; flex-shrink:0; }
+
+.ep-body { display:none; padding:16px 18px 20px; border-top:1px solid var(--border); background:var(--bg3); }
+.ep.open .ep-body { display:block; }
+
+/* ── TABS ── */
+.tabs { display:flex; gap:3px; margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:0; }
+.tab { font-family:'JetBrains Mono',monospace; font-size:11px; background:none; border:none; color:var(--text3); cursor:pointer; padding:6px 12px; transition:color .15s; border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tab:hover { color:var(--text2); }
+.tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* ── CODE BLOCK ── */
+.cb { background:var(--code-bg); border:1px solid var(--border); border-radius:9px; overflow:hidden; margin-bottom:12px; }
+.cb-header { display:flex; align-items:center; justify-content:space-between; padding:7px 12px; border-bottom:1px solid var(--border); background:rgba(255,255,255,.02); }
+.cb-lang { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text3); letter-spacing:.5px; }
+.copy-btn {
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--text2); padding:3px 10px; border-radius:5px;
+  cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:5px;
+}
+.copy-btn:hover { background:var(--surface2); color:var(--text); }
+.copy-btn.copied { background:rgba(104,211,145,.12); border-color:rgba(104,211,145,.28); color:#68d391; }
+.cb pre {
+  padding:14px 16px; overflow-x:auto;
+  font-family:'JetBrains Mono',monospace; font-size:12px;
+  line-height:1.75; color:var(--text2);
+}
+.cb pre .k  { color:#b794f4; }
+.cb pre .s  { color:#68d391; }
+.cb pre .n  { color:#76e4f7; }
+.cb pre .v  { color:#f6ad55; }
+.cb pre .c  { color:#49566a; font-style:italic; }
+.cb pre .err{ color:#fc8181; }
+
+/* ── PARAMS TABLE ── */
+.pt { width:100%; border-collapse:collapse; margin-bottom:14px; }
+.pt th { text-align:left; padding:8px 12px; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:1.2px; text-transform:uppercase; color:var(--text3); background:var(--surface); border:1px solid var(--border); }
+.pt td { padding:9px 12px; border:1px solid var(--border); font-size:12.5px; vertical-align:top; }
+.pt tr:hover td { background:rgba(99,179,237,.03); }
+.pname { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--cyan); }
+.ptype { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text3); background:var(--surface); padding:1px 6px; border-radius:4px; }
+.preq  { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--red); background:rgba(252,129,129,.08); padding:1px 5px; border-radius:4px; display:inline-block; margin-left:4px; }
+.popt  { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text3); background:var(--surface); padding:1px 5px; border-radius:4px; display:inline-block; margin-left:4px; }
+.pdesc { color:var(--text2); font-size:11.5px; margin-top:3px; line-height:1.6; }
+.pdesc code { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--blue); background:rgba(99,179,237,.1); padding:1px 4px; border-radius:3px; }
+
+/* ── RESPONSE PILLS ── */
+.rpills { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+.rp { font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:3px 10px; border-radius:6px; }
+.rp-2 { background:rgba(104,211,145,.1); color:#68d391; border:1px solid rgba(104,211,145,.25); }
+.rp-4 { background:rgba(246,173,85,.1); color:var(--amber); border:1px solid rgba(246,173,85,.25); }
+.rp-5 { background:rgba(252,129,129,.1); color:var(--red); border:1px solid rgba(252,129,129,.25); }
+
+/* ── SUB-HEADING ── */
+.sh { font-size:11.5px; font-weight:700; color:var(--text); margin:16px 0 8px; display:flex; align-items:center; gap:8px; text-transform:uppercase; letter-spacing:.8px; font-family:'JetBrains Mono',monospace; }
+.sh::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── RATE TABLE ── */
+.rt { width:100%; border-collapse:collapse; }
+.rt th { text-align:left; padding:9px 13px; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:1.2px; text-transform:uppercase; color:var(--text3); background:var(--surface); border:1px solid var(--border); }
+.rt td { padding:9px 13px; border:1px solid var(--border); font-size:12.5px; }
+.rt tr:hover td { background:rgba(99,179,237,.03); }
+.rt code { font-family:'JetBrains Mono',monospace; color:var(--blue); font-size:11px; }
+
+/* ── ADMIN GRID ── */
+.admin-grid { display:grid; gap:10px; }
+.ag-row { display:flex; align-items:flex-start; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:12px 14px; }
+.ag-method { font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:5px; flex-shrink:0; margin-top:2px; }
+.ag-path { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); font-weight:500; margin-bottom:3px; }
+.ag-desc { font-size:12px; color:var(--text2); line-height:1.5; }
+.ag-desc code { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--blue); background:rgba(99,179,237,.1); padding:1px 4px; border-radius:3px; }
+
+/* ── FOOTER ── */
+.footer {
+  padding:24px 40px; border-top:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  color:var(--text3); font-size:12px; margin-left:0;
+  transition:margin-left .28s cubic-bezier(.4,0,.2,1);
+  font-family:'JetBrains Mono',monospace;
+}
+.sidebar-open .footer { margin-left:var(--sidebar-w); }
+.footer-left { display:flex; align-items:center; gap:14px; }
+.footer-year { color:var(--text2); }
+
+/* ── RESPONSIVE ── */
+@media(max-width:800px) {
+  .main-inner { padding:28px 18px 80px; }
+  .info-grid { grid-template-columns:1fr 1fr; }
+  .ep-summary { display:none; }
+  .base-url-pill,.version-chip { display:none; }
+  .jwt-flow { grid-template-columns:1fr; }
+  .sidebar-open .footer { margin-left:0; }
+}
+</style>
+</head>
+<body class="sidebar-open">
+
+<!-- CONFIG — Edit here for domain/version changes -->
+<script>
+const API_CONFIG = {
+  baseUrl: "https://smart-ai-exam-portal-test.onrender.com",
+  version: "v1.0",
+  year:    new Date().getFullYear()
+};
+</script>
+
+<div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- HEADER -->
+<header class="header">
+  <button class="hamburger" onclick="toggleSidebar()">
+    <span></span><span></span><span></span>
+  </button>
+    <a class="nav-logo">
+        <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:34px;width:auto;"></video>
+    </a>  
+  <a class="logo" href="#">
+    <span class="logo-text">SmartAIExam</span>
+    <span class="logo-badge" id="hdr-version">v1.1</span>
+  </a>
+  <div class="header-gap"></div>
+  <div class="base-url-pill" id="hdr-base-url" onclick="copyBaseUrl()" title="Click to copy">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <span id="hdr-url-text">smartaiexam.in</span>
+  </div>
+  <span class="version-chip" id="hdr-version-chip">v1.1</span>
+  <a class="nav-home-btn" href="/">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Home
+  </a>
+  <button class="theme-btn" onclick="toggleTheme()">
+    <svg id="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg id="icon-sun"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-search-wrap">
+    <div class="sidebar-search-inner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="sbSearch" placeholder="Search endpoints..." oninput="filterSidebar(this.value)">
+    </div>
+  </div>
+
+  <div class="sg" id="sg-overview">
+    <div class="sg-header" onclick="toggleGroup('sg-overview')"><span class="sg-label">Overview</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#introduction"><span class="mdot mdot-info"></span>Introduction</a>
+      <a class="sl" href="#authentication"><span class="mdot mdot-info"></span>Authentication</a>
+      <a class="sl" href="#rate-limits"><span class="mdot mdot-info"></span>Rate Limits</a>
+      <a class="sl" href="#errors"><span class="mdot mdot-info"></span>Error Handling</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-jwt">
+    <div class="sg-header" onclick="toggleGroup('sg-jwt')"><span class="sg-label">JWT Auth</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#jwt-login"><span class="mdot mdot-post"></span>POST /api/auth/login</a>
+      <a class="sl" href="#jwt-google"><span class="mdot mdot-post"></span>POST /api/auth/google</a>
+      <a class="sl" href="#jwt-refresh"><span class="mdot mdot-post"></span>POST /api/auth/refresh</a>
+      <a class="sl" href="#jwt-logout"><span class="mdot mdot-post"></span>POST /api/auth/logout</a>
+      <a class="sl" href="#jwt-me"><span class="mdot mdot-get"></span>GET /api/auth/me</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-web-auth">
+    <div class="sg-header" onclick="toggleGroup('sg-web-auth')"><span class="sg-label">Web Auth</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#ep-reset"><span class="mdot mdot-post"></span>POST /api/request-password-reset</a>
+      <a class="sl" href="#ep-validate"><span class="mdot mdot-post"></span>POST /api/validate-user-for-request</a>
+      <a class="sl" href="#ep-access-req"><span class="mdot mdot-post"></span>POST /api/submit-access-request</a>
+      <a class="sl" href="#ep-delete-acc"><span class="mdot mdot-post"></span>POST /api/delete-account</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-exam">
+    <div class="sg-header" onclick="toggleGroup('sg-exam')"><span class="sg-label">Exams</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#ep-preload"><span class="mdot mdot-get"></span>GET /preload-exam/:id</a>
+      <a class="sl" href="#ep-start"><span class="mdot mdot-post"></span>POST /start-exam/:id</a>
+      <a class="sl" href="#ep-sync"><span class="mdot mdot-post"></span>POST /api/sync-exam-answers/:id</a>
+      <a class="sl" href="#ep-submit"><span class="mdot mdot-post"></span>POST /submit-exam/:id</a>
+      <a class="sl" href="#ep-status"><span class="mdot mdot-get"></span>GET /api/exam-attempts-status/:id</a>
+      <a class="sl" href="#ep-ping"><span class="mdot mdot-post"></span>POST /_ping</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-ai">
+    <div class="sg-header" onclick="toggleGroup('sg-ai')"><span class="sg-label">AI Assistant</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#ep-ai-init"><span class="mdot mdot-get"></span>GET /api/assistant-init</a>
+      <a class="sl" href="#ep-ai-chat"><span class="mdot mdot-post"></span>POST /api/study-chat</a>
+      <a class="sl" href="#ep-ai-clear"><span class="mdot mdot-post"></span>POST /api/clear-chat-history</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-chat">
+    <div class="sg-header" onclick="toggleGroup('sg-chat')"><span class="sg-label">Chat</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#ep-chat-search"><span class="mdot mdot-get"></span>GET /api/chat/search</a>
+      <a class="sl" href="#ep-chat-convs"><span class="mdot mdot-get"></span>GET /api/chat/conversations</a>
+      <a class="sl" href="#ep-chat-msgs"><span class="mdot mdot-get"></span>GET /api/chat/messages/:id</a>
+      <a class="sl" href="#ep-chat-send"><span class="mdot mdot-post"></span>POST /api/chat/messages/:id</a>
+      <a class="sl" href="#ep-chat-edit"><span class="mdot mdot-put"></span>PUT /api/chat/messages/:id/edit</a>
+      <a class="sl" href="#ep-chat-del"><span class="mdot mdot-delete"></span>DELETE /api/chat/messages/:id</a>
+      <a class="sl" href="#ep-chat-read"><span class="mdot mdot-post"></span>POST /api/chat/conversations/:id/read</a>
+      <a class="sl" href="#ep-chat-request"><span class="mdot mdot-post"></span>POST /api/chat/request</a>
+      <a class="sl" href="#ep-chat-inbox"><span class="mdot mdot-get"></span>GET /api/chat/requests/inbox</a>
+      <a class="sl" href="#ep-chat-respond"><span class="mdot mdot-put"></span>PUT /api/chat/request/:id</a>
+      <a class="sl" href="#ep-chat-unread"><span class="mdot mdot-get"></span>GET /api/chat/unread_count</a>
+      <a class="sl" href="#ep-chat-online"><span class="mdot mdot-get"></span>GET /api/chat/online_status</a>
+      <a class="sl" href="#ep-chat-group"><span class="mdot mdot-post"></span>POST /api/chat/group</a>
+      <a class="sl" href="#ep-friend-del"><span class="mdot mdot-delete"></span>DELETE /api/chat/friend/:id</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-disc">
+    <div class="sg-header" onclick="toggleGroup('sg-disc')"><span class="sg-label">Discussion</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#ep-disc-get"><span class="mdot mdot-get"></span>GET /api/discussion/:question_id</a>
+      <a class="sl" href="#ep-disc-post"><span class="mdot mdot-post"></span>POST /api/discussion/:question_id</a>
+      <a class="sl" href="#ep-disc-edit"><span class="mdot mdot-put"></span>PUT /api/discussion/edit/:id</a>
+      <a class="sl" href="#ep-disc-del"><span class="mdot mdot-delete"></span>DELETE /api/discussion/delete/:id</a>
+      <a class="sl" href="#ep-disc-counts"><span class="mdot mdot-post"></span>POST /api/discussion/counts/bulk</a>
+    </div>
+  </div>
+
+  <div class="sg" id="sg-admin">
+    <div class="sg-header" onclick="toggleGroup('sg-admin')"><span class="sg-label">Admin APIs</span><span class="sg-arrow">▾</span></div>
+    <div class="sg-items">
+      <a class="sl" href="#admin-exams"><span class="mdot mdot-info"></span>Exam CRUD</a>
+      <a class="sl" href="#admin-questions"><span class="mdot mdot-info"></span>Questions</a>
+      <a class="sl" href="#admin-users"><span class="mdot mdot-info"></span>Users</a>
+      <a class="sl" href="#admin-results"><span class="mdot mdot-info"></span>Analytics</a>
+      <a class="sl" href="#admin-ai-gen"><span class="mdot mdot-info"></span>AI Generation</a>
+      <a class="sl" href="#admin-categories"><span class="mdot mdot-info"></span>Categories</a>
+      <a class="sl" href="#admin-attempts"><span class="mdot mdot-info"></span>Attempts</a>
+      <a class="sl" href="#admin-requests"><span class="mdot mdot-info"></span>Access Requests</a>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+<div class="main-inner">
+
+<!-- HERO -->
+<section class="section" id="introduction">
+  <div class="hero">
+    <span class="hero-tag">REST API Reference</span>
+    <h1>SmartAIExam<br>API Docs</h1>
+    <p>Complete reference for all JSON-returning endpoints. HTML routes are excluded. Supports both session cookie auth (web) and JWT Bearer auth (mobile/external).</p>
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="ic-label">Base URL</div>
+        <div class="ic-value copy-url" id="ic-base-url" onclick="copyBaseUrl()" title="Click to copy">smartaiexam.in</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">Version</div>
+        <div class="ic-value" id="ic-version">v1.1</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">Auth</div>
+        <div class="ic-value">JWT Bearer / Cookie</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AUTH -->
+<section class="section" id="authentication">
+  <div class="section-header">
+    <span class="section-tag">Auth Model</span>
+    <h2 class="section-title">Authentication</h2>
+    <p class="section-desc">Two auth methods. Web browser uses <code>session cookies</code>. External clients (mobile, Postman, third-party) use <code>JWT Bearer tokens</code>.</p>
+  </div>
+
+  <div class="auth-box">
+    <div class="auth-box-icon">🌐</div>
+    <div>
+      <div class="auth-box-title">Web Session (Cookie) — Existing, Unchanged</div>
+      <div class="auth-box-desc">After <code>POST /login</code> via browser, server sets an <code>HttpOnly</code> session cookie. All web UI routes use this automatically. Session lifetime: <strong>3 hours</strong>.</div>
+    </div>
+  </div>
+
+  <div class="auth-box" style="background:rgba(104,211,145,.05);border-color:rgba(104,211,145,.18);">
+    <div class="auth-box-icon">🔑</div>
+    <div>
+      <div class="auth-box-title" style="color:#68d391;">JWT Bearer Token — For External Clients</div>
+      <div class="auth-box-desc">
+        Call <code>POST /api/auth/login</code> to get a JWT. Send it as <code>Authorization: Bearer &lt;token&gt;</code> on every request. Access token expires in <strong>1 hour</strong>. Use refresh token to renew without re-login.<br><br>
+        <strong>Dual-role users</strong> (role = <code>user,admin</code>) get both portals in one token. The <code>available_portals</code> array in the login response tells the client which portals this user can access. No portal selection needed — both user and admin APIs are accessible with the same token.
+      </div>
+    </div>
+  </div>
+
+  <div class="jwt-flow">
+    <div class="jwt-step">
+      <div class="jwt-step-num">STEP 01</div>
+      <div class="jwt-step-title">Login → Get Tokens</div>
+      <div class="jwt-step-desc"><code>POST /api/auth/login</code> returns <code>access_token</code> (1h) + <code>refresh_token</code> (30d)</div>
+    </div>
+    <div class="jwt-step">
+      <div class="jwt-step-num">STEP 02</div>
+      <div class="jwt-step-title">Use Access Token</div>
+      <div class="jwt-step-desc">Send <code>Authorization: Bearer &lt;access_token&gt;</code> header with every API call</div>
+    </div>
+    <div class="jwt-step">
+      <div class="jwt-step-num">STEP 03</div>
+      <div class="jwt-step-title">Token Expires</div>
+      <div class="jwt-step-desc">API returns <code>401 token_expired_or_invalid</code> when access token expires</div>
+    </div>
+    <div class="jwt-step">
+      <div class="jwt-step-num">STEP 04</div>
+      <div class="jwt-step-title">Refresh Silently</div>
+      <div class="jwt-step-desc"><code>POST /api/auth/refresh</code> with refresh token → new access token, no re-login needed</div>
+    </div>
+  </div>
+
+  <div class="sh">Quick Example</div>
+  <div class="cb">
+    <div class="cb-header"><span class="cb-lang">javascript</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+    <pre><span class="c">// Step 1: Login</span>
+<span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">'https://smartaiexam.in/api/auth/login'</span>, {
+  method: <span class="s">'POST'</span>,
+  headers: { <span class="s">'Content-Type'</span>: <span class="s">'application/json'</span> },
+  body: JSON.stringify({ username: <span class="s">'john.doe'</span>, password: <span class="s">'••••••'</span> })
+});
+<span class="k">const</span> { data } = <span class="k">await</span> res.json();
+<span class="k">const</span> { access_token, refresh_token, available_portals } = data;
+
+<span class="c">// Step 2: Use token on any API</span>
+<span class="k">const</span> convs = <span class="k">await</span> fetch(<span class="s">'https://smartaiexam.in/api/chat/conversations'</span>, {
+  headers: { <span class="n">'Authorization'</span>: <span class="s">`Bearer ${access_token}`</span> }
+});
+<span class="k">const</span> json = <span class="k">await</span> convs.json();</pre>
+  </div>
+</section>
+
+<!-- RATE LIMITS -->
+<section class="section" id="rate-limits">
+  <div class="section-header">
+    <span class="section-tag">Limits</span>
+    <h2 class="section-title">Rate Limits</h2>
+  </div>
+  <table class="rt">
+    <thead><tr><th>Endpoint</th><th>Limit</th><th>Window</th><th>Response</th></tr></thead>
+    <tbody>
+      <tr><td><code>/login</code>, <code>/admin/login</code></td><td style="color:var(--red)">3 attempts</td><td>Per IP + identifier</td><td style="color:var(--text2)">15-min lockout</td></tr>
+      <tr><td><code>POST /api/chat/messages/:id</code></td><td style="color:var(--amber)">1 msg / 2s</td><td>Per user</td><td style="color:var(--text2)">429</td></tr>
+      <tr><td><code>POST /api/discussion/:id</code></td><td style="color:var(--amber)">1 msg / 10s</td><td>Per user</td><td style="color:var(--text2)">429</td></tr>
+      <tr><td><code>POST /api/study-chat</code></td><td style="color:var(--green)">50 / day</td><td>Per user, resets midnight</td><td style="color:var(--text2)">429 with limit_reached:true</td></tr>
+      <tr><td>All other endpoints</td><td style="color:var(--green)">Unlimited</td><td>—</td><td style="color:var(--text2)">—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ERRORS -->
+<section class="section" id="errors">
+  <div class="section-header">
+    <span class="section-tag">Errors</span>
+    <h2 class="section-title">Error Handling</h2>
+    <p class="section-desc">All JSON errors return a consistent shape with <code>status: "error"</code>.</p>
+  </div>
+  <div class="cb">
+    <div class="cb-header"><span class="cb-lang">json — error shape</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+    <pre>{ <span class="n">"status"</span>: <span class="s">"error"</span>, <span class="n">"message"</span>: <span class="s">"Human-readable error description"</span> }</pre>
+  </div>
+  <div class="rpills">
+    <span class="rp rp-4">400 Bad Request</span>
+    <span class="rp rp-4">401 Unauthorized</span>
+    <span class="rp rp-4">403 Forbidden</span>
+    <span class="rp rp-4">404 Not Found</span>
+    <span class="rp rp-4">409 Conflict</span>
+    <span class="rp rp-4">429 Rate Limited</span>
+    <span class="rp rp-5">500 Server Error</span>
+  </div>
+  <div class="note note-warn"><span class="note-icon">⚠️</span><span>A <strong>401</strong> with message <code>token_expired_or_invalid</code> means JWT expired. Call <code>/api/auth/refresh</code> to get a new access token.</span></div>
+</section>
+
+<!-- JWT AUTH ENDPOINTS -->
+<section class="section" id="jwt-section">
+  <div class="section-header">
+    <span class="section-tag">JWT Authentication</span>
+    <h2 class="section-title">JWT Auth Endpoints</h2>
+    <p class="section-desc">Token-based auth for external clients. These endpoints do <strong>not</strong> require an existing session — they create tokens from credentials.</p>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="ep open" id="jwt-login">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/auth/login</span>
+      <span class="ep-summary">Username or email + password → JWT tokens</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-jlogin-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-jlogin-res')">Response</button>
+        <button class="tab" onclick="switchTab(this,'t-jlogin-err')">Errors</button>
+      </div>
+      <div class="tab-content active" id="t-jlogin-req">
+        <div class="sh">Body</div>
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"username"</span>: <span class="s">"john.doe"</span>,   <span class="c">// username OR email accepted</span>
+  <span class="n">"password"</span>: <span class="s">"MyPass@2025"</span>
+}</pre></div>
+      </div>
+      <div class="tab-content" id="t-jlogin-res">
+        <div class="sh">200 OK</div>
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"status"</span>: <span class="s">"success"</span>,
+  <span class="n">"data"</span>: {
+    <span class="n">"access_token"</span>:      <span class="s">"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."</span>,
+    <span class="n">"refresh_token"</span>:     <span class="s">"dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."</span>,
+    <span class="n">"token_type"</span>:        <span class="s">"Bearer"</span>,
+    <span class="n">"expires_in"</span>:        <span class="v">3600</span>,
+    <span class="n">"available_portals"</span>: [<span class="s">"user"</span>],
+    <span class="n">"user"</span>: {
+      <span class="n">"id"</span>:        <span class="v">42</span>,
+      <span class="n">"username"</span>:  <span class="s">"john.doe"</span>,
+      <span class="n">"full_name"</span>: <span class="s">"John Doe"</span>,
+      <span class="n">"role"</span>:      <span class="s">"user"</span>
+    }
+  }
+}</pre></div>
+        <div class="note note-info"><span class="note-icon">ℹ️</span><span><code>available_portals</code> will be <code>["user","admin"]</code> for dual-role accounts. Client uses this to show portal selection UI.</span></div>
+      </div>
+      <div class="tab-content" id="t-jlogin-err">
+        <div class="rpills">
+          <span class="rp rp-4">400 — username/email and password required</span>
+          <span class="rp rp-4">401 — Invalid credentials</span>
+          <span class="rp rp-4">401 — Password not set, use web portal</span>
+          <span class="rp rp-4">429 — Account locked (3 failed attempts)</span>
+        </div>
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 401</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"status"</span>: <span class="s">"error"</span>, <span class="n">"message"</span>: <span class="s">"Invalid credentials. 2 attempts remaining."</span> }</pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOOGLE -->
+  <div class="ep" id="jwt-google">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/auth/google</span>
+      <span class="ep-summary">Google ID token from client SDK → JWT tokens</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Get <code>id_token</code> from Google Sign-In SDK on client side (Android/iOS/Web), send it here. Server verifies with Google, creates account if new, returns JWT.</span></div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-google-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-google-res')">Response</button>
+      </div>
+      <div class="tab-content active" id="t-google-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"id_token"</span>: <span class="s">"&lt;Google ID token from client SDK&gt;"</span> }</pre></div>
+      </div>
+      <div class="tab-content" id="t-google-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"status"</span>: <span class="s">"success"</span>,
+  <span class="n">"data"</span>: {
+    <span class="n">"access_token"</span>:      <span class="s">"eyJ..."</span>,
+    <span class="n">"refresh_token"</span>:     <span class="s">"dGhp..."</span>,
+    <span class="n">"token_type"</span>:        <span class="s">"Bearer"</span>,
+    <span class="n">"expires_in"</span>:        <span class="v">3600</span>,
+    <span class="n">"is_new_user"</span>:       <span class="v">false</span>,
+    <span class="n">"available_portals"</span>: [<span class="s">"user"</span>],
+    <span class="n">"user"</span>: { <span class="n">"id"</span>: <span class="v">42</span>, <span class="n">"username"</span>: <span class="s">"john.doe"</span>, <span class="n">"role"</span>: <span class="s">"user"</span> }
+  }
+}</pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REFRESH -->
+  <div class="ep" id="jwt-refresh">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/auth/refresh</span>
+      <span class="ep-summary">Exchange refresh token for new access token</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-ref-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-ref-res')">Response</button>
+      </div>
+      <div class="tab-content active" id="t-ref-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"refresh_token"</span>: <span class="s">"dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."</span> }</pre></div>
+      </div>
+      <div class="tab-content" id="t-ref-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"status"</span>:  <span class="s">"success"</span>,
+  <span class="n">"data"</span>: {
+    <span class="n">"access_token"</span>: <span class="s">"eyJ..."</span>,
+    <span class="n">"token_type"</span>:   <span class="s">"Bearer"</span>,
+    <span class="n">"expires_in"</span>:   <span class="v">3600</span>
+  }
+}</pre></div>
+        <div class="rpills">
+          <span class="rp rp-4">401 refresh_token_expired — re-login required</span>
+          <span class="rp rp-4">401 refresh_token_invalid</span>
+          <span class="rp rp-4">401 refresh_token_revoked</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGOUT -->
+  <div class="ep" id="jwt-logout">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/auth/logout</span>
+      <span class="ep-summary">Revoke refresh token — invalidate session</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"refresh_token"</span>: <span class="s">"dGhp..."</span> }</pre></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
+      <pre>{ <span class="n">"status"</span>: <span class="s">"success"</span>, <span class="n">"message"</span>: <span class="s">"Logged out"</span> }</pre></div>
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Access token expires on its own after 1 hour. Just discard it on the client side. This endpoint only revokes the refresh token to prevent renewal.</span></div>
+    </div>
+  </div>
+
+  <!-- ME -->
+  <div class="ep" id="jwt-me">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/auth/me</span>
+      <span class="ep-summary">Get current authenticated user profile</span>
+      <span class="badge-auth">JWT</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="sh">Headers</div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">http</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</pre></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"status"</span>: <span class="s">"success"</span>,
+  <span class="n">"data"</span>: {
+    <span class="n">"id"</span>:                <span class="v">42</span>,
+    <span class="n">"username"</span>:          <span class="s">"john.doe"</span>,
+    <span class="n">"email"</span>:             <span class="s">"john@example.com"</span>,
+    <span class="n">"full_name"</span>:         <span class="s">"John Doe"</span>,
+    <span class="n">"role"</span>:              <span class="s">"user"</span>,
+    <span class="n">"available_portals"</span>: [<span class="s">"user"</span>],
+    <span class="n">"created_at"</span>:        <span class="s">"2025-01-01T10:00:00"</span>
+  }
+}</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- WEB AUTH -->
+<section class="section" id="web-auth-section">
+  <div class="section-header">
+    <span class="section-tag">Web Auth</span>
+    <h2 class="section-title">Auth JSON Endpoints</h2>
+    <p class="section-desc">Password reset, access requests, and account deletion. HTML form routes <code>/login</code>, <code>/logout</code>, <code>/create_account</code> are excluded.</p>
+  </div>
+
+  <div class="ep open" id="ep-reset">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/request-password-reset</span>
+      <span class="ep-summary">Send password reset link to email</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"email"</span>: <span class="s">"john@example.com"</span> }</pre></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200 (always, prevents email enumeration)</span></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: <span class="s">"If an account exists with this email, a reset link has been sent."</span> }</pre></div>
+      <div class="note note-warn"><span class="note-icon">⚠️</span><span>Always returns 200 regardless of email existence. Token expires in <strong>1 hour</strong>.</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-validate">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/validate-user-for-request</span>
+      <span class="ep-summary">Validate user before submitting access request</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-val-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-val-res')">Response</button>
+      </div>
+      <div class="tab-content active" id="t-val-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"username"</span>: <span class="s">"john.doe"</span>, <span class="n">"email"</span>: <span class="s">"john@example.com"</span> }</pre></div>
+      </div>
+      <div class="tab-content" id="t-val-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"success"</span>: <span class="v">true</span>,
+  <span class="n">"user"</span>: { <span class="n">"username"</span>: <span class="s">"john.doe"</span>, <span class="n">"current_access"</span>: <span class="s">"user"</span> },
+  <span class="n">"available_requests"</span>: [<span class="s">"admin"</span>, <span class="s">"user,admin"</span>],
+  <span class="n">"has_pending_request"</span>: <span class="v">false</span>,
+  <span class="n">"can_request"</span>: <span class="v">true</span>
+}</pre></div>
+        <div class="rpills"><span class="rp rp-4">404 — User not found</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-access-req">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/submit-access-request</span>
+      <span class="ep-summary">Submit admin/role access request</span>
+      <span class="badge-pub">Public</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-acc-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-acc-res')">Response</button>
+      </div>
+      <div class="tab-content active" id="t-acc-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"username"</span>:         <span class="s">"john.doe"</span>,
+  <span class="n">"email"</span>:            <span class="s">"john@example.com"</span>,
+  <span class="n">"current_access"</span>:   <span class="s">"user"</span>,
+  <span class="n">"requested_access"</span>: <span class="s">"admin"</span>,
+  <span class="n">"user_reason"</span>:      <span class="s">"I need to manage exams for my batch"</span>
+}</pre></div>
+      </div>
+      <div class="tab-content" id="t-acc-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: <span class="s">"Request submitted."</span>, <span class="n">"request_id"</span>: <span class="v">7</span> }</pre></div>
+        <div class="rpills"><span class="rp rp-4">400 — Already has pending request</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-delete-acc">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/delete-account</span>
+      <span class="ep-summary">Permanently delete authenticated user's account</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"confirm"</span>: <span class="s">"DELETE"</span> }  <span class="c">// must be exactly "DELETE"</span></pre></div>
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true }</span>
+        <span class="rp rp-4">400 — Invalid confirmation string</span>
+        <span class="rp rp-4">401 — Not authenticated</span>
+      </div>
+      <div class="note note-danger"><span class="note-icon">🚨</span><span><strong>Irreversible.</strong> Deletes all user data in FK-safe order. Group chats preserved with deleted-account placeholder.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- EXAMS -->
+<section class="section" id="exam-section">
+  <div class="section-header">
+    <span class="section-tag">Exams</span>
+    <h2 class="section-title">Exam Endpoints</h2>
+    <p class="section-desc">Start, sync answers, submit, and check attempt status. All require auth.</p>
+  </div>
+
+  <div class="ep open" id="ep-preload">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/preload-exam/<span class="param">{exam_id}</span></span>
+      <span class="ep-summary">Pre-cache exam questions in session</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"cached"</span>: <span class="v">true</span>, <span class="n">"question_count"</span>: <span class="v">30</span> }</pre></div>
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Call before starting exam. Resolves Google Drive image URLs and stores questions in session. Returns instantly if already cached.</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-start">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/start-exam/<span class="param">{exam_id}</span></span>
+      <span class="ep-summary">Create new attempt or resume existing in-progress attempt</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-start-fresh')">Fresh Start</button>
+        <button class="tab" onclick="switchTab(this,'t-start-resume')">Resume</button>
+        <button class="tab" onclick="switchTab(this,'t-start-err')">Errors</button>
+      </div>
+      <div class="tab-content active" id="t-start-fresh">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200 fresh start</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"success"</span>:        <span class="v">true</span>,
+  <span class="n">"redirect_url"</span>:   <span class="s">"/exam/42"</span>,
+  <span class="n">"resumed"</span>:        <span class="v">false</span>,
+  <span class="n">"attempt_id"</span>:     <span class="v">17</span>,
+  <span class="n">"attempt_number"</span>: <span class="v">1</span>,
+  <span class="n">"fresh_start"</span>:    <span class="v">true</span>
+}</pre></div>
+      </div>
+      <div class="tab-content" id="t-start-resume">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200 resumed</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"resumed"</span>: <span class="v">true</span>, <span class="n">"attempt_id"</span>: <span class="v">17</span>, <span class="n">"redirect_url"</span>: <span class="s">"/exam/42"</span> }</pre></div>
+      </div>
+      <div class="tab-content" id="t-start-err">
+        <div class="rpills">
+          <span class="rp rp-4">400 — Max attempts (N) reached</span>
+          <span class="rp rp-4">401 — Not authenticated</span>
+          <span class="rp rp-5">500 — DB failure</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-sync">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/sync-exam-answers/<span class="param">{exam_id}</span></span>
+      <span class="ep-summary">Sync in-progress answers to server session</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"answers"</span>: {
+    <span class="n">"101"</span>: <span class="s">"A"</span>,          <span class="c">// MCQ — single letter</span>
+    <span class="n">"102"</span>: [<span class="s">"A"</span>, <span class="s">"C"</span>],   <span class="c">// MSQ — array</span>
+    <span class="n">"103"</span>: <span class="s">"42.5"</span>        <span class="c">// NUMERIC — string</span>
+  },
+  <span class="n">"markedForReview"</span>: [<span class="v">101</span>, <span class="v">104</span>]
+}</pre></div>
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Call every ~30s and on every answer change. Submission reads from session state set here.</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-submit">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/submit-exam/<span class="param">{exam_id}</span></span>
+      <span class="ep-summary">Submit exam, calculate score, create result record</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>No request body needed — reads answers from server session. Redirects to result or result-pending page depending on exam's <code>result_mode</code>.</span></div>
+      <div class="rpills">
+        <span class="rp rp-2">302 → /result/:exam_id (instant mode)</span>
+        <span class="rp rp-2">302 → /result-pending/:exam_id (delayed/manual)</span>
+        <span class="rp rp-4">401 — Not authenticated</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-status">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/exam-attempts-status/<span class="param">{exam_id}</span></span>
+      <span class="ep-summary">Get attempt count and active attempt info</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200 (active attempt)</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"has_active_attempt"</span>: <span class="v">true</span>,
+  <span class="n">"attempt_id"</span>:         <span class="v">17</span>,
+  <span class="n">"attempt_number"</span>:     <span class="v">2</span>,
+  <span class="n">"start_time"</span>:         <span class="s">"2025-01-15 10:30:00"</span>,
+  <span class="n">"completed_count"</span>:    <span class="v">1</span>,
+  <span class="n">"max_attempts"</span>:       <span class="v">3</span>,
+  <span class="n">"attempts_remaining"</span>: <span class="v">1</span>
+}</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-ping">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/_ping</span>
+      <span class="ep-summary">Session heartbeat — check if session is alive</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="rpills">
+        <span class="rp rp-2">204 — Session alive (no body)</span>
+        <span class="rp rp-4">401 — { "reason": "no_session" }</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI ASSISTANT -->
+<section class="section" id="ai-section">
+  <div class="section-header">
+    <span class="section-tag">AI Assistant</span>
+    <h2 class="section-title">AI Study Assistant</h2>
+    <p class="section-desc">Groq LLM (LLaMA 3.3 70B) powered study chat. Responses include LaTeX for math/science. Daily limit: <code>50 messages/user/day</code>.</p>
+  </div>
+
+  <div class="ep open" id="ep-ai-init">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/assistant-init</span>
+      <span class="ep-summary">Get daily limits + full chat history in one call</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"success"</span>:       <span class="v">true</span>,
+  <span class="n">"dailyLimit"</span>:    <span class="v">50</span>,
+  <span class="n">"questionsUsed"</span>: <span class="v">12</span>,
+  <span class="n">"history"</span>: [
+    { <span class="n">"text"</span>: <span class="s">"What is Newton's second law?"</span>, <span class="n">"isUser"</span>: <span class="v">true</span>,  <span class="n">"timestamp"</span>: <span class="s">"2025-01-15T10:30:00"</span> },
+    { <span class="n">"text"</span>: <span class="s">"Newton's second law states $F = ma$..."</span>, <span class="n">"isUser"</span>: <span class="v">false</span>, <span class="n">"timestamp"</span>: <span class="s">"2025-01-15T10:30:05"</span> }
+  ]
+}</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-ai-chat">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/study-chat</span>
+      <span class="ep-summary">Send message to AI study assistant</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-ai-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-ai-res')">Response</button>
+        <button class="tab" onclick="switchTab(this,'t-ai-err')">Errors</button>
+      </div>
+      <div class="tab-content active" id="t-ai-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"message"</span>: <span class="s">"Explain conservation of momentum with an example"</span> }</pre></div>
+      </div>
+      <div class="tab-content" id="t-ai-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"success"</span>:              <span class="v">true</span>,
+  <span class="n">"response"</span>:             <span class="s">"[FINAL ANSWER]\nConservation of momentum states that..."</span>,
+  <span class="n">"questions_remaining"</span>:  <span class="v">37</span>
+}</pre></div>
+      </div>
+      <div class="tab-content" id="t-ai-err">
+        <div class="rpills">
+          <span class="rp rp-4">400 — Message too short or too long</span>
+          <span class="rp rp-4">429 — Daily limit reached</span>
+        </div>
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 429</span></div>
+        <pre>{ <span class="n">"success"</span>: <span class="v">false</span>, <span class="n">"message"</span>: <span class="s">"Daily limit reached."</span>, <span class="n">"limit_reached"</span>: <span class="v">true</span> }</pre></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-ai-clear">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/clear-chat-history</span>
+      <span class="ep-summary">Delete all AI chat history for current user</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>No request body. Deletes all rows from <code>ai_chat_history</code>. Daily usage counter is NOT reset.</span></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: <span class="s">"Chat history cleared."</span> }</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- CHAT -->
+<section class="section" id="chat-section">
+  <div class="section-header">
+    <span class="section-tag">Chat</span>
+    <h2 class="section-title">Chat Endpoints</h2>
+    <p class="section-desc">Real-time peer chat with connection requests, groups, and unread tracking. All require auth.</p>
+  </div>
+
+  <div class="ep open" id="ep-chat-search">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/chat/search?q=<span class="param">{query}</span></span>
+      <span class="ep-summary">Search users by username (min 2 chars)</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"success"</span>: <span class="v">true</span>,
+  <span class="n">"users"</span>: [
+    {
+      <span class="n">"id"</span>:                <span class="v">5</span>,
+      <span class="n">"username"</span>:          <span class="s">"jane.smith"</span>,
+      <span class="n">"full_name"</span>:         <span class="s">"Jane Smith"</span>,
+      <span class="n">"online"</span>:            <span class="v">true</span>,
+      <span class="n">"connection_status"</span>: <span class="s">"accepted"</span>  <span class="c">// null | "pending" | "accepted" | "rejected"</span>
+    }
+  ]
+}</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-convs">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/chat/conversations</span>
+      <span class="ep-summary">List all DM and group conversations with unread counts</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"success"</span>: <span class="v">true</span>,
+  <span class="n">"conversations"</span>: [
+    {
+      <span class="n">"id"</span>:           <span class="v">12</span>,
+      <span class="n">"name"</span>:         <span class="s">"Jane Smith"</span>,
+      <span class="n">"is_group"</span>:     <span class="v">false</span>,
+      <span class="n">"unread"</span>:       <span class="v">3</span>,
+      <span class="n">"online"</span>:       <span class="v">true</span>,
+      <span class="n">"last_message"</span>: { <span class="n">"message"</span>: <span class="s">"Hey!"</span>, <span class="n">"created_at"</span>: <span class="s">"2025-01-15T10:30:00"</span> }
+    }
+  ]
+}</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-msgs">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/chat/messages/<span class="param">{conv_id}</span>?before=<span class="param">{iso_ts}</span></span>
+      <span class="ep-summary">Get messages — 40 at a time, paginated backwards</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"success"</span>: <span class="v">true</span>,
+  <span class="n">"messages"</span>: [
+    {
+      <span class="n">"id"</span>:          <span class="v">88</span>,
+      <span class="n">"sender_name"</span>: <span class="s">"Jane Smith"</span>,
+      <span class="n">"message"</span>:     <span class="s">"Hi there!"</span>,
+      <span class="n">"created_at"</span>:  <span class="s">"2025-01-15T10:30:00"</span>,
+      <span class="n">"is_own"</span>:      <span class="v">false</span>,
+      <span class="n">"is_edited"</span>:   <span class="v">false</span>,
+      <span class="n">"reply_to_id"</span>: <span class="v">null</span>
+    }
+  ]
+}</pre></div>
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Also marks conversation as read. Pass <code>before</code> ISO timestamp to load older messages (pagination).</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-send">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/chat/messages/<span class="param">{conv_id}</span></span>
+      <span class="ep-summary">Send a message — max 1000 chars, 1 per 2s</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-send-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-send-res')">Response</button>
+      </div>
+      <div class="tab-content active" id="t-send-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"message"</span>:      <span class="s">"Hey, how are you?"</span>,
+  <span class="n">"reply_to_id"</span>:  <span class="v">85</span>,           <span class="c">// optional</span>
+  <span class="n">"reply_to_text"</span>:<span class="s">"Hi there!"</span>,   <span class="c">// optional, truncated to 100 chars</span>
+  <span class="n">"reply_to_name"</span>:<span class="s">"Jane Smith"</span>   <span class="c">// optional</span>
+}</pre></div>
+      </div>
+      <div class="tab-content" id="t-send-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: { <span class="n">"id"</span>: <span class="v">89</span>, <span class="n">"message"</span>: <span class="s">"Hey, how are you?"</span>, <span class="n">"is_own"</span>: <span class="v">true</span>, <span class="n">"created_at"</span>: <span class="s">"..."</span> } }</pre></div>
+        <div class="rpills">
+          <span class="rp rp-4">429 — Rate limited (2s cooldown)</span>
+          <span class="rp rp-4">403 — Not a member</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-edit">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-PUT">PUT</span>
+      <span class="ep-path">/api/chat/messages/<span class="param">{msg_id}</span>/edit</span>
+      <span class="ep-summary">Edit own message</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"message"</span>: <span class="s">"Edited message text"</span> }</pre></div>
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true, message: "Edited text" }</span>
+        <span class="rp rp-4">403 — Not own message</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-del">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-DELETE">DELETE</span>
+      <span class="ep-path">/api/chat/messages/<span class="param">{msg_id}</span></span>
+      <span class="ep-summary">Soft-delete own message</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true }</span>
+        <span class="rp rp-4">403 — Not own message</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-read">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/chat/conversations/<span class="param">{conv_id}</span>/read</span>
+      <span class="ep-summary">Mark conversation as read — reset unread count to 0</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="rpills"><span class="rp rp-2">200 — { success: true }</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-request">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/chat/request</span>
+      <span class="ep-summary">Send connection request to a user</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"recipient_id"</span>: <span class="v">5</span> }</pre></div>
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true }</span>
+        <span class="rp rp-4">409 — Already sent or connected</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-inbox">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/chat/requests/inbox</span>
+      <span class="ep-summary">Get pending incoming connection requests</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"success"</span>: <span class="v">true</span>,
+  <span class="n">"requests"</span>: [
+    { <span class="n">"conn_id"</span>: <span class="v">3</span>, <span class="n">"from_id"</span>: <span class="v">5</span>, <span class="n">"from_name"</span>: <span class="s">"Jane Smith"</span>, <span class="n">"created_at"</span>: <span class="s">"2025-01-15T09:00:00"</span> }
+  ]
+}</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-respond">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-PUT">PUT</span>
+      <span class="ep-path">/api/chat/request/<span class="param">{conn_id}</span></span>
+      <span class="ep-summary">Accept or reject a connection request</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"action"</span>: <span class="s">"accept"</span> }  <span class="c">// or "reject"</span></pre></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200 (accepted)</span></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"conv_id"</span>: <span class="v">12</span> }</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-unread">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/chat/unread_count</span>
+      <span class="ep-summary">Total unread messages + pending connection requests</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"unread"</span>: <span class="v">5</span>, <span class="n">"requests"</span>: <span class="v">2</span> }</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-online">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/chat/online_status?ids=<span class="param">1,2,5</span></span>
+      <span class="ep-summary">Check online status of multiple users at once</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"status"</span>: { <span class="n">"1"</span>: <span class="v">true</span>, <span class="n">"2"</span>: <span class="v">false</span>, <span class="n">"5"</span>: <span class="v">true</span> } }</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-chat-group">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/chat/group</span>
+      <span class="ep-summary">Create a group conversation</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"name"</span>: <span class="s">"Physics Study Group"</span>, <span class="n">"member_ids"</span>: [<span class="v">3</span>, <span class="v">5</span>, <span class="v">7</span>] }</pre></div>
+      <div class="rpills"><span class="rp rp-2">200 — { success: true, conv_id: 15 }</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-friend-del">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-DELETE">DELETE</span>
+      <span class="ep-path">/api/chat/friend/<span class="param">{other_id}</span></span>
+      <span class="ep-summary">Remove friend and purge shared DM conversation</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Deletes connection record + DM conversation entirely. Group chats shared with this user are unaffected.</span></div>
+      <div class="rpills"><span class="rp rp-2">200 — { success: true }</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- DISCUSSION -->
+<section class="section" id="discussion-section">
+  <div class="section-header">
+    <span class="section-tag">Discussion</span>
+    <h2 class="section-title">Discussion Endpoints</h2>
+    <p class="section-desc">Per-question threaded comments with replies, pinning, and best-answer marking.</p>
+  </div>
+
+  <div class="ep open" id="ep-disc-get">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/discussion/<span class="param">{question_id}</span></span>
+      <span class="ep-summary">Get threaded comments for a question</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"success"</span>: <span class="v">true</span>,
+  <span class="n">"count"</span>:   <span class="v">5</span>,
+  <span class="n">"comments"</span>: [
+    {
+      <span class="n">"id"</span>:             <span class="v">1</span>,
+      <span class="n">"username"</span>:       <span class="s">"jane.smith"</span>,
+      <span class="n">"message"</span>:        <span class="s">"Approach using energy conservation..."</span>,
+      <span class="n">"is_own"</span>:         <span class="v">false</span>,
+      <span class="n">"is_pinned"</span>:      <span class="v">false</span>,
+      <span class="n">"is_best_answer"</span>: <span class="v">true</span>,
+      <span class="n">"created_at"</span>:     <span class="s">"2025-01-15T10:00:00"</span>,
+      <span class="n">"replies"</span>:        []
+    }
+  ]
+}</pre></div>
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Deleted account messages show as <code>username: "Deleted Account"</code> with a placeholder. Thread structure is preserved.</span></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-disc-post">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/discussion/<span class="param">{question_id}</span></span>
+      <span class="ep-summary">Post a comment — max 500 chars, 1 per 10s</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{
+  <span class="n">"message"</span>:   <span class="s">"The answer is B because..."</span>,
+  <span class="n">"exam_id"</span>:   <span class="v">42</span>,   <span class="c">// optional</span>
+  <span class="n">"parent_id"</span>: <span class="v">1</span>    <span class="c">// optional — for replies</span>
+}</pre></div>
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true, message: { id, username, ... } }</span>
+        <span class="rp rp-4">429 — Rate limited (10s)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-disc-edit">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-PUT">PUT</span>
+      <span class="ep-path">/api/discussion/edit/<span class="param">{comment_id}</span></span>
+      <span class="ep-summary">Edit own comment (admins can edit any)</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+      <pre>{ <span class="n">"message"</span>: <span class="s">"Updated explanation..."</span> }</pre></div>
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true }</span>
+        <span class="rp rp-4">403 — Forbidden</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-disc-del">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-DELETE">DELETE</span>
+      <span class="ep-path">/api/discussion/delete/<span class="param">{comment_id}</span></span>
+      <span class="ep-summary">Soft-delete own comment (admins can delete any)</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="rpills">
+        <span class="rp rp-2">200 — { success: true }</span>
+        <span class="rp rp-4">403 — Forbidden</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-disc-counts">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/api/discussion/counts/bulk</span>
+      <span class="ep-summary">Get discussion counts for up to 100 questions at once</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-bulk-req')">Request</button>
+        <button class="tab" onclick="switchTab(this,'t-bulk-res')">Response</button>
+      </div>
+      <div class="tab-content active" id="t-bulk-req">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"question_ids"</span>: [<span class="v">101</span>, <span class="v">102</span>, <span class="v">103</span>] }  <span class="c">// max 100</span></pre></div>
+      </div>
+      <div class="tab-content" id="t-bulk-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"counts"</span>: { <span class="n">"101"</span>: <span class="v">5</span>, <span class="n">"102"</span>: <span class="v">0</span>, <span class="n">"103"</span>: <span class="v">12</span> } }</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN -->
+<section class="section" id="admin-section">
+  <div class="section-header">
+    <span class="section-tag">Admin</span>
+    <h2 class="section-title">Admin JSON APIs</h2>
+    <p class="section-desc">All admin endpoints require an active admin session or JWT with <code>admin</code> role. Base path: <code>/admin/</code></p>
+  </div>
+  <div class="note note-warn"><span class="note-icon">⚠️</span><span>All endpoints below require <code>admin</code> in role. Regular user JWT returns 403.</span></div>
+
+  <!-- EXAM CRUD -->
+  <div class="ep" id="admin-exams">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/admin/exams</span>
+      <span class="ep-summary">Exam CRUD endpoints</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/exams</div><div class="ag-desc">Create exam. Fields: name, date, start_time, duration, status, instructions, positive_marks, negative_marks, max_attempts, result_mode, result_delay, category_id</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/exams/edit/{exam_id}</div><div class="ag-desc">Update exam fields</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-DELETE" style="background:rgba(252,129,129,.12);color:#fc8181;border:1px solid rgba(252,129,129,.25);">POST</span><div><div class="ag-path">/admin/exams/delete/{exam_id}</div><div class="ag-desc">Delete exam + all questions, results, responses → <code>{ success: true }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/exams/{exam_id}/release-results</div><div class="ag-desc">Toggle result release → <code>{ success, released: bool }</code></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUESTIONS -->
+  <div class="ep" id="admin-questions">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/admin/questions</span>
+      <span class="ep-summary">Question CRUD, bulk ops, CSV import/export</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/questions/get/{question_id}</div><div class="ag-desc">Fetch single question → <code>{ success, question }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/questions/add-ajax</div><div class="ag-desc">Add question. Fields: exam_id, question_text, option_a-d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/questions/edit-ajax/{question_id}</div><div class="ag-desc">Update question</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/questions/delete/{question_id}</div><div class="ag-desc">Delete question + FK children</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/questions/delete-multiple</div><div class="ag-desc">Bulk delete. Body: <code>{ ids: [1,2,3] }</code> → <code>{ success, deleted: N }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/questions/batch-add</div><div class="ag-desc">Bulk insert. Body: <code>{ exam_id, questions: [...] }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/questions/export-csv/{exam_id}</div><div class="ag-desc">Download CSV of all questions for exam</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/questions/import-csv</div><div class="ag-desc">Upload CSV → <code>{ success, inserted, skipped, errors }</code></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USERS -->
+  <div class="ep" id="admin-users">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/admin/api/users/search</span>
+      <span class="ep-summary">User search, stats, role management</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/users/search?q=&role=&page=</div><div class="ag-desc">Paginated user search. role filter: <code>user | admin | both</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/users/stats</div><div class="ag-desc">Role counts → <code>{ total_users, user_role, admin_role, both_roles }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/users/update-role</div><div class="ag-desc">Update role. Body: <code>{ user_id, new_role }</code>. Roles: <code>user | admin | user,admin</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/users/bulk-update-roles</div><div class="ag-desc">Bulk update. Body: <code>{ updates: [{user_id, new_role}] }</code></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="ep" id="admin-results">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/admin/api/users-analytics/stats</span>
+      <span class="ep-summary">Analytics, result data, PDF download</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/users-analytics/stats</div><div class="ag-desc">Counts → <code>{ total_users, total_exams, total_results, total_responses }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/users-analytics/data?timePeriod=&exam=&startDate=&endDate=</div><div class="ag-desc">Full analytics JSON — score distribution, top performers, exam stats, recent activity</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/users-analytics/results?user=&exam=&dateFrom=&dateTo=&page=&partial=1</div><div class="ag-desc">Paginated results. <code>partial=1</code> returns table HTML fragment only</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/users-analytics/download-result/{result_id}</div><div class="ag-desc">Download result PDF</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI GEN -->
+  <div class="ep" id="admin-ai-gen">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-POST">POST</span>
+      <span class="ep-path">/admin/ai-command-centre/generate</span>
+      <span class="ep-summary">AI Question Generation via Gemini</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'t-aigen-req')">Generate</button>
+        <button class="tab" onclick="switchTab(this,'t-aigen-res')">Response</button>
+        <button class="tab" onclick="switchTab(this,'t-aigen-save')">Save / Export</button>
+      </div>
+      <div class="tab-content active" id="t-aigen-req">
+        <div class="note note-info"><span class="note-icon">ℹ️</span><span>Multipart form data. <code>mode</code> determines what else is required.</span></div>
+        <div class="cb"><div class="cb-header"><span class="cb-lang">multipart/form-data</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>mode:              <span class="s">"extract"</span>  <span class="c">// extract | mine | pure</span>
+exam_id:           <span class="v">42</span>
+difficulty:        <span class="s">"Medium"</span>   <span class="c">// Easy | Medium | Hard</span>
+mcq_count:         <span class="v">5</span>
+msq_count:         <span class="v">2</span>
+numeric_count:     <span class="v">3</span>
+pdf_file:          <span class="s">&lt;file&gt;</span>     <span class="c">// required for extract/mine</span>
+topic:             <span class="s">"Newton's Laws"</span>  <span class="c">// required for pure</span></pre></div>
+      </div>
+      <div class="tab-content" id="t-aigen-res">
+        <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
+        <pre>{
+  <span class="n">"success"</span>:   <span class="v">true</span>,
+  <span class="n">"count"</span>:     <span class="v">10</span>,
+  <span class="n">"questions"</span>: [
+    {
+      <span class="n">"exam_id"</span>:        <span class="v">42</span>,
+      <span class="n">"question_text"</span>:  <span class="s">"A block of mass $\\large m$ slides..."</span>,
+      <span class="n">"option_a"</span>:       <span class="s">"$\\large \\frac{1}{2}mv^2$"</span>,
+      <span class="n">"correct_answer"</span>: <span class="s">"A"</span>,
+      <span class="n">"question_type"</span>:  <span class="s">"MCQ"</span>,
+      <span class="n">"positive_marks"</span>: <span class="v">4.0</span>,
+      <span class="n">"negative_marks"</span>: <span class="v">1.0</span>
+    }
+  ]
+}</pre></div>
+      </div>
+      <div class="tab-content" id="t-aigen-save">
+        <div class="admin-grid">
+          <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/ai-command-centre/save</div><div class="ag-desc">Save to DB. Body: <code>{ questions: [...] }</code> → <code>{ success, count }</code></div></div></div>
+          <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/ai-command-centre/export-csv</div><div class="ag-desc">Export as CSV. Body: <code>{ questions: [...] }</code> → CSV download</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORIES -->
+  <div class="ep" id="admin-categories">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/admin/api/categories</span>
+      <span class="ep-summary">Category CRUD with Google Drive image upload</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/categories</div><div class="ag-desc">List all categories → <code>{ categories: [...] }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/categories/create</div><div class="ag-desc">Create. Multipart: <code>name, image (optional, max 5MB)</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/categories/update/{cat_id}</div><div class="ag-desc">Update name or image</div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/categories/delete/{cat_id}</div><div class="ag-desc">Delete (fails if exams linked)</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATTEMPTS -->
+  <div class="ep" id="admin-attempts">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/admin/api/attempts/search</span>
+      <span class="ep-summary">Attempt management — search, modify, bulk modify</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/attempts/search?q=&exam_id=&status=&page=</div><div class="ag-desc">Paginated attempts. status: <code>unlimited | available | exhausted</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/attempts/modify</div><div class="ag-desc">Modify. Body: <code>{ student_id, exam_id, action: "reset|increase|decrease", amount }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/attempts/bulk-modify</div><div class="ag-desc">Bulk. Body: <code>{ items: [{student_id, exam_id}], action, amount }</code></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACCESS REQUESTS -->
+  <div class="ep" id="admin-requests">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/admin/api/requests/list</span>
+      <span class="ep-summary">Access request management</span>
+      <span class="badge-admin">Admin</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="admin-grid">
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/requests/list?status=pending&page=1</div><div class="ag-desc">Paginated requests. status: <code>pending | completed | denied</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/admin/api/requests/stats</div><div class="ag-desc">Counts → <code>{ pending, completed, denied, total }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/requests/approve/{request_id}</div><div class="ag-desc">Approve. Body: <code>{ approved_access: "admin" }</code></div></div></div>
+        <div class="ag-row"><span class="ag-method mb-POST">POST</span><div><div class="ag-path">/admin/requests/deny/{request_id}</div><div class="ag-desc">Deny. Body: <code>{ reason: "..." }</code></div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- main-inner -->
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-left">
+    <span>© <span id="footer-year">2025</span> SmartAIExam</span>
+    <span style="color:var(--border2)">·</span>
+    <span>API Reference <span id="footer-version">v1.1</span></span>
+  </div>
+      <a class="footer-logo">
+          <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:26px;width:auto;"></video>
+      </a>
+  <span id="footer-url" style="color:var(--text3);">smartaiexam.in</span>
+</footer>
+
+</div><!-- main -->
+
+<script>
+/* ── INIT: inject config values ── */
+document.addEventListener('DOMContentLoaded', () => {
+  const b = API_CONFIG.baseUrl;
+  const v = API_CONFIG.version;
+  const y = API_CONFIG.year;
+
+  document.getElementById('hdr-version').textContent    = v;
+  document.getElementById('hdr-version-chip').textContent = v;
+  document.getElementById('hdr-url-text').textContent   = b.replace(/^https?:\/\//, '');
+  document.getElementById('ic-base-url').textContent    = b.replace(/^https?:\/\//, '');
+  document.getElementById('ic-version').textContent     = v;
+  document.getElementById('footer-year').textContent    = y;
+  document.getElementById('footer-version').textContent = v;
+  document.getElementById('footer-url').textContent     = b.replace(/^https?:\/\//, '');
+});
+
+/* ── THEME ── */
+function toggleTheme() {
+  const h = document.documentElement;
+  const n = h.dataset.theme === 'dark' ? 'light' : 'dark';
+  h.dataset.theme = n;
+  document.getElementById('icon-moon').style.display = n === 'dark'  ? 'block' : 'none';
+  document.getElementById('icon-sun').style.display  = n === 'light' ? 'block' : 'none';
+  localStorage.setItem('sae-theme', n);
+}
+(function(){
+  const s = localStorage.getItem('sae-theme');
+  if (s) {
+    document.documentElement.dataset.theme = s;
+    document.getElementById('icon-moon').style.display = s === 'dark'  ? 'block' : 'none';
+    document.getElementById('icon-sun').style.display  = s === 'light' ? 'block' : 'none';
+  }
+})();
+
+/* ── SIDEBAR ── */
+function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
+function closeSidebar()  { document.body.classList.remove('sidebar-open'); }
+document.querySelectorAll('.sl').forEach(l => {
+  l.addEventListener('click', () => { if (window.innerWidth < 800) closeSidebar(); });
+});
+
+/* ── GROUP COLLAPSE ── */
+function toggleGroup(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+/* ── SIDEBAR SEARCH ── */
+function filterSidebar(q) {
+  const t = q.trim().toLowerCase();
+  document.querySelectorAll('.sl').forEach(l => {
+    l.classList.toggle('hidden', t.length > 0 && !l.textContent.toLowerCase().includes(t));
+  });
+  if (t.length > 0) document.querySelectorAll('.sg').forEach(g => g.classList.remove('collapsed'));
+}
+
+/* ── ENDPOINT TOGGLE ── */
+function toggleEp(header) { header.parentElement.classList.toggle('open'); }
+
+/* ── TAB SWITCHER ── */
+function switchTab(btn, tid) {
+  const body = btn.closest('.ep-body');
+  body.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  body.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  const el = document.getElementById(tid);
+  if (el) el.classList.add('active');
+}
+
+/* ── COPY CODE ── */
+function copyCode(btn) {
+  const pre = btn.closest('.cb').querySelector('pre');
+  const text = pre.innerText || pre.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+/* ── COPY BASE URL ── */
+function copyBaseUrl() {
+  navigator.clipboard.writeText(API_CONFIG.baseUrl).then(() => {
+    const el = document.getElementById('hdr-url-text');
+    const ic = document.getElementById('ic-base-url');
+    const orig = el.textContent;
+    el.textContent = 'Copied!';
+    if (ic) ic.textContent = 'Copied!';
+    setTimeout(() => {
+      el.textContent = API_CONFIG.baseUrl.replace(/^https?:\/\//, '');
+      if (ic) ic.textContent = API_CONFIG.baseUrl.replace(/^https?:\/\//, '');
+    }, 1500);
+  });
+}
+
+/* ── ACTIVE SIDEBAR LINK on scroll ── */
+const allSections = document.querySelectorAll('.section, .ep');
+const sidebarLinks = document.querySelectorAll('.sl');
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const id = e.target.id;
+    if (!id) return;
+    sidebarLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + id));
+  });
+}, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+allSections.forEach(s => { if (s.id) io.observe(s); });
+
+/* ── SMOOTH SCROLL ── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const t = document.querySelector(a.getAttribute('href'));
+    if (!t) return;
+    e.preventDefault();
+    const off = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) + 24;
+    window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' });
+  });
+});
+</script>
+</body>
+</html>

@@ -51,6 +51,9 @@ def create_app() -> Flask:
 
     # ── Google OAuth (Authlib) ─────────────────────────────────────────────
     _init_google_oauth(app)
+    
+    from app.middleware.jwt_middleware import init_jwt_middleware
+    init_jwt_middleware(app)    
 
     # ── GC tuning ──────────────────────────────────────────────────────────
     gc.set_threshold(700, 10, 10)
@@ -140,6 +143,9 @@ def _register_blueprints(app: Flask) -> None:
     from latex_editor import latex_bp
 
     from app.routes.categories import categories_bp
+    
+    from app.routes.api_auth import api_auth_bp
+    app.register_blueprint(api_auth_bp)    
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(categories_bp)

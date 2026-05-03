@@ -78,3 +78,8 @@ def debug_service_status():
         except Exception as e:
             test = f"Error: {e}"
     return jsonify({"drive_initialized": drive is not None, "drive_test": test})
+
+
+@misc_bp.route("/api-docs")
+def api_docs():
+    return render_template("api_docs.html")
