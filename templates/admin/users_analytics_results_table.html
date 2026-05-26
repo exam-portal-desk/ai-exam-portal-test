@@ -1,10 +1,27 @@
 {% if results %}
+<style>
+.icon-btn { width:30px; height:30px; border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-2); display:inline-block; position:relative; cursor:pointer; transition:background .12s,color .12s,border-color .12s; font-size:.72rem; text-decoration:none; vertical-align:middle; }
+.icon-btn i { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); line-height:1; }
+.icon-btn:hover { background:var(--accent-subtle); color:var(--accent); border-color:var(--accent); }
+.icon-btn.dl:hover { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.pagi { display:flex; align-items:center; justify-content:space-between; padding:.6rem 1rem; border-top:1px solid var(--border); background:var(--surface-2); flex-wrap:wrap; gap:.4rem; }
+.pagi-info { font-size:.75rem; color:var(--text-3); }
+.pagi-btns { display:flex; gap:.3rem; flex-wrap:wrap; align-items:center; }
+.pg-btn { padding:.28rem .65rem; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text-2); font-size:.78rem; font-weight:600; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; justify-content:center; min-width:32px; transition:background .12s,color .12s,border-color .12s; }
+.pg-btn:hover:not(.active) { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+.pg-btn.active { background:var(--accent); color:var(--accent-on); border-color:var(--accent); }
+.actions-td { padding:.7rem 1rem; vertical-align:middle; text-align:center; background:var(--surface); border-bottom:1px solid var(--border); }
+.actions-wrap { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; }
+.empty-state { text-align:center; padding:3rem 1rem; }
+.empty-state i { font-size:2rem; color:var(--text-3); opacity:.35; display:block; margin-bottom:.75rem; }
+.empty-state p { color:var(--text-3); margin:0; font-size:.88rem; }
+</style>
 <div class="table-responsive">
   <table class="table mb-0">
     <thead>
       <tr>
         <th>User</th><th>Exam</th><th>Date</th>
-        <th>Score</th><th>%</th><th>Grade</th><th>Duration</th><th>Actions</th>
+        <th>Score</th><th>%</th><th>Grade</th><th>Duration</th><th style="text-align:center;">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -12,21 +29,21 @@
       {% set pct = r.percentage|float %}
       <tr>
         <td>
-          <div style="font-size:.83rem;font-weight:600;color:var(--text-primary)">{{ r.username }}</div>
-          <div style="font-size:.75rem;color:var(--text-muted)">{{ r.full_name }}</div>
+          <div style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ r.username }}</div>
+          <div style="font-size:.75rem;color:var(--text-3)">{{ r.full_name }}</div>
         </td>
-        <td style="font-size:.83rem;font-weight:600;color:var(--text-primary)">{{ r.exam_name }}</td>
-        <td style="font-size:.78rem;color:var(--text-muted)">{{ r.created_at }}</td>
-        <td style="font-weight:700;color:var(--text-primary)">{{ r.score }}/{{ r.max_score }}</td>
+        <td style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ r.exam_name }}</td>
+        <td style="font-size:.78rem;color:var(--text-3)">{{ r.created_at | string | truncate(19, True, '') | replace('T', ' ') }}</td>
+        <td style="font-weight:700;color:var(--text-1)">{{ r.score }}/{{ r.max_score }}</td>
         <td>
           <span class="pct-badge {% if pct>=90 %}pct-ex{% elif pct>=75 %}pct-gd{% elif pct>=60 %}pct-av{% else %}pct-pr{% endif %}">
             {{ "%.1f"|format(pct) }}%
           </span>
         </td>
-        <td style="font-weight:700;color:var(--text-primary)">{{ r.grade }}</td>
-        <td style="font-size:.78rem;color:var(--text-muted)">{{ r.duration or '—' }}</td>
-        <td>
-          <div style="display:flex;gap:.3rem">
+        <td style="font-weight:700;color:var(--text-1)">{{ r.grade }}</td>
+        <td style="font-size:.78rem;color:var(--text-3)">{{ r.duration or '—' }}</td>
+        <td class="actions-td">
+          <div class="actions-wrap">
             <a class="icon-btn" title="View Result"
                onclick="popupOpen('/admin/users-analytics/view-result/{{ r.id }}/{{ r.exam_id }}',900,700)">
               <i class="fas fa-eye"></i>
@@ -75,6 +92,3 @@
   <p><strong>No Results Found</strong><br><span style="font-size:.8rem">Try adjusting the filters.</span></p>
 </div>
 {% endif %}
-
-
-

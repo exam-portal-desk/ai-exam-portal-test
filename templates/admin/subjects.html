@@ -2,61 +2,292 @@
 {% block title %}Manage Subjects{% endblock %}
 
 {% block content %}
+
 <style>
-  .subject-avatar {
-    width: 34px; height: 34px; border-radius: 9px;
-    background: var(--accent-subtle); border: 1px solid var(--accent-border);
-    color: var(--accent); display: inline-flex; align-items: center;
-    justify-content: center; font-weight: 700; font-size: 0.85rem;
-    flex-shrink: 0;
-  }
+/* =========================
+   PAGE HEADER
+========================= */
 
-  .subject-name-text { font-weight: 600; color: var(--text-primary); font-size: 0.875rem; }
+.page-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:1rem;
+  margin-bottom:1.5rem;
+}
 
-  .folder-pill {
-    background: var(--table-head-bg); border: 1px solid var(--card-border);
-    color: var(--text-muted); padding: 2px 8px; border-radius: 6px;
-    font-size: 0.72rem; font-weight: 600; font-family: monospace;
-    display: inline-block; max-width: 200px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    cursor: pointer; transition: border-color 0.15s, color 0.15s;
-    vertical-align: middle;
-  }
-  .folder-pill:hover { border-color: var(--accent); color: var(--accent); }
+.page-top h1{
+  margin:0 0 .25rem;
+  font-size:1.5rem;
+  font-weight:700;
+  color:var(--text-1);
+}
 
-  .action-btns { display: flex; gap: 0.35rem; align-items: center; }
+.page-top p{
+  margin:0;
+  color:var(--text-3);
+  font-size:.9rem;
+}
 
-  .icon-btn {
-    width: 32px; height: 32px; border-radius: 8px;
-    border: 1px solid var(--card-border); background: var(--card-bg);
-    color: var(--text-secondary); display: inline-flex; align-items: center;
-    justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 0.78rem;
-  }
-  .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
-  .icon-btn.danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
+/* =========================
+   CARD
+========================= */
 
-  .page-top {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
-  }
-  .page-top h1 { font-size: clamp(1.2rem,3vw,1.6rem); font-weight: 700; margin: 0; color: var(--text-primary); }
-  .page-top p  { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--text-muted); }
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:calc(var(--radius) + 6px);
+  overflow:hidden;
+  box-shadow:var(--shadow-md);
+}
 
-  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
-  .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3; display: block; }
-  .empty-state p { font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+/* =========================
+   TABLE
+========================= */
 
-  .info-box {
-    background: var(--accent-subtle); border: 1px solid var(--accent-border);
-    border-radius: 10px; padding: 0.9rem 1rem; font-size: 0.82rem;
-    color: var(--text-secondary);
-  }
-  .info-box ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
-  .info-box li { margin-bottom: 0.2rem; }
+.table{
+  margin:0;
+  width:100%;
+  color:var(--text-2);
+}
 
-  @media (max-width: 768px) {
-    .page-top { flex-direction: column; align-items: flex-start; }
-  }
+.table thead th{
+  background:var(--surface-2);
+  color:var(--text-3);
+  border-bottom:1px solid var(--border);
+  padding:1rem 1.25rem;
+  font-size:.72rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  white-space:nowrap;
+}
+
+.table tbody td{
+  background:var(--surface);
+  color:var(--text-2);
+  border-bottom:1px solid var(--border);
+  padding:1rem 1.25rem;
+  vertical-align:middle;
+  font-size:.88rem;
+}
+
+.table tbody tr:last-child td{
+  border-bottom:none;
+}
+
+.table tbody tr:hover td{
+  background:var(--surface-hover);
+}
+
+/* =========================
+   SUBJECT INFO
+========================= */
+
+.subject-avatar{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  background:var(--accent-subtle);
+  border:1px solid var(--border);
+  color:var(--accent);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  font-size:1rem;
+  flex-shrink:0;
+}
+
+.subject-name-text{
+  color:var(--text-1);
+  font-size:.92rem;
+  font-weight:600;
+}
+
+/* =========================
+   FOLDER BADGE
+========================= */
+
+.folder-pill{
+  display:inline-flex;
+  align-items:center;
+  max-width:320px;
+  padding:.42rem .9rem;
+  border-radius:999px;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  color:var(--text-2);
+  font-size:.76rem;
+  font-weight:600;
+  transition:.15s ease;
+}
+
+.folder-pill:hover{
+  background:var(--accent-subtle);
+  border-color:var(--accent);
+  color:var(--accent);
+}
+
+/* =========================
+   ACTION BUTTONS
+========================= */
+
+.action-btns{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+
+.icon-btn{
+  width:36px;
+  height:36px;
+  border-radius:12px;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  color:var(--text-2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:.15s ease;
+}
+
+.icon-btn:hover{
+  background:var(--accent-subtle);
+  border-color:var(--accent);
+  color:var(--accent);
+}
+
+.icon-btn.danger:hover{
+  background:var(--danger-bg);
+  border-color:var(--danger-border);
+  color:var(--danger-text);
+}
+
+/* =========================
+   EMPTY STATE
+========================= */
+
+.empty-state{
+  text-align:center;
+  padding:4rem 1rem;
+}
+
+.empty-state i{
+  font-size:2.5rem;
+  color:var(--text-3);
+  opacity:.4;
+  margin-bottom:1rem;
+}
+
+.empty-state p{
+  margin:0;
+  color:var(--text-3);
+  font-size:.9rem;
+}
+
+/* =========================
+   MODAL
+========================= */
+
+.modal-content{
+  background:var(--surface) !important;
+  border:1px solid var(--border) !important;
+  border-radius:calc(var(--radius) + 6px) !important;
+  overflow:hidden;
+  box-shadow:var(--shadow-lg);
+}
+
+.modal-header{
+  background:var(--surface-2) !important;
+  border-bottom:1px solid var(--border) !important;
+}
+
+.modal-title{
+  color:var(--text-1) !important;
+  font-size:1rem;
+  font-weight:700;
+}
+
+.modal-body{
+  background:var(--surface) !important;
+  color:var(--text-2) !important;
+}
+
+.modal-footer{
+  background:var(--surface) !important;
+  border-top:1px solid var(--border) !important;
+}
+
+/* =========================
+   FORM
+========================= */
+
+.form-label{
+  color:var(--text-2);
+  font-size:.82rem;
+  font-weight:600;
+  margin-bottom:.45rem;
+}
+
+.form-control{
+  background:var(--bg) !important;
+  border:1px solid var(--border) !important;
+  border-radius:var(--radius) !important;
+  color:var(--text-1) !important;
+  min-height:46px;
+  font-size:.88rem;
+}
+
+.form-control::placeholder{
+  color:var(--text-3) !important;
+}
+
+.form-control:focus{
+  background:var(--bg) !important;
+  border-color:var(--accent) !important;
+  box-shadow:0 0 0 3px var(--accent-subtle) !important;
+}
+
+.form-text{
+  color:var(--text-3) !important;
+}
+
+/* =========================
+   INFO BOX
+========================= */
+
+.info-box{
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:calc(var(--radius) + 2px);
+  padding:1rem;
+  color:var(--text-2);
+}
+
+.info-box strong{
+  color:var(--text-1);
+}
+
+.info-box ul{
+  margin:.7rem 0 0;
+  padding-left:1.1rem;
+}
+
+.info-box li{
+  margin-bottom:.4rem;
+  color:var(--text-2);
+  font-size:.82rem;
+}
+
+/* =========================
+   CLOSE BUTTON
+========================= */
+
+.btn-close{
+  filter:var(--btn-close-filter, none);
+}
+
 </style>
 
 <div class="page-top">
@@ -98,7 +329,9 @@
                   {{ subject.subject_folder_id }}
                 </span>
               </td>
-              <td style="color:var(--text-muted);font-size:0.8rem">{{ subject.subject_folder_created_at }}</td>
+              <td style="color:var(--text-muted);font-size:0.8rem">
+                {{ subject.subject_folder_created_at[:16].replace('T', '  ') if subject.subject_folder_created_at else '-' }}
+              </td>
               <td>
                 <div class="action-btns">
                   <button class="icon-btn"
@@ -222,14 +455,13 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   document.querySelectorAll('.folder-pill').forEach(el => {
-    el.addEventListener('click', function() {
+    el.addEventListener('click', async function() {
       const text = this.dataset.folder;
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-          const orig = this.textContent;
-          this.textContent = 'Copied!';
-          setTimeout(() => this.textContent = orig, 1000);
-        });
+      try {
+        await navigator.clipboard.writeText(text);
+        adminToast('Folder ID copied to clipboard', 'success');
+      } catch(err) {
+        adminToast('Failed to copy. Try again.', 'danger');
       }
     });
   });
@@ -271,6 +503,4 @@ document.getElementById('confirmSubjectDeleteBtn').addEventListener('click', fun
 });
 </script>
 {% endblock %}
-
-
 

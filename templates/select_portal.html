@@ -1,354 +1,249 @@
 {% extends "base.html" %}
-
 {% block title %}Select Portal - SmartAIExam{% endblock %}
 
 {% block content %}
-<div class="particles-container">
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-</div>
-
-<div class="reset-wrapper">
-    <div class="reset-container">
-        <div class="reset-header">
-            <div class="logo-section" style="margin-bottom:12px;justify-content:center;">
-                <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:44px;width:auto;"></video>
-            </div>
-            <p class="reset-subtitle" style="text-align:center;">Your account has access to multiple portals</p>
-        </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash-alert flash-{{ category }}">
-                            <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' if category == 'success' else 'info-circle' }}"></i>
-                            <span>{{ message }}</span>
-                            <button type="button" class="flash-close">&times;</button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <div class="portal-options">
-            <form method="POST">
-                <input type="hidden" name="portal" value="user">
-                <button type="submit" class="portal-card portal-user">
-                    <div class="portal-icon">
-                        <i class="fas fa-user-graduate"></i>
-                    </div>
-                    <div class="portal-info">
-                        <div class="portal-title">User Portal</div>
-                        <div class="portal-desc">Take exams, view results, access your dashboard</div>
-                    </div>
-                    <i class="fas fa-chevron-right portal-arrow"></i>
-                </button>
-            </form>
-
-            <form method="POST">
-                <input type="hidden" name="portal" value="admin">
-                <button type="submit" class="portal-card portal-admin">
-                    <div class="portal-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <div class="portal-info">
-                        <div class="portal-title">Admin Portal</div>
-                        <div class="portal-desc">Manage exams, users, questions and analytics</div>
-                    </div>
-                    <i class="fas fa-chevron-right portal-arrow"></i>
-                </button>
-            </form>
-        </div>
-
-        <div class="back-to-login">
-            <a href="{{ url_for('auth.login') }}" class="back-link">
-                <i class="fas fa-arrow-left"></i>
-                <span>Back to Login</span>
-            </a>
-        </div>
-    </div>
-</div>
-
 <style>
-body {
-    background: #0a0a0f;
-    font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
-    overflow-x: hidden; min-height: 100vh;
-}
-.particles-container {
-    position: fixed; top: 0; left: 0;
-    width: 100%; height: 100%;
-    overflow: hidden; z-index: 1; pointer-events: none;
-}
-.particle {
-    position: absolute; background: rgba(45,91,227,0.3);
-    border-radius: 50%; animation: float 10s ease-in-out infinite;
-}
-.particle:nth-child(1){width:3px;height:3px;top:15%;left:20%;animation-delay:0s}
-.particle:nth-child(2){width:2px;height:2px;top:65%;left:80%;animation-delay:2s}
-.particle:nth-child(3){width:4px;height:4px;top:35%;left:8%;animation-delay:4s}
-.particle:nth-child(4){width:2px;height:2px;top:75%;left:25%;animation-delay:1s}
-.particle:nth-child(5){width:3px;height:3px;top:25%;left:88%;animation-delay:3s}
-.particle:nth-child(6){width:2px;height:2px;top:55%;left:65%;animation-delay:5s}
-.particle:nth-child(7){width:3px;height:3px;top:45%;left:30%;animation-delay:6s}
-.particle:nth-child(8){width:2px;height:2px;top:85%;left:55%;animation-delay:7s}
-
-.reset-wrapper {
-    position: relative; z-index: 2; min-height: 100vh;
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-}
-.reset-container {
-    background: #111118;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 18px; padding: 40px 36px;
-    width: 100%; max-width: 460px; position: relative; overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
-}
-.reset-container::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(45,91,227,0.4), transparent);
+/* ── SELECT PORTAL PAGE ────────────────────────────────────────
+   All colors via theme.css tokens. Only layout here.
+──────────────────────────────────────────────────────────────── */
+.portal-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 2rem 1rem;
 }
 
-.reset-header { margin-bottom: 28px; }
-.logo-section {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
-}
-.logo-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, rgba(45,91,227,0.2), rgba(45,91,227,0.1));
-    border: 1px solid rgba(45,91,227,0.3);
-    display: flex; align-items: center; justify-content: center;
-    color: #5b7fe8; font-size: 1rem;
-}
-.brand-name {
-    color: white; font-size: 1.3rem; font-weight: 700; margin: 0; line-height: 1;
-}
-.reset-subtitle {
-    color: rgba(255,255,255,0.3); font-size: 0.85rem; margin: 0;
+.portal-box {
+  width: 100%;
+  max-width: 420px;
 }
 
-.flash-messages { margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
-.flash-alert {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border-radius: 8px; font-size: 0.85rem;
+/* Header */
+.portal-head {
+  text-align: center;
+  margin-bottom: 2rem;
 }
-.flash-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
-.flash-success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
-.flash-warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.2); color: #fde047; }
-.flash-close {
-    margin-left: auto; background: none; border: none;
-    color: inherit; cursor: pointer; opacity: 0.6; font-size: 1rem; padding: 0;
+.portal-head h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.02em;
+  margin: 1rem 0 .3rem;
 }
-.flash-close:hover { opacity: 1; }
-
-.portal-options { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
-.portal-options form { margin: 0; }
-
-.portal-card {
-    width: 100%; display: flex; align-items: center; gap: 16px;
-    padding: 18px 20px; border-radius: 12px; cursor: pointer;
-    transition: all 0.2s; text-align: left; font-family: inherit;
-    border: 1px solid rgba(255,255,255,0.07);
-    background: rgba(255,255,255,0.03);
-}
-.portal-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-.portal-user:hover {
-    border-color: rgba(45,91,227,0.4);
-    background: rgba(45,91,227,0.06);
-}
-.portal-admin:hover {
-    border-color: rgba(234,179,8,0.4);
-    background: rgba(234,179,8,0.06);
+.portal-head p {
+  font-size: .83rem;
+  color: var(--text-3);
 }
 
-.portal-icon {
-    width: 44px; height: 44px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.2rem; flex-shrink: 0;
+/* Portal option buttons */
+.portal-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
+  margin-bottom: .75rem;
+  text-decoration: none;
 }
-.portal-user .portal-icon {
-    background: rgba(45,91,227,0.15);
-    border: 1px solid rgba(45,91,227,0.25);
-    color: #5b7fe8;
+.portal-option:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
-.portal-admin .portal-icon {
-    background: rgba(234,179,8,0.15);
-    border: 1px solid rgba(234,179,8,0.25);
-    color: #fbbf24;
-}
-
-.portal-info { flex: 1; }
-.portal-title {
-    color: white; font-size: 0.95rem; font-weight: 600; margin-bottom: 3px;
-}
-.portal-desc {
-    color: rgba(255,255,255,0.3); font-size: 0.78rem; line-height: 1.4;
-}
-
-.portal-arrow { color: rgba(255,255,255,0.2); font-size: 0.8rem; flex-shrink: 0; }
-.portal-card:hover .portal-arrow { color: rgba(255,255,255,0.5); }
-
-.back-to-login { text-align: center; margin-top: 20px; }
-.back-link {
-    display: inline-flex; align-items: center; gap: 6px;
-    color: rgba(255,255,255,0.25); text-decoration: none;
-    font-size: 0.82rem; transition: color 0.2s;
-}
-.back-link:hover { color: rgba(255,255,255,0.6); text-decoration: none; }
-
-@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
-
-@media (max-width: 480px) {
-    .reset-container { padding: 28px 18px; border-radius: 16px; }
-    .portal-desc { display: none; }
+.portal-option:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
-/* ── LIGHT THEME OVERRIDES ── */
-[data-theme="light"] body { background: #f0f2f8; color: #1a202c; }
-[data-theme="light"] .particles-container,
-[data-theme="light"] .pending-particles { opacity: 0.4; }
-[data-theme="light"] .minimal-btn { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
-[data-theme="light"] .minimal-btn:hover { background: #e2e8f0; color: #1a202c; border-color: #cbd5e0; }
-[data-theme="light"] .btn-label { background: rgba(0,0,0,0.75); }
-[data-theme="light"] .login-wrapper,
-[data-theme="light"] .reset-wrapper,
-[data-theme="light"] .request-wrapper { background: transparent; }
-[data-theme="light"] .login-container,
-[data-theme="light"] .reset-container,
-[data-theme="light"] .request-container,
-[data-theme="light"] .pending-card { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
-[data-theme="light"] .login-container::before,
-[data-theme="light"] .reset-container::before,
-[data-theme="light"] .request-container::before,
-[data-theme="light"] .pending-card::before { background: linear-gradient(90deg, transparent, rgba(45,91,227,0.2), transparent); }
-[data-theme="light"] .brand-name { color: #1a202c; -webkit-text-fill-color: #1a202c; background: none; }
-[data-theme="light"] .welcome-text,
-[data-theme="light"] .success-title,
-[data-theme="light"] .pending-title { color: #1a202c; }
-[data-theme="light"] .welcome-subtitle,
-[data-theme="light"] .reset-subtitle,
-[data-theme="light"] .success-subtitle,
-[data-theme="light"] .pending-exam-name { color: #718096; }
-[data-theme="light"] .form-label { color: #4a5568 !important; }
-[data-theme="light"] .form-label i { color: #2d5be3; }
-[data-theme="light"] .input-icon { color: #a0aec0; }
-[data-theme="light"] .form-input,
-[data-theme="light"] .form-control,
-[data-theme="light"] .form-select {
-    background: #f8faff !important;
-    border-color: #e2e8f0 !important;
-    color: #1a202c !important;
+/* Icon box */
+.portal-opt-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  transition: background .15s;
 }
-[data-theme="light"] .form-input::placeholder,
-[data-theme="light"] .form-control::placeholder { color: #a0aec0 !important; }
-[data-theme="light"] .form-input:-webkit-autofill,
-[data-theme="light"] .form-input:-webkit-autofill:hover,
-[data-theme="light"] .form-input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
-    -webkit-text-fill-color: #1a202c !important;
-    caret-color: #1a202c !important;
+.portal-option:hover .portal-opt-icon {
+  background: var(--accent);
+  color: var(--accent-on);
 }
-[data-theme="light"] .form-select option { background: #ffffff; color: #1a202c; }
-[data-theme="light"] .toggle-password { color: #a0aec0; }
-[data-theme="light"] .toggle-password:hover { color: #4a5568; }
-[data-theme="light"] .help-card,
-[data-theme="light"] .step-section,
-[data-theme="light"] .user-details-card,
-[data-theme="light"] .request-history-section,
-[data-theme="light"] .new-request-section { background: #f8faff; border-color: #e2e8f0; }
-[data-theme="light"] .help-header,
-[data-theme="light"] .card-title { color: #718096; }
-[data-theme="light"] .help-item { color: #4a5568; }
-[data-theme="light"] .help-item strong { color: #1a202c; }
-[data-theme="light"] .action-link.primary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
-[data-theme="light"] .action-link.primary:hover { background: #e2e8f0; color: #1a202c; }
-[data-theme="light"] .action-link.secondary { background: transparent; border-color: #e2e8f0; color: #718096; }
-[data-theme="light"] .action-link.secondary:hover { background: #f1f5f9; color: #1a202c; }
-[data-theme="light"] .back-link { color: #a0aec0; }
-[data-theme="light"] .back-link:hover { color: #4a5568; }
-[data-theme="light"] .security-footer { color: #a0aec0; }
-[data-theme="light"] .step-title { color: #4a5568; }
-[data-theme="light"] .step-title i { color: #2d5be3; }
-[data-theme="light"] .request-header { border-bottom-color: #e2e8f0; }
-[data-theme="light"] .table thead th { background: #f1f5f9 !important; color: #718096 !important; border-bottom-color: #e2e8f0 !important; }
-[data-theme="light"] .table tbody td { background: transparent !important; color: #4a5568 !important; border-bottom-color: #f1f5f9 !important; }
-[data-theme="light"] .table tbody tr:hover { background: rgba(45,91,227,0.04) !important; }
-[data-theme="light"] .table { background: transparent !important; }
-[data-theme="light"] .table-responsive { border-color: #e2e8f0; }
-[data-theme="light"] .text-muted { color: #718096 !important; }
-[data-theme="light"] .loading-state { color: #718096; }
-[data-theme="light"] .user-info-card { background: rgba(45,91,227,0.05); border-color: rgba(45,91,227,0.15); }
-[data-theme="light"] .user-name { color: #1a202c; }
-[data-theme="light"] .user-email { color: #718096; }
-[data-theme="light"] .input-note { color: #a0aec0; }
-[data-theme="light"] .username-display { color: #1a202c; }
-[data-theme="light"] .text-muted-improved { color: #a0aec0; }
-[data-theme="light"] .date-display { color: #718096; }
-[data-theme="light"] .reason-display { color: #4a5568; }
-[data-theme="light"] .user-email-display { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
-[data-theme="light"] .password-requirements .requirement { color: #a0aec0; }
-[data-theme="light"] .requirement.valid { color: rgba(5,150,105,0.8); }
-[data-theme="light"] .setup-instructions-card { background: rgba(5,150,105,0.05); border-color: rgba(5,150,105,0.15); }
-[data-theme="light"] .setup-header { color: #059669; }
-[data-theme="light"] .setup-item { color: #4a5568; }
-[data-theme="light"] .setup-item strong { color: #059669; }
-[data-theme="light"] .instructions-panel { background: #f8faff; border-color: #e2e8f0; }
-[data-theme="light"] .panel-header { color: #059669; }
-[data-theme="light"] .main-message { color: #4a5568; }
-[data-theme="light"] .step-details strong { color: #1a202c; }
-[data-theme="light"] .step-details span { color: #718096; }
-[data-theme="light"] .help-text { color: #a0aec0; }
-[data-theme="light"] .portal-card { background: #f8faff; border-color: #e2e8f0; }
-[data-theme="light"] .portal-title { color: #1a202c; }
-[data-theme="light"] .portal-desc { color: #718096; }
-[data-theme="light"] .portal-arrow { color: #a0aec0; }
-[data-theme="light"] .portal-user:hover { border-color: rgba(45,91,227,0.3); background: rgba(45,91,227,0.05); }
-[data-theme="light"] .portal-admin:hover { border-color: rgba(217,119,6,0.3); background: rgba(217,119,6,0.05); }
-[data-theme="light"] .portal-card:hover .portal-arrow { color: #4a5568; }
-[data-theme="light"] .pending-body { background: #f0f2f8; }
-[data-theme="light"] .pending-reason { background: rgba(168,85,247,0.05); color: #4a5568; }
-[data-theme="light"] .pending-btn-secondary { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
-[data-theme="light"] .pending-btn-secondary:hover { background: #e2e8f0; color: #1a202c; }
-[data-theme="light"] .refresh-note { color: #a0aec0; }
-[data-theme="light"] .success-container { background: #ffffff; border-color: #e2e8f0; }
-[data-theme="light"] .success-header { border-bottom-color: #e2e8f0; }
+
+/* Text */
+.portal-opt-title {
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: .2rem;
+}
+.portal-opt-desc {
+  font-size: .75rem;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+/* Arrow */
+.portal-opt-arrow {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: .75rem;
+  flex-shrink: 0;
+  transition: transform .15s, color .15s;
+}
+.portal-option:hover .portal-opt-arrow {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+
+/* Divider between options */
+.portal-sep {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: .25rem 0;
+}
+.portal-sep-line { flex: 1; height: 1px; background: var(--border); }
+.portal-sep-text { font-size: .68rem; color: var(--text-3); }
+
+/* Back link */
+.portal-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  margin-top: 1.5rem;
+  font-size: .78rem;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color .15s;
+}
+.portal-back:hover { color: var(--text-1); }
+
+/* Flash */
+.flash-wrap { margin-bottom: 1.25rem; }
+.flash-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .65rem .85rem;
+  border-radius: var(--radius);
+  border: 1px solid;
+  font-size: .82rem;
+  font-weight: 500;
+  margin-bottom: .4rem;
+}
+.flash-success { background:var(--success-bg);border-color:var(--success-border);color:var(--success-text); }
+.flash-warning { background:var(--warning-bg);border-color:var(--warning-border);color:var(--warning-text); }
+.flash-danger,
+.flash-error   { background:var(--danger-bg); border-color:var(--danger-border); color:var(--danger-text); }
+.flash-info    { background:var(--info-bg);   border-color:var(--info-border);   color:var(--info-text); }
+.flash-x {
+  margin-left:auto;background:none;border:none;color:inherit;
+  opacity:.5;cursor:pointer;font-size:1rem;line-height:1;flex-shrink:0;
+}
+.flash-x:hover { opacity:1; }
 </style>
 
+<div class="portal-page">
+  <div class="portal-box">
+
+    {# ── Header ── #}
+    <div class="portal-head">
+      <video src="{{ url_for('static', filename='logo.mp4') }}"
+             autoplay loop muted playsinline
+             style="height:40px;width:auto;display:block;margin:0 auto">
+      </video>
+      <h1>Choose your portal</h1>
+      <p>Your account has access to multiple portals</p>
+    </div>
+
+    {# ── Flash messages ── #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for category, message in messages %}
+            <div class="flash-item flash-{{ category }}">
+              <i class="fas fa-{{ 'exclamation-triangle' if category in ('error','warning') else 'check-circle' if category == 'success' else 'info-circle' }}" style="flex-shrink:0;margin-top:.1rem;font-size:.78rem"></i>
+              <span>{{ message }}</span>
+              <button class="flash-x" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {# ── User Portal ── #}
+    <form method="POST" style="margin:0">
+      <input type="hidden" name="portal" value="user">
+      <button type="submit" class="portal-option">
+        <div class="portal-opt-icon">
+          <i class="fas fa-user-graduate"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="portal-opt-title">User Portal</div>
+          <div class="portal-opt-desc">Take exams, view results, access your dashboard</div>
+        </div>
+        <i class="fas fa-arrow-right portal-opt-arrow"></i>
+      </button>
+    </form>
+
+    {# ── Separator ── #}
+    <div class="portal-sep">
+      <span class="portal-sep-line"></span>
+      <span class="portal-sep-text">or</span>
+      <span class="portal-sep-line"></span>
+    </div>
+
+    {# ── Admin Portal ── #}
+    <form method="POST" style="margin:0">
+      <input type="hidden" name="portal" value="admin">
+      <button type="submit" class="portal-option">
+        <div class="portal-opt-icon">
+          <i class="fas fa-shield-alt"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="portal-opt-title">Admin Portal</div>
+          <div class="portal-opt-desc">Manage exams, users, questions and analytics</div>
+        </div>
+        <i class="fas fa-arrow-right portal-opt-arrow"></i>
+      </button>
+    </form>
+
+    {# ── Back link ── #}
+    <a href="{{ url_for('auth.login') }}" class="portal-back">
+      <i class="fas fa-arrow-left" style="font-size:.7rem"></i>
+      Back to login
+    </a>
+
+  </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const flashAlerts = document.querySelectorAll('.flash-alert');
-    flashAlerts.forEach(alert => {
-        const closeBtn = alert.querySelector('.flash-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                alert.style.opacity = '0';
-                setTimeout(() => alert.remove(), 300);
-            });
-        }
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(function () {
+    document.querySelectorAll('.flash-item').forEach(function (el) {
+      el.style.transition = 'opacity .3s';
+      el.style.opacity = '0';
+      setTimeout(function () { el.remove(); }, 300);
     });
-    setTimeout(() => {
-        flashAlerts.forEach(alert => {
-            if (alert && alert.parentNode) {
-                alert.style.opacity = '0';
-                setTimeout(() => { if (alert.parentNode) alert.remove(); }, 300);
-            }
-        });
-    }, 5000);
+  }, 5000);
 });
 </script>
 
 {% endblock %}
-
-
-

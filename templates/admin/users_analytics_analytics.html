@@ -1,198 +1,76 @@
 <!-- File: templates/admin/users_analytics_analytics.html -->
-<!-- FIX: Remove DOCTYPE and html/head/body tags to prevent container fluctuations -->
+
 <style>
-/* FIX: Analytics content styles that work within tab container */
-.analytics-content {
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 2rem !important;
-    background: transparent !important;
-    color: #222 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
+/* ── Scoped to this partial ── */
+.analytics-content { font-family:'DM Sans',system-ui,sans-serif; }
 
-/* Analytics Filters */
-.analytics-filters {
-    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-    padding: 1.25rem;
-    border-radius: 12px;
-    margin-bottom: 1.75rem;
-    color: #222;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
+.anl-filter-box { background:var(--surface-2); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); padding:1rem 1.25rem; margin-bottom:1rem; }
+.anl-filter-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem; }
+.anl-filter-header h5 { font-size:.9rem; font-weight:700; color:var(--text-1); margin:0; display:flex; align-items:center; gap:.4rem; }
+.anl-filter-header h5 i { color:var(--accent); }
+.anl-filter-header small { font-size:.72rem; color:var(--text-3); }
 
-.filter-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    align-items: end;
+.anl-filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.75rem; }
+.anl-label { font-size:.72rem; font-weight:600; color:var(--text-3); display:block; margin-bottom:.3rem; }
+.anl-select, .anl-input {
+  background:var(--bg) !important; border:1px solid var(--border) !important;
+  border-radius:var(--radius) !important; color:var(--text-1) !important;
+  font-family:inherit; font-size:.83rem; padding:.4rem .65rem;
+  min-height:36px; width:100%; transition:border-color .12s;
 }
+.anl-select:focus, .anl-input:focus { border-color:var(--accent) !important; outline:none; box-shadow:0 0 0 3px var(--accent-subtle); }
+.anl-select option { background:var(--surface); color:var(--text-1); }
+.anl-input::-webkit-calendar-picker-indicator { filter:var(--btn-close-filter,none); opacity:.6; }
 
-/* Summary Cards */
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
+.btn-flat-anl { display:inline-flex; align-items:center; gap:.4rem; padding:.42rem .9rem; border-radius:var(--radius); font-size:.8rem; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid var(--accent); background:var(--accent); color:var(--accent-on); transition:background .12s,border-color .12s; width:100%; justify-content:center; }
+.btn-flat-anl:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
 
-.summary-card {
-    padding: 1rem;
-    border-radius: 10px;
-    color: #fff;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    text-align: center;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
-}
+/* ── Summary Grid ── */
+.anl-summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.75rem; margin-bottom:1rem; }
+.anl-summary-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem 1rem; text-align:center; }
+.anl-summary-num  { font-size:1.35rem; font-weight:800; color:var(--accent); line-height:1; }
+.anl-summary-lbl  { font-size:.67rem; font-weight:600; color:var(--text-3); margin-top:.25rem; text-transform:uppercase; letter-spacing:.05em; }
 
-.summary-number {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0;
-}
+/* ── Analytics Charts Dashboard ── */
+.anl-charts-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem; margin-bottom:1rem; }
+.anl-chart-card  { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.anl-chart-hdr   { padding:.65rem .85rem; border-bottom:1px solid var(--border); background:var(--surface); }
+.anl-chart-title { font-size:.78rem; font-weight:700; color:var(--text-2); margin:0; display:flex; align-items:center; gap:.35rem; }
+.anl-chart-title i { color:var(--accent); }
+.anl-chart-body  { padding:.75rem; height:200px; position:relative; }
 
-.summary-label {
-    font-size: 0.9rem;
-    opacity: 0.9;
-    margin-top: 0.5rem;
-}
+/* ── Performance Tables ── */
+.anl-tables-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem; margin-bottom:1rem; }
+.anl-perf-card   { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.anl-perf-hdr    { padding:.65rem .85rem; border-bottom:1px solid var(--border); background:var(--surface); font-size:.78rem; font-weight:700; color:var(--text-2); }
+.anl-table       { width:100%; border-collapse:collapse; font-size:.8rem; }
+.anl-table thead th { background:var(--surface); padding:.5rem .75rem; text-align:left; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); border-bottom:1px solid var(--border); white-space:nowrap; }
+.anl-table tbody td { padding:.55rem .75rem; border-bottom:1px solid var(--border); color:var(--text-2); vertical-align:middle; background:var(--surface-2); }
+.anl-table tbody tr:last-child td { border-bottom:none; }
+.anl-table tbody tr:hover td { background:var(--surface); transition:background .1s; }
 
-/* Charts grid */
-.analytics-dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
+/* ── Score Bar ── */
+.anl-score-bar  { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:2px; }
+.anl-score-fill { height:100%; background:var(--accent); border-radius:3px; }
+.anl-score-text { font-size:.7rem; color:var(--text-3); }
 
-.chart-card {
-    padding: 1rem;
-    border-radius: 10px;
-    background: #fff;
-    color: #222;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-    min-height: 260px;
-    display: flex;
-    flex-direction: column;
-}
-
-.chart-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-
-.chart-title {
-    font-weight: 700;
-    margin: 0;
-}
-
-.chart-container {
-    flex: 1;
-    position: relative;
-    min-height: 180px;
-}
-
-/* Performance tables */
-.performance-table {
-    background: #fff;
-    border-radius: 10px;
-    padding: 0;
-    overflow: hidden;
-    color: #222;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-    margin-bottom: 1rem;
-}
-
-.table-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-    padding: 0.75rem 1rem;
-}
-
-.performance-table table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.performance-table th,
-.performance-table td {
-    padding: 0.75rem 1rem;
-    text-align: center;
-    border-bottom: 1px solid #eef2f6;
-    font-size: 0.95rem;
-}
-
-.rank-badge {
-    padding: 0.25rem 0.6rem;
-    border-radius: 12px;
-    font-weight: 700;
-    display: inline-block;
-}
-
-.rank-badge.top3 {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: #fff;
-}
-
-.score-bar {
-    width: 100%;
-    height: 18px;
-    background: #eef2f6;
-    border-radius: 999px;
-    position: relative;
-    overflow: hidden;
-}
-
-.score-fill {
-    height: 100%;
-    border-radius: 999px;
-    transition: width 0.8s ease;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.score-text {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    color: #fff;
-    font-weight: 600;
-    font-size: 0.75rem;
-}
-
-/* No results / error */
-.no-data {
-    padding: 1rem;
-    text-align: center;
-    color: #666;
-    font-style: italic;
-    background: #fff;
-    border-radius: 8px;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .filter-grid {
-        grid-template-columns: 1fr;
-    }
-}
+/* ── Rank Badge ── */
+.rank-badge      { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:6px; font-size:.72rem; font-weight:700; background:var(--surface); border:1px solid var(--border); color:var(--text-2); }
+.rank-badge.top3 { background:var(--accent-subtle); border-color:var(--accent); color:var(--accent); }
 </style>
 
 <div class="analytics-content">
     <!-- Filters -->
-    <div class="analytics-filters">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="m-0"><i class="fas fa-sliders-h me-2"></i>Analytics Filters</h5>
-            <div class="text-muted small">Use filters to focus the analytics</div>
+    <div class="anl-filter-box">
+        <div class="anl-filter-header">
+            <h5><i class="fas fa-sliders-h"></i>Analytics Filters</h5>
+            <small>Use filters to focus the analytics</small>
         </div>
 
-        <div class="filter-grid">
+        <div class="anl-filter-grid">
             <div>
-                <label class="form-label mb-1">Time Period</label>
-                <select id="timePeriodFilter" class="form-select">
+                <label class="anl-label">Time Period</label>
+                <select id="timePeriodFilter" class="anl-select">
                     <option value="all">All Time</option>
                     <option value="today">Today</option>
                     <option value="week">This Week</option>
@@ -204,16 +82,16 @@
             </div>
 
             <div id="customDateRange" style="display:none;">
-                <label class="form-label mb-1">Date Range</label>
-                <div class="d-flex gap-2">
-                    <input id="startDate" type="date" class="form-control" />
-                    <input id="endDate" type="date" class="form-control" />
+                <label class="anl-label">Date Range</label>
+                <div style="display:flex;gap:.5rem;">
+                    <input id="startDate" type="date" class="anl-input" />
+                    <input id="endDate" type="date" class="anl-input" />
                 </div>
             </div>
 
             <div>
-                <label class="form-label mb-1">Exam</label>
-                <select id="examFilter" class="form-select">
+                <label class="anl-label">Exam</label>
+                <select id="examFilter" class="anl-select">
                     <option value="">All Exams</option>
                     {% for exam in exams %}
                         <option value="{{ exam.id }}">{{ exam.name }}</option>
@@ -221,114 +99,116 @@
                 </select>
             </div>
 
-            <div class="d-flex align-items-center">
-                <button class="btn btn-primary w-100" onclick="updateAnalytics()">
-                    <i class="fas fa-chart-bar me-2"></i> Update Analytics
+            <div style="align-self:flex-end;">
+                <button class="btn-flat-anl" onclick="updateAnalytics()">
+                    <i class="fas fa-sync-alt"></i>Update
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Summary -->
-    <div class="summary-grid">
-        <div class="summary-card">
-            <div class="summary-number" id="avgScore"><i class="fas fa-spinner fa-spin"></i></div>
-            <div class="summary-label">Average Score</div>
+    <div class="anl-summary-grid">
+        <div class="anl-summary-card">
+            <div class="anl-summary-num" id="avgScore"><i class="fas fa-spinner fa-spin"></i></div>
+            <div class="anl-summary-lbl">Average Score</div>
         </div>
-        <div class="summary-card">
-            <div class="summary-number" id="totalAttempts"><i class="fas fa-spinner fa-spin"></i></div>
-            <div class="summary-label">Total Attempts</div>
+        <div class="anl-summary-card">
+            <div class="anl-summary-num" id="totalAttempts"><i class="fas fa-spinner fa-spin"></i></div>
+            <div class="anl-summary-lbl">Total Attempts</div>
         </div>
-        <div class="summary-card">
-            <div class="summary-number" id="passRate"><i class="fas fa-spinner fa-spin"></i></div>
-            <div class="summary-label">Pass Rate</div>
+        <div class="anl-summary-card">
+            <div class="anl-summary-num" id="passRate"><i class="fas fa-spinner fa-spin"></i></div>
+            <div class="anl-summary-lbl">Pass Rate</div>
         </div>
-        <div class="summary-card">
-            <div class="summary-number" id="activeUsers"><i class="fas fa-spinner fa-spin"></i></div>
-            <div class="summary-label">Active Users</div>
+        <div class="anl-summary-card">
+            <div class="anl-summary-num" id="activeUsers"><i class="fas fa-spinner fa-spin"></i></div>
+            <div class="anl-summary-lbl">Active Users</div>
         </div>
     </div>
 
     <!-- Charts -->
-    <div class="analytics-dashboard">
-        <div class="chart-card">
-            <div class="chart-header">
-                <h6 class="chart-title"><i class="fas fa-chart-pie me-2"></i> Score Distribution</h6>
+    <div class="anl-charts-grid">
+        <div class="anl-chart-card">
+            <div class="anl-chart-hdr">
+                <h6 class="anl-chart-title"><i class="fas fa-chart-pie"></i>Score Distribution</h6>
             </div>
-            <div class="chart-container">
+            <div class="anl-chart-body">
                 <canvas id="scoreDistributionChart"></canvas>
             </div>
         </div>
 
-        <div class="chart-card">
-            <div class="chart-header">
-                <h6 class="chart-title"><i class="fas fa-chart-line me-2"></i> Performance Trends</h6>
+        <div class="anl-chart-card">
+            <div class="anl-chart-hdr">
+                <h6 class="anl-chart-title"><i class="fas fa-chart-line"></i>Performance Trends</h6>
             </div>
-            <div class="chart-container">
+            <div class="anl-chart-body">
                 <canvas id="performanceTrendsChart"></canvas>
             </div>
         </div>
 
-        <div class="chart-card">
-            <div class="chart-header">
-                <h6 class="chart-title"><i class="fas fa-bar-chart me-2"></i> Exam Performance</h6>
+        <div class="anl-chart-card">
+            <div class="anl-chart-hdr">
+                <h6 class="anl-chart-title"><i class="fas fa-chart-bar"></i>Exam Performance</h6>
             </div>
-            <div class="chart-container">
+            <div class="anl-chart-body">
                 <canvas id="examPerformanceChart"></canvas>
             </div>
         </div>
 
-        <div class="chart-card">
-            <div class="chart-header">
-                <h6 class="chart-title"><i class="fas fa-chart-area me-2"></i> User Activity</h6>
+        <div class="anl-chart-card">
+            <div class="anl-chart-hdr">
+                <h6 class="anl-chart-title"><i class="fas fa-chart-area"></i>User Activity</h6>
             </div>
-            <div class="chart-container">
+            <div class="anl-chart-body">
                 <canvas id="userActivityChart"></canvas>
             </div>
         </div>
     </div>
 
     <!-- Tables -->
-    <div class="row">
-        <div class="col-lg-6">
-            <div class="performance-table">
-                <div class="table-header"><strong>Top Performers</strong></div>
-                <table class="table mb-0">
+    <div class="anl-tables-grid">
+        <div class="anl-perf-card">
+            <div class="anl-perf-hdr"><i class="fas fa-medal me-1" style="color:var(--accent)"></i>Top Performers</div>
+            <div class="table-responsive">
+                <table class="anl-table">
                     <thead>
-                        <tr><th>Rank</th><th>User</th><th>Average Score</th><th>Attempts</th></tr>
+                        <tr><th>Rank</th><th>User</th><th>Avg Score</th><th>Attempts</th></tr>
                     </thead>
                     <tbody id="topPerformersTable">
-                        <tr><td colspan="4" class="text-center py-3">Loading...</td></tr>
+                        <tr><td colspan="4" style="text-align:center;padding:1.25rem;color:var(--text-3)">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="col-lg-6">
-            <div class="performance-table">
-                <div class="table-header"><strong>Exam Statistics</strong></div>
-                <table class="table mb-0">
+        <div class="anl-perf-card">
+            <div class="anl-perf-hdr"><i class="fas fa-file-alt me-1" style="color:var(--accent)"></i>Exam Statistics</div>
+            <div class="table-responsive">
+                <table class="anl-table">
                     <thead>
                         <tr><th>Exam</th><th>Attempts</th><th>Avg Score</th><th>Pass Rate</th></tr>
                     </thead>
                     <tbody id="examStatsTable">
-                        <tr><td colspan="4" class="text-center py-3">Loading...</td></tr>
+                        <tr><td colspan="4" style="text-align:center;padding:1.25rem;color:var(--text-3)">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <div class="performance-table">
-        <div class="table-header"><strong>Recent Activity</strong></div>
-        <table class="table mb-0">
-            <thead>
-                <tr><th>Time</th><th>User</th><th>Exam</th><th>Score</th><th>Performance</th></tr>
-            </thead>
-            <tbody id="recentActivityTable">
-                <tr><td colspan="5" class="text-center py-3">Loading...</td></tr>
-            </tbody>
-        </table>
+    <div class="anl-perf-card" style="margin:0 0 1rem">
+        <div class="anl-perf-hdr"><i class="fas fa-history me-1" style="color:var(--accent)"></i>Recent Activity</div>
+        <div class="table-responsive">
+            <table class="anl-table">
+                <thead>
+                    <tr><th>Time</th><th>User</th><th>Exam</th><th>Score</th><th>Performance</th></tr>
+                </thead>
+                <tbody id="recentActivityTable">
+                    <tr><td colspan="5" style="text-align:center;padding:1.25rem;color:var(--text-3)">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -577,8 +457,9 @@ function updateTables(tables = {}) {
                 return `<tr>
                     <td><span class="rank-badge ${i < 3 ? 'top3' : ''}">#${i + 1}</span></td>
                     <td><strong>${escapeHtml(u.username || '')}</strong><br><small class="text-muted">${escapeHtml(u.full_name || '')}</small></td>
-                    <td style="min-width:180px">
-                        <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div><div class="score-text">${pct.toFixed(1)}%</div></div>
+                    <td style="min-width:150px">
+                        <div class="anl-score-bar"><div class="anl-score-fill" style="width:${pct}%"></div></div>
+                        <div class="anl-score-text">${pct.toFixed(1)}%</div>
                     </td>
                     <td>${u.attempts || 0}</td>
                 </tr>`;
@@ -644,6 +525,4 @@ function escapeHtml(s) {
     });
 }
 </script>
-
-
 

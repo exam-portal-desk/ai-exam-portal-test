@@ -2,370 +2,526 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
+
 <style>
-  /* ── Page-level styles (inherit theme vars from base) ── */
-  .dash-heading { font-size: clamp(1.3rem, 3vw, 1.75rem); font-weight: 700; color: var(--text-primary); margin: 0; }
-  .dash-sub     { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+/* ── DASHBOARD LAYOUT — structure only, all colors via tokens ── */
 
-  /* Stats grid */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
+.dash-header {
+  margin-bottom: 2rem;
+}
+.dash-header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.02em;
+  margin-bottom: .25rem;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.dash-header h1 i { color: var(--accent); font-size: 1.1rem; }
+.dash-header p {
+  font-size: .83rem;
+  color: var(--text-3);
+}
 
-  .stat-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 14px;
-    padding: 1.25rem 1.4rem;
-    display: flex; align-items: center; gap: 1rem;
-    transition: box-shadow 0.2s, transform 0.2s;
-  }
-  .stat-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+/* ── Stat cards ── */
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.dash-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.dash-stat:hover {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-sm);
+}
+.dash-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.dsi-blue   { background: var(--info-bg);    color: var(--info-text); }
+.dsi-green  { background: var(--success-bg); color: var(--success-text); }
+.dsi-purple { background: var(--accent-subtle); color: var(--accent); }
+.dsi-amber  { background: var(--warning-bg); color: var(--warning-text); }
 
-  .stat-icon {
-    width: 46px; height: 46px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.15rem; flex-shrink: 0;
-  }
-  .si-blue   { background: rgba(102,126,234,0.14); color: #667eea; }
-  .si-green  { background: rgba(16,185,129,0.14);  color: #10b981; }
-  .si-purple { background: rgba(139,92,246,0.14);  color: #8b5cf6; }
-  .si-amber  { background: rgba(245,158,11,0.14);  color: #f59e0b; }
+.dash-stat-body { min-width: 0; }
+.dash-stat-num {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-1);
+  line-height: 1.1;
+  letter-spacing: -.02em;
+}
+.dash-stat-exact {
+  font-size: .68rem;
+  color: var(--text-3);
+  margin-top: .1rem;
+}
+.dash-stat-label {
+  font-size: .75rem;
+  color: var(--text-3);
+  font-weight: 600;
+  margin-top: .2rem;
+}
 
-  .stat-body {}
-  .stat-num   { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); line-height: 1; }
-  .stat-label { font-size: 0.76rem; color: var(--text-muted); font-weight: 500; margin-top: 0.2rem; }
+/* ── Section title ── */
+.dash-section-title {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-3);
+  margin-bottom: .85rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.dash-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 
-  /* Quick actions */
-  .section-title {
-    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--text-muted);
-    margin-bottom: 0.85rem;
-  }
+/* ── Quick actions grid ── */
+.dash-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+  margin-bottom: 2rem;
+}
+.dash-action {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
+}
+.dash-action:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.dash-action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .9rem;
+  color: var(--accent);
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s;
+}
+.dash-action:hover .dash-action-icon {
+  background: var(--accent);
+  color: var(--accent-on);
+  border-color: var(--accent);
+}
+.dash-action-label {
+  font-size: .83rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: .15rem;
+}
+.dash-action-desc {
+  font-size: .72rem;
+  color: var(--text-3);
+}
 
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.85rem;
-    margin-bottom: 2rem;
-  }
+/* ── Bottom info row ── */
+.dash-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
 
-  .action-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 13px;
-    padding: 1.1rem 1.2rem;
-    display: flex; align-items: center; gap: 0.85rem;
-    text-decoration: none;
-    color: var(--text-primary);
-    transition: all 0.18s;
-    cursor: pointer;
-  }
-  .action-card:hover {
-    border-color: rgba(102,126,234,0.4);
-    box-shadow: 0 4px 20px rgba(102,126,234,0.1);
-    transform: translateY(-2px);
-    color: var(--text-primary);
-    text-decoration: none;
-  }
+/* Portal overview card */
+.dash-overview {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  overflow: hidden;
+}
+.dash-card-hdr {
+  padding: .75rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.dash-card-hdr i { color: var(--accent); font-size: .82rem; }
 
-  .action-icon {
-    width: 38px; height: 38px; border-radius: 10px;
-    background: rgba(102,126,234,0.1);
-    color: #667eea;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.95rem; flex-shrink: 0;
-    transition: background 0.18s;
-  }
-  .action-card:hover .action-icon { background: var(--brand-gradient); color: white; }
+.dash-overview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .6rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .8rem;
+}
+.dash-overview-row:last-child { border-bottom: none; }
+.dash-overview-lbl { color: var(--text-3); font-weight: 500; }
+.dash-overview-val {
+  font-weight: 700;
+  color: var(--text-1);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.dash-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { box-shadow: 0 0 0 0 var(--success-bg); }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
 
-  .action-label { font-size: 0.875rem; font-weight: 600; }
-  .action-desc  { font-size: 0.73rem; color: var(--text-muted); margin-top: 0.1rem; }
+/* Quick links card */
+.dash-links {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  overflow: hidden;
+}
+.dash-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .65rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .8rem;
+  transition: background .12s;
+}
+.dash-link-row:last-child { border-bottom: none; }
+.dash-link-row:hover { background: var(--surface-2); }
+.dash-link-lbl {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.dash-link-lbl i {
+  width: 16px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .75rem;
+}
+.dash-link-row:hover .dash-link-lbl i { color: var(--accent); }
+.dash-link-action {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  transition: opacity .15s;
+}
+.dash-link-action:hover { opacity: .75; }
 
-  /* Info cards row */
-  .info-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-  }
-
-  .info-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 14px;
-    padding: 1.25rem 1.4rem;
-  }
-
-  .info-card-title {
-    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em;
-    text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem;
-    display: flex; align-items: center; gap: 0.5rem;
-  }
-
-  .info-row-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0.6rem 0;
-    border-bottom: 1px solid var(--card-border);
-    font-size: 0.85rem;
-  }
-  .info-row-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .info-row-item .label { color: var(--text-secondary); font-weight: 500; }
-  .info-row-item .value { color: var(--text-primary); font-weight: 600; }
-
-  .status-dot {
-    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.4rem;
-  }
-  .dot-green { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
-  .dot-blue  { background: #667eea; }
-
- 
-
-
-  @media (max-width: 640px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .actions-grid { grid-template-columns: repeat(2, 1fr); }
-    .action-desc { display: none; }
-    
-  }
-
-  @media (max-width: 400px) {
-    .stats-grid { grid-template-columns: 1fr 1fr; }
-    .actions-grid { grid-template-columns: 1fr 1fr; }
-  }
+/* Responsive */
+@media (max-width: 1100px) {
+  .dash-stats   { grid-template-columns: repeat(2, 1fr); }
+  .dash-actions { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .dash-stats   { grid-template-columns: 1fr; }
+  .dash-actions { grid-template-columns: 1fr; }
+  .dash-bottom  { grid-template-columns: 1fr; }
+}
 </style>
 
-<!-- Header -->
-<div style="margin-bottom:1.75rem">
-  <h1 class="dash-heading">Dashboard</h1>
-  <p class="dash-sub">Welcome back — here's what's happening on your portal.</p>
+<!-- ── Header ── -->
+<div class="dash-header">
+  <h1><i class="fas fa-home"></i> Dashboard</h1>
+  <p>Welcome back - here's what's happening on your portal.</p>
 </div>
 
-<!-- Stats -->
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-icon si-blue"><i class="fas fa-file-alt"></i></div>
-    <div class="stat-body">
-      <div class="stat-num">{{ stats.get('total_exams', 0) }}</div>
-      <div class="stat-label">Total Exams</div>
+<!-- ── Stat Cards ── -->
+<div class="dash-stats">
+  <div class="dash-stat">
+    <div class="dash-stat-icon dsi-blue"><i class="fas fa-file-alt"></i></div>
+    <div class="dash-stat-body">
+      <div class="dash-stat-num">{{ stats.get('total_exams', 0) }}</div>
+      <div class="dash-stat-label">Total Exams</div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon si-green"><i class="fas fa-users"></i></div>
-    <div class="stat-body">
-<div class="stat-num" id="dash-users">{{ stats.get('total_users', 0) }}</div>
-<div class="stat-exact" style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem" id="dash-users-exact"></div>
-<div class="stat-label">Registered Users</div>
+  <div class="dash-stat">
+    <div class="dash-stat-icon dsi-green"><i class="fas fa-users"></i></div>
+    <div class="dash-stat-body">
+      <div class="dash-stat-num" id="dash-users">{{ stats.get('total_users', 0) }}</div>
+      <div class="dash-stat-exact" id="dash-users-exact"></div>
+      <div class="dash-stat-label">Registered Users</div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon si-purple"><i class="fas fa-user-shield"></i></div>
-    <div class="stat-body">
-      <div class="stat-num">{{ stats.get('total_admins', 0) }}</div>
-      <div class="stat-label">Admin Accounts</div>
+  <div class="dash-stat">
+    <div class="dash-stat-icon dsi-purple"><i class="fas fa-user-shield"></i></div>
+    <div class="dash-stat-body">
+      <div class="dash-stat-num">{{ stats.get('total_admins', 0) }}</div>
+      <div class="dash-stat-label">Admin Accounts</div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon si-amber"><i class="fas fa-users-cog"></i></div>
-    <div class="stat-body">
-<div class="stat-num" id="dash-students">{{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }}</div>
-<div class="stat-exact" style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem" id="dash-students-exact"></div>
-<div class="stat-label">Student Accounts</div>
+  <div class="dash-stat">
+    <div class="dash-stat-icon dsi-amber"><i class="fas fa-users-cog"></i></div>
+    <div class="dash-stat-body">
+      <div class="dash-stat-num" id="dash-students">{{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }}</div>
+      <div class="dash-stat-exact" id="dash-students-exact"></div>
+      <div class="dash-stat-label">Student Accounts</div>
     </div>
   </div>
 </div>
 
+<!-- ── Quick Actions ── -->
+<div class="dash-section-title">Quick Actions</div>
+<div class="dash-actions">
 
+  <a href="{{ url_for('admin.exams') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-file-alt"></i></div>
+    <div>
+      <div class="dash-action-label">Manage Exams</div>
+      <div class="dash-action-desc">Create, edit, delete exams</div>
+    </div>
+  </a>
 
-<!-- Quick Actions -->
-<div class="section-title">Quick Actions</div>
-<div class="actions-grid">
-  <a href="{{ url_for('admin.exams') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-file-alt"></i></div>
+  <a href="{{ url_for('admin.subjects') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-book"></i></div>
     <div>
-      <div class="action-label">Manage Exams</div>
-      <div class="action-desc">Create, edit, delete exams</div>
+      <div class="dash-action-label">Manage Subjects</div>
+      <div class="dash-action-desc">Add or remove subjects</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.subjects') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-book"></i></div>
+
+  <a href="{{ url_for('admin.questions_index') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-question-circle"></i></div>
     <div>
-      <div class="action-label">Manage Subjects</div>
-      <div class="action-desc">Add or remove subjects</div>
+      <div class="dash-action-label">Manage Questions</div>
+      <div class="dash-action-desc">View and edit questions</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.questions_index') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-question-circle"></i></div>
+
+  <a href="{{ url_for('admin.requests_dashboard') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-user-plus"></i></div>
     <div>
-      <div class="action-label">Manage Questions</div>
-      <div class="action-desc">View and edit questions</div>
+      <div class="dash-action-label">Users &amp; Requests</div>
+      <div class="dash-action-desc">Approve access requests</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.requests_dashboard') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-user-plus"></i></div>
+
+  <a href="{{ url_for('admin.attempts') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-list-ol"></i></div>
     <div>
-      <div class="action-label">Users &amp; Requests</div>
-      <div class="action-desc">Approve access requests</div>
+      <div class="dash-action-label">Manage Attempts</div>
+      <div class="dash-action-desc">View exam attempts</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.attempts') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-list-ol"></i></div>
+
+  <a href="{{ url_for('admin.users_analytics') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-chart-line"></i></div>
     <div>
-      <div class="action-label">Manage Attempts</div>
-      <div class="action-desc">View exam attempts</div>
+      <div class="dash-action-label">Users Analytics</div>
+      <div class="dash-action-desc">Performance insights</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.users_analytics') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-chart-line"></i></div>
+
+  <a href="{{ url_for('admin.upload_images_page') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-images"></i></div>
     <div>
-      <div class="action-label">Users Analytics</div>
-      <div class="action-desc">Performance insights</div>
+      <div class="dash-action-label">Upload Images</div>
+      <div class="dash-action-desc">Manage question images</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.upload_images_page') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-images"></i></div>
+
+  <a href="{{ url_for('admin.ai_command_centre') }}" class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-robot"></i></div>
     <div>
-      <div class="action-label">Upload Images</div>
-      <div class="action-desc">Manage question images</div>
+      <div class="dash-action-label">AI Command Centre</div>
+      <div class="dash-action-desc">AI-powered tools</div>
     </div>
   </a>
-  <a href="{{ url_for('admin.ai_command_centre') }}" class="action-card">
-    <div class="action-icon"><i class="fas fa-robot"></i></div>
+
+  <a href="#"
+     id="open-latex-editor-card"
+     data-url="{{ url_for('latex_editor.latex_editor') }}"
+     class="dash-action">
+    <div class="dash-action-icon"><i class="fas fa-square-root-alt"></i></div>
     <div>
-      <div class="action-label">AI Command Centre</div>
-      <div class="action-desc">AI-powered tools</div>
+      <div class="dash-action-label">LaTeX Editor</div>
+      <div class="dash-action-desc">Create and edit questions using LaTeX</div>
     </div>
   </a>
-  <a href="#" 
-    id="open-latex-editor-card" 
-    data-url="{{ url_for('latex_editor.latex_editor') }}" 
-    class="action-card">
-    <div class="action-icon"><i class="fas fa-square-root-alt"></i></div>
-    <div>
-      <div class="action-label">Latex</div>
-      <div class="action-desc">Create and edit questions using LaTeX</div>
-    </div>
-  </a>
+
 </div>
 
-<!-- Info row -->
-<div class="info-row">
-  <div class="info-card">
-    <div class="info-card-title"><i class="fas fa-info-circle"></i> Portal Overview</div>
-    <div class="info-row-item">
-      <span class="label">System Status</span>
-      <span class="value"><span class="status-dot dot-green"></span>Online</span>
+<!-- ── Bottom Row ── -->
+<div class="dash-section-title">Overview &amp; Links</div>
+<div class="dash-bottom">
+
+  <!-- Portal Overview -->
+  <div class="dash-overview">
+    <div class="dash-card-hdr">
+      <i class="fas fa-info-circle"></i> Portal Overview
     </div>
-    <div class="info-row-item">
-      <span class="label">Total Exams</span>
-      <span class="value">{{ stats.get('total_exams', 0) }}</span>
+    <div class="dash-overview-row">
+      <span class="dash-overview-lbl">System Status</span>
+      <span class="dash-overview-val">
+        <span class="dash-status-dot"></span> Online
+      </span>
     </div>
-    <div class="info-row-item">
-      <span class="label">Total Users</span>
-      <span class="value" id="dash-users-2">{{ stats.get('total_users', 0) }}</span>
+    <div class="dash-overview-row">
+      <span class="dash-overview-lbl">Total Exams</span>
+      <span class="dash-overview-val">{{ stats.get('total_exams', 0) }}</span>
     </div>
-    <div class="info-row-item">
-      <span class="label">Admins</span>
-      <span class="value">{{ stats.get('total_admins', 0) }}</span>
+    <div class="dash-overview-row">
+      <span class="dash-overview-lbl">Total Users</span>
+      <span class="dash-overview-val" id="dash-users-2">{{ stats.get('total_users', 0) }}</span>
     </div>
-    <div class="info-row-item">
-      <span class="label">Students</span>
-      <span class="value" id="dash-students-2">{{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }}</span>
+    <div class="dash-overview-row">
+      <span class="dash-overview-lbl">Admins</span>
+      <span class="dash-overview-val">{{ stats.get('total_admins', 0) }}</span>
+    </div>
+    <div class="dash-overview-row">
+      <span class="dash-overview-lbl">Students</span>
+      <span class="dash-overview-val" id="dash-students-2">{{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }}</span>
     </div>
   </div>
 
-  <div class="info-card">
-    <div class="info-card-title"><i class="fas fa-bolt"></i> Quick Links</div>
-    <div class="info-row-item">
-      <span class="label">Pending Requests</span>
-      <a href="{{ url_for('admin.requests_dashboard') }}" style="color:var(--brand1);font-weight:600;font-size:0.85rem;text-decoration:none">View &rarr;</a>
+  <!-- Quick Links -->
+  <div class="dash-links">
+    <div class="dash-card-hdr">
+      <i class="fas fa-bolt"></i> Quick Links
     </div>
-
-    <div class="info-row-item">
-      <span class="label">View Analytics</span>
-      <a href="{{ url_for('admin.users_analytics') }}" style="color:var(--brand1);font-weight:600;font-size:0.85rem;text-decoration:none">Open &rarr;</a>
+    <div class="dash-link-row">
+      <span class="dash-link-lbl">
+        <i class="fas fa-user-plus"></i> Pending Requests
+      </span>
+      <a href="{{ url_for('admin.requests_dashboard') }}" class="dash-link-action">View &rarr;</a>
     </div>
-    <div class="info-row-item">
-      <span class="label">AI Command Centre</span>
-      <a href="{{ url_for('admin.ai_command_centre') }}" style="color:var(--brand1);font-weight:600;font-size:0.85rem;text-decoration:none">Open &rarr;</a>
+    <div class="dash-link-row">
+      <span class="dash-link-lbl">
+        <i class="fas fa-chart-line"></i> Users Analytics
+      </span>
+      <a href="{{ url_for('admin.users_analytics') }}" class="dash-link-action">Open &rarr;</a>
     </div>
-    <div class="info-row-item">
-      <span class="label">LaTeX Editor</span>
-      <button id="dash-latex-btn" style="background:none;border:none;color:var(--brand1);font-weight:600;font-size:0.85rem;cursor:pointer;padding:0">Open &rarr;</button>
+    <div class="dash-link-row">
+      <span class="dash-link-lbl">
+        <i class="fas fa-robot"></i> AI Command Centre
+      </span>
+      <a href="{{ url_for('admin.ai_command_centre') }}" class="dash-link-action">Open &rarr;</a>
+    </div>
+    <div class="dash-link-row">
+      <span class="dash-link-lbl">
+        <i class="fas fa-layer-group"></i> Manage Categories
+      </span>
+      <a href="{{ url_for('admin.categories') }}" class="dash-link-action">Open &rarr;</a>
+    </div>
+    <div class="dash-link-row">
+      <span class="dash-link-lbl">
+        <i class="fas fa-square-root-alt"></i> LaTeX Editor
+      </span>
+      <button id="dash-latex-btn" class="dash-link-action">Open &rarr;</button>
     </div>
   </div>
+
 </div>
 
 <script>
-document.getElementById('dash-latex-btn').addEventListener('click', function(){
-  const w=Math.max(Math.round(window.innerWidth*.6),900),h=Math.max(Math.round(window.innerHeight*.75),600);
-  window.open('/admin/latex_editor','latexEditor',`width=${w},height=${h},left=${Math.round(window.screenX+(window.innerWidth-w)/2)},top=${Math.round(window.screenY+(window.innerHeight-h)/2)},resizable=yes`);
+/* ── LaTeX editor popups ── */
+document.getElementById('dash-latex-btn').addEventListener('click', function () {
+  var w = Math.max(Math.round(window.innerWidth * .6), 900);
+  var h = Math.max(Math.round(window.innerHeight * .75), 600);
+  window.open('/admin/latex_editor', 'latexEditor',
+    'width=' + w + ',height=' + h +
+    ',left=' + Math.round(window.screenX + (window.innerWidth - w) / 2) +
+    ',top='  + Math.round(window.screenY + (window.innerHeight - h) / 2) +
+    ',resizable=yes');
 });
-</script>
 
-<script>
-document.addEventListener("DOMContentLoaded", function(){
-
-  const btn = document.getElementById("open-latex-editor-card");
-  if(!btn) return;
-
-  btn.addEventListener("click", function(e){
-
+document.addEventListener('DOMContentLoaded', function () {
+  var btn = document.getElementById('open-latex-editor-card');
+  if (!btn) return;
+  btn.addEventListener('click', function (e) {
     e.preventDefault();
-
-    const url = btn.dataset.url;
-
-    const w = Math.max(Math.round(window.innerWidth * 0.6), 900);
-    const h = Math.max(Math.round(window.innerHeight * 0.75), 600);
-
-    window.open(
-      url,
-      "latexEditor",
-      "width=" + w +
-      ",height=" + h +
-      ",left=" + Math.round(window.screenX + (window.innerWidth - w)/2) +
-      ",top=" + Math.round(window.screenY + (window.innerHeight - h)/2) +
-      ",resizable=yes"
-    );
-
+    var url = btn.dataset.url;
+    var w = Math.max(Math.round(window.innerWidth * 0.6), 900);
+    var h = Math.max(Math.round(window.innerHeight * 0.75), 600);
+    window.open(url, 'latexEditor',
+      'width=' + w + ',height=' + h +
+      ',left=' + Math.round(window.screenX + (window.innerWidth - w) / 2) +
+      ',top='  + Math.round(window.screenY + (window.innerHeight - h) / 2) +
+      ',resizable=yes');
   });
-
 });
-</script>
-<script>
+
+/* ── Number formatting ── */
 function fmtCompact(n) {
-  if (n >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M+';
-  if (n >= 1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'') + 'K+';
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M+';
+  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K+';
   return String(n);
 }
 function fmtExact(n) {
   return Number(n).toLocaleString('en-IN');
 }
-document.addEventListener('DOMContentLoaded', function() {
-  const u = {{ stats.get('total_users', 0) }};
-  const s = {{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }};
 
-  // Big cards
-  const uEl  = document.getElementById('dash-users');
-  const sEl  = document.getElementById('dash-students');
-  const uxEl = document.getElementById('dash-users-exact');
-  const sxEl = document.getElementById('dash-students-exact');
+document.addEventListener('DOMContentLoaded', function () {
+  var u = {{ stats.get('total_users', 0) }};
+  var s = {{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }};
 
+  /* Stat cards */
+  var uEl  = document.getElementById('dash-users');
+  var sEl  = document.getElementById('dash-students');
+  var uxEl = document.getElementById('dash-users-exact');
+  var sxEl = document.getElementById('dash-students-exact');
   if (uEl)  uEl.textContent  = fmtCompact(u);
   if (sEl)  sEl.textContent  = fmtCompact(s);
   if (uxEl && u >= 1000) uxEl.textContent = fmtExact(u);
   if (sxEl && s >= 1000) sxEl.textContent = fmtExact(s);
 
-  // Info card
-  const u2 = document.getElementById('dash-users-2');
-  const s2 = document.getElementById('dash-students-2');
+  /* Overview card */
+  var u2 = document.getElementById('dash-users-2');
+  var s2 = document.getElementById('dash-students-2');
   if (u2) u2.textContent = fmtCompact(u) + (u >= 1000 ? ' (' + fmtExact(u) + ')' : '');
   if (s2) s2.textContent = fmtCompact(s) + (s >= 1000 ? ' (' + fmtExact(s) + ')' : '');
 });
 </script>
+
 {% endblock %}
-
-
-

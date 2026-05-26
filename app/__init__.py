@@ -145,7 +145,10 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.categories import categories_bp
     
     from app.routes.api_auth import api_auth_bp
-    app.register_blueprint(api_auth_bp)    
+    app.register_blueprint(api_auth_bp)
+
+    from app.routes.explanation import explanation_bp
+    app.register_blueprint(explanation_bp)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(categories_bp)

@@ -1,434 +1,507 @@
 {% extends "base.html" %}
-
 {% block title %}Admin Login - SmartAIExam{% endblock %}
 
 {% block content %}
-    <div class="particles-container">
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-    </div>
-
-    <div class="top-navigation-minimal">
-        <a href="{{ url_for('misc.home') }}" class="minimal-btn" title="Home">
-            <i class="fas fa-home"></i>
-            <span class="btn-label">Home</span>
-        </a>
-        <a href="{{ url_for('auth.login') }}" class="minimal-btn" title="Student Login">
-            <i class="fas fa-user-graduate"></i>
-            <span class="btn-label">Student Login</span>
-        </a>
-    </div>
-
-    <div class="login-wrapper">
-        <div class="login-container">
-                        <div class="login-header">
-                            <div class="logo-section">
-                                <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:44px;width:auto;"></video>
-                            </div>
-                            <h2 class="welcome-text">Admin Portal</h2>
-                            <p class="welcome-subtitle">Manage exams, questions & student access</p>
-                        </div>
-
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                            {% if messages %}
-                                <div class="flash-messages">
-                                    {% for category, message in messages %}
-                                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show {% if category == 'tip' %}permanent-tip{% endif %}">
-                                            <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' if category == 'success' else 'info-circle' }}"></i>
-                                            {{ message }}
-                                            {% if category != 'tip' %}
-                                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                            {% endif %}
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        {% endwith %}
-
-                        <form method="POST" id="adminLoginForm" class="login-form">
-                            <div class="form-group">
-                                <label for="username" class="form-label">
-                                    <i class="fas fa-user-shield"></i> Username or Email
-                                </label>
-                                <div class="input-wrapper">
-                                    <div class="input-icon">
-                                        <i class="fas fa-user-shield"></i>
-                                    </div>
-                                    <input type="text"
-                                           class="form-input"
-                                           id="username"
-                                           name="username"
-                                           placeholder="Enter username or email"
-                                           required
-                                           autocomplete="username">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="password" class="form-label">
-                                    <i class="fas fa-lock"></i> Password
-                                </label>
-                                <div class="input-wrapper">
-                                    <div class="input-icon">
-                                        <i class="fas fa-lock"></i>
-                                    </div>
-                                    <input type="password"
-                                           class="form-input"
-                                           id="password"
-                                           name="password"
-                                           placeholder="Enter your password"
-                                           required
-                                           autocomplete="current-password">
-                                    <button class="toggle-password" type="button" id="toggleBtn">
-                                        <i class="fas fa-eye" id="toggleIcon"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="login-button admin-button" id="loginBtn">
-                                <span class="button-content" id="loginText">
-                                    <i class="fas fa-sign-in-alt"></i>
-                                    <span>Login</span>
-                                </span>
-                                <span id="loginSpinner" class="button-loading d-none">
-                                    <i class="fas fa-spinner fa-spin"></i>
-                                    <span>Verifying…</span>
-                                </span>
-                            </button>
-                        </form>
-
-                        <div class="action-links">
-                            <a href="{{ url_for('auth.login') }}" class="action-link secondary">
-                                <i class="fas fa-arrow-left"></i>
-                                <span>Back to Student Login</span>
-                            </a>
-                        </div>
-
-                        <div class="help-section">
-                            <div class="alert alert-info permanent-tip">
-                                <h6 class="mb-1"><i class="fas fa-info-circle"></i> Tip</h6>
-                                <small class="mb-0 d-block">
-                                    Use your admin credentials. For student access, switch to <strong>Student Login</strong>.
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="security-footer admin-security">
-                            <i class="fas fa-shield-alt"></i>
-                            <span>Protected Admin Area</span>
-                            <div class="security-indicators">
-                                <div class="security-dot admin-dot"></div>
-                                <div class="security-dot admin-dot"></div>
-                                <div class="security-dot admin-dot"></div>
-                            </div>
-                        </div>
-                    </div>
-    </div>
-
 <style>
-        body {
-            background: #0a0a0f;
-            font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
-            overflow-x: hidden; min-height: 100vh;
-            display: flex; flex-direction: column;
-        }
-        .particles-container {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            overflow: hidden; z-index: 1; pointer-events: none;
-        }
-        .particle {
-            position: absolute; background: rgba(245,158,11,0.25);
-            border-radius: 50%; animation: float 10s ease-in-out infinite;
-        }
-        .particle:nth-child(1){width:3px;height:3px;top:15%;left:20%;animation-delay:0s}
-        .particle:nth-child(2){width:2px;height:2px;top:65%;left:80%;animation-delay:2s}
-        .particle:nth-child(3){width:4px;height:4px;top:35%;left:8%;animation-delay:4s}
-        .particle:nth-child(4){width:2px;height:2px;top:75%;left:25%;animation-delay:1s}
-        .particle:nth-child(5){width:3px;height:3px;top:25%;left:88%;animation-delay:3s}
-        .particle:nth-child(6){width:2px;height:2px;top:55%;left:65%;animation-delay:5s}
-        .particle:nth-child(7){width:3px;height:3px;top:45%;left:30%;animation-delay:6s}
-        .particle:nth-child(8){width:2px;height:2px;top:85%;left:55%;animation-delay:7s}
+/* ── ADMIN LOGIN PAGE LAYOUT ───────────────────────────────────────
+   All colors via theme.css tokens. Only layout/structure here.
+─────────────────────────────────────────────────────────────────── */
 
-        .top-navigation-minimal {
-            position: fixed; top: 24px; right: 24px;
-            z-index: 1000; display: flex; gap: 10px;
-        }
-        .minimal-btn {
-            width: 40px; height: 40px;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);
-            text-decoration: none; border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.08);
-            font-size: 0.95rem; transition: all 0.2s; position: relative;
-        }
-        .minimal-btn:hover {
-            background: rgba(245,158,11,0.1);
-            color: #f59e0b; border-color: rgba(245,158,11,0.2);
-        }
-        .btn-label {
-            position: absolute; right: 48px;
-            background: rgba(0,0,0,0.9); color: white;
-            padding: 6px 10px; border-radius: 6px;
-            font-size: 12px; font-weight: 500;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.2s; white-space: nowrap;
-        }
-        .minimal-btn:hover .btn-label { opacity: 1; }
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  background: var(--bg);
+}
 
-        .login-wrapper {
-            position: relative; z-index: 2; flex: 1;
-            display: flex; align-items: center; justify-content: center;
-            padding: 20px;
-        }
-        .login-container {
-            background: #111118;
-            border: 1px solid rgba(255,255,255,0.07);
-            border-radius: 18px; padding: 40px 36px;
-            width: 100%; max-width: 420px; position: relative; overflow: hidden;
-            box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
-        }
-        .login-container::before {
-            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent);
-        }
+/* Left panel — branding */
+.login-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem 5rem;
+  border-right: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.login-left-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 40%, var(--accent-subtle), transparent),
+    radial-gradient(ellipse 40% 60% at 70% 70%, var(--accent-subtle), transparent);
+  pointer-events: none;
+}
+.login-left-content { position: relative; z-index: 1; max-width: 420px; }
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 3rem;
+}
+.login-brand-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.01em;
+}
+.login-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .2rem .6rem;
+  border-radius: 20px;
+  font-size: .68rem;
+  font-weight: 700;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.login-tagline {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.25;
+  letter-spacing: -.02em;
+  margin-bottom: 1rem;
+}
+.login-tagline span { color: var(--accent); }
+.login-desc {
+  font-size: .9rem;
+  color: var(--text-3);
+  line-height: 1.7;
+  margin-bottom: 2.5rem;
+}
+.login-features { display: flex; flex-direction: column; gap: .75rem; }
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-size: .82rem;
+  color: var(--text-2);
+}
+.login-feature-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
 
-        .login-header { text-align: center; margin-bottom: 28px; }
-        .logo-section {
-            display: flex; align-items: center; justify-content: center;
-            gap: 10px; margin-bottom: 16px;
-        }
-        .logo-icon {
-            width: 38px; height: 38px; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1rem; color: white;
-        }
-        .logo-icon.admin { background: #d97706; }
-        .brand-name {
-            font-family: 'DM Serif Display', serif;
-            font-size: 1.4rem; font-weight: 400;
-            color: white; margin: 0; letter-spacing: -0.01em;
-        }
-        .welcome-text {
-            font-size: 1.3rem; font-weight: 600; color: white;
-            margin: 0 0 6px 0; letter-spacing: -0.01em;
-        }
-        .welcome-subtitle { color: rgba(255,255,255,0.35); font-size: 0.85rem; margin: 0; }
+/* Right panel — form */
+.login-right {
+  width: 480px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem 3.5rem;
+  background: var(--surface);
+  position: relative;
+}
+.login-right-top {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+}
 
-        .flash-messages { margin-bottom: 20px; }
-        .alert {
-            border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
-            font-size: 0.85rem; border: 1px solid transparent;
-            background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7);
-        }
-        .alert-info { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.15); color: rgba(245,158,11,0.8); }
-        .alert-danger { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #fca5a5; }
-        .alert-success { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.2); color: #86efac; }
-        .btn-close { filter: invert(1); opacity: 0.5; }
+/* Form heading */
+.login-form-heading {
+  margin-bottom: 1.75rem;
+}
+.login-form-heading h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.02em;
+  margin-bottom: .3rem;
+}
+.login-form-heading p {
+  font-size: .83rem;
+  color: var(--text-3);
+}
 
-        .login-form { margin-bottom: 16px; }
-        .form-group { margin-bottom: 16px; }
-        .form-label {
-            display: block; color: rgba(255,255,255,0.5); font-weight: 500;
-            margin-bottom: 7px; font-size: 0.8rem;
-            text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .form-label i { display: none; }
-        .input-wrapper { position: relative; }
-        .input-icon {
-            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-            color: rgba(255,255,255,0.2); z-index: 2; font-size: 0.85rem;
-            pointer-events: none;
-        }
-        .input-wrapper:focus-within .input-icon {
-            color: rgba(245,158,11,0.8);
-        }
-        .form-input {
-            width: 100%; padding: 12px 14px 12px 40px;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px; color: white;
-            font-size: 0.9rem; font-family: inherit;
-            transition: all 0.2s; outline: none;
-        }
-        .form-input::placeholder { color: rgba(255,255,255,0.2); }
-        .form-input:-webkit-autofill,
-        .form-input:-webkit-autofill:hover,
-        .form-input:-webkit-autofill:focus,
-        .form-input:-webkit-autofill:active {
-            -webkit-box-shadow: 0 0 0 1000px #111118 inset !important;
-            -webkit-text-fill-color: white !important;
-            caret-color: white;
-            border-color: rgba(255,255,255,0.08) !important;
-            transition: background-color 5000s ease-in-out 0s;
-        }
-        .form-input:focus {
-            border-color: rgba(245,158,11,0.4);
-            background: rgba(245,158,11,0.04);
-            box-shadow: 0 0 0 3px rgba(245,158,11,0.08);
-        }
-        .toggle-password {
-            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-            background: none; border: none;
-            color: rgba(255,255,255,0.25); cursor: pointer;
-            padding: 4px; border-radius: 4px; transition: color 0.2s;
-        }
-        .toggle-password:hover { color: rgba(255,255,255,0.6); }
+/* Google button */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .7rem;
+  width: 100%;
+  padding: .7rem 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-size: .875rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  margin-bottom: 1.25rem;
+}
+.google-btn:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
 
-        .admin-button {
-            width: 100%; padding: 13px;
-            background: #d97706; border: none; border-radius: 10px;
-            color: white; font-size: 0.9rem; font-weight: 600;
-            cursor: pointer; transition: all 0.2s; font-family: inherit;
-            box-shadow: 0 4px 16px rgba(217,119,6,0.3);
-        }
-        .admin-button:hover {
-            background: #f59e0b; transform: translateY(-1px);
-            box-shadow: 0 8px 24px rgba(245,158,11,0.35);
-        }
-        .admin-button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-        .button-content, .button-loading {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .button-loading { display: none; }
-        .admin-button.loading .button-content { display: none; }
-        .admin-button.loading .button-loading { display: flex; }
+/* Divider */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+.or-line { flex: 1; height: 1px; background: var(--border); }
+.or-text  { font-size: .72rem; color: var(--text-3); white-space: nowrap; }
 
-        .action-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .action-link {
-            display: flex; align-items: center; justify-content: center;
-            gap: 8px; padding: 11px 16px; border-radius: 10px;
-            text-decoration: none; font-weight: 500; font-size: 0.85rem;
-            transition: all 0.2s; border: 1px solid transparent;
-        }
-        .action-link.secondary {
-            background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07);
-            color: rgba(255,255,255,0.45);
-        }
-        .action-link.secondary:hover {
-            background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.8); text-decoration: none;
-        }
+/* Form fields */
+.field { margin-bottom: 1rem; }
+.field-label {
+  display: block;
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: .4rem;
+  letter-spacing: .02em;
+}
+.field-wrap { position: relative; display: flex; align-items: center; }
+.field-icon-l,
+.field-icon-r {
+  position: absolute;
+  color: var(--text-3);
+  font-size: .78rem;
+  transition: color .15s;
+  pointer-events: none;
+}
+.field-icon-l { left: .85rem; }
+.field-icon-r { right: .85rem; pointer-events: auto; cursor: pointer; }
 
-        .help-section { margin-bottom: 20px; }
-        .permanent-tip {
-            background: rgba(245,158,11,0.06) !important;
-            border: 1px solid rgba(245,158,11,0.12) !important;
-            border-radius: 10px !important; padding: 14px !important;
-            color: rgba(245,158,11,0.7) !important; font-size: 0.82rem;
-        }
-        .permanent-tip h6 { color: rgba(245,158,11,0.8); font-size: 0.82rem; }
-        .permanent-tip strong { color: rgba(245,158,11,0.9); }
+.field-input {
+  width: 100%;
+  padding: .65rem .9rem .65rem 2.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-size: .875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+  -webkit-appearance: none;
+}
+.field-input.has-right { padding-right: 2.4rem; }
+.field-input::placeholder { color: var(--text-3); }
+.field-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-raised);
+}
+.field-wrap:focus-within .field-icon-l { color: var(--accent); }
 
-        .security-footer {
-            text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .security-indicators { display: flex; gap: 3px; margin-left: 6px; }
-        .security-dot {
-            width: 4px; height: 4px; border-radius: 50%;
-            background: rgba(245,158,11,0.4);
-            animation: pulse 2s ease-in-out infinite;
-        }
-        .security-dot:nth-child(2){animation-delay:0.3s}
-        .security-dot:nth-child(3){animation-delay:0.6s}
+/* Admin protected notice */
+.admin-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .65rem .85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: .78rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.admin-notice i { flex-shrink: 0; margin-top: .1rem; font-size: .78rem; }
 
-        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+/* Sign in button */
+.signin-btn {
+  width: 100%;
+  padding: .7rem 1rem;
+  background: var(--accent);
+  color: var(--accent-on);
+  border: none;
+  border-radius: var(--radius);
+  font-size: .875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  transition: background .15s, transform .1s, box-shadow .15s;
+  margin-top: .5rem;
+}
+.signin-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.signin-btn:active { transform: translateY(0); box-shadow: none; }
+.signin-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
 
-        @media (max-width: 768px) {
-            .top-navigation-minimal { top: 16px; right: 16px; }
-            .login-container { padding: 28px 18px; border-radius: 16px; }
-            .welcome-text { font-size: 1.15rem; }
-        }
-        @media (max-width: 480px) {
-            .login-container { padding: 24px 16px; }
-            .logo-section { flex-direction: column; gap: 6px; }
-        }
+/* Back link */
+.back-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  margin-top: 1.5rem;
+  font-size: .78rem;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color .15s;
+}
+.back-link:hover { color: var(--text-1); }
 
-        [data-theme="light"] body { background: #f0f2f8; color: #1a202c; }
-        [data-theme="light"] .particles-container { opacity: 0.35; }
-        [data-theme="light"] .minimal-btn { background: #f1f5f9; color: #4a5568; border-color: #e2e8f0; }
-        [data-theme="light"] .minimal-btn:hover { background: rgba(217,119,6,0.08); color: #d97706; border-color: rgba(217,119,6,0.25); }
-        [data-theme="light"] .btn-label { background: rgba(0,0,0,0.75); }
-        [data-theme="light"] .login-container { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
-        [data-theme="light"] .login-container::before { background: linear-gradient(90deg, transparent, rgba(217,119,6,0.25), transparent); }
-        [data-theme="light"] .brand-name { color: #1a202c; }
-        [data-theme="light"] .welcome-text { color: #1a202c; }
-        [data-theme="light"] .welcome-subtitle { color: #718096; }
-        [data-theme="light"] .form-label { color: #4a5568; }
-        [data-theme="light"] .input-icon { color: #a0aec0; }
-        [data-theme="light"] .input-wrapper:focus-within .input-icon { color: #d97706; }
-        [data-theme="light"] .form-input { background: #f8faff; border-color: #e2e8f0; color: #1a202c; }
-        [data-theme="light"] .form-input::placeholder { color: #a0aec0; }
-        [data-theme="light"] .form-input:-webkit-autofill,
-        [data-theme="light"] .form-input:-webkit-autofill:hover,
-        [data-theme="light"] .form-input:-webkit-autofill:focus {
-            -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
-            -webkit-text-fill-color: #1a202c !important;
-            caret-color: #1a202c !important;
-        }
-        [data-theme="light"] .form-input:focus { border-color: rgba(217,119,6,0.4); background: rgba(217,119,6,0.03); box-shadow: 0 0 0 3px rgba(217,119,6,0.08); }
-        [data-theme="light"] .toggle-password { color: #a0aec0; }
-        [data-theme="light"] .toggle-password:hover { color: #4a5568; }
-        [data-theme="light"] .alert { background: #f8faff; border-color: #e2e8f0; color: #4a5568; }
-        [data-theme="light"] .alert-info { background: rgba(217,119,6,0.06); border-color: rgba(217,119,6,0.15); color: #92400e; }
-        [data-theme="light"] .alert-danger { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
-        [data-theme="light"] .alert-success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-        [data-theme="light"] .btn-close { filter: none; opacity: 0.5; }
-        [data-theme="light"] .permanent-tip { background: rgba(217,119,6,0.06) !important; border-color: rgba(217,119,6,0.18) !important; color: #92400e !important; }
-        [data-theme="light"] .permanent-tip h6 { color: #b45309; }
-        [data-theme="light"] .permanent-tip strong { color: #92400e; }
-        [data-theme="light"] .action-link.secondary { background: #f1f5f9; border-color: #e2e8f0; color: #718096; }
-        [data-theme="light"] .action-link.secondary:hover { background: #e2e8f0; color: #1a202c; }
-        [data-theme="light"] .security-footer { color: #a0aec0; }
+/* Footer */
+.login-footer {
+  margin-top: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  font-size: .72rem;
+  color: var(--text-3);
+}
+
+/* Flash alerts */
+.flash-wrap { margin-bottom: 1rem; }
+.flash-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .65rem .85rem;
+  border-radius: var(--radius);
+  border: 1px solid;
+  font-size: .82rem;
+  font-weight: 500;
+  margin-bottom: .4rem;
+}
+.flash-success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+.flash-warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+.flash-danger,
+.flash-error   { background: var(--danger-bg);  border-color: var(--danger-border);  color: var(--danger-text); }
+.flash-info    { background: var(--info-bg);    border-color: var(--info-border);    color: var(--info-text); }
+.flash-x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: .5;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.flash-x:hover { opacity: 1; }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .login-left  { display: none; }
+  .login-right { width: 100%; padding: 2.5rem 1.75rem; }
+}
+@media (max-width: 480px) {
+  .login-right { padding: 2rem 1.25rem; }
+}
 </style>
 
+<div class="login-page">
+
+  {# ══ LEFT — admin branding ════════════════════════════════════ #}
+  <div class="login-left">
+    <div class="login-left-bg"></div>
+    <div class="login-left-content">
+
+      <div class="login-brand">
+        <video src="{{ url_for('static', filename='logo.mp4') }}"
+               autoplay loop muted playsinline
+               style="height:36px;width:auto;border-radius:8px">
+        </video>
+        <span class="login-brand-name">SmartAIExam</span>
+        <span class="login-brand-badge"><i class="fas fa-user-shield"></i> Admin</span>
+      </div>
+
+      <h1 class="login-tagline">
+        The control centre<br>for your <span>exam platform.</span>
+      </h1>
+      <p class="login-desc">
+        A powerful admin portal to manage exams,
+        questions, users, and analytics — all in one place.
+      </p>
+
+      <div class="login-features">
+        <div class="login-feature"><span class="login-feature-dot"></span>Create and manage exams and questions</div>
+        <div class="login-feature"><span class="login-feature-dot"></span>Approve student access requests</div>
+        <div class="login-feature"><span class="login-feature-dot"></span>AI-powered question generation</div>
+        <div class="login-feature"><span class="login-feature-dot"></span>Deep analytics and performance insights</div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ══ RIGHT — form ═════════════════════════════════════════════ #}
+  <div class="login-right">
+
+    {# Student login link #}
+    <div class="login-right-top">
+      <a href="{{ url_for('auth.login') }}"
+         style="display:inline-flex;align-items:center;gap:.35rem;
+                font-size:.75rem;font-weight:600;color:var(--text-3);
+                text-decoration:none;transition:color .15s"
+         onmouseover="this.style.color='var(--text-1)'"
+         onmouseout="this.style.color='var(--text-3)'">
+        <i class="fas fa-user-graduate" style="font-size:.65rem"></i> Student Login
+      </a>
+    </div>
+
+    {# Heading #}
+    <div class="login-form-heading">
+      <h2>Admin Sign in</h2>
+      <p>Enter your admin credentials to continue</p>
+    </div>
+
+    {# Flash messages #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for category, message in messages %}
+            <div class="flash-item flash-{{ 'danger' if category == 'error' else category }}">
+              <i class="fas fa-{{ 'exclamation-triangle' if category in ('error','warning') else 'check-circle' if category == 'success' else 'info-circle' }}" style="flex-shrink:0;margin-top:.1rem;font-size:.78rem"></i>
+              <span>{{ message }}</span>
+              <button class="flash-x" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {# Admin notice #}
+    <div class="admin-notice">
+      <i class="fas fa-shield-alt"></i>
+      <span>This is a <strong>protected admin area</strong>. Use your admin credentials only. For student access, use Student Login.</span>
+    </div>
+
+    {# Google #}
+    <a href="{{ url_for('auth.google_login') }}" class="google-btn">
+      <svg width="17" height="17" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </a>
+
+    {# Divider #}
+    <div class="or-divider">
+      <span class="or-line"></span>
+      <span class="or-text">or with credentials</span>
+      <span class="or-line"></span>
+    </div>
+
+    {# Form #}
+    <form method="POST" id="adminLoginForm" autocomplete="on">
+
+      <div class="field">
+        <label class="field-label" for="username">Username or Email</label>
+        <div class="field-wrap">
+          <i class="fas fa-user-shield field-icon-l"></i>
+          <input id="username" name="username" type="text"
+                 class="field-input"
+                 placeholder="Enter admin username or email"
+                 required autocomplete="username">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="password">Password</label>
+        <div class="field-wrap">
+          <i class="fas fa-lock field-icon-l"></i>
+          <input id="password" name="password" type="password"
+                 class="field-input has-right"
+                 placeholder="••••••••"
+                 required autocomplete="current-password">
+          <i class="fas fa-eye field-icon-r" id="toggleIcon" onclick="togglePwd()"></i>
+        </div>
+      </div>
+
+      <button type="submit" class="signin-btn" id="loginBtn">
+        <span id="btnNormal" style="display:inline-flex;align-items:center;gap:.45rem">
+          <i class="fas fa-sign-in-alt" style="font-size:.82rem"></i> Sign In to Admin
+        </span>
+        <span id="btnLoad" style="display:none;align-items:center;gap:.45rem">
+          <i class="fas fa-spinner fa-spin" style="font-size:.82rem"></i> Verifying…
+        </span>
+      </button>
+
+    </form>
+
+    {# Back link #}
+    <a href="{{ url_for('auth.login') }}" class="back-link">
+      <i class="fas fa-arrow-left" style="font-size:.65rem"></i> Back to Student Login
+    </a>
+
+    {# Footer #}
+    <div class="login-footer">
+      <i class="fas fa-shield-alt" style="font-size:.7rem"></i>
+      <span>Protected Admin Area · SmartAIExam © {{ CURRENT_YEAR }}</span>
+    </div>
+
+  </div>
+</div>
+
 {% block scripts %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const pwd = document.getElementById('password');
-            const toggleBtn = document.getElementById('toggleBtn');
-            const toggleIcon = document.getElementById('toggleIcon');
-            toggleBtn.addEventListener('click', () => {
-                if (pwd.type === 'password') {
-                    pwd.type = 'text';
-                    toggleIcon.classList.replace('fa-eye', 'fa-eye-slash');
-                } else {
-                    pwd.type = 'password';
-                    toggleIcon.classList.replace('fa-eye-slash', 'fa-eye');
-                }
-            });
+<script>
+function togglePwd() {
+  var p = document.getElementById('password');
+  var i = document.getElementById('toggleIcon');
+  var show = p.type === 'password';
+  p.type = show ? 'text' : 'password';
+  i.classList.toggle('fa-eye', !show);
+  i.classList.toggle('fa-eye-slash', show);
+}
 
-            const ALERT_CLOSE_DELAY_MS = 1000;
-            const alerts = document.querySelectorAll('.alert:not(.permanent-tip)');
-            alerts.forEach(function (el) {
-                setTimeout(function () {
-                    const bsAlert = new bootstrap.Alert(el);
-                    bsAlert.close();
-                }, ALERT_CLOSE_DELAY_MS);
-            });
+document.addEventListener('DOMContentLoaded', function () {
+  var form    = document.getElementById('adminLoginForm');
+  var btn     = document.getElementById('loginBtn');
 
-            const form = document.getElementById('adminLoginForm');
-            const loginBtn = document.getElementById('loginBtn');
-            const loginText = document.getElementById('loginText');
-            const loginSpinner = document.getElementById('loginSpinner');
-            form.addEventListener('submit', function() {
-                loginBtn.disabled = true;
-                loginText.classList.add('d-none');
-                loginSpinner.classList.remove('d-none');
-                loginBtn.classList.add('loading');
-            });
-        });
-    </script>
+  form.addEventListener('submit', function () {
+    btn.disabled = true;
+    document.getElementById('btnNormal').style.display = 'none';
+    var load = document.getElementById('btnLoad');
+    load.style.display = 'inline-flex';
+  });
+
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) {
+      btn.disabled = false;
+      document.getElementById('btnNormal').style.display = 'inline-flex';
+      document.getElementById('btnLoad').style.display = 'none';
+    }
+  });
+
+  setTimeout(function () {
+    document.querySelectorAll('.flash-item').forEach(function (el) {
+      el.style.transition = 'opacity .3s';
+      el.style.opacity = '0';
+      setTimeout(function () { el.remove(); }, 300);
+    });
+  }, 6000);
+});
+</script>
 {% endblock %}
 
 {% endblock %}
-
-
-

@@ -1,161 +1,323 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Result Details</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <script>
-  /* Inherit theme from opener (admin panel) — runs before CSS paints */
-  (function(){
-    var t = 'dark';
-    try {
-      /* Try reading from opener's localStorage first */
-      if(window.opener && !window.opener.closed){
-        t = window.opener.localStorage.getItem('adminTheme') || 'dark';
-      } else {
-        t = localStorage.getItem('adminTheme') || 'dark';
-      }
-    } catch(e) { t = 'dark'; }
-    document.documentElement.setAttribute('data-theme', t);
-  })();
-  </script>
-  <style>
-    /* Dark theme (default) */
-    [data-theme="dark"] {
-      --bg:#0a0a0f; --card:#111118; --border:rgba(255,255,255,0.07);
-      --accent:#2d5be3; --accent-s:rgba(45,91,227,0.15);
-      --t1:#e6eef8; --t2:rgba(255,255,255,0.55); --t3:rgba(255,255,255,0.28);
-      --section-bg:rgba(255,255,255,.03); --stat-bg:rgba(255,255,255,.03);
-    }
-    /* Light theme */
-    [data-theme="light"] {
-      --bg:#f0f2f8; --card:#ffffff; --border:#e2e8f0;
-      --accent:#2d5be3; --accent-s:rgba(45,91,227,0.08);
-      --t1:#1a202c; --t2:#4a5568; --t3:#718096;
-      --section-bg:#f8faff; --stat-bg:#f8faff;
-    }
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:1.5rem;transition:background .2s,color .2s;}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;max-width:820px;margin:0 auto;}
-    .card-hdr{background:var(--accent);padding:1.5rem 1.75rem;}
-    .card-hdr h1{font-size:1.35rem;font-weight:700;color:#fff;margin:0;}
-    .card-hdr p{font-size:.82rem;color:rgba(255,255,255,.75);margin:.3rem 0 0;}
-    .card-body{padding:1.5rem 1.75rem;}
-    .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
-    .tbtn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--stat-bg);color:var(--t1);transition:all .15s;text-decoration:none;}
-    .tbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-s);}
-    .tbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
-    .tbtn.primary:hover{background:#2450c8;}
-    .section{background:var(--section-bg);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1rem;}
-    .section h6{font-size:.78rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.75rem;}
-    .info-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.84rem;}
-    .info-row:last-child{border-bottom:none;padding-bottom:0;}
-    .info-row .lbl{color:var(--t2);font-weight:600;}
-    .info-row .val{color:var(--t1);}
-    .score-box{text-align:center;background:var(--accent-s);border:1px solid rgba(45,91,227,.2);border-radius:12px;padding:1.5rem;margin:1rem 0;}
-    .score-num{font-size:2.6rem;font-weight:800;color:var(--t1);}
-    .score-pct{font-size:1.2rem;color:var(--t2);margin:.25rem 0;}
-    .grade-pill{display:inline-flex;align-items:center;padding:.4rem 1.2rem;border-radius:20px;font-size:.95rem;font-weight:700;margin-top:.75rem;}
-    .gp-ex{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.2);}
-    .gp-gd{background:rgba(45,91,227,.15);color:#7b9ef7;border:1px solid rgba(45,91,227,.2);}
-    .gp-av{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.2);}
-    .gp-pr{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
-    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-top:.5rem;}
-    @media(max-width:500px){.stat-grid{grid-template-columns:1fr 1fr;}}
-    .stat-box{background:var(--stat-bg);border:1px solid var(--border);border-radius:8px;padding:.75rem;text-align:center;}
-    .stat-box .sv{font-size:1.4rem;font-weight:800;color:var(--t1);}
-    .stat-box .sl{font-size:.7rem;color:var(--t3);margin-top:.15rem;}
-    @media print{.toolbar{display:none!important;}body{background:#fff;color:#000;}
-      .card{border:none;}.section{border:1px solid #ddd;background:#f9f9f9;}
-      .info-row .lbl,.info-row .val{color:#333!important;}.score-box{background:#eef;}}
-    @media(max-width:600px){
-      body{padding:1rem;}
-      .card-hdr{padding:1.1rem 1.2rem;}
-      .card-body{padding:1.1rem 1.2rem;}
-      .score-num{font-size:2rem;}
-      .info-row{flex-direction:column;align-items:flex-start;gap:.25rem;}
-    }
-  </style>
-</head>
-<body>
-{% if result and exam and user %}
-<div class="card">
-  <div class="card-hdr">
-    <h1><i class="fas fa-trophy me-2"></i>Exam Result</h1>
-    <p>{{ exam.name|default('Exam') }} — Detailed performance report</p>
+{% extends "admin_base.html" %}
+{% block title %}Exam Result - Admin View{% endblock %}
+
+{% block content %}
+<style>
+.res-page { background:var(--bg); padding:2rem 1rem; min-height:100%; }
+.res-wrap { max-width:760px; margin:0 auto; }
+
+/* Back link */
+.res-back {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-size:.78rem; font-weight:600; color:var(--text-3);
+  text-decoration:none; margin-bottom:1.25rem;
+  transition:color .15s;
+}
+.res-back:hover { color:var(--text-1); }
+
+/* Trophy header */
+.res-hero {
+  text-align:center; padding:1.75rem 1.5rem 1.5rem;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:calc(var(--radius)+4px); margin-bottom:1rem;
+  position:relative; overflow:hidden;
+}
+.res-hero::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+}
+.res-trophy { font-size:2.5rem; margin-bottom:.75rem; display:block; }
+.res-hero h1 { font-size:1.25rem; font-weight:700; color:var(--text-1); margin-bottom:.25rem; }
+.res-exam-name { font-size:.85rem; color:var(--text-3); }
+
+/* Info grid */
+.res-info {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:.75rem; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:1rem 1.25rem; margin-bottom:1rem;
+}
+.res-info-row { display:flex; justify-content:space-between; align-items:center; font-size:.82rem; padding:.25rem 0; }
+.res-info-row:not(:last-child) { border-bottom:1px solid var(--border); }
+.res-info-lbl { color:var(--text-3); font-weight:500; }
+.res-info-val { color:var(--text-1); font-weight:600; }
+
+/* Score cards */
+.score-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; margin-bottom:1rem; }
+.score-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:1rem .75rem; text-align:center;
+}
+.score-card-val { font-size:1.6rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:.35rem; }
+.score-card-lbl { font-size:.7rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+
+/* Grade badge */
+.grade-display { text-align:center; margin-bottom:1rem; }
+.grade-badge {
+  display:inline-flex; align-items:center; gap:.5rem;
+  padding:.45rem 1.25rem; border-radius:20px;
+  font-size:1.1rem; font-weight:800; border:2px solid;
+}
+.grade-A,.grade-Ap { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.grade-B  { background:var(--info-bg);    color:var(--info-text);    border-color:var(--info-border); }
+.grade-C  { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.grade-D,.grade-F { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+
+/* Performance section */
+.perf-section {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden; margin-bottom:1rem;
+}
+.perf-header {
+  background:var(--surface-2); padding:.7rem 1.1rem;
+  border-bottom:1px solid var(--border);
+  font-size:.78rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--text-3);
+  display:flex; align-items:center; gap:.4rem;
+}
+.perf-header i { color:var(--accent); }
+.perf-grid { display:grid; grid-template-columns:repeat(3,1fr); }
+.perf-item {
+  padding:1rem; text-align:center;
+  border-right:1px solid var(--border);
+}
+.perf-item:last-child { border-right:none; }
+.perf-icon { font-size:1.25rem; margin-bottom:.5rem; display:block; }
+.perf-val  { font-size:1.4rem; font-weight:800; color:var(--text-1); line-height:1; margin-bottom:.25rem; }
+.perf-lbl  { font-size:.7rem; color:var(--text-3); font-weight:600; }
+
+/* Stats section */
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; margin-bottom:1rem; }
+.stat-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.85rem 1rem;
+  text-align:center; position:relative; overflow:hidden;
+}
+.stat-box::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.stat-box.attempt::before { background:linear-gradient(90deg,var(--accent),#6366f1); }
+.stat-box.accuracy::before { background:linear-gradient(90deg,var(--success),#06b6d4); }
+.stat-box.overall::before  { background:linear-gradient(90deg,var(--warning),#ef4444); }
+.stat-box-val { font-size:1.35rem; font-weight:800; color:var(--text-1); margin-bottom:.25rem; }
+.stat-box-lbl { font-size:.7rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+
+/* Feedback alert */
+.res-feedback {
+  display:flex; align-items:flex-start; gap:.6rem;
+  padding:.8rem 1rem; border-radius:var(--radius);
+  border:1px solid; font-size:.83rem; font-weight:500;
+  margin-bottom:1rem;
+}
+.res-feedback i { flex-shrink:0; margin-top:.1rem; }
+.res-feedback.excellent { background:var(--success-bg); border-color:var(--success-border); color:var(--success-text); }
+.res-feedback.good      { background:var(--info-bg);    border-color:var(--info-border);    color:var(--info-text); }
+.res-feedback.fair      { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning-text); }
+.res-feedback.poor      { background:var(--danger-bg);  border-color:var(--danger-border);  color:var(--danger-text); }
+
+/* Loading bar */
+.loading-bar-wrap {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:1rem 1.1rem;
+  margin-bottom:1rem; display:none;
+}
+.loading-bar-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.65rem; }
+.loading-bar-title { font-size:.85rem; font-weight:700; color:var(--text-1); margin-bottom:.15rem; }
+.loading-bar-sub   { font-size:.75rem; color:var(--text-3); }
+.loading-bar-pct   { font-size:.9rem; font-weight:700; color:var(--success-text); }
+.loading-bar-track { height:5px; background:var(--surface-2); border-radius:3px; overflow:hidden; margin-bottom:.45rem; }
+.loading-bar-fill  { height:100%; background:var(--success); border-radius:3px; transition:width .3s ease; width:0%; }
+.loading-bar-detail { font-size:.72rem; color:var(--text-3); }
+
+/* Actions */
+.res-actions { display:flex; flex-wrap:wrap; gap:.6rem; justify-content:center; }
+.res-btn {
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.55rem 1.1rem; border-radius:var(--radius);
+  font-size:.82rem; font-weight:600; font-family:inherit;
+  border:none; cursor:pointer; text-decoration:none;
+  transition:background .12s, transform .1s;
+}
+.res-btn:hover { transform:translateY(-1px); }
+.res-btn.success { background:var(--success); color:#fff; }
+.res-btn.success:hover { background:#27ae60; color:#fff; }
+.res-btn.primary { background:var(--accent);  color:var(--accent-on); }
+.res-btn.primary:hover { background:var(--accent-hover); color:var(--accent-on); }
+.res-btn.ghost   { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border); }
+.res-btn.ghost:hover { border-color:var(--accent); color:var(--accent); }
+.res-hint { text-align:center; font-size:.72rem; color:var(--text-3); margin-top:.6rem; }
+
+@media(max-width:600px){
+  .score-grid { grid-template-columns:repeat(2,1fr); }
+  .perf-grid  { grid-template-columns:1fr 1fr; }
+  .perf-item:nth-child(3) { border-right:none; grid-column:span 2; }
+  .stat-row   { grid-template-columns:1fr; }
+  .res-info   { grid-template-columns:1fr; }
+}
+</style>
+
+<div class="res-page">
+<div class="res-wrap">
+
+  <a href="javascript:window.close()" class="res-back">
+    <i class="fas fa-arrow-left" style="font-size:.7rem"></i> Back
+  </a>
+
+  {# Hero #}
+  <div class="res-hero">
+    <span class="res-trophy"><i class="fas fa-trophy" style="color:#f59e0b"></i></span>
+    <h1>Exam Completed</h1>
+    <div class="res-exam-name">{{ exam.name }}</div>
   </div>
-  <div class="card-body">
-    <div class="toolbar">
-      <button class="tbtn" onclick="openResponses()"><i class="fas fa-list"></i>Responses</button>
-      <a class="tbtn" href="/admin/users-analytics/download-result/{{ result.id }}" target="_blank"><i class="fas fa-download"></i>PDF</a>
-      <button class="tbtn primary" onclick="window.print()"><i class="fas fa-print"></i>Print</button>
-      <button class="tbtn" onclick="window.close()"><i class="fas fa-times"></i>Close</button>
-    </div>
 
-    <div class="section">
-      <h6><i class="fas fa-user me-1"></i>Student</h6>
-      <div class="info-row"><span class="lbl">Username</span><span class="val">{{ user.username|default('Unknown') }}</span></div>
-      <div class="info-row"><span class="lbl">Full Name</span><span class="val">{{ user.full_name|default('Unknown') }}</span></div>
-      <div class="info-row"><span class="lbl">Email</span><span class="val">{{ user.email|default('—') }}</span></div>
+  {# Info grid #}
+  <div class="res-info">
+    <div>
+      <div class="res-info-row"><span class="res-info-lbl">Date</span><span class="res-info-val">{{ exam.date }}</span></div>
+      <div class="res-info-row"><span class="res-info-lbl">Duration</span><span class="res-info-val">{{ exam.duration }} min</span></div>
     </div>
-
-    <div class="section">
-      <h6><i class="fas fa-file-alt me-1"></i>Exam Info</h6>
-      <div class="info-row"><span class="lbl">Exam</span><span class="val">{{ exam.name|default('Unknown') }}</span></div>
-      <div class="info-row"><span class="lbl">Duration Taken</span><span class="val">{% if result.time_taken_minutes %}{{ "%.1f"|format(result.time_taken_minutes) }} min{% else %}—{% endif %}</span></div>
-      <div class="info-row"><span class="lbl">Completed At</span><span class="val">{{ result.completed_at|default('—') }}</span></div>
+    <div>
+      <div class="res-info-row"><span class="res-info-lbl">Submitted</span><span class="res-info-val">{{ result.completed_at | string | truncate(19, True, '') | replace('T', ' ') }}</span></div>
+      <div class="res-info-row"><span class="res-info-lbl">Time Taken</span><span class="res-info-val">{{ result.time_taken_minutes }} min</span></div>
     </div>
+  </div>
 
-    <div class="score-box">
-      <div class="score-num">{{ "%.2f"|format(result.score|default(0.0)) }}/{{ "%.2f"|format(result.max_score|default(0.0)) }}</div>
-      <div class="score-pct">{{ "%.1f"|format(result.percentage|default(0.0)) }}%</div>
-      {% set pct = result.percentage|default(0)|float %}
-      <span class="grade-pill {% if pct>=90 %}gp-ex{% elif pct>=75 %}gp-gd{% elif pct>=60 %}gp-av{% else %}gp-pr{% endif %}">
-        Grade: {{ result.grade|default('N/A') }}
-      </span>
-    </div>
+  {# Score cards #}
+  <div class="score-grid">
+    <div class="score-card"><div class="score-card-val">{{ result.score }}</div><div class="score-card-lbl">Score</div></div>
+    <div class="score-card"><div class="score-card-val">{{ result.max_score }}</div><div class="score-card-lbl">Max Score</div></div>
+    <div class="score-card"><div class="score-card-val">{{ result.total_questions }}</div><div class="score-card-lbl">Questions</div></div>
+    <div class="score-card"><div class="score-card-val">{{ result.percentage }}%</div><div class="score-card-lbl">Percentage</div></div>
+  </div>
 
-    <div class="section">
-      <h6><i class="fas fa-chart-bar me-1"></i>Breakdown</h6>
-      <div class="stat-grid">
-        <div class="stat-box"><div class="sv">{{ result.total_questions|default('—') }}</div><div class="sl">Total Qs</div></div>
-        <div class="stat-box"><div class="sv" style="color:#10b981">{{ result.correct_answers|default('—') }}</div><div class="sl">Correct</div></div>
-        <div class="stat-box"><div class="sv" style="color:#ef4444">{{ result.incorrect_answers|default('—') }}</div><div class="sl">Incorrect</div></div>
-        <div class="stat-box"><div class="sv" style="color:#f59e0b">{{ result.unanswered_questions|default('—') }}</div><div class="sl">Unanswered</div></div>
-        <div class="stat-box"><div class="sv">{{ result.attempted_questions|default('—') }}</div><div class="sl">Attempted</div></div>
+  {# Grade #}
+  <div class="grade-display">
+    <span class="grade-badge grade-{{ result.grade | replace('+','p') }}">
+      <i class="fas fa-star" style="font-size:.9rem"></i>
+      Grade {{ result.grade }}
+    </span>
+  </div>
+
+  {# Performance #}
+  <div class="perf-section">
+    <div class="perf-header"><i class="fas fa-chart-pie"></i> Performance Analysis</div>
+    <div class="perf-grid">
+      <div class="perf-item">
+        <span class="perf-icon" style="color:var(--success-text)"><i class="fas fa-check-circle"></i></span>
+        <div class="perf-val">{{ result.correct_answers if result.correct_answers is defined else 0 }}</div>
+        <div class="perf-lbl">Correct</div>
+      </div>
+      <div class="perf-item">
+        <span class="perf-icon" style="color:var(--danger-text)"><i class="fas fa-times-circle"></i></span>
+        <div class="perf-val">{{ result.incorrect_answers if result.incorrect_answers is defined else 0 }}</div>
+        <div class="perf-lbl">Incorrect</div>
+      </div>
+      <div class="perf-item">
+        <span class="perf-icon" style="color:var(--text-3)"><i class="fas fa-question-circle"></i></span>
+        <div class="perf-val">{{ result.unanswered_questions if result.unanswered_questions is defined else 0 }}</div>
+        <div class="perf-lbl">Unanswered</div>
       </div>
     </div>
   </div>
-</div>
-{% else %}
-<div class="card">
-  <div class="card-body" style="text-align:center;padding:3rem">
-    <i class="fas fa-exclamation-triangle" style="font-size:2.5rem;color:#ef4444;opacity:.5;display:block;margin-bottom:1rem"></i>
-    <h5 style="color:var(--t1)">Result Not Found</h5>
-    <p style="color:var(--t2);font-size:.85rem">The result could not be loaded.</p>
+
+  {# Detailed stats #}
+  {% set correct = result.correct_answers if result.correct_answers is defined else 0 %}
+  {% set incorrect = result.incorrect_answers if result.incorrect_answers is defined else 0 %}
+  {% set attempted = correct + incorrect %}
+  <div class="stat-row">
+    <div class="stat-box attempt">
+      <div class="stat-box-val">{{ attempted }} / {{ result.total_questions }}</div>
+      <div class="stat-box-lbl">Attempted</div>
+    </div>
+    <div class="stat-box accuracy">
+      <div class="stat-box-val">{% if attempted > 0 %}{{ (correct / attempted * 100) | round(1) }}%{% else %}N/A{% endif %}</div>
+      <div class="stat-box-lbl">Accuracy</div>
+    </div>
+    <div class="stat-box overall">
+      <div class="stat-box-val">{{ result.percentage }}%</div>
+      <div class="stat-box-lbl">Overall Score</div>
+    </div>
   </div>
+
+  {# Feedback #}
+  <div class="res-feedback {% if result.percentage >= 80 %}excellent{% elif result.percentage >= 60 %}good{% elif result.percentage >= 40 %}fair{% else %}poor{% endif %}">
+    <i class="fas fa-{% if result.percentage >= 80 %}trophy{% elif result.percentage >= 60 %}thumbs-up{% elif result.percentage >= 40 %}info-circle{% else %}exclamation-triangle{% endif %}"></i>
+    <div>
+      {% if result.percentage >= 80 %}<strong>Excellent Performance!</strong> You have demonstrated a strong understanding of the subject matter.
+      {% elif result.percentage >= 60 %}<strong>Good Job!</strong> You have a solid grasp of the concepts. Keep up the good work!
+      {% elif result.percentage >= 40 %}<strong>Fair Performance.</strong> There is room for improvement. Review the topics you missed.
+      {% else %}<strong>Needs Improvement.</strong> We recommend studying the material more thoroughly.{% endif %}
+    </div>
+  </div>
+
+  {# Loading bar #}
+  <div class="loading-bar-wrap" id="loadingBar">
+    <div class="loading-bar-top">
+      <div>
+        <div class="loading-bar-title" id="lbTitle">Preparing Response Analysis…</div>
+        <div class="loading-bar-sub"   id="lbSub">Loading your detailed answers</div>
+      </div>
+      <div class="loading-bar-pct" id="lbPct">0%</div>
+    </div>
+    <div class="loading-bar-track"><div class="loading-bar-fill" id="lbFill"></div></div>
+    <div class="loading-bar-detail" id="lbDetail">Fetching response data…</div>
+  </div>
+
+  {# Actions #}
+  <div class="res-actions">
+<button class="res-btn success" id="viewResponseBtn" onclick="openResponse()">
+    <i class="fas fa-clipboard-check"></i> View Response
+  </button>
+  <button class="res-btn ghost" onclick="window.close()">
+    <i class="fas fa-times"></i> Close
+  </button>
+    <button class="res-btn ghost" onclick="window.print()">
+      <i class="fas fa-print"></i> Print
+    </button>
+  </div>
+  <div class="res-hint"><i class="fas fa-info-circle"></i> Click "View Response" to see your answers and correct solutions.</div>
+
 </div>
-{% endif %}
+</div>
 
 <script>
-function openResponses() {
-  window.open('/admin/users-analytics/view-responses/{{ result.id }}/{{ exam.id }}',
-    '_blank', 'width=1100,height=800,scrollbars=yes,resizable=yes');
+function openResponse() {
+  var bar = document.getElementById('loadingBar');
+  var btn = document.getElementById('viewResponseBtn');
+  bar.style.display = 'block';
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…';
+
+  var steps = [
+    {p:15, t:"Fetching Your Responses…",   s:"Retrieving submitted answers",      d:"Loading from database"},
+    {p:35, t:"Loading Question Details…",   s:"Gathering question information",    d:"Fetching question text and options"},
+    {p:55, t:"Processing Answer Analysis…", s:"Comparing your answers",            d:"Analyzing correct vs incorrect"},
+    {p:75, t:"Loading Question Images…",    s:"Preparing visual content",          d:"Optimizing images"},
+    {p:90, t:"Generating Report…",          s:"Creating detailed analysis",        d:"Calculating metrics"},
+    {p:100,t:"Opening Response…",           s:"Analysis ready!",                   d:"Launching viewer"}
+  ];
+  var i = 0;
+  function next() {
+    if (i >= steps.length) return;
+    var s = steps[i++];
+    document.getElementById('lbFill').style.width   = s.p + '%';
+    document.getElementById('lbPct').textContent    = s.p + '%';
+    document.getElementById('lbTitle').textContent  = s.t;
+    document.getElementById('lbSub').textContent    = s.s;
+    document.getElementById('lbDetail').textContent = s.d;
+    if (s.p < 100) { setTimeout(next, Math.random()*600+300); }
+    else setTimeout(function(){
+      bar.style.display = 'none';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-clipboard-check"></i> View Response';
+      var w = screen.availWidth*.9, h = screen.availHeight*.9;
+      var win = window.open(
+        '{{ url_for("admin.users_analytics_view_responses", exam_id=exam.id, result_id=result.id) }}',
+        '_blank',
+        'width='+w+',height='+h+',top='+((screen.availHeight-h)/2)+',left='+((screen.availWidth-w)/2)+',resizable=yes,scrollbars=yes'
+      );
+      if (!win) window.location.href = '{{ url_for("result.response_page", exam_id=exam.id, result_id=result.id) }}';
+      else win.focus();
+    }, 500);
+  }
+  next();
 }
-/* Listen for live theme changes from the parent admin window */
-window.addEventListener('message', function(ev){
-  try {
-    if(ev.origin !== window.location.origin) return;
-    if(ev.data && ev.data.type === 'adminThemeChange'){
-      document.documentElement.setAttribute('data-theme', ev.data.theme);
-    }
-  } catch(e){}
-});
 </script>
-</body>
-</html>
-
-
-
+{% endblock %}

@@ -76,6 +76,15 @@ AI_MAX_MESSAGE_LENGTH = int(os.environ.get("AI_MAX_MESSAGE_LENGTH", 500))
 AI_REQUEST_TIMEOUT = int(os.environ.get("AI_REQUEST_TIMEOUT", 30))
 
 # ─────────────────────────────────────────────
+# AI Explanation Generator (separate Groq key)
+# ─────────────────────────────────────────────
+GROQ_EXPLANATION_API_KEY       = os.environ.get("GROQ_EXPLANATION_API_KEY", "")
+EXPLANATION_MODEL             = os.environ.get("EXPLANATION_MODEL", "llama-3.3-70b-versatile")
+EXPLANATION_VISION_MODEL      = os.environ.get("EXPLANATION_VISION_MODEL", "llama-4-scout-17b-16e-instruct")
+EXPLANATION_DAILY_LIMIT       = int(os.environ.get("EXPLANATION_DAILY_LIMIT", 5))
+EXPLANATION_PER_QUESTION_LIMIT = int(os.environ.get("EXPLANATION_PER_QUESTION_LIMIT", 2))
+
+# ─────────────────────────────────────────────
 # Gemini (AI question generator)
 # ─────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")

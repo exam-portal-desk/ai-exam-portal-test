@@ -26,6 +26,20 @@ _ALL_COLS = (
 )
 
 
+def get_question_by_id(question_id: int) -> Optional[Dict]:
+    try:
+        res = (
+            supabase.table("questions")
+            .select(_ALL_COLS)
+            .eq("id", question_id)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"[db.questions] get_question_by_id error: {e}")
+        return None
+
+
 def get_questions_by_exam(exam_id: int) -> List[Dict]:
     try:
         res = (
