@@ -2,6 +2,7 @@
 {% set hide_navbar = true %}
 {% block title %}SmartAIExam - API Reference{% endblock %}
 {% block content %}
+
 <script>
 const API_CONFIG = {
   baseUrl: "https://smart-ai-exam-portal-test.onrender.com",
@@ -9,6 +10,92 @@ const API_CONFIG = {
   year:    new Date().getFullYear()
 };
 </script>
+<style>
+/* ── MOB SIDEBAR BUTTON (hidden on desktop) ── */
+.apidoc-mob-sb-btn{display:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border2,rgba(255,255,255,.1));background:rgba(128,128,128,.1);color:var(--text1,#f1f3f9);cursor:pointer;flex-shrink:0;order:-1}
+/* ── MOB OVERLAY ── */
+.apidoc-mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:299;backdrop-filter:blur(2px)}
+.apidoc-mob-overlay.active{display:block}
+
+@media(max-width:768px){
+  /* ── HEADER: show all items, just shrink them ── */
+  .apidoc-header{display:flex !important;align-items:center;gap:.35rem;padding:0 .75rem;height:52px;overflow:hidden;position:sticky;top:0;z-index:150;flex-shrink:0}
+  .nav-logo{flex-shrink:0}
+  .apidoc-logo{display:none !important}
+  .apidoc-header-gap{flex:1;min-width:.2rem}
+  .apidoc-base-url-pill{font-size:.62rem !important;padding:.18rem .4rem !important;max-width:140px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex-shrink:1;min-width:0;display:inline-flex !important;align-items:center;gap:.25rem}
+  .apidoc-base-url-pill span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
+  .apidoc-version-chip{font-size:.6rem !important;padding:.15rem .3rem !important;flex-shrink:0;white-space:nowrap}
+  .apidoc-nav-home-btn{font-size:.72rem !important;padding:.28rem .45rem !important;flex-shrink:0;white-space:nowrap}
+  .apidoc-mob-sb-btn{display:flex !important}
+
+  /* ── BODY LAYOUT ── */
+  .apidoc-body{flex-direction:column !important;position:relative}
+
+  /* ── SIDEBAR: width:0 hides it without breaking flow,
+       mob-sb-open class makes it a fixed drawer ── */
+  .apidoc-sidebar:not(.mob-sb-open){
+    width:0 !important;min-width:0 !important;
+    overflow:hidden !important;
+    padding:0 !important;border:none !important;
+    flex-shrink:0
+  }
+  .apidoc-sidebar.mob-sb-open{
+    position:fixed !important;
+    top:0;left:0;
+    width:min(280px,82vw) !important;
+    height:100vh !important;
+    z-index:300;
+    overflow-y:auto !important;
+    padding:52px 0 1rem !important;
+    box-shadow:6px 0 28px rgba(0,0,0,.55);
+    background:var(--bg2,#111116)
+  }
+  /* Force sidebar content visible regardless of sb-collapsed state */
+  .apidoc-sidebar .sidebar-search-wrap,
+  .apidoc-sidebar .sg{display:block !important}
+  .apidoc-sidebar .sg-items{display:flex !important;flex-direction:column}
+  .sb-collapse-btn{display:none !important}
+
+  /* ── MAIN: full width ── */
+  .apidoc-main{width:100% !important;min-width:0}
+  .apidoc-main-inner{padding:1rem .75rem}
+
+  /* ── HERO ── */
+  .hero h1{font-size:1.4rem !important;line-height:1.25}
+  .info-grid{grid-template-columns:1fr !important;gap:.6rem}
+  .jwt-flow{grid-template-columns:1fr !important;gap:.75rem}
+
+  /* ── ENDPOINTS ── */
+  .ep-header{flex-wrap:wrap;gap:.3rem .5rem;align-items:center;padding:.6rem .75rem}
+  .ep-path{font-size:.7rem !important;word-break:break-all;order:10;flex-basis:100%}
+  .ep-summary{display:none}
+  .ep-body{padding:.75rem}
+
+  /* ── CODE ── */
+  .cb{overflow-x:auto}
+  .cb pre{font-size:.68rem !important}
+
+  /* ── TABLES ── */
+  .rt{display:block;overflow-x:auto;font-size:.7rem}
+
+  /* ── TABS ── */
+  .tabs{flex-wrap:wrap;gap:.25rem}
+  .tab{font-size:.73rem;padding:.28rem .55rem}
+
+  /* ── ADMIN ── */
+  .ag-row{flex-direction:column !important;gap:.3rem}
+  .ag-method{align-self:flex-start}
+
+  /* ── MISC ── */
+  .section-title{font-size:1.2rem !important}
+  .rpills{flex-direction:column;gap:.35rem;align-items:flex-start}
+  .auth-box{flex-direction:column;gap:.5rem}
+
+  /* ── FOOTER ── */
+  .apidoc-footer{flex-direction:column;align-items:center;text-align:center;gap:.5rem;padding:.875rem 1rem;font-size:.75rem}
+}
+</style>
 
 <div class="apidoc-wrap">
 
@@ -31,8 +118,12 @@ const API_CONFIG = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     Home
   </a>
+  <button class="apidoc-mob-sb-btn" id="mobSbBtn" onclick="toggleMobileSidebar()" aria-label="Toggle navigation">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
 </header>
 
+<div class="apidoc-mob-overlay" id="mobOverlay" onclick="toggleMobileSidebar()"></div>
 <div class="apidoc-body" id="apidoc-body">
 <!-- SIDEBAR -->
 <nav class="apidoc-sidebar" id="sidebar">
@@ -1446,13 +1537,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const wrap = document.getElementById('apidoc-body');
   if (!sb) return;
   sb.style.transition = 'none';
-  if (localStorage.getItem('sae-sb-collapsed') === '1') {
+  if (localStorage.getItem('sae-sb-collapsed') === '1' && window.innerWidth > 768) {
     sb.classList.add('sb-collapsed');
     if (wrap) wrap.classList.add('sb-is-collapsed');
     if (icon) icon.style.transform = 'rotate(180deg)';
   }
   requestAnimationFrame(() => requestAnimationFrame(() => { sb.style.transition = ''; }));
 })();
+
 function toggleSidebarCollapse() {
   const sb = document.getElementById('sidebar');
   const icon = document.getElementById('sb-collapse-icon');
@@ -1552,6 +1644,14 @@ allSections.forEach(s => { if (s.id) io.observe(s); });
     }
   });
 })();
+
+/* ── MOBILE SIDEBAR ── */
+function toggleMobileSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('mobOverlay');
+  const open = sb.classList.toggle('mob-sb-open');
+  ov.classList.toggle('active', open);
+}
 
 /* ── SMOOTH SCROLL ── */
 function _getScrollParent(el) {

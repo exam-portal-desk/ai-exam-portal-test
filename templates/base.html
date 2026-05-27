@@ -458,7 +458,7 @@
       </div>
       <button class="dd-lnk" onclick="closeProfDd();openSettings()"><i class="fas fa-cog"></i> Settings</button>
       <div class="dd-sep"></div>
-      <a class="dd-lnk danger" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+      <button class="dd-lnk danger" onclick="closeProfDd();openLogoutModal()"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
   </div>
   {% endif %}
@@ -745,7 +745,7 @@ document.addEventListener('click',function(e){
   /* SSR state already applied — just sync class */
   apply(collapsed, false);
 
-  tog.addEventListener('click',function(){ apply(!collapsed, true); });
+  tog.addEventListener('click',function(){ if(window.innerWidth<=768){ closeMobileSb(); } else { apply(!collapsed, true); } });
 
   /* ── Tooltip via fixed positioning (no overflow clip issues) ── */
   var tip = document.createElement('div');
@@ -783,7 +783,7 @@ function closeMobileSb(){
   if(ov) ov.classList.remove('open');
 }
 var mt=document.getElementById('mobToggle');
-if(mt) mt.addEventListener('click', openMobileSb);
+if(mt) mt.addEventListener('click', function(){ var sb=document.getElementById('mainSb'); if(sb&&sb.classList.contains('mobile-open')) closeMobileSb(); else openMobileSb(); });
 
 /* ── SETTINGS ── */
 function openSettings(){ var m=document.getElementById('settingsModal'); if(m) m.classList.add('open'); }
