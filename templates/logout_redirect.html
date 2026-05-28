@@ -18,6 +18,6 @@
 </div>
 <style>@keyframes ldot{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}</style>
 <script>
-setTimeout(function(){window.location.href='{{ redirect_url or url_for("auth.login") }}';},{{ redirect_delay or 2000 }});
+setTimeout(function(){window.location.href='{{ redirect_url or url_for("misc.home") }}';},{{ redirect_delay or 2000 }});
 </script>
 {% endblock %}

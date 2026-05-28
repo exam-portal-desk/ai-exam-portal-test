@@ -82,8 +82,8 @@ textarea.form-control { resize:vertical; }
 .size-selector-wrap select { background:none; border:none; outline:none; color:var(--text-2); font-size:.72rem; font-family:inherit; cursor:pointer; }
 .size-selector-wrap select option { background:var(--surface); color:var(--text-1); }
 .raw-code { display:block; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:.6rem .85rem; font-size:.78rem; color:var(--text-1); font-family:'JetBrains Mono',monospace; white-space:pre-wrap; word-break:break-all; }
-.rendered-view-box { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:.85rem 1rem; }
-.rendered-option   { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.4rem .7rem; font-size:.83rem; }
+.rendered-view-box { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:.85rem 1rem; color:var(--text-1); }
+.rendered-option   { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.4rem .7rem; font-size:.83rem; color:var(--text-1); }
 
 /* ── ACC Modals ── */
 .acc-modal-backdrop { display:none; position:fixed; inset:0; z-index:1070; background:rgba(0,0,0,.6); backdrop-filter:blur(5px); align-items:center; justify-content:center; }
@@ -151,7 +151,7 @@ window.MathJax = {
 <div id="previewSection" style="display:none;">
   <div class="preview-section">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-      <h3 class="fw-bold mb-0" style="font-size:1.1rem;">
+      <h3 class="fw-bold mb-0" style="font-size:1.1rem;color:var(--text-1);">
         <i class="fas fa-check-circle me-2" style="color:var(--success-text)"></i>
         Generated Questions (<span id="questionCount">0</span>)
       </h3>

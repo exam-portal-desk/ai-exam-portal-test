@@ -117,12 +117,11 @@
                     <code style="background:var(--input-bg);color:var(--accent);padding:2px 5px;border-radius:4px;font-size:0.78rem;">exam_id, question_text, option_a–d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance</code>
                   </p>
 
-                  <div id="csvDropZone"
-                       onclick="document.getElementById('csvFileInput').click()"
-                       ondragover="csvDragOver(event)"
-                       ondragleave="csvDragLeave(event)"
-                       ondrop="csvDrop(event)"
-                       style="">
+                  <label id="csvDropZone" for="csvFileInput"
+                        ondragover="csvDragOver(event)"
+                        ondragleave="csvDragLeave(event)"
+                        ondrop="csvDrop(event)"
+                        style="display:block;">
                     <i class="fas fa-cloud-upload-alt" style="font-size:2.2rem;color:var(--accent);margin-bottom:.6rem;display:block;"></i>
                     <div class="fw-semibold" style="color:var(--text-1);">Drop CSV here or <span style="color:var(--accent);">browse</span></div>
                     <div style="font-size:0.8rem;color:var(--text-3);margin-top:4px;" id="csvFileName">No file selected</div>
