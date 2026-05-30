@@ -489,7 +489,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 
             <div class="card-body">
               <h6><strong>Question:</strong></h6>
-              <p>{{ response.question.question_text | safe }}</p>
+              <p data-raw="{{ response.question.question_text | e }}"></p>
 
               {% if response.question.has_image and response.question.image_url %}
               <div class="mb-3">
@@ -545,7 +545,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
                           {% elif response.is_attempted and opt.id == response.given_answer and opt.id != response.correct_answer %}bg-danger
                           {% elif opt.id == response.correct_answer %}bg-success
                           {% else %}bg-light{% endif %}">
-                          <strong>{{ opt.id }}.</strong> {{ opt.text | safe }}
+                          <strong>{{ opt.id }}.</strong> <span data-raw="{{ opt.text | e }}"></span>
                           {% if response.is_attempted and opt.id == response.given_answer %}
                             <i class="fas fa-arrow-left ms-2"></i> <span class="label-glow-gold">Your Choice</span>
                           {% endif %}
@@ -605,7 +605,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
                           {% elif in_given and not in_correct %}bg-danger
                           {% elif not in_given and in_correct %}bg-warning
                           {% else %}bg-light{% endif %}">
-                          <strong>{{ opt.id }}.</strong> {{ opt.text | safe }}
+                          <strong>{{ opt.id }}.</strong> <span data-raw="{{ opt.text | e }}"></span>
                           {% if in_given %} <i class="fas fa-check-square ms-2"></i> <span class="label-glow-gold">Your Choice</span>{% endif %}
                           {% if in_correct %} <i class="fas fa-star ms-2"></i> <span class="label-glow-green">Correct Option</span>{% endif %}
                         </div>
@@ -1421,22 +1421,72 @@ function discToast(msg, type) {
   setTimeout(() => t.remove(), 3000);
 }
 
+// ── Content renderer (\n, pipe-tables) ───────────────────────────────────────
+
+function _renderContent(text) {
+  if (!text) return '';
+  const lz = [];
+  let t = text
+    .replace(/\$\$[\s\S]*?\$\$/g, m => { lz.push(m); return `\x00L${lz.length-1}\x00`; })
+    .replace(/\$[^$\n]+?\$/g,     m => { lz.push(m); return `\x00L${lz.length-1}\x00`; });
+  t = t.replace(/\\n/g, '\n');
+  const lines = t.split('\n'), out = [], buf = [];
+  const isTR = l => { const s = l.trim(); return (s.startsWith('|') && s.endsWith('|') && s.length > 2) || /^[^|]+(\|[^|]+){1,}$/.test(s); };
+  const isSep = l => /^\|?[\s|:|-]+\|?$/.test(l.trim()) && /[-]{2,}/.test(l);
+  const flush = () => {
+    if (!buf.length) return;
+    let h = '<div style="overflow-x:auto;margin:.5rem 0"><table style="border-collapse:collapse;width:100%;font-size:.82rem;">';
+    let hdr = true;
+    buf.forEach(r => {
+      if (isSep(r)) return;
+      const s = r.trim(); let cells;
+      if (s.startsWith('|') && s.endsWith('|')) cells = s.split('|').map(c => c.trim()).filter((_,i,a) => i > 0 && i < a.length-1);
+      else cells = s.split('|').map(c => c.trim());
+      if (!cells.length) return;
+      if (hdr) { h += '<tr>' + cells.map(c => `<th style="border:1px solid var(--border);padding:.35rem .6rem;background:var(--surface-2);font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('') + '</tr>'; hdr = false; }
+      else h += '<tr>' + cells.map(c => `<td style="border:1px solid var(--border);padding:.3rem .6rem;">${c}</td>`).join('') + '</tr>';
+    });
+    h += '</table></div>'; out.push(h); buf.length = 0;
+  };
+  const stg = lines.map(l => isTR(l) ? {t:'p',l} : {t:'x',l});
+  let i = 0;
+  while (i < stg.length) {
+    if (stg[i].t === 'p') {
+      let j = i; while (j < stg.length && stg[j].t === 'p') j++;
+      const run = stg.slice(i, j);
+      if (run.length >= 2) { run.forEach(s => buf.push(s.l)); flush(); } else out.push(stg[i].l);
+      i = j;
+    } else { out.push(stg[i].l); i++; }
+  }
+  flush();
+  let r = out.join('\n').replace(/\n{3,}/g, '\n\n').split('\n').map(l => l.trim() === '' ? '<br>' : l).join('<br>');
+  r = r.replace(/\x00L(\d+)\x00/g, (_, idx) => lz[+idx]);
+  return r;
+}
+
 // ── MathJax ───────────────────────────────────────────────────────────────────
 
 function discWrapMath() {
-  document.querySelectorAll('.question-response-card .card-body').forEach(card => {
-    card.querySelectorAll('p, .option-display').forEach(el => {
-      if (!el.closest('.disc-section') && !el.classList.contains('math-wrap'))
-        el.classList.add('math-wrap');
-    });
+  document.querySelectorAll('[data-raw]:not([data-rendered])').forEach(el => {
+    if (el.closest('.disc-section')) return;
+    el.innerHTML = _renderContent(el.dataset.raw || '');
+    el.dataset.rendered = '1';
+    el.classList.add('math-wrap');
   });
-  if (window.MathJax && MathJax.typesetPromise) {
-    MathJax.typesetPromise([...document.querySelectorAll('.math-wrap')]).catch(e => console.warn(e));
-  }
+  // existing non-data-raw elements (labels etc.) also get typeset
+  document.querySelectorAll('.question-response-card .card-body p:not([data-raw]), .question-response-card .card-body .option-display').forEach(el => {
+    if (!el.closest('.disc-section') && !el.classList.contains('math-wrap')) el.classList.add('math-wrap');
+  });
+  (function _mj(n) {
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([...document.querySelectorAll('.math-wrap')]).catch(e => console.warn(e));
+    } else if (n > 0) setTimeout(() => _mj(n-1), 200);
+  })(30);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.MathJax) MathJax.startup.promise.then(() => discWrapMath());
+  discWrapMath();
+  if (window.MathJax && MathJax.startup) MathJax.startup.promise.then(() => discWrapMath());
   else window.addEventListener('load', discWrapMath);
 });
 

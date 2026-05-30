@@ -16,7 +16,7 @@
   -->
   <script>
   (function(){
-    var lt = localStorage.getItem('landingTheme') || 'dark';
+    var lt = localStorage.getItem('landingTheme') || 'emerald';
     var t  = (lt === 'paper') ? 'light' : lt;
     document.documentElement.setAttribute('data-theme', t);
     if (localStorage.getItem('adminSidebarCollapsed') === 'true')
@@ -609,7 +609,7 @@
   var html = document.documentElement;
 
   function landingToPortal(lt) {
-    return (lt === 'paper') ? 'light' : (lt || 'dark');
+    return (lt === 'paper') ? 'light' : (lt || 'emerald');
   }
 
   function applyTheme(landingTheme) {
@@ -632,7 +632,7 @@
   }
 
   /* Init */
-  var current = localStorage.getItem(KEY) || 'dark';
+  var current = localStorage.getItem(KEY) || 'emerald';
   syncSettingsRows(current);
 
   /* Cross-tab sync with index.html */
@@ -885,7 +885,7 @@ document.addEventListener('DOMContentLoaded',function(){
             <label class="accs-opt-row" data-accs-theme="emerald">
               <input type="radio" name="accsTheme" value="emerald" style="display:none">
               <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon" style="background:rgba(123,196,42,0.12);color:#7bc42a"><i class="fas fa-leaf"></i></div>
+              <div class="accs-opt-icon" style="background:rgba(34,197,94,0.12);color:#22c55e"><i class="fas fa-leaf"></i></div>
               <div>
                 <div class="accs-opt-name">Emerald</div>
                 <div class="accs-opt-desc">Deep forest green</div>
@@ -978,7 +978,7 @@ document.addEventListener('DOMContentLoaded', function() {
     openBtn.addEventListener('click', function(){ syncSelections(); bsModal.show(); });
 
     function syncSelections(){
-      var storedTheme = localStorage.getItem('landingTheme') || 'dark';
+      var storedTheme = localStorage.getItem('landingTheme') || 'emerald';
       document.querySelectorAll('[data-accs-theme]').forEach(function(el){
         el.classList.toggle('accs-selected', el.getAttribute('data-accs-theme') === storedTheme);
       });

@@ -92,13 +92,12 @@ GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-1.5-flash")
 DRIVE_CATEGORY_FOLDER_ID = os.environ.get("DRIVE_CATEGORY_FOLDER_ID", "")
 
 # ─────────────────────────────────────────────
-# Email (Mailjet)
+# Email (SMTP - Gmail)
 # ─────────────────────────────────────────────
-MAILJET_API_KEY = os.environ.get("MAILJET_API_KEY", "")
-MAILJET_API_SECRET = os.environ.get("MAILJET_API_SECRET", "")
-FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@examportal.com")
-FROM_NAME = "ExamPortal System"
-BASE_URL = os.environ.get("BASE_URL", "https://your-domain.com")
+EMAIL_ADDRESS  = os.environ.get("EMAIL_ADDRESS", "")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+FROM_NAME      = os.environ.get("FROM_NAME", "SmartAIExam")
+BASE_URL       = os.environ.get("BASE_URL", "https://your-domain.com")
 
 # ─────────────────────────────────────────────
 # Image upload

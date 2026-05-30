@@ -1,6 +1,33 @@
 {% extends "admin_base.html" %}
 {% block title %}Manage Questions{% endblock %}
 
+{% block extra_head %}
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$','$'], ['\\(','\\)']],
+    displayMath: [['$$','$$'], ['\\[','\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+  },
+  startup: {
+    ready() {
+      MathJax.startup.defaultReady();
+      // Signal that MathJax is fully initialised — used by _typesetWhenReady
+      window._mathJaxReady = true;
+      if (typeof window._mathJaxReadyCallback === 'function') {
+        window._mathJaxReadyCallback();
+      }
+    }
+  }
+};
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -414,24 +441,20 @@
 
 <!-- Exam Selector -->
 <div class="control-card">
-  <form id="exam-select-form" class="row g-3 align-items-end">
-    <div class="col-md-8">
-      <label class="form-label" style="font-size:0.8rem;font-weight:600;color:var(--text-3)">
-        <i class="fas fa-graduation-cap me-1"></i>Select Exam
-      </label>
-      <select id="exam-select" class="form-control" name="exam_id">
-        {% for e in exams %}
-          <option value="{{ e.id }}" {% if selected_exam_id == e.id %}selected{% endif %} data-exam-name="{{ e.name }}">
-            {{ e.name }} (ID: {{ e.id }})
-          </option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-4">
-      <button id="reload-btn" type="button" class="btn-flat primary w-100" style="padding:0.55rem 1rem">
-        <i class="fas fa-sync-alt me-1"></i>Load Questions
-      </button>
-    </div>
+  <form id="exam-select-form" class="d-flex align-items-center gap-2">
+    <label class="mb-0 text-nowrap" style="font-size:0.8rem;font-weight:600;color:var(--text-3);flex-shrink:0;">
+      <i class="fas fa-graduation-cap me-1"></i>Select Exam
+    </label>
+    <select id="exam-select" class="form-control form-control-sm" name="exam_id" style="flex:1;min-width:0;">
+      {% for e in exams %}
+        <option value="{{ e.id }}" {% if selected_exam_id == e.id %}selected{% endif %} data-exam-name="{{ e.name }}">
+          {{ e.name }} (ID: {{ e.id }})
+        </option>
+      {% endfor %}
+    </select>
+    <button id="reload-btn" type="button" class="btn-flat primary" style="padding:0.42rem 1rem;white-space:nowrap;flex-shrink:0;">
+      <i class="fas fa-sync-alt me-1"></i>Load Questions
+    </button>
   </form>
   {% if selected_exam_id %}
   <div class="exam-info-pill">
@@ -538,7 +561,7 @@
               data-question-id="{{ q.id }}">
             <td><input class="row-checkbox enhanced-checkbox" data-id="{{ q.id }}" type="checkbox"></td>
             <td><span class="question-id-badge">{{ q.id }}</span></td>
-            <td><div class="question-text">{{ q.question_text }}</div></td>
+            <td><div class="question-text" data-raw="{{ q.question_text | e }}"></div></td>
             <td>
               <span class="question-type-badge {% if q.question_type == 'MCQ' %}type-mcq{% elif q.question_type == 'MSQ' %}type-msq{% else %}type-num{% endif %}">
                 {{ q.question_type }}
@@ -1441,10 +1464,113 @@ async function submitQuestionModal() {
 }
 
 /* Tolerance field toggle — wire up on DOM ready */
+function _renderQText(text){
+  if(!text) return '';
+
+  // Step 1: Protect ALL LaTeX zones ($...$, $$...$$) before any processing
+  const latexZones=[];
+  let protected_text=text
+    .replace(/\$\$[\s\S]*?\$\$/g, m=>{latexZones.push(m);return `\x00LATEX${latexZones.length-1}\x00`;})
+    .replace(/\$[^$\n]+?\$/g,     m=>{latexZones.push(m);return `\x00LATEX${latexZones.length-1}\x00`;});
+
+  // Step 2: Convert literal \n (backslash+n from DB storage) to real newlines
+  protected_text=protected_text.replace(/\\n/g,'\n');
+
+  // Step 3: Detect and convert pipe-table rows to HTML table
+  const lines=protected_text.split('\n'), out=[];
+  let tableBuffer=[];
+  const isTableRow=l=>{
+    const t=l.trim();
+    return (t.startsWith('|')&&t.endsWith('|')&&t.length>2)||
+           /^[^|]+(\|[^|]+){1,}$/.test(t);
+  };
+  const isSepRow=l=>/^\|?[\s|:|-]+\|?$/.test(l.trim())&&/[-]{2,}/.test(l);
+  const flushTable=()=>{
+    if(!tableBuffer.length) return;
+    let html='<div style="overflow-x:auto;margin:.5rem 0"><table style="border-collapse:collapse;width:100%;font-size:.82rem;">';
+    let isHeader=true;
+    tableBuffer.forEach(row=>{
+      if(isSepRow(row)) return;
+      let cells;
+      const t=row.trim();
+      if(t.startsWith('|')&&t.endsWith('|')){
+        cells=t.split('|').map(c=>c.trim()).filter((_,i,a)=>i>0&&i<a.length-1);
+      } else {
+        cells=t.split('|').map(c=>c.trim());
+      }
+      if(!cells.length) return;
+      if(isHeader){
+        html+='<tr>'+cells.map(c=>`<th style="border:1px solid var(--border);padding:.35rem .6rem;background:var(--surface-2);font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('')+'</tr>';
+        isHeader=false;
+      } else {
+        html+='<tr>'+cells.map(c=>`<td style="border:1px solid var(--border);padding:.3rem .6rem;">${c}</td>`).join('')+'</tr>';
+      }
+    });
+    html+='</table></div>';
+    out.push(html);
+    tableBuffer=[];
+  };
+
+  // 2+ consecutive pipe rows = table; single pipe row = plain text
+  const staged=[];
+  for(const line of lines){
+    if(isTableRow(line)) staged.push({type:'pipe',line});
+    else staged.push({type:'text',line});
+  }
+  let i=0;
+  while(i<staged.length){
+    if(staged[i].type==='pipe'){
+      let j=i;
+      while(j<staged.length&&staged[j].type==='pipe') j++;
+      const run=staged.slice(i,j);
+      if(run.length>=2){ run.forEach(s=>tableBuffer.push(s.line)); flushTable(); }
+      else out.push(staged[i].line);
+      i=j;
+    } else { out.push(staged[i].line); i++; }
+  }
+  flushTable();
+
+  // Step 4: Collapse blank lines, join with <br>
+  let result=out.map(l=>l.trim()===''?'':l).join('\n');
+  result=result.replace(/\n{3,}/g,'\n\n');
+  result=result.split('\n').map(l=>l===''?'<br>':l).join('<br>');
+
+  // Step 5: Restore LaTeX zones
+  result=result.replace(/\x00LATEX(\d+)\x00/g,(_,idx)=>latexZones[+idx]);
+
+  return result;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const qTypeEl = document.getElementById('qf-question-type');
   if (qTypeEl) qTypeEl.addEventListener('change', _toggleToleranceField);
   _toggleToleranceField();
+
+  // Render \n, markdown tables, and LaTeX in question_text cells
+  const qTextEls = Array.from(document.querySelectorAll('.question-text[data-raw]'));
+  qTextEls.forEach(el => {
+    el.innerHTML = _renderQText(el.dataset.raw || '');
+    el.style.whiteSpace  = 'normal';
+    el.style.overflow    = 'visible';
+    el.style.textOverflow = 'unset';
+    el.style.maxWidth    = 'none';
+  });
+  // Typeset via startup.promise — guaranteed to fire after MathJax fully initialises
+  function _doTypeset(els) {
+    if (!els.length) return;
+    if (typeof MathJax.typesetClear === 'function') MathJax.typesetClear(els);
+    MathJax.typesetPromise(els).catch(function(e) { console.warn('[MathJax]', e); });
+  }
+  if (window._mathJaxReady) {
+    // startup.ready() already fired (script was blocking, loaded before DOMContentLoaded)
+    _doTypeset(qTextEls);
+  } else if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+    // Script loaded but startup.ready() not yet called — wait on the promise
+    MathJax.startup.promise.then(function() { _doTypeset(qTextEls); });
+  } else {
+    // Script still loading — startup.ready() will call this when done
+    window._mathJaxReadyCallback = function() { _doTypeset(qTextEls); };
+  }
 
   /* Delete single question modal */
   const confirmDelBtn = document.getElementById('confirmQuestionDeleteBtn');
@@ -1619,4 +1745,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% endblock %}
-

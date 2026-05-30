@@ -17,7 +17,8 @@ SOLUTION:
 import os
 import json
 import re
-from typing import List, Dict, Optional
+import time
+from typing import List, Dict, Optional, Callable, Optional
 
 from pydantic import BaseModel, Field, validator
 from pypdf import PdfReader
@@ -179,6 +180,30 @@ def _count_line(config: Dict) -> str:
     )
 
 
+def _exclude_block(config: Dict) -> str:
+    """Prompt block listing already-generated question stubs to prevent duplicates."""
+    texts = config.get("excluded_texts", [])
+    if not texts:
+        return ""
+    # Send ALL exclusions — no cap. Truncate each stub to EXCLUDE_STUB_LEN chars.
+    lines = "\n".join(f"  [{idx+1}] {t[:_EXCLUDE_STUB_LEN]}" for idx, t in enumerate(texts))
+    return (
+        f"\n\n{'='*60}\n"
+        f"ABSOLUTE DUPLICATE BAN — THIS IS NON-NEGOTIABLE:\n"
+        f"{'='*60}\n"
+        f"The following {len(texts)} question(s) have ALREADY BEEN GENERATED in previous batches "
+        f"or already exist in the database.\n"
+        f"You are STRICTLY FORBIDDEN from:\n"
+        f"  • Reproducing any of these questions verbatim\n"
+        f"  • Rephrasing or paraphrasing any of these questions\n"
+        f"  • Generating questions that test the same specific fact in the same way\n"
+        f"Every single question you output MUST be completely unique and MUST NOT overlap "
+        f"with any question listed below. Violating this rule makes the entire output useless.\n\n"
+        f"BANNED QUESTIONS:\n{lines}\n"
+        f"{'='*60}\n\n"
+    )
+
+
 def _schema_example(exam_id: int) -> str:
     """
     Two examples are shown:
@@ -223,6 +248,23 @@ def _schema_example(exam_id: int) -> str:
 # ========================
 
 _MAX_CONTEXT_CHARS = 12000  # ~3k tokens — fast and sufficient
+_MIN_TEXT_CHARS_PER_PAGE = 150  # Below this avg, PDF is treated as image-based
+_MAX_INLINE_PDF_BYTES = 15 * 1024 * 1024  # 15 MB — above this use File API
+_BATCH_SIZE = 20  # max questions per single Gemini call to prevent JSON truncation
+_DEDUP_KEY_LEN = 80   # chars used for dedup fingerprint (first N chars of question_text)
+_EXCLUDE_STUB_LEN = 160  # chars sent to AI in the banned-questions block
+
+
+def _dedup_key(text: str) -> str:
+    """Normalised fingerprint for dedup: lowercase, collapse whitespace, strip punctuation."""
+    t = text.lower().strip()
+    # Collapse all whitespace variants (newlines, tabs, multiple spaces)
+    t = re.sub(r'\s+', ' ', t)
+    # Strip LaTeX wrappers so "$\large x$" and "x" don't appear distinct
+    t = re.sub(r'\$[^$]*\$', '', t).strip()
+    # Remove common punctuation noise
+    t = re.sub(r'[^\w\s]', '', t)
+    return t[:_DEDUP_KEY_LEN]
 
 
 class AIQuestionGenerator:
@@ -267,44 +309,90 @@ class AIQuestionGenerator:
             raise Exception(f"PDF extraction failed: {str(e)}")
 
     def is_image_pdf(self, pdf_path: str) -> bool:
-        """Returns True if PDF has no extractable text (scanned/image-based)."""
+        """
+        Returns True if PDF has insufficient extractable text.
+        Checks text density (avg chars/page), not just presence.
+        Handles scanned PDFs, hybrid PDFs, and PDFs with garbage-text layers.
+        """
         try:
             reader = PdfReader(pdf_path)
-            for page in reader.pages:
-                if (page.extract_text() or "").strip():
-                    return False
-            return True
+            if not reader.pages:
+                return True
+            total_chars = sum(
+                len((page.extract_text() or "").strip())
+                for page in reader.pages
+            )
+            avg_chars_per_page = total_chars / len(reader.pages)
+            needs_vision = avg_chars_per_page < _MIN_TEXT_CHARS_PER_PAGE
+            if needs_vision:
+                print(f"Image-PDF detected — avg {avg_chars_per_page:.0f} chars/page "
+                      f"(threshold: {_MIN_TEXT_CHARS_PER_PAGE}). Switching to Vision mode.")
+            return needs_vision
         except Exception:
-            return True
+            return True  # Unreadable by pypdf → try vision
 
-    def generate_text_with_pdf_vision(self, pdf_path: str, prompt_suffix: str) -> str:
-        """
-        Send PDF directly to Gemini using File API — works for image-based PDFs.
-        Gemini natively reads PDF images, so no OCR step needed.
-        """
-        import base64
+    @staticmethod
+    def _retry_call(fn: Callable, max_retries: int = 3, base_delay: float = 5.0):
+        """Retry a Gemini API call on transient errors (503/UNAVAILABLE) with exponential backoff."""
+        for attempt in range(max_retries + 1):
+            try:
+                return fn()
+            except Exception as e:
+                err = str(e)
+                is_transient = any(x in err for x in ('503', 'UNAVAILABLE', 'Resource has been exhausted', 'overloaded'))
+                if is_transient and attempt < max_retries:
+                    wait = base_delay * (2 ** attempt)  # 5s → 10s → 20s
+                    print(f"Gemini transient error (attempt {attempt + 1}/{max_retries}) — retrying in {wait:.0f}s...")
+                    time.sleep(wait)
+                else:
+                    raise
+
+    def _upload_pdf(self, pdf_path: str) -> str:
+        """Upload PDF via File API once — returns URI for reuse across batches."""
+        file_size = os.path.getsize(pdf_path)
+        print(f"Uploading PDF ({file_size / (1024*1024):.1f} MB) via File API.")
+        uploaded = self.client.files.upload(
+            file=pdf_path,
+            config={"mime_type": "application/pdf"},
+        )
+        return uploaded.uri
+
+    def _generate_vision_with_uri(self, file_uri: str, prompt: str) -> str:
+        """Call Gemini with a pre-uploaded PDF URI. Reusable across batches. Retries on 503."""
         try:
-            with open(pdf_path, "rb") as f:
-                pdf_bytes = f.read()
-            pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
-
-            response = self.client.models.generate_content(
+            return self._retry_call(lambda: self.client.models.generate_content(
                 model=self.model_name,
                 contents=[
-                    types.Part(
-                        inline_data=types.Blob(
-                            mime_type="application/pdf",
-                            data=pdf_b64,
-                        )
-                    ),
-                    types.Part(text=prompt_suffix),
+                    types.Part(file_data=types.FileData(file_uri=file_uri, mime_type="application/pdf")),
+                    types.Part(text=prompt),
                 ],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.3,
+                    max_output_tokens=65536,
                 ),
-            )
-            return response.text
+            ).text)
+        except Exception as e:
+            raise Exception(f"Gemini Vision PDF error: {str(e)}")
+
+    def _generate_vision_inline(self, pdf_path: str, prompt: str) -> str:
+        """Call Gemini with inline base64 PDF (small PDFs <= 15 MB). Retries on 503."""
+        import base64
+        try:
+            with open(pdf_path, "rb") as f:
+                pdf_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
+            return self._retry_call(lambda: self.client.models.generate_content(
+                model=self.model_name,
+                contents=[
+                    types.Part(inline_data=types.Blob(mime_type="application/pdf", data=pdf_b64)),
+                    types.Part(text=prompt),
+                ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.3,
+                    max_output_tokens=65536,
+                ),
+            ).text)
         except Exception as e:
             raise Exception(f"Gemini Vision PDF error: {str(e)}")
 
@@ -313,17 +401,17 @@ class AIQuestionGenerator:
     # ------------------------------------------------------------------
 
     def generate_text(self, prompt: str) -> str:
-        """Single Gemini call with JSON mode and low temperature for accuracy."""
+        """Single Gemini call with JSON mode, low temperature, and transient-error retry."""
         try:
-            response = self.client.models.generate_content(
+            return self._retry_call(lambda: self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type='application/json',
-                    temperature=0.3,  # Set low to ensure strict instruction following
+                    temperature=0.3,
+                    max_output_tokens=65536,
                 ),
-            )
-            return response.text
+            ).text)
         except Exception as e:
             raise Exception(f"Gemini API error: {str(e)}")
 
@@ -331,76 +419,268 @@ class AIQuestionGenerator:
     # Generation modes
     # ------------------------------------------------------------------
 
-    def extract_from_pdf(self, pdf_path: str, config: Dict) -> List[Dict]:
-        """Card A: Extract existing questions from PDF. Auto-detects image-based PDFs."""
-        base_prompt = (
-            "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-            "Extract questions ONLY from the content of this PDF. DO NOT generate unrelated questions.\n\n"
-            f"{_config_block(config)}\n\n"
-            f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
-            f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_count_line(config)}"
-        )
-        if self.is_image_pdf(pdf_path):
-            print("Detected image-based PDF — using Gemini Vision mode.")
-            return self._parse_and_validate(
-                self.generate_text_with_pdf_vision(pdf_path, base_prompt), config
-            )
+    def extract_from_pdf(self, pdf_path: str, config: Dict, progress_callback=None) -> List[Dict]:
+        """Card A: Extract existing questions from PDF. Progress callback, per-batch error recovery."""
+        def _cb(event: dict):
+            if progress_callback:
+                progress_callback(event)
+
+        batches = self._split_batches(config)
+        is_vision = self.is_image_pdf(pdf_path)
+
+        file_uri = None
+        context = None
+        if is_vision:
+            _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
+            file_size = os.path.getsize(pdf_path)
+            if file_size > _MAX_INLINE_PDF_BYTES:
+                _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
+                file_uri = self._upload_pdf(pdf_path)
+                _cb({"type": "uploaded", "message": "PDF uploaded. Starting batch extraction..."})
         else:
             context = self.extract_pdf_text(pdf_path)
-            prompt = (
-                "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-                "Extract questions ONLY from the provided PDF content. DO NOT generate unrelated questions.\n\n"
-                f"PDF CONTENT:\n{context}\n\n"
-                f"{_config_block(config)}\n\n"
-                f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
-                f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_count_line(config)}"
-            )
-            return self._parse_and_validate(self.generate_text(prompt), config)
 
-    def mine_concepts(self, pdf_path: str, config: Dict) -> List[Dict]:
-        """Card B: Generate new questions from theory/concepts. Auto-detects image-based PDFs."""
-        base_prompt = (
-            "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-            "Generate NEW, HIGH-QUALITY questions based ONLY on the topic/content in this PDF.\n"
-            "DO NOT generate questions about unrelated topics.\n\n"
-            f"{_config_block(config)}\n\n"
-            f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
-            f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
-            f"Match the '{config['difficulty']}' difficulty level.\n"
-            f"{_count_line(config)}"
-        )
-        if self.is_image_pdf(pdf_path):
-            print("Detected image-based PDF — using Gemini Vision mode.")
-            return self._parse_and_validate(
-                self.generate_text_with_pdf_vision(pdf_path, base_prompt), config
-            )
+        _cb({"type": "batches_ready", "total_batches": len(batches),
+             "message": f"Starting {len(batches)} batch(es)..."})
+
+        # Track how many questions have been extracted so far for sequential offset
+        total_extracted_so_far = len(config.get("excluded_texts", []))
+
+        # Build a dedup set from EXISTING excluded_texts so AI-generated duplicates of DB
+        # questions get caught in post-generation dedup even if AI ignores the ban block.
+        existing_excluded_keys: set = {
+            _dedup_key(t) for t in config.get("excluded_texts", []) if t
+        }
+
+        all_questions = []
+        # seen_keys tracks fingerprints of everything generated THIS session + pre-existing
+        seen_keys: set = set(existing_excluded_keys)
+        batch_errors = []
+        for i, batch_config in enumerate(batches):
+            n = i + 1
+            # Rolling dedup: add THIS session's already-generated stubs into each batch's exclude list
+            session_stubs = [q["question_text"][:_EXCLUDE_STUB_LEN] for q in all_questions]
+            existing_stubs = batch_config.get("excluded_texts", [])
+            batch_config = dict(batch_config)
+            batch_config["excluded_texts"] = existing_stubs + session_stubs
+
+            # Sequential offset so AI picks up where it left off in the PDF
+            questions_done = total_extracted_so_far + len(all_questions)
+
+            _cb({"type": "batch_start", "batch": n, "total_batches": len(batches),
+                 "questions_so_far": len(all_questions),
+                 "message": f"Batch {n}/{len(batches)} — MCQ={batch_config['mcq_count']}, "
+                            f"MSQ={batch_config['msq_count']}, NUM={batch_config['numeric_count']}"})
+            print(f"Extracting batch {n}/{len(batches)} "
+                  f"(MCQ={batch_config['mcq_count']}, MSQ={batch_config['msq_count']}, "
+                  f"NUM={batch_config['numeric_count']}) ...")
+            try:
+                sequential_instruction = (
+                    f"\nSEQUENTIAL EXTRACTION ORDER — MANDATORY:\n"
+                    f"The PDF contains questions numbered sequentially. "
+                    f"{questions_done} question(s) have already been extracted (see BANNED list above).\n"
+                    f"You MUST continue from where extraction left off — extract the NEXT "
+                    f"{batch_config['mcq_count'] + batch_config['msq_count'] + batch_config['numeric_count']} "
+                    f"questions in PDF order (question #{questions_done + 1} onwards).\n"
+                    f"Do NOT skip ahead, do NOT go back to earlier questions, do NOT pick randomly.\n"
+                ) if questions_done > 0 else (
+                    f"\nSEQUENTIAL EXTRACTION ORDER — MANDATORY:\n"
+                    f"Extract questions from the PDF in the EXACT ORDER they appear — start from question #1.\n"
+                    f"Do NOT pick questions randomly. Follow the PDF sequence strictly.\n"
+                )
+                prompt = (
+                    "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                    "Extract questions EXACTLY as written in the PDF — same question text, same options, same answer.\n"
+                    "DO NOT rephrase, DO NOT reorder, DO NOT generate new questions.\n\n"
+                    f"{_config_block(batch_config)}\n\n"
+                    f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
+                    f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_exclude_block(batch_config)}"
+                    f"{sequential_instruction}\n{_count_line(batch_config)}"
+                )
+                if is_vision:
+                    raw = (self._generate_vision_with_uri(file_uri, prompt)
+                           if file_uri else self._generate_vision_inline(pdf_path, prompt))
+                else:
+                    full_prompt = (
+                        "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                        "Extract questions EXACTLY as written — same text, same options, same answer, same order.\n"
+                        "DO NOT rephrase, DO NOT reorder, DO NOT generate new questions.\n\n"
+                        f"PDF CONTENT:\n{context}\n\n"
+                        f"{_config_block(batch_config)}\n\n"
+                        f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
+                        f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_exclude_block(batch_config)}"
+                        f"{sequential_instruction}\n{_count_line(batch_config)}"
+                    )
+                    raw = self.generate_text(full_prompt)
+                batch_result = self._parse_and_validate(raw, batch_config)
+                # Post-generation dedup: use normalised fingerprint against ALL seen keys
+                # (includes DB-existing questions from excluded_texts + this session's output)
+                deduped = []
+                for q in batch_result:
+                    key = _dedup_key(q["question_text"])
+                    if key not in seen_keys:
+                        deduped.append(q)
+                        seen_keys.add(key)
+                    else:
+                        print(f"[DEDUP] Dropped duplicate: {q['question_text'][:60]}...")
+                all_questions.extend(deduped)
+                _cb({"type": "batch_done", "batch": n, "total_batches": len(batches),
+                     "batch_count": len(deduped), "questions_so_far": len(all_questions),
+                     "message": f"Batch {n} done — {len(deduped)} questions extracted ({len(batch_result)-len(deduped)} duplicates dropped)."})
+            except Exception as e:
+                msg = f"Batch {n} failed: {str(e)}"
+                print(msg)
+                batch_errors.append(msg)
+                _cb({"type": "batch_error", "batch": n, "total_batches": len(batches),
+                     "questions_so_far": len(all_questions), "message": msg})
+
+        if not all_questions:
+            raise Exception(f"All {len(batches)} batch(es) failed. "
+                            f"Last error: {batch_errors[-1] if batch_errors else 'unknown'}")
+        return all_questions
+
+    def mine_concepts(self, pdf_path: str, config: Dict, progress_callback=None) -> List[Dict]:
+        """Card B: Generate new questions from theory/concepts. Progress callback, per-batch error recovery."""
+        def _cb(event: dict):
+            if progress_callback:
+                progress_callback(event)
+
+        batches = self._split_batches(config)
+        is_vision = self.is_image_pdf(pdf_path)
+
+        file_uri = None
+        context = None
+        if is_vision:
+            _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
+            file_size = os.path.getsize(pdf_path)
+            if file_size > _MAX_INLINE_PDF_BYTES:
+                _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
+                file_uri = self._upload_pdf(pdf_path)
+                _cb({"type": "uploaded", "message": "PDF uploaded. Starting concept mining..."})
         else:
             context = self.extract_pdf_text(pdf_path)
-            prompt = (
-                "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-                "Generate NEW, HIGH-QUALITY questions from the theory content below.\n"
-                "DO NOT generate questions about unrelated topics.\n\n"
-                f"THEORY CONTENT:\n{context}\n\n"
-                f"{_config_block(config)}\n\n"
-                f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
-                f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
-                f"Match the '{config['difficulty']}' difficulty level.\n"
-                f"{_count_line(config)}"
-            )
-            return self._parse_and_validate(self.generate_text(prompt), config)
 
-    def generate_from_topic(self, topic: str, config: Dict) -> List[Dict]:
-        """Card C: Pure generation from topic name — no PDF needed."""
-        prompt = (
-            "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
-            f"Generate HIGH-QUALITY questions on the topic: {topic}\n\n"
-            f"{_config_block(config)}\n\n"
-            f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(config['exam_id'])}\n\n"
-            f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
-            f"Match the '{config['difficulty']}' difficulty level.\n"
-            f"{_count_line(config)}"
-        )
-        return self._parse_and_validate(self.generate_text(prompt), config)
+        _cb({"type": "batches_ready", "total_batches": len(batches),
+             "message": f"Starting {len(batches)} batch(es)..."})
+
+        existing_excluded_keys: set = {
+            _dedup_key(t) for t in config.get("excluded_texts", []) if t
+        }
+        all_questions = []
+        seen_keys: set = set(existing_excluded_keys)
+        batch_errors = []
+        for i, batch_config in enumerate(batches):
+            n = i + 1
+            # Rolling dedup: feed this session's already-generated stubs as banned list
+            session_stubs = [q["question_text"][:_EXCLUDE_STUB_LEN] for q in all_questions]
+            existing_stubs = batch_config.get("excluded_texts", [])
+            batch_config = dict(batch_config)
+            batch_config["excluded_texts"] = existing_stubs + session_stubs
+
+            _cb({"type": "batch_start", "batch": n, "total_batches": len(batches),
+                 "questions_so_far": len(all_questions),
+                 "message": f"Batch {n}/{len(batches)} — MCQ={batch_config['mcq_count']}, "
+                            f"MSQ={batch_config['msq_count']}, NUM={batch_config['numeric_count']}"})
+            print(f"Mining batch {n}/{len(batches)} "
+                  f"(MCQ={batch_config['mcq_count']}, MSQ={batch_config['msq_count']}, "
+                  f"NUM={batch_config['numeric_count']}) ...")
+            try:
+                prompt = (
+                    "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                    "Generate NEW, HIGH-QUALITY questions based ONLY on the topic/content in this PDF.\n"
+                    "DO NOT generate questions about unrelated topics.\n\n"
+                    f"{_config_block(batch_config)}\n\n"
+                    f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
+                    f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
+                    f"Match the '{batch_config['difficulty']}' difficulty level.\n"
+                    f"{_exclude_block(batch_config)}{_count_line(batch_config)}"
+                )
+                if is_vision:
+                    raw = (self._generate_vision_with_uri(file_uri, prompt)
+                           if file_uri else self._generate_vision_inline(pdf_path, prompt))
+                else:
+                    full_prompt = (
+                        "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                        "Generate NEW, HIGH-QUALITY questions from the theory content below.\n"
+                        "DO NOT generate questions about unrelated topics.\n\n"
+                        f"THEORY CONTENT:\n{context}\n\n"
+                        f"{_config_block(batch_config)}\n\n"
+                        f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
+                        f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
+                        f"Match the '{batch_config['difficulty']}' difficulty level.\n"
+                        f"{_exclude_block(batch_config)}{_count_line(batch_config)}"
+                    )
+                    raw = self.generate_text(full_prompt)
+                batch_result = self._parse_and_validate(raw, batch_config)
+                # Post-generation dedup using normalised fingerprint vs ALL seen keys
+                deduped = []
+                for q in batch_result:
+                    key = _dedup_key(q["question_text"])
+                    if key not in seen_keys:
+                        deduped.append(q)
+                        seen_keys.add(key)
+                    else:
+                        print(f"[DEDUP] Dropped duplicate: {q['question_text'][:60]}...")
+                all_questions.extend(deduped)
+                _cb({"type": "batch_done", "batch": n, "total_batches": len(batches),
+                     "questions_so_far": len(all_questions),
+                     "message": f"Batch {n} done — {len(deduped)} questions mined ({len(batch_result)-len(deduped)} duplicates dropped)."})
+            except Exception as e:
+                msg = f"Batch {n} failed: {str(e)}"
+                print(msg)
+                batch_errors.append(msg)
+                _cb({"type": "batch_error", "batch": n, "total_batches": len(batches),
+                     "questions_so_far": len(all_questions), "message": msg})
+
+        if not all_questions:
+            raise Exception(f"All {len(batches)} batch(es) failed. "
+                            f"Last error: {batch_errors[-1] if batch_errors else 'unknown'}")
+        return all_questions
+
+    def generate_from_topic(self, topic: str, config: Dict, progress_callback=None) -> List[Dict]:
+        """Card C: Pure generation from topic name — no PDF needed. Batches large counts."""
+        def _cb(event: dict):
+            if progress_callback:
+                progress_callback(event)
+
+        batches = self._split_batches(config)
+        _cb({"type": "batches_ready", "total_batches": len(batches),
+             "message": f"Generating {len(batches)} batch(es) on topic: {topic}"})
+
+        all_questions = []
+        batch_errors = []
+        for i, batch_config in enumerate(batches):
+            n = i + 1
+            _cb({"type": "batch_start", "batch": n, "total_batches": len(batches),
+                 "questions_so_far": len(all_questions),
+                 "message": f"Batch {n}/{len(batches)} — MCQ={batch_config['mcq_count']}, "
+                            f"MSQ={batch_config['msq_count']}, NUM={batch_config['numeric_count']}"})
+            try:
+                prompt = (
+                    "You are a Professional Question Paper Designer for JEE/NEET level exams.\n"
+                    f"Generate HIGH-QUALITY questions on the topic: {topic}\n\n"
+                    f"{_config_block(batch_config)}\n\n"
+                    f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
+                    f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n"
+                    f"Match the '{batch_config['difficulty']}' difficulty level.\n"
+                    f"{_exclude_block(batch_config)}{_count_line(batch_config)}"
+                )
+                batch_result = self._parse_and_validate(self.generate_text(prompt), batch_config)
+                all_questions.extend(batch_result)
+                _cb({"type": "batch_done", "batch": n, "total_batches": len(batches),
+                     "batch_count": len(batch_result), "questions_so_far": len(all_questions),
+                     "message": f"Batch {n} done — {len(batch_result)} questions generated."})
+            except Exception as e:
+                msg = f"Batch {n} failed: {str(e)}"
+                print(msg)
+                batch_errors.append(msg)
+                _cb({"type": "batch_error", "batch": n, "total_batches": len(batches),
+                     "questions_so_far": len(all_questions), "message": msg})
+
+        if not all_questions:
+            raise Exception(f"All {len(batches)} batch(es) failed. "
+                            f"Last error: {batch_errors[-1] if batch_errors else 'unknown'}")
+        return all_questions
 
     # ------------------------------------------------------------------
     # JSON parsing + Pydantic validation
@@ -435,8 +715,74 @@ class AIQuestionGenerator:
                 i += 1
         return ''.join(result)
 
+    @staticmethod
+    def _split_batches(config: Dict) -> List[Dict]:
+        """
+        Split large question counts into batches of <= _BATCH_SIZE.
+        Fills MCQ first, then MSQ, then NUMERIC within each batch slot.
+        """
+        remaining = {
+            'mcq_count':     config.get('mcq_count', 0),
+            'msq_count':     config.get('msq_count', 0),
+            'numeric_count': config.get('numeric_count', 0),
+        }
+        total = sum(remaining.values())
+        if total <= _BATCH_SIZE:
+            return [config]
+
+        batches = []
+        while any(v > 0 for v in remaining.values()):
+            batch = dict(config)
+            slots = _BATCH_SIZE
+            for key in ('mcq_count', 'msq_count', 'numeric_count'):
+                take = min(remaining[key], slots)
+                batch[key] = take
+                remaining[key] -= take
+                slots -= take
+            batches.append(batch)
+        return batches
+
+    @staticmethod
+    def _salvage_partial_json(text: str) -> list:
+        """
+        Gemini sometimes truncates JSON mid-stream when output is long.
+        Walk the string tracking brace depth to recover all fully-closed objects.
+        """
+        if not text.strip().startswith('['):
+            return []
+        try:
+            last_good = 0
+            depth = 0
+            in_string = False
+            skip_next = False
+            for i, ch in enumerate(text):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if ch == '\\' and in_string:
+                    skip_next = True
+                    continue
+                if ch == '"':
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        last_good = i + 1  # end of a complete top-level object
+            if last_good == 0:
+                return []
+            salvaged = '[' + text[1:last_good] + ']'
+            salvaged = re.sub(r',\s*]', ']', salvaged)
+            return json.loads(salvaged)
+        except Exception:
+            return []
+
     def _parse_and_validate(self, llm_output: str, config: Dict) -> List[Dict]:
-        """Parse LLM JSON output and validate with Pydantic."""
+        """Parse LLM JSON output and validate with Pydantic. Auto-salvages truncated output."""
         try:
             cleaned = llm_output.strip()
             cleaned = re.sub(r'^```json\s*', '', cleaned)
@@ -461,9 +807,28 @@ class AIQuestionGenerator:
             return validated
 
         except json.JSONDecodeError as e:
-            raise Exception(
-                f"Invalid JSON from AI: {str(e)}\nOutput preview: {llm_output[:500]}"
+            # Attempt to salvage complete objects before giving up
+            salvaged_raw = self._salvage_partial_json(cleaned)
+            if salvaged_raw:
+                validated = []
+                for q in salvaged_raw:
+                    try:
+                        validated.append(QuestionModel(**q).dict())
+                    except Exception:
+                        pass
+                if validated:
+                    print(f"JSON truncated — salvaged {len(validated)} complete questions from partial output.")
+                    return validated
+            # Categorise the error for user-friendly display
+            err_str = str(e)
+            is_cut = any(x in err_str for x in ("Unterminated", "Expecting property"))
+            friendly = (
+                "TRUNCATED: AI response was cut off mid-output. "
+                "Reduce question count — try 20 or fewer per session."
+            ) if is_cut else (
+                "MALFORMED: AI returned invalid JSON. Try again."
             )
+            raise Exception(friendly)
         except Exception as e:
             raise Exception(f"Validation failed: {str(e)}")
 
@@ -477,10 +842,12 @@ def generate_questions(
     config: Dict,
     pdf_path: Optional[str] = None,
     topic: Optional[str] = None,
+    progress_callback=None,
 ) -> List[Dict]:
     """
     Generate questions via AI.
     mode: 'extract' | 'mine' | 'pure'
+    progress_callback: optional callable(event: dict) for live progress updates.
     Raises a clean Exception on failure — never crashes the caller.
     """
     generator = AIQuestionGenerator()
@@ -488,14 +855,14 @@ def generate_questions(
     if mode == 'extract':
         if not pdf_path:
             raise ValueError("PDF path required for extraction mode")
-        return generator.extract_from_pdf(pdf_path, config)
+        return generator.extract_from_pdf(pdf_path, config, progress_callback)
     elif mode == 'mine':
         if not pdf_path:
             raise ValueError("PDF path required for concept mining mode")
-        return generator.mine_concepts(pdf_path, config)
+        return generator.mine_concepts(pdf_path, config, progress_callback)
     elif mode == 'pure':
         if not topic:
             raise ValueError("Topic required for pure generation mode")
-        return generator.generate_from_topic(topic, config)
+        return generator.generate_from_topic(topic, config, progress_callback)
     else:
         raise ValueError(f"Invalid mode: {mode}")

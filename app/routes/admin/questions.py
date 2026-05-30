@@ -260,9 +260,9 @@ def import_questions_csv():
                 "correct_answer": str(row.get("correct_answer","")).strip() if pd.notna(row.get("correct_answer")) else "",
                 "question_type":  str(row.get("question_type","MCQ")).strip(),
                 "image_path":     str(row.get("image_path","")).strip() if pd.notna(row.get("image_path")) else "",
-                "positive_marks": int(row.get("positive_marks",4)) if pd.notna(row.get("positive_marks")) else 4,
-                "negative_marks": float(row.get("negative_marks",1)) if pd.notna(row.get("negative_marks")) else 1,
-                "tolerance":      float(row.get("tolerance",0)) if pd.notna(row.get("tolerance")) else 0,
+                "positive_marks": int(float(row.get("positive_marks",4))) if pd.notna(row.get("positive_marks")) else 4,
+                "negative_marks": float(row.get("negative_marks", 1) or 1) if pd.notna(row.get("negative_marks")) else 1.0,
+                "tolerance":      float(row.get("tolerance", 0) or 0) if pd.notna(row.get("tolerance")) else 0.0,
             }).execute()
             inserted += 1
         except Exception as e:

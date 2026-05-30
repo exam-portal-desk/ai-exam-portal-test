@@ -198,27 +198,27 @@
    THEME: emerald  (dark forest green)
    ================================================================ */
 [data-theme="emerald"] {
-  --bg:            #070f08;
-  --bg-raised:     #0c1a0d;
-  --surface:       #101f11;
-  --surface-2:     #162718;
-  --border:        rgba(123,196,42,0.14);
-  --border-focus:  #7bc42a;
+  --bg:            #060d0a;
+  --bg-raised:     #0a1510;
+  --surface:       #0e1d16;
+  --surface-2:     #14261c;
+  --border:        rgba(34,197,94,0.13);
+  --border-focus:  #22c55e;
 
-  --accent:        #7bc42a;
-  --accent-hover:  #69a822;
-  --accent-subtle: rgba(123,196,42,0.12);
-  --accent-on:     #071008;
+  --accent:        #22c55e;
+  --accent-hover:  #16a34a;
+  --accent-subtle: rgba(34,197,94,0.11);
+  --accent-on:     #ffffff;
 
-  --text-1:        #edfae0;
-  --text-2:        rgba(237,250,224,0.55);
-  --text-3:        rgba(237,250,224,0.28);
-  --text-on-dark:  rgba(255,255,255,0.75);
+  --text-1:        #f0fdf4;
+  --text-2:        rgba(240,253,244,0.58);
+  --text-3:        rgba(240,253,244,0.30);
+  --text-on-dark:  rgba(255,255,255,0.78);
 
-  --success:       #7bc42a;
-  --success-bg:    rgba(123,196,42,0.12);
-  --success-border:rgba(123,196,42,0.28);
-  --success-text:  #b8f58a;
+  --success:       #22c55e;
+  --success-bg:    rgba(34,197,94,0.11);
+  --success-border:rgba(34,197,94,0.26);
+  --success-text:  #86efac;
 
   --warning:       #e67700;
   --warning-bg:    rgba(230,119,0,0.12);

@@ -8,7 +8,7 @@
 
   <script>
   (function(){
-    var lt = localStorage.getItem('landingTheme') || 'dark';
+    var lt = localStorage.getItem('landingTheme') || 'emerald';
     document.documentElement.setAttribute('data-theme', lt === 'paper' ? 'light' : lt);
     if (localStorage.getItem('sbCollapsed') === '1')
       document.documentElement.setAttribute('data-sb', 'collapsed');
@@ -607,7 +607,7 @@
           <button class="theme-pill" data-lt="paper"><span class="theme-dot" style="background:#e8e6e0;border:1px solid #bbb"></span>Paper</button>
           <button class="theme-pill" data-lt="dark"><span class="theme-dot" style="background:#111116;border:1px solid #444"></span>Dark</button>
           <button class="theme-pill" data-lt="midnight"><span class="theme-dot" style="background:#7c6fff"></span>Midnight</button>
-          <button class="theme-pill" data-lt="emerald"><span class="theme-dot" style="background:#7bc42a"></span>Emerald</button>
+          <button class="theme-pill" data-lt="emerald"><span class="theme-dot" style="background:#22c55e"></span>Emerald</button>
           <button class="theme-pill" data-lt="sunset"><span class="theme-dot" style="background:#f07830"></span>Sunset</button>
         </div>
       </div>
@@ -702,11 +702,11 @@
 (function(){
   var K='landingTheme', h=document.documentElement;
   function ap(lt){
-    h.setAttribute('data-theme',lt==='paper'?'light':(lt||'dark'));
+    h.setAttribute('data-theme',lt==='paper'?'light':(lt||'emerald'));
     localStorage.setItem(K,lt);
     document.querySelectorAll('.theme-pill').forEach(function(p){ p.classList.toggle('active',p.getAttribute('data-lt')===lt); });
   }
-  ap(localStorage.getItem(K)||'dark');
+  ap(localStorage.getItem(K)||'emerald');
   document.addEventListener('click',function(e){ var p=e.target.closest('.theme-pill'); if(p) ap(p.getAttribute('data-lt')); });
   window.addEventListener('storage',function(e){ if(e.key===K&&e.newValue) ap(e.newValue); });
 })();

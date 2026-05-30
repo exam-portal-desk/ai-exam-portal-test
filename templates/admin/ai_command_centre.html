@@ -62,8 +62,7 @@ textarea.form-control { resize:vertical; }
 .loading-title { font-size:1rem; font-weight:700; color:var(--text-1); margin-bottom:.35rem; }
 .loading-sub   { font-size:.78rem; color:var(--text-3); margin-bottom:1.1rem; min-height:1.2em; }
 .ai-progress-wrap { background:var(--surface-2); border-radius:999px; height:4px; overflow:hidden; margin-bottom:1.25rem; }
-.ai-progress-bar  { height:100%; background:var(--accent); border-radius:999px; animation:prog 3s ease-in-out infinite; }
-@keyframes prog { 0%{width:0%;} 60%{width:80%;} 100%{width:100%;} }
+.ai-progress-bar  { height:100%; background:var(--accent); border-radius:999px; width:0%; transition:width .5s ease; }
 .loading-steps { display:flex; justify-content:center; gap:1rem; flex-wrap:wrap; }
 .loading-step  { display:flex; flex-direction:column; align-items:center; gap:.3rem; font-size:.6rem; font-weight:700; letter-spacing:.08em; color:var(--text-3); opacity:.4; transition:opacity .3s; }
 .loading-step.active { opacity:1; color:var(--accent); }
@@ -74,6 +73,79 @@ textarea.form-control { resize:vertical; }
 .preview-section { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+6px); padding:1.5rem; margin-bottom:1.5rem; box-shadow:var(--shadow-md); }
 .question-preview-card { background:var(--surface-2); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); padding:1.25rem; margin-bottom:.85rem; }
 .question-preview-card:last-child { margin-bottom:0; }
+
+/* ── Sticky Preview Header ── */
+#accStickyBar {
+  position:sticky;
+  top:0;
+  z-index:200;
+  background:var(--bg);
+  padding:.75rem 0;
+  transition:all .2s ease;
+}
+#accStickyBar.acc-bar-scrolled {
+  backdrop-filter:blur(10px);
+  box-shadow:var(--shadow-lg);
+}
+
+/* ── Floating Scroll Navigation ── */
+#accScrollNav {
+  position:fixed;
+  right:18px;
+  bottom:22px;
+  z-index:300;
+  display:flex;
+  flex-direction:column;
+  gap:.7rem;
+  opacity:0;
+  transform:translateY(20px);
+  pointer-events:none;
+  transition:all .22s ease;
+}
+#accScrollNav.acc-nav-visible {
+  opacity:1;
+  transform:translateY(0);
+  pointer-events:auto;
+}
+.acc-scroll-btn {
+  width:58px; height:58px; border-radius:50%;
+  border:1px solid var(--border);
+  background:color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter:blur(10px);
+  color:var(--text-1);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; position:relative;
+  transition:all .18s ease;
+  box-shadow:var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--text-1) 6%, transparent);
+}
+.acc-scroll-btn:hover {
+  transform:translateY(-3px) scale(1.06);
+  border-color:var(--accent); color:var(--accent);
+  background:color-mix(in srgb, var(--surface-2) 92%, transparent);
+  box-shadow:0 14px 34px rgba(0,0,0,.28), 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.acc-scroll-btn:active { transform:scale(.96); }
+.acc-scroll-btn i { font-size:1.15rem; pointer-events:none; }
+.acc-scroll-btn::after {
+  content:attr(data-tooltip);
+  position:absolute; right:72px; top:50%;
+  transform:translateY(-50%) translateX(10px);
+  background:var(--surface); color:var(--text-1);
+  padding:.48rem .75rem; border-radius:10px; font-size:.78rem; font-weight:600; white-space:nowrap;
+  opacity:0; pointer-events:none; transition:all .18s ease;
+  border:1px solid var(--border); box-shadow:var(--shadow-lg);
+}
+.acc-scroll-btn:hover::after { opacity:1; transform:translateY(-50%) translateX(0); }
+.acc-scroll-progress { position:absolute; inset:0; transform:rotate(-90deg); pointer-events:none; }
+.acc-scroll-progress circle { fill:none; stroke-width:3; }
+.acc-scroll-progress .bg { stroke:var(--border); }
+.acc-scroll-progress .fg { stroke:var(--accent); stroke-linecap:round; stroke-dasharray:113; stroke-dashoffset:113; transition:stroke-dashoffset .15s linear; }
+
+/* ── Card toolbar responsive (same as csv) ── */
+.acc-top-toolbar { overflow:visible; padding-bottom:2px; }
+.acc-top-toolbar > * { flex-shrink:0; }
+.acc-top-toolbar .btn { white-space:nowrap; }
+.acc-top-toolbar .btn-primary { min-width:max-content; }
 .type-badge { display:inline-flex; align-items:center; padding:.2rem .6rem; border-radius:999px; font-size:.7rem; font-weight:800; letter-spacing:.06em; border:1px solid var(--border); }
 .type-badge-mcq     { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
 .type-badge-msq     { background:var(--info-bg,var(--accent-subtle)); color:var(--info-text,var(--accent)); border-color:var(--info-border,var(--border)); }
@@ -99,6 +171,164 @@ textarea.form-control { resize:vertical; }
 .acc-modal-msg   { font-size:.83rem; color:var(--text-2); line-height:1.7; }
 .acc-modal-msg strong { color:var(--text-1); }
 .acc-modal-footer { display:flex; justify-content:flex-end; gap:.5rem; padding:.85rem 1.25rem; border-top:1px solid var(--border); flex-wrap:wrap; }
+
+/* ── Tips Panel ── */
+.tips-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.tips-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1.1rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.tips-panel-header-left {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: .82rem; font-weight: 700; color: var(--accent);
+}
+.tips-panel-header-left i { font-size: .9rem; }
+.tips-toggle-icon { color: var(--text-3); font-size: .75rem; transition: transform .25s; }
+.tips-panel-body { padding: 1rem 1.1rem 1.1rem; display: none; }
+.tips-panel-body.open { display: block; }
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: .75rem;
+  margin-bottom: .85rem;
+}
+.tip-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem .9rem;
+  display: flex; gap: .65rem; align-items: flex-start;
+}
+.tip-card-icon {
+  width: 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .78rem; flex-shrink: 0; margin-top: .05rem;
+}
+.tip-card-icon.green  { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+.tip-card-icon.blue   { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--border); }
+.tip-card-icon.yellow { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
+.tip-card-icon.red    { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+.tip-card-icon.purple { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+.tip-card-text h5 { font-size: .78rem; font-weight: 700; color: var(--text-1); margin: 0 0 .2rem; }
+.tip-card-text p  { font-size: .73rem; color: var(--text-2); margin: 0; line-height: 1.55; }
+.tip-card-text code { font-size: .7rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 .3rem; color: var(--accent); }
+
+.tips-modes-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .6rem;
+  margin-bottom: .85rem;
+}
+@media (max-width: 600px) {
+  .tips-modes-row { grid-template-columns: 1fr; }
+  .tips-grid { grid-template-columns: 1fr; }
+}
+.mode-tip-badge {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .6rem .8rem;
+  text-align: center;
+}
+.mode-tip-badge .mode-name { font-size: .75rem; font-weight: 700; color: var(--accent); margin-bottom: .25rem; }
+.mode-tip-badge p { font-size: .7rem; color: var(--text-2); margin: 0; line-height: 1.45; }
+
+.tips-note {
+  font-size: .72rem; color: var(--text-3);
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: .5rem .75rem;
+  line-height: 1.55;
+}
+
+/* ── Pre-generate Checklist Modal ── */
+#preGenChecklistModal {
+  display: none; position: fixed; inset: 0;
+  z-index: 1080;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+#preGenChecklistModal.show { display: flex; }
+.pgcm-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 8px);
+  max-width: 520px; width: 92%;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.pgcm-header {
+  padding: 1rem 1.25rem .75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex; align-items: center; gap: .6rem;
+}
+.pgcm-close-btn {
+  margin-left: auto; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .78rem; transition: background .15s, color .15s, border-color .15s;
+}
+.pgcm-close-btn:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+.pgcm-header-icon {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent-subtle); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .9rem; flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.pgcm-header h5 { font-size: .9rem; font-weight: 700; color: var(--text-1); margin: 0; }
+.pgcm-header small { font-size: .72rem; color: var(--text-3); }
+.pgcm-body { padding: 1rem 1.25rem; }
+.pgcm-section-label {
+  font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3);
+  margin: .75rem 0 .4rem;
+}
+.pgcm-section-label:first-child { margin-top: 0; }
+.pgcm-check-item {
+  display: flex; align-items: flex-start; gap: .65rem;
+  padding: .55rem .7rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: .4rem;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pgcm-check-item:hover { border-color: var(--accent); }
+.pgcm-check-item.checked { border-color: var(--success-border); background: var(--success-bg); }
+.pgcm-check-item input[type=checkbox] { margin-top: .15rem; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
+.pgcm-check-item label { font-size: .76rem; color: var(--text-1); cursor: pointer; line-height: 1.5; margin: 0; }
+.pgcm-check-item label span { font-size: .68rem; color: var(--text-3); display: block; margin-top: .1rem; }
+.pgcm-footer {
+  padding: .85rem 1.25rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; flex-wrap: wrap;
+}
+.pgcm-progress-text { font-size: .73rem; color: var(--text-3); }
+.pgcm-progress-text strong { color: var(--accent); }
+#pgcmProceedBtn {
+  opacity: .45; pointer-events: none;
+  transition: opacity .2s;
+}
+#pgcmProceedBtn.ready { opacity: 1; pointer-events: auto; }
 </style>
 
 <script>
@@ -147,46 +377,234 @@ window.MathJax = {
   </div>
 </div>
 
+<!-- ── Best Practices Tips Panel ─────────────────────────────────────── -->
+<div class="tips-panel" id="tipsPanelRoot">
+  <div class="tips-panel-header" onclick="toggleTipsPanel()">
+    <div class="tips-panel-header-left">
+      <i class="fas fa-lightbulb"></i>
+      Best Practices &amp; Tips — Read for Fastest &amp; Most Accurate Results
+    </div>
+    <i class="fas fa-chevron-down tips-toggle-icon" id="tipsPanelChevron"></i>
+  </div>
+  <div class="tips-panel-body" id="tipsPanelBody">
+
+    <!-- Mode-wise guide -->
+    <p style="font-size:.73rem;color:var(--text-3);margin-bottom:.55rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Which mode should I use?</p>
+    <div class="tips-modes-row">
+      <div class="mode-tip-badge">
+        <div class="mode-name"><i class="fas fa-file-pdf me-1"></i>Direct Extraction</div>
+        <p>Already have a question paper (PDF)? Use this to extract questions exactly as they appear — same text, same options, same order.</p>
+      </div>
+      <div class="mode-tip-badge">
+        <div class="mode-name"><i class="fas fa-brain me-1"></i>Concept Mining</div>
+        <p>Have a theory/textbook PDF? AI reads the concepts and <em>generates new questions</em> inspired by the content — not copy-paste.</p>
+      </div>
+      <div class="mode-tip-badge">
+        <div class="mode-name"><i class="fas fa-wand-magic-sparkles me-1"></i>Pure Generation</div>
+        <p>No PDF? Just type a topic name like <code>Fluid Mechanics</code> and AI generates fresh questions from scratch.</p>
+      </div>
+    </div>
+
+    <!-- Core tips grid -->
+    <p style="font-size:.73rem;color:var(--text-3);margin:.6rem 0 .5rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Tips for better &amp; faster generation</p>
+    <div class="tips-grid">
+      <div class="tip-card">
+        <div class="tip-card-icon green"><i class="fas fa-scissors"></i></div>
+        <div class="tip-card-text">
+          <h5>Split large PDFs first</h5>
+          <p>If your PDF has 100+ questions, split it into chunks of 20–30 pages before uploading. Smaller PDFs = faster AI response + less hallucination.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon blue"><i class="fas fa-layer-group"></i></div>
+        <div class="tip-card-text">
+          <h5>Use small batch sizes</h5>
+          <p>Ask for <code>10–15 questions max</code> per run. Run multiple times to hit your total target. Smaller batches are faster, more accurate, and less likely to get cut off.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon yellow"><i class="fas fa-ban"></i></div>
+        <div class="tip-card-text">
+          <h5>Always upload the Exclude CSV</h5>
+          <p>After every run, export the CSV and upload it in <em>"Exclude Already Generated"</em> before the next run. This is the most reliable way to prevent duplicate questions.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon green"><i class="fas fa-repeat"></i></div>
+        <div class="tip-card-text">
+          <h5>Run in multiple short sessions</h5>
+          <p>Instead of 50 at once, do 5 runs of 10. Each run with updated exclude CSV = zero duplicates and higher quality per question.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon red"><i class="fas fa-clock-rotate-left"></i></div>
+        <div class="tip-card-text">
+          <h5>Error? Wait &amp; retry</h5>
+          <p>If generation fails with a timeout or overload error, wait <code>30–60 seconds</code> and try again. Gemini API has rate limits that self-reset quickly.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon blue"><i class="fas fa-file-image"></i></div>
+        <div class="tip-card-text">
+          <h5>Scanned PDF? AI uses Vision</h5>
+          <p>If your PDF is image-based (scanned paper), the system automatically switches to Gemini Vision mode — no action needed from your side.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon yellow"><i class="fas fa-pen-to-square"></i></div>
+        <div class="tip-card-text">
+          <h5>Use Custom Instructions</h5>
+          <p>In the config form, add specific instructions like <em>"Focus on numerical problems only"</em> or <em>"Avoid questions about Topic X"</em> to guide the AI.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon purple"><i class="fas fa-eye"></i></div>
+        <div class="tip-card-text">
+          <h5>Always preview before saving</h5>
+          <p>Review all generated questions in the preview panel. Use <em>Edit</em> to fix any LaTeX or wording issues before hitting <em>Save to DB</em>.</p>
+        </div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-icon green"><i class="fas fa-file-csv"></i></div>
+        <div class="tip-card-text">
+          <h5>Export CSV as backup</h5>
+          <p>Before saving to DB, always export a CSV copy. If something goes wrong, you can re-import via the <em>Upload CSV</em> button without re-generating.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tips-note">
+      <i class="fas fa-info-circle me-1" style="color:var(--accent)"></i>
+      <strong>Workflow summary:</strong>
+      Split PDF → Upload chunk → Set count to 10–15 → Generate → Preview &amp; edit → Export CSV → Upload as exclude → Repeat for next chunk → Save to DB when done.
+    </div>
+  </div>
+</div>
+
+<!-- ── Pre-Generate Checklist Modal ──────────────────────────────────── -->
+<div id="preGenChecklistModal">
+  <div class="pgcm-box">
+    <div class="pgcm-header">
+      <div class="pgcm-header-icon"><i class="fas fa-clipboard-check"></i></div>
+      <div>
+        <h5>Pre-Generation Checklist</h5>
+        <small>Tick all items to unlock generation</small>
+      </div>
+      <button class="pgcm-close-btn" onclick="pgcmClose()" title="Close"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="pgcm-body">
+      <div class="pgcm-section-label">PDF &amp; Setup</div>
+      <div class="pgcm-check-item" id="pgc1">
+        <input type="checkbox" id="pgc1cb" onchange="pgcmToggle('pgc1')">
+        <label for="pgc1cb">
+          I have split my PDF into small chunks (20–30 pages each) if it's large
+          <span>Large PDFs cause timeouts and hallucinations - split first for best results</span>
+        </label>
+      </div>
+      <div class="pgcm-check-item" id="pgc2">
+        <input type="checkbox" id="pgc2cb" onchange="pgcmToggle('pgc2')">
+        <label for="pgc2cb">
+          I have selected the correct exam and mode for this session
+          <span>Wrong mode = wrong output type. Double-check before launching</span>
+        </label>
+      </div>
+
+      <div class="pgcm-section-label">Duplicate Prevention</div>
+      <div class="pgcm-check-item" id="pgc3">
+        <input type="checkbox" id="pgc3cb" onchange="pgcmToggle('pgc3')">
+        <label for="pgc3cb">
+          I have uploaded the exclude CSV (or this is my very first run for this exam)
+          <span>Export CSV after every run and re-upload it here to prevent duplicate questions</span>
+        </label>
+      </div>
+
+      <div class="pgcm-section-label">Count &amp; Quality</div>
+      <div class="pgcm-check-item" id="pgc4">
+        <input type="checkbox" id="pgc4cb" onchange="pgcmToggle('pgc4')">
+        <label for="pgc4cb">
+          My question count per run is 15 or fewer (recommended: 10)
+          <span>Smaller batches = higher accuracy + less chance of JSON truncation</span>
+        </label>
+      </div>
+      <div class="pgcm-check-item" id="pgc5">
+        <input type="checkbox" id="pgc5cb" onchange="pgcmToggle('pgc5')">
+        <label for="pgc5cb">
+          I understand errors may occur - I will wait 30-60s and retry if needed
+          <span>Gemini API has rate limits that reset automatically - no panic needed</span>
+        </label>
+      </div>
+    </div>
+    <div class="pgcm-footer">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="pgcm-progress-text">
+          <strong id="pgcmCheckedCount">0</strong> / 5 checked
+        </div>
+        <button class="btn btn-secondary btn-sm" id="pgcmSelectAllBtn" onclick="pgcmSelectAll()" style="font-size:.72rem;padding:.25rem .65rem;">
+          <i class="fas fa-check-double me-1"></i>Select All
+        </button>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-secondary btn-sm" onclick="pgcmClose()">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="pgcmProceedBtn" onclick="pgcmProceed()">
+          <i class="fas fa-rocket me-1"></i>Proceed to Configure
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Preview Section -->
 <div id="previewSection" style="display:none;">
   <div class="preview-section">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-      <h3 class="fw-bold mb-0" style="font-size:1.1rem;color:var(--text-1);">
-        <i class="fas fa-check-circle me-2" style="color:var(--success-text)"></i>
-        Generated Questions (<span id="questionCount">0</span>)
-      </h3>
-<div class="d-flex gap-2 flex-wrap">
-  <div class="dropdown">
-    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-      <i class="fas fa-text-height me-1"></i>Global Size
-    </button>
-    <ul class="dropdown-menu dropdown-menu-end">
-      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('small');return false;">Small</a></li>
-      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('normalsize');return false;">Normal</a></li>
-      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('large');return false;">Large</a></li>
-      <li><a class="dropdown-item" href="#" onclick="accApplyGlobalSize('Large');return false;">Extra Large</a></li>
-    </ul>
-  </div>
-
-  <button class="btn btn-secondary btn-sm" onclick="accRenderAll()">
-    <i class="fas fa-calculator me-1"></i>Render All
-  </button>
-
-  <button class="btn btn-secondary btn-sm" onclick="accRawAll()">
-    <i class="fas fa-code me-1"></i>Raw All
-  </button>
-
-  <button class="btn btn-secondary btn-sm" onclick="exportToCSV()">
-    <i class="fas fa-download me-1"></i>Export CSV
-  </button>
-
-  <button class="btn btn-primary btn-sm" onclick="saveToDatabase()">
-    <i class="fas fa-save me-1"></i>Save to Database
-  </button>
-</div>
+    <div id="accStickyBar">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-nowrap gap-2 acc-top-toolbar">
+        <h3 class="fw-bold mb-0" style="font-size:1.1rem;color:var(--text-1);">
+          <i class="fas fa-check-circle me-2" style="color:var(--success-text)"></i>
+          Generated Questions (<span id="questionCount">0</span>)
+        </h3>
+        <div class="d-flex gap-2 align-items-center flex-nowrap">
+          <div style="position:relative;display:inline-block;flex-shrink:0;">
+            <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" style="width:auto;">
+              <i class="fas fa-text-height me-1"></i>Global Size
+            </button>
+            <ul class="dropdown-menu" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+              <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="accApplyGlobalSize('small');return false;">Small</a></li>
+              <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="accApplyGlobalSize('normalsize');return false;">Normal</a></li>
+              <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="accApplyGlobalSize('large');return false;">Large</a></li>
+              <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="accApplyGlobalSize('Large');return false;">Extra Large</a></li>
+            </ul>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="accRenderAll()">
+            <i class="fas fa-calculator me-1"></i>Render All
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="accRawAll()">
+            <i class="fas fa-code me-1"></i>Raw All
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="exportToCSV()">
+            <i class="fas fa-file-export me-1"></i>Export CSV
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveToDatabase()">
+            <i class="fas fa-database me-1"></i>Save to DB
+          </button>
+        </div>
+      </div>
     </div>
     <div id="questionsPreviewList"></div>
   </div>
+</div>
+
+<!-- Floating Scroll Navigation (ACC) -->
+<div id="accScrollNav">
+  <button class="acc-scroll-btn" onclick="accNavScrollTop()" data-tooltip="Jump to Top">
+    <svg class="acc-scroll-progress" viewBox="0 0 40 40">
+      <circle class="bg" cx="20" cy="20" r="18"></circle>
+      <circle id="accScrollProgress" class="fg" cx="20" cy="20" r="18"></circle>
+    </svg>
+    <i class="fas fa-arrow-up"></i>
+  </button>
+  <button class="acc-scroll-btn" onclick="accNavScrollBot()" data-tooltip="Jump to Bottom">
+    <i class="fas fa-arrow-down"></i>
+  </button>
 </div>
 
 <!-- Configuration Modal -->
@@ -227,6 +645,18 @@ window.MathJax = {
             <div class="config-section-title"><i class="fas fa-file-pdf"></i>Upload PDF Document</div>
             <input type="file" name="pdf_file" class="form-control" accept=".pdf">
             <small class="text-muted mt-1 d-block">Upload your PDF containing questions or theory content</small>
+          </div>
+
+          <div class="config-section" id="excludeSection">
+            <div class="config-section-title"><i class="fas fa-ban"></i>Exclude Already Generated (Optional)</div>
+            <input type="file" id="existingQuestionsFile" accept=".csv" class="form-control">
+            <small class="text-muted mt-1 d-block">
+              Upload a CSV (with <code>question_text</code> column) — AI will skip these questions to avoid duplicates.
+            </small>
+            <div id="excludeStatus" style="display:none;margin-top:.6rem;font-size:.75rem;padding:.35rem .7rem;background:var(--success-bg);border:1px solid var(--success-border);border-radius:var(--radius);color:var(--success-text);">
+              <i class="fas fa-check-circle me-1"></i><span id="excludeStatusText"></span>
+            </div>
+            <input type="hidden" name="excluded_texts" id="excludedTextsInput" value="[]">
           </div>
 
           <div class="config-section" id="topicInputArea" style="display:none;">
@@ -314,7 +744,9 @@ window.MathJax = {
     </div>
     <div class="loading-title">AI Engine Active</div>
     <div class="loading-sub" id="loadingSubText">Initialising question generation...</div>
-    <div class="ai-progress-wrap"><div class="ai-progress-bar"></div></div>
+    <div style="font-size:.72rem;color:var(--accent);font-weight:700;margin-bottom:.5rem;min-height:1.1em;transition:opacity .3s;" id="loadingBatchText"></div>
+    <div class="ai-progress-wrap"><div class="ai-progress-bar" id="aiProgressBar"></div></div>
+    <div style="font-size:.65rem;color:var(--text-3);margin-top:.4rem;margin-bottom:.6rem;min-height:1em;" id="loadingPctText"></div>
     <div class="loading-steps">
       <div class="loading-step active" id="lstep-1"><div class="step-dot"></div><span>READING</span></div>
       <div class="loading-step" id="lstep-2"><div class="step-dot"></div><span>ANALYSING</span></div>
@@ -482,7 +914,75 @@ document.addEventListener('DOMContentLoaded', function() {
         else exitManager.hide();
     };
 });
+// ── Tips Panel toggle ────────────────────────────────────────────────────
+function toggleTipsPanel() {
+  const body    = document.getElementById('tipsPanelBody');
+  const chevron = document.getElementById('tipsPanelChevron');
+  const isOpen  = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+  try { localStorage.setItem('acc_tips_open', isOpen ? '0' : '1'); } catch(e){}
+}
+(function _restoreTipsState() {
+  try {
+    if (localStorage.getItem('acc_tips_open') !== '0') {
+      document.getElementById('tipsPanelBody').classList.add('open');
+      document.getElementById('tipsPanelChevron').style.transform = 'rotate(180deg)';
+    }
+  } catch(e){}
+})();
+
+// ── Pre-Generate Checklist ────────────────────────────────────────────────
+let _pendingMode = null;
+const _TOTAL_CHECKS = 5;
+
+function pgcmToggle(itemId) {
+  const item = document.getElementById(itemId);
+  if (!item) return;
+  const cb = item.querySelector('input[type=checkbox]');
+  item.classList.toggle('checked', cb.checked);
+  _pgcmUpdateProgress();
+}
+function pgcmSelectAll() {
+  const allChecks = document.querySelectorAll('#preGenChecklistModal input[type=checkbox]');
+  const allChecked = Array.from(allChecks).every(cb => cb.checked);
+  allChecks.forEach(cb => {
+    cb.checked = !allChecked;
+    const item = cb.closest('.pgcm-check-item');
+    if (item) item.classList.toggle('checked', cb.checked);
+  });
+  _pgcmUpdateProgress();
+}
+function _pgcmUpdateProgress() {
+  const checked = document.querySelectorAll('#preGenChecklistModal input[type=checkbox]:checked').length;
+  document.getElementById('pgcmCheckedCount').textContent = checked;
+  const btn = document.getElementById('pgcmProceedBtn');
+  btn.classList.toggle('ready', checked === _TOTAL_CHECKS);
+}
+function pgcmClose() {
+  document.getElementById('preGenChecklistModal').classList.remove('show');
+  _pendingMode = null;
+}
+function pgcmProceed() {
+  if (!document.getElementById('pgcmProceedBtn').classList.contains('ready')) return;
+  document.getElementById('preGenChecklistModal').classList.remove('show');
+  _openModeModalDirect(_pendingMode);
+  _pendingMode = null;
+}
+function _resetChecklist() {
+  document.querySelectorAll('#preGenChecklistModal input[type=checkbox]').forEach(cb => {
+    cb.checked = false;
+    cb.closest('.pgcm-check-item').classList.remove('checked');
+  });
+  _pgcmUpdateProgress();
+}
+
 function openModeModal(mode) {
+  _pendingMode = mode;
+  _resetChecklist();
+  document.getElementById('preGenChecklistModal').classList.add('show');
+}
+function _openModeModalDirect(mode) {
   if (!genModal) { showToast('Page not ready — please refresh.', 'error'); return; }
   document.getElementById('modalMode').value = mode;
   document.getElementById('modalTitle').innerHTML =
@@ -493,6 +993,40 @@ function openModeModal(mode) {
   genModal.show();
 }
 
+let _pollTimer   = null;
+let _smoothTimer = null;
+let _displayPct  = 0;   // what bar actually shows right now
+let _targetPct   = 0;   // what backend last told us
+
+// ── Smooth ticker: runs at 80ms, always moving toward target ──────────────
+function _startSmoothTicker() {
+  if (_smoothTimer) return;
+  _smoothTimer = setInterval(() => {
+    const bar   = document.getElementById('aiProgressBar');
+    const pctEl = document.getElementById('loadingPctText');
+    if (!bar) return;
+
+    if (_displayPct < _targetPct) {
+      // Ease-in: fast when gap is big, slow when close
+      const gap = _targetPct - _displayPct;
+      _displayPct += Math.max(0.3, gap * 0.06);
+      if (_displayPct > _targetPct) _displayPct = _targetPct;
+    } else if (_targetPct < 99 && _displayPct < 94) {
+      // Creep slowly while waiting for next server poll (never goes past 94 on its own)
+      _displayPct += 0.03;
+    }
+
+    const shown = Math.min(_displayPct, 99.5);
+    bar.style.width        = shown.toFixed(1) + '%';
+    if (pctEl) pctEl.textContent = Math.round(shown) + '%';
+  }, 80);
+}
+
+function _stopSmoothTicker() {
+  if (_smoothTimer) { clearInterval(_smoothTimer); _smoothTimer = null; }
+}
+
+// ── Form submit ───────────────────────────────────────────────────────────
 document.getElementById('aiGenForm').onsubmit = async (e) => {
   e.preventDefault();
   const mode = document.getElementById('modalMode').value;
@@ -501,28 +1035,136 @@ document.getElementById('aiGenForm').onsubmit = async (e) => {
     showToast('Topic Required — please enter a topic for Pure Generation.', 'error'); return;
   }
   genModal.hide();
-  document.getElementById('loadingOverlay').style.display = 'flex';
-  startLoadingAnimation();
+  _showLoading('Submitting to AI Engine...');
   try {
-    const res  = await fetch('/admin/ai-command-centre/generate', {method:'POST', body:formData});
+    const res  = await fetch('/admin/ai-command-centre/generate', { method: 'POST', body: formData });
     const data = await res.json();
-    stopLoadingAnimation();
-    document.getElementById('loadingOverlay').style.display = 'none';
-    if (data.success) {
-      generatedQuestions = data.questions;
-      renderPreview();
-      document.getElementById('previewSection').style.display = 'block';
-      showToast(`Generated ${data.count} questions successfully!`, 'success');
-      document.getElementById('previewSection').scrollIntoView({behavior:'smooth'});
-    } else {
-      showToast('Generation Failed: ' + (data.message || 'Unknown error'), 'error');
+    if (!data.success) {
+      _hideLoading();
+      showToast('Launch failed: ' + (data.message || 'Unknown error'), 'error');
+      return;
     }
+    _pollJob(data.job_id);
   } catch {
-    stopLoadingAnimation();
-    document.getElementById('loadingOverlay').style.display = 'none';
+    _hideLoading();
     showToast('Could not connect to server.', 'error');
   }
 };
+
+function _showLoading(msg) {
+  _displayPct = 0;
+  _targetPct  = 4;  // immediate tiny nudge so bar isn't dead at 0
+  document.getElementById('loadingSubText').textContent  = msg || '';
+  document.getElementById('loadingBatchText').textContent = '';
+  document.getElementById('loadingPctText').textContent   = '0%';
+  document.getElementById('aiProgressBar').style.width    = '0%';
+  for (let i = 1; i <= 4; i++) document.getElementById(`lstep-${i}`)?.classList.remove('active');
+  document.getElementById('lstep-1')?.classList.add('active');
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  _startSmoothTicker();
+}
+
+function _hideLoading() {
+  _stopSmoothTicker();
+  document.getElementById('loadingOverlay').style.display = 'none';
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+function _pollJob(jobId) {
+  _pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`/admin/ai-command-centre/status/${jobId}`);
+      const job = await res.json();
+      _updateLoadingUI(job);
+
+      if (job.status === 'done' || job.status === 'failed') {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+        _targetPct = 100;  // let smooth ticker finish the last stretch
+
+        // Give bar 700ms to reach 100% visually before hiding
+        setTimeout(() => {
+          _hideLoading();
+          if (job.questions && job.questions.length > 0) {
+            generatedQuestions = job.questions;
+            renderPreview();
+            document.getElementById('previewSection').style.display = 'block';
+            document.getElementById('previewSection').scrollIntoView({ behavior: 'smooth' });
+            if (job.status === 'failed') {
+              accShowError({
+                title: 'Partial Results',
+                msg: `Some batches failed but <strong>${job.questions.length}</strong> questions were recovered.`
+                   + `<br><small style="color:var(--text-3)">${job.error || ''}</small>`
+              });
+            } else {
+              showToast(`Generated ${job.questions.length} questions successfully!`, 'success');
+            }
+          } else {
+            const err = job.error || '';
+            let title = 'Generation Failed';
+            let msg   = 'No questions could be generated. Please try again.';
+            if (err.includes('TRUNCATED')) {
+              title = 'AI Response Cut Off';
+              msg   = 'Gemini hit its output limit mid-response. '
+                    + '<strong>Try generating 20 or fewer questions at a time.</strong> '
+                    + 'Already-generated questions (if any) were recovered above.';
+            } else if (err.includes('503') || err.includes('UNAVAILABLE')) {
+              title = 'Gemini Busy';
+              msg   = 'Gemini API is experiencing high load. '
+                    + 'Wait a minute and try again — it\'s a temporary spike.';
+            } else if (err.includes('MALFORMED')) {
+              title = 'Unexpected AI Response';
+              msg   = 'Gemini returned an unexpected format. Try again — '
+                    + 'this usually resolves itself.';
+            } else if (err) {
+              msg = err.substring(0, 200);
+            }
+            accShowError({ title, msg });
+          }
+        }, 700);
+      }
+    } catch (err) {
+      console.warn('Poll error (will retry):', err);
+    }
+  }, 1500);
+}
+
+function _updateLoadingUI(job) {
+  const sub       = document.getElementById('loadingSubText');
+  const batchText = document.getElementById('loadingBatchText');
+
+  if (sub) sub.textContent = job.message || 'Processing...';
+
+  const total = job.total_batches || 1;
+  const done  = job.completed_batches || 0;
+
+  // Only update targetPct — smooth ticker handles actual bar movement
+  const serverPct = job.percent != null ? job.percent : Math.round((done / total) * 90);
+  if (serverPct > _targetPct) _targetPct = serverPct;
+
+  if (batchText) {
+    if (total > 1 && done > 0) {
+      batchText.textContent = `Batch ${done} of ${total} complete - ${job.questions_so_far || 0} questions collected`;
+    } else if (total > 1) {
+      batchText.textContent = `${total} batches queued, starting...`;
+    } else if (job.questions_so_far) {
+      batchText.textContent = `${job.questions_so_far} questions generated`;
+    } else {
+      batchText.textContent = '';
+    }
+  }
+
+  const stepMap = {
+    start: 1, vision_detected: 1, uploading: 1, uploaded: 1,
+    batches_ready: 2, batch_start: 2,
+    batch_done: 3, batch_error: 3,
+    done: 4, failed: 4,
+  };
+  const activeStep = stepMap[job.last_event] || 1;
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById(`lstep-${i}`)?.classList.toggle('active', i <= activeStep);
+  }
+}
 
 function applyLatexSize(text, sizeCmd) {
     if (!text) return text;
@@ -542,26 +1184,154 @@ function escapeHtml(text) {
   const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
 }
 
+
+
+// ── CSV parser (handles quoted fields with commas inside) ─────────────────
+function _parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; continue; }
+    if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// ── Rich content renderer: \n → <br>, markdown tables → HTML ─────────────
+function _renderContent(text) {
+  if (!text) return '';
+
+  // Step 1: Protect ALL LaTeX zones ($...$, $$...$$) before any processing
+  const latexZones = [];
+  let protected_text = text
+    .replace(/\$\$[\s\S]*?\$\$/g, m => { latexZones.push(m); return `\x00LATEX${latexZones.length-1}\x00`; })
+    .replace(/\$[^$\n]+?\$/g,     m => { latexZones.push(m); return `\x00LATEX${latexZones.length-1}\x00`; });
+
+  // Step 2: Convert literal \n (backslash+n) to real newlines — safe now that LaTeX is protected
+  protected_text = protected_text.replace(/\\n/g, '\n');
+
+  // Step 3: Detect and convert pipe-table rows to HTML table
+  const lines = protected_text.split('\n');
+  const out = [];
+  let tableBuffer = [];
+
+  const isTableRow = l => {
+    const t = l.trim();
+    return (t.startsWith('|') && t.endsWith('|') && t.length > 2) ||
+           /^[^|]+(\|[^|]+){1,}$/.test(t);
+  };
+  const isSepRow = l => /^\|?[\s|:|-]+\|?$/.test(l.trim()) && /[-]{2,}/.test(l);
+
+  const flushTable = () => {
+    if (!tableBuffer.length) return;
+    let html = '<div style="overflow-x:auto;margin:.5rem 0"><table style="border-collapse:collapse;width:100%;font-size:.82rem;">';
+    let isHeader = true;
+    tableBuffer.forEach(row => {
+      if (isSepRow(row)) return;
+      let cells;
+      const t = row.trim();
+      if (t.startsWith('|') && t.endsWith('|')) {
+        cells = t.split('|').map(c => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+      } else {
+        cells = t.split('|').map(c => c.trim());
+      }
+      if (!cells.length) return;
+      if (isHeader) {
+        html += '<tr>' + cells.map(c => `<th style="border:1px solid var(--border);padding:.35rem .6rem;background:var(--surface-2);font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('') + '</tr>';
+        isHeader = false;
+      } else {
+        html += '<tr>' + cells.map(c => `<td style="border:1px solid var(--border);padding:.3rem .6rem;">${c}</td>`).join('') + '</tr>';
+      }
+    });
+    html += '</table></div>';
+    out.push(html);
+    tableBuffer = [];
+  };
+
+  // Runs of 2+ pipe rows = table; single pipe row = plain text
+  const staged = [];
+  for (const line of lines) {
+    if (isTableRow(line)) staged.push({ type: 'pipe', line });
+    else staged.push({ type: 'text', line });
+  }
+  let si = 0;
+  while (si < staged.length) {
+    if (staged[si].type === 'pipe') {
+      let j = si;
+      while (j < staged.length && staged[j].type === 'pipe') j++;
+      const run = staged.slice(si, j);
+      if (run.length >= 2) { run.forEach(s => tableBuffer.push(s.line)); flushTable(); }
+      else out.push(staged[si].line);
+      si = j;
+    } else { out.push(staged[si].line); si++; }
+  }
+  flushTable();
+
+  // Step 4: Collapse blank lines, join with <br>
+  let result = out.map(l => l.trim() === '' ? '' : l).join('\n');
+  result = result.replace(/\n{3,}/g, '\n\n');
+  result = result.split('\n').map(l => l === '' ? '<br>' : l).join('<br>');
+
+  // Step 5: Restore LaTeX zones
+  result = result.replace(/\x00LATEX(\d+)\x00/g, (_, idx) => latexZones[+idx]);
+
+  return result;
+}
+
 function renderPreview() {
   const list = document.getElementById('questionsPreviewList');
   document.getElementById('questionCount').textContent = generatedQuestions.length;
-  list.innerHTML = generatedQuestions.map((q, i) => {
-    const typeBadgeClass = q.question_type==='MCQ'?'type-badge-mcq':q.question_type==='MSQ'?'type-badge-msq':'type-badge-numeric';
-    const optionsRaw = q.question_type !== 'NUMERIC' ? `
+  list.innerHTML = '';
+
+  const FIRST_BATCH = 10;
+  const CHUNK = 15;
+
+  const renderChunk = (start) => {
+    const end = Math.min(start + CHUNK, generatedQuestions.length);
+    const frag = document.createDocumentFragment();
+    for (let i = start; i < end; i++) {
+      const div = document.createElement('div');
+      div.innerHTML = _cardHTML(generatedQuestions[i], i);
+      frag.appendChild(div.firstElementChild);
+    }
+    list.appendChild(frag);
+    if (end < generatedQuestions.length) setTimeout(() => renderChunk(end), 0);
+  };
+
+  const frag = document.createDocumentFragment();
+  const firstEnd = Math.min(FIRST_BATCH, generatedQuestions.length);
+  for (let i = 0; i < firstEnd; i++) {
+    const div = document.createElement('div');
+    div.innerHTML = _cardHTML(generatedQuestions[i], i);
+    frag.appendChild(div.firstElementChild);
+  }
+  list.appendChild(frag);
+  if (generatedQuestions.length > FIRST_BATCH) setTimeout(() => renderChunk(FIRST_BATCH), 0);
+
+  // Reattach scroll nav after render
+  setTimeout(_accAttachScrollNav, 400);
+}
+
+function _cardHTML(q, i) {
+  const typeBadgeClass = q.question_type==='MCQ'?'type-badge-mcq':q.question_type==='MSQ'?'type-badge-msq':'type-badge-numeric';
+  const optionsRaw = q.question_type !== 'NUMERIC' ? `
       <div class="row g-2 mb-3">
         <div class="col-6"><strong style="color:var(--text-2)">A)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_a)}</code></div>
         <div class="col-6"><strong style="color:var(--text-2)">B)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_b)}</code></div>
         <div class="col-6"><strong style="color:var(--text-2)">C)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_c)}</code></div>
         <div class="col-6"><strong style="color:var(--text-2)">D)</strong> <code class="raw-code" style="display:inline;padding:3px 7px;">${escapeHtml(q.option_d)}</code></div>
       </div>` : '';
-    const optionsRendered = q.question_type !== 'NUMERIC' ? `
+  const optionsRendered = q.question_type !== 'NUMERIC' ? `
       <div class="row g-2 mb-2">
-        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">A)</strong> <span id="ropt-${i}-a">${q.option_a}</span></div></div>
-        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">B)</strong> <span id="ropt-${i}-b">${q.option_b}</span></div></div>
-        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">C)</strong> <span id="ropt-${i}-c">${q.option_c}</span></div></div>
-        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">D)</strong> <span id="ropt-${i}-d">${q.option_d}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">A)</strong> <span id="ropt-${i}-a">${_renderContent(q.option_a||'')}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">B)</strong> <span id="ropt-${i}-b">${_renderContent(q.option_b||'')}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">C)</strong> <span id="ropt-${i}-c">${_renderContent(q.option_c||'')}</span></div></div>
+        <div class="col-6"><div class="rendered-option"><strong style="color:var(--success-text)">D)</strong> <span id="ropt-${i}-d">${_renderContent(q.option_d||'')}</span></div></div>
       </div>` : '';
-    const optionsEdit = q.question_type !== 'NUMERIC' ? `
+  const optionsEdit = q.question_type !== 'NUMERIC' ? `
       <div class="row g-2 mb-3">
         <div class="col-6"><label class="form-label">Option A:</label><input type="text" class="form-control" id="edit-opt-a-${i}" value="${escapeHtml(q.option_a)}"></div>
         <div class="col-6"><label class="form-label">Option B:</label><input type="text" class="form-control" id="edit-opt-b-${i}" value="${escapeHtml(q.option_b)}"></div>
@@ -569,9 +1339,9 @@ function renderPreview() {
         <div class="col-6"><label class="form-label">Option D:</label><input type="text" class="form-control" id="edit-opt-d-${i}" value="${escapeHtml(q.option_d)}"></div>
       </div>` : '';
 
-    return `
+  return `
     <div class="question-preview-card" id="card-${i}">
-      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-nowrap gap-2 acc-top-toolbar">
         <div class="d-flex gap-2 align-items-center flex-wrap">
           <span class="type-badge ${typeBadgeClass}">${q.question_type}</span>
           <span class="badge" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:0.72rem;">+${q.positive_marks} / -${q.negative_marks}</span>
@@ -586,14 +1356,14 @@ function renderPreview() {
             </select>
           </div>
         </div>
-        <div class="btn-group">
-          <button class="btn btn-sm btn-secondary" id="toggle-btn-${i}" onclick="toggleView(${i})">
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-secondary" id="toggle-btn-${i}" onclick="toggleView(${i})">
             <i class="fas fa-eye"></i> Rendered
           </button>
-          <button class="btn btn-sm btn-secondary" onclick="editQuestion(${i})">
+          <button class="btn btn-secondary" onclick="editQuestion(${i})">
             <i class="fas fa-edit"></i> Edit
           </button>
-          <button class="btn btn-sm" style="background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);" onclick="deleteQuestion(${i})">
+          <button class="btn" style="background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);" onclick="deleteQuestion(${i})">
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -609,9 +1379,9 @@ function renderPreview() {
         ${optionsRaw}
       </div>
 
-      <div id="rendered-view-${i}" class="rendered-view-box">
+      <div id="rendered-view-${i}" class="rendered-view-box" style="display:none;">
         <p class="mb-1" style="font-size:0.78rem;color:var(--accent);font-weight:600;">QUESTION</p>
-        <div style="margin-top:6px;line-height:1.9;overflow-wrap:break-word;" id="rq-${i}">${q.question_text}</div>
+        <div style="margin-top:6px;line-height:1.9;overflow-wrap:break-word;" id="rq-${i}">${_renderContent(q.question_text)}</div>
         ${optionsRendered}
       </div>
 
@@ -635,7 +1405,6 @@ function renderPreview() {
         <i class="fas fa-check-circle me-1"></i>Correct Answer: <span id="answer-${i}">${escapeHtml(q.correct_answer)}</span>
       </div>
     </div>`;
-  }).join('');
 }
 
 function accApplyGlobalSize(size){
@@ -658,6 +1427,7 @@ function accApplyGlobalSize(size){
 function accRenderAll(){
   if (!generatedQuestions || !generatedQuestions.length) { showToast('No questions to render.', 'error'); return; }
   let count = 0;
+  const toTypeset = [];
   generatedQuestions.forEach((q, i) => {
     const raw  = document.getElementById(`raw-view-${i}`);
     const rend = document.getElementById(`rendered-view-${i}`);
@@ -665,15 +1435,24 @@ function accRenderAll(){
     if (raw && rend && raw.style.display !== 'none') {
       raw.style.display  = 'none';
       rend.style.display = 'block';
-      if (btn) btn.innerHTML = '<i class="fas fa-code"></i> Raw LaTeX';
+      if (btn) btn.innerHTML = '<i class="fas fa-code"></i> Raw';
+      if (!rend.dataset.mathjaxDone) toTypeset.push(rend);
       count++;
     }
   });
-  if (window.MathJax && window.MathJax.typesetPromise) {
-    const container = document.getElementById('questionsPreviewList');
-    MathJax.typesetPromise([container]).catch(err => console.error('MathJax Error:', err));
+  if (window.MathJax && toTypeset.length) {
+    const BATCH = 10;
+    const typesetBatch = (start) => {
+      const batch = toTypeset.slice(start, start + BATCH);
+      if (!batch.length) return;
+      MathJax.typesetPromise(batch).then(() => {
+        batch.forEach(el => el.dataset.mathjaxDone = '1');
+        setTimeout(() => typesetBatch(start + BATCH), 0);
+      }).catch(err => console.error('MathJax Error:', err));
+    };
+    typesetBatch(0);
   }
-  if (count > 0) showToast(`Render complete — ${count} question(s) rendered`, 'success');
+  if (count > 0) showToast(`Rendering...`, 'success', `${count} question(s) queued for render`);
   else showToast('Already rendered', 'info');
 }
 
@@ -702,8 +1481,10 @@ function toggleView(index) {
   const isRaw = rawView.style.display !== 'none';
   if (isRaw) {
     rawView.style.display = 'none'; renderedView.style.display = 'block';
-    btn.innerHTML = '<i class="fas fa-code"></i> Raw LaTeX';
-    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([renderedView]).catch(()=>{});
+    btn.innerHTML = '<i class="fas fa-code"></i> Raw';
+    if (window.MathJax && MathJax.typesetPromise && !renderedView.dataset.mathjaxDone) {
+      MathJax.typesetPromise([renderedView]).then(() => { renderedView.dataset.mathjaxDone = '1'; }).catch(()=>{});
+    }
   } else {
     rawView.style.display = 'block'; renderedView.style.display = 'none';
     btn.innerHTML = '<i class="fas fa-eye"></i> Rendered';
@@ -917,33 +1698,84 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
-const _loadSteps = [
-  [1,'Reading and parsing PDF content...'],
-  [2,'Analysing concepts with RAG pipeline...'],
-  [3,'Crafting high-quality questions via Gemini...'],
-  [4,'Validating LaTeX and schema compliance...'],
-];
-let _loadTimer = null;
+// startLoadingAnimation / stopLoadingAnimation replaced by _showLoading / _hideLoading above.
+function startLoadingAnimation() {}
+function stopLoadingAnimation() {}
 
-function startLoadingAnimation() {
-  let idx = 0;
-  for (let i=1;i<=4;i++) document.getElementById(`lstep-${i}`)?.classList.remove('active');
-  document.getElementById('lstep-1')?.classList.add('active');
-  const sub = document.getElementById('loadingSubText');
-  if (sub) sub.textContent = _loadSteps[0][1];
-  _loadTimer = setInterval(()=>{
-    idx++;
-    if (idx >= _loadSteps.length) { clearInterval(_loadTimer); return; }
-    const [step, msg] = _loadSteps[idx];
-    document.getElementById(`lstep-${step-1}`)?.classList.remove('active');
-    document.getElementById(`lstep-${step}`)?.classList.add('active');
-    if (sub) sub.textContent = msg;
-  }, 2200);
-}
-function stopLoadingAnimation() {
-  if (_loadTimer) clearInterval(_loadTimer);
-  for (let i=1;i<=4;i++) document.getElementById(`lstep-${i}`)?.classList.remove('active');
-}
+// ── ACC Sticky Header + Floating Scroll Nav ───────────────────────────────
+(function () {
+  function _accAttachScrollNav() {
+    const bar  = document.getElementById('accStickyBar');
+    const nav  = document.getElementById('accScrollNav');
+    const ring = document.getElementById('accScrollProgress');
+    const scrollEl = document.documentElement;
+
+    function _update() {
+      const st  = window.scrollY || document.documentElement.scrollTop;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      if (nav) nav.classList.add('acc-nav-visible');
+      if (bar) {
+        if (st > 10) bar.classList.add('acc-bar-scrolled');
+        else bar.classList.remove('acc-bar-scrolled');
+      }
+      if (ring && max > 0) {
+        ring.style.strokeDashoffset = (113 - (113 * (st / max)));
+      }
+    }
+
+    window.removeEventListener('scroll', window._accScrollHandler);
+    window._accScrollHandler = _update;
+    window.addEventListener('scroll', _update, { passive: true });
+    _update();
+  }
+
+  window._accAttachScrollNav = _accAttachScrollNav;
+
+  window.accNavScrollTop = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  window.accNavScrollBot = function () { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); };
+})();
+
+// ── Exclude-CSV file handler ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  const fileInput = document.getElementById('existingQuestionsFile');
+  if (!fileInput) return;
+  fileInput.addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        const csvText = ev.target.result;
+        const lines   = csvText.split('\n').filter(l => l.trim());
+        if (!lines.length) { showToast('CSV is empty', 'error'); return; }
+
+        const headers = _parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/"/g, '').trim());
+        const colIdx  = headers.findIndex(h => h === 'question_text');
+        if (colIdx === -1) {
+          showToast('CSV must have a "question_text" column header', 'error'); return;
+        }
+
+        const texts = lines.slice(1)
+          .map(l => {
+            const cols = _parseCSVLine(l);
+            return cols[colIdx] ? cols[colIdx].replace(/^"|"$/g, '').trim() : '';
+          })
+          .filter(Boolean);
+
+        if (!texts.length) { showToast('No question texts found in CSV', 'error'); return; }
+
+        document.getElementById('excludedTextsInput').value = JSON.stringify(texts);
+        document.getElementById('excludeStatus').style.display = 'block';
+        document.getElementById('excludeStatusText').textContent =
+          `${texts.length} questions loaded - AI will generate different questions only`;
+        showToast(`Loaded ${texts.length} exclusions from CSV`, 'success');
+      } catch (err) {
+        showToast('Could not parse CSV: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  });
+});
 </script>
 
 {% include 'admin/csv_upload.html' %}

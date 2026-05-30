@@ -163,13 +163,53 @@ def create_drive_service_user():
 
         # Already an authorized token
         if all(k in data for k in ("refresh_token", "token_uri", "client_id", "client_secret")):
+            from google.auth.transport.requests import Request
+
             creds = UserCredentials.from_authorized_user_info(data, scopes=_scopes())
+
+            # Refresh token if expired or missing access token
+            if not creds.valid:
+                if creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                        # Persist refreshed token back to disk
+                        token_to_save = {
+                            "token":         creds.token,
+                            "refresh_token": creds.refresh_token,
+                            "token_uri":     creds.token_uri,
+                            "client_id":     creds.client_id,
+                            "client_secret": creds.client_secret,
+                            "scopes":        list(creds.scopes or _scopes()),
+                            "expiry":        creds.expiry.isoformat() if getattr(creds, "expiry", None) else None,
+                        }
+                        with open(token_path, "w", encoding="utf-8") as f:
+                            json.dump(token_to_save, f)
+                        print("Token refreshed and saved.")
+                    except Exception as refresh_err:
+                        err_str = str(refresh_err)
+                        if "invalid_grant" in err_str:
+                            raise RuntimeError(
+                                "OAuth refresh token has expired or been revoked. "
+                                "Delete token.json, place your client_secret.json at the configured "
+                                "path, and restart the app to trigger re-authorization."
+                            )
+                        raise RuntimeError(f"Token refresh failed: {refresh_err}")
+                else:
+                    raise RuntimeError(
+                        "No refresh_token found in token.json. Re-authorization required."
+                    )
+
             service = build("drive", "v3", credentials=creds, cache_discovery=False)
             try:
                 about = service.about().get(fields="user").execute()
                 print(f"User OAuth ready: {about.get('user', {}).get('emailAddress', 'unknown')}")
-            except Exception:
-                print("User OAuth client ready.")
+            except Exception as e:
+                if "invalid_grant" in str(e):
+                    raise RuntimeError(
+                        "token.json credentials are invalid (invalid_grant). "
+                        "Delete token.json and restart the app to re-authorize."
+                    )
+                print(f"User OAuth about() warn: {e}")
             return service
 
         # Client secret JSON — run one-time browser flow and persist token

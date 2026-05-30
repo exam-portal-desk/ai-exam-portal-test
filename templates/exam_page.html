@@ -807,7 +807,45 @@ renderMathJax() { if(window.MathJax) MathJax.typesetPromise().catch(()=>{}); }
 
 renderQuestion(question) {
   const qc=document.getElementById('questionContent'), qid=String(question.id), sel=this.answers[qid];
-  const p=(t)=>{ if(!t)return''; return String(t).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'); };
+  const p=(t)=>{
+    if(!t) return '';
+    t = String(t);
+    // Protect LaTeX zones
+    const lz=[];
+    t = t.replace(/\$\$[\s\S]*?\$\$/g,m=>{lz.push(m);return`\x00L${lz.length-1}\x00`;})
+         .replace(/\$[^$\n]+?\$/g,m=>{lz.push(m);return`\x00L${lz.length-1}\x00`;});
+    // \n → real newlines
+    t = t.replace(/\\n/g,'\n').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    // Pipe-table detection
+    const lines=t.split('\n'), out=[], buf=[];
+    const isTR=l=>{const s=l.trim();return(s.startsWith('|')&&s.endsWith('|')&&s.length>2)||/^[^|]+(\|[^|]+){1,}$/.test(s);};
+    const isSep=l=>/^\|?[\s|:|-]+\|?$/.test(l.trim())&&/[-]{2,}/.test(l);
+    const flush=()=>{
+      if(!buf.length)return;
+      let h='<div style="overflow-x:auto;margin:.4rem 0"><table style="border-collapse:collapse;width:100%;font-size:.82rem;">';
+      let hdr=true;
+      buf.forEach(r=>{
+        if(isSep(r))return;
+        const s=r.trim(); let cells;
+        if(s.startsWith('|')&&s.endsWith('|')) cells=s.split('|').map(c=>c.trim()).filter((_,i,a)=>i>0&&i<a.length-1);
+        else cells=s.split('|').map(c=>c.trim());
+        if(!cells.length)return;
+        if(hdr){h+='<tr>'+cells.map(c=>`<th style="border:1px solid var(--border);padding:.3rem .55rem;background:var(--surface-2);font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('')+'</tr>';hdr=false;}
+        else h+='<tr>'+cells.map(c=>`<td style="border:1px solid var(--border);padding:.28rem .55rem;">${c}</td>`).join('')+'</tr>';
+      });
+      h+='</table></div>';out.push(h);buf.length=0;
+    };
+    const stg=lines.map(l=>isTR(l)?{t:'p',l}:{t:'x',l});
+    let i=0;
+    while(i<stg.length){
+      if(stg[i].t==='p'){let j=i;while(j<stg.length&&stg[j].t==='p')j++;const run=stg.slice(i,j);if(run.length>=2){run.forEach(s=>buf.push(s.l));flush();}else out.push(stg[i].l);i=j;}
+      else{out.push(stg[i].l);i++;}
+    }
+    flush();
+    let r=out.join('\n').replace(/\n{3,}/g,'\n\n').split('\n').map(l=>l.trim()===''?'<br>':l).join('<br>');
+    r=r.replace(/\x00L(\d+)\x00/g,(_,idx)=>lz[+idx]);
+    return r;
+  };
   let html=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:1rem">
     <div style="flex:1"><h5 style="margin:0;font-size:.95rem;color:var(--text-1);line-height:1.5"><span class="badge bg-primary me-2">Q${this.currentIndex+1}</span>${p(question.question_text)||''}</h5></div>
     <div style="text-align:right;flex-shrink:0">
