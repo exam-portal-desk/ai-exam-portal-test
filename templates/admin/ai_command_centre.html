@@ -146,6 +146,11 @@ textarea.form-control { resize:vertical; }
 .acc-top-toolbar > * { flex-shrink:0; }
 .acc-top-toolbar .btn { white-space:nowrap; }
 .acc-top-toolbar .btn-primary { min-width:max-content; }
+@media (max-width:640px) {
+  .acc-top-toolbar { flex-direction:column !important; align-items:flex-start !important; gap:.55rem !important; flex-wrap:wrap !important; }
+  .acc-top-toolbar > div { flex-wrap:wrap !important; width:100%; flex-shrink:1 !important; }
+  .acc-top-toolbar .btn-sm { font-size:.72rem !important; padding:.28rem .55rem !important; }
+}
 .type-badge { display:inline-flex; align-items:center; padding:.2rem .6rem; border-radius:999px; font-size:.7rem; font-weight:800; letter-spacing:.06em; border:1px solid var(--border); }
 .type-badge-mcq     { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
 .type-badge-msq     { background:var(--info-bg,var(--accent-subtle)); color:var(--info-text,var(--accent)); border-color:var(--info-border,var(--border)); }

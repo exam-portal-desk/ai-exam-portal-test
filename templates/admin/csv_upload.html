@@ -236,14 +236,8 @@
 /* ── Top Toolbar Responsive Fix ───────────────────── */
 
 .csv-top-toolbar{
-  overflow-x:auto;
-  overflow-y:hidden;
-  scrollbar-width:none;
+  overflow:visible;
   padding-bottom:2px;
-}
-
-.csv-top-toolbar::-webkit-scrollbar{
-  display:none;
 }
 
 .csv-top-toolbar > *{
@@ -255,12 +249,62 @@
 .csv-top-toolbar .form-select,
 .csv-top-toolbar .input-group{
   white-space:nowrap;
+  flex-shrink:0;
 }
 
 /* Prevent Save button compression */
 .csv-top-toolbar .btn-success,
 .csv-top-toolbar .btn-primary{
   min-width:max-content;
+}
+
+/* Dropdown always on top */
+.csv-top-toolbar .dropdown-menu {
+  z-index:9999 !important;
+}
+
+/* ── Mobile Responsive ─────────────────────────────── */
+@media (max-width: 640px) {
+  #csvUploaderModal .modal-header { padding:.75rem 1rem; }
+  #csvUploaderModal .modal-body { padding:1rem !important; }
+
+  /* Stack title row above buttons row */
+  #csvStickyBar .csv-top-toolbar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: .55rem !important;
+  }
+
+  /* Buttons wrap — no horizontal scroll so dropdown renders correctly */
+  #csvStickyBar .csv-btn-row {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: .4rem !important;
+    flex-shrink: 1 !important;
+  }
+  #csvStickyBar .btn {
+    flex-shrink: 0;
+    font-size: .72rem;
+    padding: .3rem .55rem;
+    white-space: nowrap;
+  }
+  #csvStickyBar .dropdown-menu {
+    z-index: 9999 !important;
+  }
+
+  .csv-q-card { padding:.85rem .75rem; overflow:hidden; max-width:100%; }
+  .csv-raw-code { font-size:.7rem; word-break:break-all; max-width:100%; overflow-x:auto; }
+  .csv-rend-opt { font-size:.78rem; }
+
+  .csv-q-card .d-flex.align-items-center.gap-2 {
+    flex-wrap: wrap !important;
+    gap: .35rem !important;
+  }
+  #csvStep1 .col-lg-6 { padding:0; }
+
+  /* Prevent any child from busting card width */
+  .csv-q-card * { max-width: 100%; }
+  .modal-body { overflow-x: hidden !important; }
 }
 </style>
 
@@ -335,42 +379,42 @@
         <!-- Step 2: Preview/Edit -->
         <div id="csvStep2" style="display:none;">
           <div id="csvStickyBar">
-  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <div class="d-flex align-items-center gap-3">
-              <button class="btn btn-secondary btn-sm" onclick="csvBackToUpload()">
-                <i class="fas fa-arrow-left me-1"></i>Back
-              </button>
-              <span class="fw-bold" style="font-size:1rem;color:var(--text-1);">
-                <i class="fas fa-list-ol me-2" style="color:var(--accent)"></i>
-                <span id="csvQCount">0</span> questions
-              </span>
-            </div>
-            <div class="d-flex gap-2 align-items-center flex-wrap">
-              <div style="position:relative;display:inline-block;flex-shrink:0;">
-                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" style="width:auto;">
-                  <i class="fas fa-text-height me-1"></i>Global Size
+            <div class="d-flex justify-content-between align-items-center mb-3 csv-top-toolbar" style="gap:.5rem;flex-wrap:wrap;padding-right:.25rem;">
+              <div class="d-flex align-items-center gap-3" style="flex-shrink:0;min-width:0;">
+                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;" onclick="csvBackToUpload()">
+                  <i class="fas fa-arrow-left me-1"></i>Back
                 </button>
-                <ul class="dropdown-menu" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
-                  <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('small');return false;">Small</a></li>
-                  <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('normalsize');return false;">Normal</a></li>
-                  <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('large');return false;">Large</a></li>
-                  <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('Large');return false;">Extra Large</a></li>
-                </ul>
+                <span class="fw-bold" style="font-size:1rem;color:var(--text-1);white-space:nowrap;">
+                  <i class="fas fa-list-ol me-2" style="color:var(--accent)"></i>
+                  <span id="csvQCount">0</span> questions
+                </span>
               </div>
-              <button class="btn btn-secondary btn-sm" onclick="csvRenderAll()" title="Render all cards to MathJax view">
-                <i class="fas fa-calculator me-1"></i>Render All
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="csvRawAll()" title="Show raw LaTeX for all cards">
-                <i class="fas fa-code me-1"></i>Raw All
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="csvExport()">
-                <i class="fas fa-file-export me-1"></i>Export CSV
-              </button>
-              <button class="btn btn-primary btn-sm" onclick="csvConfirmSave()">
-                <i class="fas fa-database me-1"></i>Save to DB
-              </button>
+              <div class="d-flex gap-2 align-items-center csv-btn-row" style="flex-shrink:0;flex-wrap:wrap;">
+                <div class="btn-group" style="flex-shrink:0;">
+                  <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space:nowrap;">
+                    <i class="fas fa-text-height me-1"></i>Global Size
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);z-index:9999;">
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('small');return false;">Small</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('normalsize');return false;">Normal</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('large');return false;">Large</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('Large');return false;">Extra Large</a></li>
+                  </ul>
+                </div>
+                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap;" onclick="csvRenderAll()" title="Render all cards to MathJax view">
+                  <i class="fas fa-calculator me-1"></i>Render All
+                </button>
+                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap;" onclick="csvRawAll()" title="Show raw LaTeX for all cards">
+                  <i class="fas fa-code me-1"></i>Raw All
+                </button>
+                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap;" onclick="csvExport()">
+                  <i class="fas fa-file-export me-1"></i>Export CSV
+                </button>
+                <button class="btn btn-primary btn-sm" style="flex-shrink:0;white-space:nowrap;" onclick="csvConfirmSave()">
+                  <i class="fas fa-database me-1"></i>Save to DB
+                </button>
+              </div>
             </div>
-          </div>
           </div>
 
 <div id="csvCardList"></div>
