@@ -20,26 +20,27 @@ def _now_ist() -> str:
 
 
 def _send(to_email: str, to_name: str, subject: str, html: str, text: str) -> Tuple[bool, str]:
-    email_address = getattr(config, "EMAIL_ADDRESS", None)
-    email_password = getattr(config, "EMAIL_PASSWORD", None)
-    if not email_address or not email_password:
-        return False, "SMTP credentials not configured"
+    api_key    = getattr(config, "MAILJET_API_KEY", None)
+    api_secret = getattr(config, "MAILJET_API_SECRET", None)
+    from_email = getattr(config, "FROM_EMAIL", None)
+    if not api_key or not api_secret or not from_email:
+        return False, "Mailjet credentials not configured"
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = f"SmartAIExam <{email_address}>"
-        msg["To"]      = f"{to_name} <{to_email}>"
-        msg.attach(MIMEText(text, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html",  "utf-8"))
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ctx) as s:
-            s.login(email_address, email_password)
-            s.sendmail(email_address, to_email, msg.as_string())
-        return True, "Email sent successfully"
-    except smtplib.SMTPAuthenticationError:
-        return False, "SMTP auth failed - check EMAIL_ADDRESS and EMAIL_PASSWORD"
-    except smtplib.SMTPRecipientsRefused:
-        return False, f"Recipient refused: {to_email}"
+        from mailjet_rest import Client
+        mj   = Client(auth=(api_key, api_secret), version="v3.1")
+        data = {
+            "Messages": [{
+                "From": {"Email": from_email, "Name": "SmartAIExam"},
+                "To":   [{"Email": to_email,  "Name": to_name}],
+                "Subject":  subject,
+                "TextPart": text,
+                "HTMLPart": html,
+            }]
+        }
+        result = mj.send.create(data=data)
+        if result.status_code == 200:
+            return True, "Email sent successfully"
+        return False, f"Mailjet returned status {result.status_code}"
     except Exception as e:
         return False, f"Email send failed: {e}"
 

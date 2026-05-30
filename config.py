@@ -94,10 +94,11 @@ DRIVE_CATEGORY_FOLDER_ID = os.environ.get("DRIVE_CATEGORY_FOLDER_ID", "")
 # ─────────────────────────────────────────────
 # Email (SMTP - Gmail)
 # ─────────────────────────────────────────────
-EMAIL_ADDRESS  = os.environ.get("EMAIL_ADDRESS", "")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
-FROM_NAME      = os.environ.get("FROM_NAME", "SmartAIExam")
-BASE_URL       = os.environ.get("BASE_URL", "https://your-domain.com")
+MAILJET_API_KEY    = os.environ.get("MAILJET_API_KEY", "")
+MAILJET_API_SECRET = os.environ.get("MAILJET_API_SECRET", "")
+FROM_EMAIL         = os.environ.get("FROM_EMAIL", "")
+FROM_NAME          = "SmartAIExam"
+BASE_URL           = os.environ.get("BASE_URL", "https://your-domain.com")
 
 # ─────────────────────────────────────────────
 # Image upload
