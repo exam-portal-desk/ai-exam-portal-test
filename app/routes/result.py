@@ -46,13 +46,6 @@ def result(exam_id, result_id):
                                reason=reason, result_id=result_data["id"],
                                from_history=False)
 
-    if result_data.get("completed_at"):
-        try:
-            result_data["completed_at"] = datetime.fromisoformat(
-                str(result_data["completed_at"])
-            ).strftime("%d %B %Y %I:%M:%S %p")
-        except Exception:
-            pass
 
     return render_template("result.html", result=result_data, exam=exam,
                            from_history=request.args.get("from_history","0") == "1")

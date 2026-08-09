@@ -25,6 +25,9 @@ from pypdf import PdfReader
 from google import genai
 from google.genai import types
 
+import config as app_config
+from app.services import ai_provider
+
 
 # ========================
 # LATEX SANITIZER
@@ -276,11 +279,11 @@ class AIQuestionGenerator:
     """
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
+        model = ai_provider.get_model("text_models", app_config.QUESTION_GENERATOR_TEXT_MODEL)
+        self.api_key = api_key or model["api_key"]
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY not found in environment")
-        model_raw = os.environ.get('GEMINI_MODEL_NAME', 'gemini-1.5-flash')
-        self.model_name = model_raw.replace('models/', '')
+            raise ValueError(f"No API key configured for AI model '{model['name']}'")
+        self.model_name = model["model"].replace('models/', '')
         self.client = genai.Client(api_key=self.api_key)
         print(f"AI Question Generator ready — model: {self.model_name}")
 

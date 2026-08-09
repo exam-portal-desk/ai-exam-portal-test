@@ -294,7 +294,7 @@
             {% endif %}
           </td>
           <td><span class="cat-name-cell">{{ cat.name }}</span></td>
-          <td><span class="cat-date-cell">{{ cat.created_at[:10] if cat.created_at else '—' }}</span></td>
+          <td><span class="cat-date-cell">{{ cat.created_at | display_date if cat.created_at else '—' }}</span></td>
           <td>
             <div style="display:flex;gap:.3rem">
               <button class="icon-btn" title="Edit"

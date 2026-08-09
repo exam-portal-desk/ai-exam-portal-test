@@ -173,11 +173,11 @@
   {# Info grid #}
   <div class="res-info">
     <div>
-      <div class="res-info-row"><span class="res-info-lbl">Date</span><span class="res-info-val">{{ exam.date }}</span></div>
+      <div class="res-info-row"><span class="res-info-lbl">Date</span><span class="res-info-val">{{ exam.date | display_date if exam.date else exam.date }}</span></div>
       <div class="res-info-row"><span class="res-info-lbl">Duration</span><span class="res-info-val">{{ exam.duration }} min</span></div>
     </div>
     <div>
-      <div class="res-info-row"><span class="res-info-lbl">Submitted</span><span class="res-info-val">{{ result.completed_at }}</span></div>
+      <div class="res-info-row"><span class="res-info-lbl">Submitted</span><span class="res-info-val">{{ result.completed_at | display_dt if result.completed_at else '—' }}</span></div>
       <div class="res-info-row"><span class="res-info-lbl">Time Taken</span><span class="res-info-val">{{ result.time_taken_minutes }} min</span></div>
     </div>
   </div>

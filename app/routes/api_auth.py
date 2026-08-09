@@ -10,7 +10,6 @@ Endpoints:
   GET  /api/auth/me       — current user info (JWT required)
 """
 
-from datetime import datetime
 from flask import Blueprint, request, jsonify, g, session
 
 from app.db.users import (
@@ -18,6 +17,7 @@ from app.db.users import (
     get_user_by_google_id, get_all_users,
     create_user, update_user,
 )
+from app.utils.datetime_service import now_utc_naive
 from app.db.auth import check_login_attempts, record_failed_login, clear_login_attempts
 from app.services.auth_service import is_password_hashed, verify_password
 from app.services.jwt_service import create_tokens, refresh_access_token, revoke_refresh_token
@@ -100,7 +100,7 @@ def api_google_login():
             update_user(int(user["id"]), {
                 "google_id":     google_id,
                 "auth_provider": "google",
-                "updated_at":    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "updated_at":    now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
             })
 
     if not user:

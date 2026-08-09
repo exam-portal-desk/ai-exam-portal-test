@@ -2,16 +2,6 @@
 {% block title %}{{ exam.name }} - SmartAIExam{% endblock %}
 
 {% block content %}
-<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script>
-window.MathJax = {
-  tex: { inlineMath:[['$','$'],['\\(','\\)']], displayMath:[['$$','$$'],['\\[','\\]']], processEscapes:true, processEnvironments:true },
-  chtml: { linebreaks:{automatic:true,width:"container"} },
-  options: { skipHtmlTags:['script','noscript','style','textarea','pre'] }
-};
-</script>
-
 <style>
 /* exam_page.html — all colors via CSS variables */
 
@@ -308,7 +298,7 @@ html, body { overflow:hidden !important; height:100% !important; }
 .modal-title   { font-size:.9rem; font-weight:700; color:var(--text-1); }
 .modal-body    { padding:1.1rem; background:var(--surface); }
 .modal-footer  { border-top:1px solid var(--border); }
-[data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close,[data-theme="sunset"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
+[data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
 .btn-secondary { background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);border-radius:var(--radius);padding:.4rem .85rem;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit; }
 
 /* Bootstrap grid minimal — only what exam uses */

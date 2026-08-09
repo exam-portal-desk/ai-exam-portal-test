@@ -744,7 +744,7 @@ function renderUsers(users) {
           <i class="fas fa-save me-1"></i>Update
         </button>
       </td>
-      <td><span class="ts" style="font-size:.75rem;color:var(--text-3)">${fmtDate(u.updated_at||u.created_at)}</span></td>
+      <td><span class="ts" style="font-size:.75rem;color:var(--text-3)">${u.updated_at||u.created_at||'—'}</span></td>
     </tr>`;
   }).join('');
   syncSelectAll();
@@ -944,18 +944,6 @@ function accessBadge(role) {
   return `<span class="access-badge ${cls}">${lbl}</span>`;
 }
 function cap(s){ return s?s.charAt(0).toUpperCase()+s.slice(1):s; }
-function fmtDate(s) {
-  if (!s) return '—';
-  const d = new Date(s);
-  if (isNaN(d)) return s;
-  const dd   = String(d.getDate()).padStart(2,'0');
-  const mm   = String(d.getMonth()+1).padStart(2,'0');
-  const yyyy = d.getFullYear();
-  const HH   = String(d.getHours()).padStart(2,'0');
-  const min  = String(d.getMinutes()).padStart(2,'0');
-  const sec  = String(d.getSeconds()).padStart(2,'0');
-  return `${dd}-${mm}-${yyyy} ${HH}:${min}:${sec}`;
-}
 function esc(s){ return (s||'').replace(/'/g,"\\'"); }
 
 function setLoading(btn, on) {

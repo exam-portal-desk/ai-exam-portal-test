@@ -10,6 +10,7 @@ DELETE ACCOUNT: now delegates to app.services.user_deletion_service
 
 import secrets
 from datetime import datetime
+from app.utils.datetime_service import now_utc_naive, format_display
 
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -296,7 +297,7 @@ def setup_password(token):
 
         if update_user(user["id"], {
             "password": hash_password(new_pw),
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "updated_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
         }):
             flash(f"Password set succesfully!", "success")
         else:
@@ -368,7 +369,7 @@ def reset_password_with_token(token):
         user = get_user_by_email(token_data["email"])
         if not user or not update_user(user["id"], {
             "password": hash_password(new_pw),
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "updated_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
         }):
             flash("Failed to update password. Please try again.", "error")
             return render_template("password_reset_form.html", token=token)
@@ -429,7 +430,7 @@ def api_validate_user_for_request():
     formatted = [
         {"request_id": int(r.get("request_id",0)),
          "requested_access": r.get("requested_access",""),
-         "request_date": str(r.get("request_date","")),
+         "request_date": format_display(r.get("request_date")),
          "status": r.get("request_status",""),
          "reason": r.get("reason","") or ""}
         for r in reqs
@@ -480,7 +481,7 @@ def api_submit_access_request():
     new_req = {
         "username": username, "email": email,
         "current_access": current_access, "requested_access": requested_access,
-        "request_date": datetime.now().isoformat(),
+        "request_date": now_utc_naive().isoformat(),
         "request_status": "pending",
         "reason": f"[USER REQUEST] {user_reason}",
     }
@@ -599,7 +600,7 @@ def google_callback():
             update_user(int(user["id"]), {
                 "google_id": google_id,
                 "auth_provider": "google",
-                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "updated_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
             })
 
     if not user:
@@ -674,6 +675,6 @@ def _validate_token_for_display(token: str, expected_type: str):
             exp = datetime.strptime(td["expires_at"], "%Y-%m-%d %H:%M:%S")
         except Exception:
             flash("Link expiry unreadable.", "error"); return None
-    if datetime.now() > exp:
+    if now_utc_naive() > exp:
         flash("This link has expired.", "error"); return None
     return td

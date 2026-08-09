@@ -16,7 +16,7 @@
   -->
   <script>
   (function(){
-    var lt = localStorage.getItem('landingTheme') || 'emerald';
+    var lt = localStorage.getItem('landingTheme') || 'sunset';
     var t  = (lt === 'paper') ? 'light' : lt;
     document.documentElement.setAttribute('data-theme', t);
     if (localStorage.getItem('adminSidebarCollapsed') === 'true')
@@ -609,7 +609,7 @@
   var html = document.documentElement;
 
   function landingToPortal(lt) {
-    return (lt === 'paper') ? 'light' : (lt || 'emerald');
+    return (lt === 'paper') ? 'light' : (lt || 'sunset');
   }
 
   function applyTheme(landingTheme) {
@@ -632,7 +632,7 @@
   }
 
   /* Init */
-  var current = localStorage.getItem(KEY) || 'emerald';
+  var current = localStorage.getItem(KEY) || 'sunset';
   syncSettingsRows(current);
 
   /* Cross-tab sync with index.html */
@@ -852,6 +852,16 @@ document.addEventListener('DOMContentLoaded',function(){
           <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text-3);margin-bottom:0.65rem">Theme</div>
           <div style="display:flex;flex-direction:column;gap:6px" id="accs-theme-group">
 
+            <label class="accs-opt-row" data-accs-theme="sunset">
+              <input type="radio" name="accsTheme" value="sunset" style="display:none">
+              <div class="accs-opt-radio"></div>
+              <div class="accs-opt-icon" style="background:rgba(193,95,60,0.12);color:#c15f3c"><i class="fas fa-fire"></i></div>
+              <div>
+                <div class="accs-opt-name">Sunset</div>
+                <div class="accs-opt-desc">Warm cream, terracotta accent</div>
+              </div>
+            </label>
+
             <label class="accs-opt-row" data-accs-theme="paper">
               <input type="radio" name="accsTheme" value="paper" style="display:none">
               <div class="accs-opt-radio"></div>
@@ -885,20 +895,10 @@ document.addEventListener('DOMContentLoaded',function(){
             <label class="accs-opt-row" data-accs-theme="emerald">
               <input type="radio" name="accsTheme" value="emerald" style="display:none">
               <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon" style="background:rgba(34,197,94,0.12);color:#22c55e"><i class="fas fa-leaf"></i></div>
+              <div class="accs-opt-icon" style="background:rgba(47,158,116,0.12);color:#2f9e74"><i class="fas fa-leaf"></i></div>
               <div>
                 <div class="accs-opt-name">Emerald</div>
                 <div class="accs-opt-desc">Deep forest green</div>
-              </div>
-            </label>
-
-            <label class="accs-opt-row" data-accs-theme="sunset">
-              <input type="radio" name="accsTheme" value="sunset" style="display:none">
-              <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon" style="background:rgba(240,120,48,0.12);color:#f07830"><i class="fas fa-fire"></i></div>
-              <div>
-                <div class="accs-opt-name">Sunset</div>
-                <div class="accs-opt-desc">Warm amber / orange</div>
               </div>
             </label>
 
@@ -978,7 +978,7 @@ document.addEventListener('DOMContentLoaded', function() {
     openBtn.addEventListener('click', function(){ syncSelections(); bsModal.show(); });
 
     function syncSelections(){
-      var storedTheme = localStorage.getItem('landingTheme') || 'emerald';
+      var storedTheme = localStorage.getItem('landingTheme') || 'sunset';
       document.querySelectorAll('[data-accs-theme]').forEach(function(el){
         el.classList.toggle('accs-selected', el.getAttribute('data-accs-theme') === storedTheme);
       });

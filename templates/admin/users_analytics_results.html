@@ -20,6 +20,7 @@
 .res-input option { background:var(--surface); color:var(--text-1); }
 .res-input::-webkit-calendar-picker-indicator { filter:var(--btn-close-filter,none); opacity:.6; }
 .res-input::placeholder { color:var(--text-3) !important; }
+.res-date-preview { font-size:.68rem; color:var(--text-3); min-height:1em; }
 
 .res-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.42rem .85rem; border-radius:var(--radius); font-size:.8rem; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid transparent; transition:background .12s,color .12s,border-color .12s; white-space:nowrap; }
 .res-btn:disabled { opacity:.5; cursor:not-allowed; }
@@ -97,11 +98,13 @@
             </div>
             <div class="res-filter-group">
                 <label>Date From</label>
-                <input type="date" class="res-input" id="dateFromFilter">
+                <input type="date" class="res-input" id="dateFromFilter" onchange="updateDatePreview(this,'dateFromPreview')">
+                <span class="res-date-preview" id="dateFromPreview"></span>
             </div>
             <div class="res-filter-group">
                 <label>Date To</label>
-                <input type="date" class="res-input" id="dateToFilter">
+                <input type="date" class="res-input" id="dateToFilter" onchange="updateDatePreview(this,'dateToPreview')">
+                <span class="res-date-preview" id="dateToPreview"></span>
             </div>
             <div class="res-filter-group" style="justify-content:flex-end;">
                 <div style="display:flex;gap:.4rem;">
@@ -149,7 +152,7 @@
                             <div style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ result.exam_name }}</div>
                             <div style="font-size:.73rem;color:var(--text-3)">{{ result.subject_name }}</div>
                         </td>
-                        <td style="font-size:.78rem;color:var(--text-3)">{{ result.created_at }}</td>
+                        <td style="font-size:.78rem;color:var(--text-3)">{{ result.created_at | display_dt if result.created_at and result.created_at != 'N/A' else '—' }}</td>
                         <td style="font-weight:700;color:var(--text-1)">{{ result.score }}/{{ result.max_score }}</td>
                         <td>
                             <span class="res-badge {% if pct >= 90 %}excellent{% elif pct >= 75 %}good{% elif pct >= 60 %}average{% else %}poor{% endif %}">
@@ -221,6 +224,18 @@
 </div>
 
 <script>
+const DISPLAY_DATE_FORMAT = "{{ DISPLAY_DATE_FORMAT }}";
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function updateDatePreview(input, previewId) {
+    const el = document.getElementById(previewId);
+    if (!input.value) { el.textContent = ''; return; }
+    const [y, m, d] = input.value.split('-').map(Number);
+    el.textContent = DISPLAY_DATE_FORMAT
+        .replace('%Y', y).replace('%y', String(y).slice(-2))
+        .replace('%B', MONTH_NAMES[m-1]).replace('%b', MONTH_NAMES[m-1].slice(0,3))
+        .replace('%m', String(m).padStart(2,'0')).replace('%d', String(d).padStart(2,'0'));
+}
+
 let currentFilters = {
     user: '',
     exam: '',
@@ -286,7 +301,9 @@ function clearFilters() {
         document.getElementById('examFilter').value = '';
         document.getElementById('dateFromFilter').value = '';
         document.getElementById('dateToFilter').value = '';
-        
+        document.getElementById('dateFromPreview').textContent = '';
+        document.getElementById('dateToPreview').textContent = '';
+
         currentFilters = {
             user: '',
             exam: '',

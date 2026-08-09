@@ -12,7 +12,8 @@ from app.db.exams import get_all_exams, get_exam_by_id
 from app.db.users import get_user_by_id, get_users_by_ids, get_all_users
 from app.db.results import get_result_by_id,  get_responses_by_result
 from app.db.questions import get_questions_by_exam
-from app.db import supabase
+from app.db import fetch_one, fetch_all
+from app.utils.datetime_service import format_display
 
 
 # ── Analytics dashboard ───────────────────────────────────────────────────
@@ -24,19 +25,18 @@ def users_analytics():
     exams_list = [{"id": int(e["id"]), "name": e.get("name","")} for e in exams]
 
     counts = {
-        "total_users":     supabase.table("users").select("id",count="exact").execute().count or 0,
-        "total_exams":     supabase.table("exams").select("id",count="exact").execute().count or 0,
-        "total_results":   supabase.table("results").select("id",count="exact").execute().count or 0,
-        "total_responses": supabase.table("responses").select("id",count="exact").execute().count or 0,
+        "total_users":     fetch_one("SELECT COUNT(*) AS count FROM users")["count"],
+        "total_exams":     fetch_one("SELECT COUNT(*) AS count FROM exams")["count"],
+        "total_results":   fetch_one("SELECT COUNT(*) AS count FROM results")["count"],
+        "total_responses": fetch_one("SELECT COUNT(*) AS count FROM responses")["count"],
     }
 
     # First page of results
-    page_res = supabase.table("results").select("*").order("completed_at",desc=True).range(0,19).execute()
-    page_data = page_res.data or []
+    page_data = fetch_all("SELECT * FROM results ORDER BY completed_at DESC LIMIT 20 OFFSET 0")
     sid_set = {str(r.get("student_id")) for r in page_data}
     eid_set = {str(r.get("exam_id")) for r in page_data}
     um = get_users_by_ids([int(x) for x in sid_set if x])
-    em = {str(e["id"]): e for e in supabase.table("exams").select("id,name").in_("id",list(eid_set)).execute().data or []}
+    em = {str(e["id"]): e for e in fetch_all("SELECT id,name FROM exams WHERE id = ANY(%s)", ([int(x) for x in eid_set if x],))}
 
     results_page = []
     for r in page_data:
@@ -95,45 +95,41 @@ def users_analytics_results():
     start_idx = (page - 1) * per_page
  
     try:
+        # ── Shared WHERE clause ──────────────────────────────────────
+        where, params = [], []
+        if user_filter: where.append("student_id=%s"); params.append(user_filter)
+        if exam_filter: where.append("exam_id=%s");     params.append(exam_filter)
+        if date_from:   where.append("completed_at >= %s"); params.append(date_from)
+        if date_to:     where.append("completed_at <= %s"); params.append(date_to + "T23:59:59")
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+
         # ── Count query ───────────────────────────────────────────────
-        cq = supabase.table("results").select("id", count="exact")
-        if user_filter: cq = cq.eq("student_id", user_filter)
-        if exam_filter: cq = cq.eq("exam_id",    exam_filter)
-        if date_from:   cq = cq.gte("completed_at", date_from)
-        if date_to:     cq = cq.lte("completed_at", date_to + "T23:59:59")
-        count_r       = cq.execute()
-        total_results = count_r.count or 0
- 
+        total_results = fetch_one(f"SELECT COUNT(*) AS count FROM results {where_sql}", params)["count"]
+
         # ── Data query ────────────────────────────────────────────────
-        dq = (supabase.table("results")
-              .select("*")
-              .order("completed_at", desc=True)
-              .range(start_idx, start_idx + per_page - 1))
-        if user_filter: dq = dq.eq("student_id", user_filter)
-        if exam_filter: dq = dq.eq("exam_id",    exam_filter)
-        if date_from:   dq = dq.gte("completed_at", date_from)
-        if date_to:     dq = dq.lte("completed_at", date_to + "T23:59:59")
-        data_r      = dq.execute()
-        page_results = data_r.data or []
- 
+        page_results = fetch_all(
+            f"SELECT * FROM results {where_sql} ORDER BY completed_at DESC LIMIT %s OFFSET %s",
+            params + [per_page, start_idx],
+        )
+
         # ── Lookup maps (only IDs on this page) ───────────────────────
         sid_set = {str(r.get("student_id")) for r in page_results}
         eid_set = {str(r.get("exam_id"))    for r in page_results}
         users_map, exams_map = {}, {}
- 
+
         if sid_set:
-            ur = (supabase.table("users")
-                  .select("id, username, full_name")
-                  .in_("id", list(sid_set))
-                  .execute())
-            users_map = {str(u["id"]): u for u in (ur.data or [])}
- 
+            ur = fetch_all(
+                "SELECT id, username, full_name FROM users WHERE id = ANY(%s)",
+                ([int(x) for x in sid_set if x],),
+            )
+            users_map = {str(u["id"]): u for u in ur}
+
         if eid_set:
-            er = (supabase.table("exams")
-                  .select("id, name")
-                  .in_("id", list(eid_set))
-                  .execute())
-            exams_map = {str(e["id"]): e for e in (er.data or [])}
+            er = fetch_all(
+                "SELECT id, name FROM exams WHERE id = ANY(%s)",
+                ([int(x) for x in eid_set if x],),
+            )
+            exams_map = {str(e["id"]): e for e in er}
  
         # ── Build result list ─────────────────────────────────────────
         results_list = []
@@ -225,10 +221,10 @@ def api_users_analytics_stats():
     Returns compact + exact numbers for stat cards.
     """
     try:
-        users_count     = supabase.table("users")    .select("id", count="exact").execute().count or 0
-        exams_count     = supabase.table("exams")    .select("id", count="exact").execute().count or 0
-        results_count   = supabase.table("results")  .select("id", count="exact").execute().count or 0
-        responses_count = supabase.table("responses").select("id", count="exact").execute().count or 0
+        users_count     = fetch_one("SELECT COUNT(*) AS count FROM users")["count"]
+        exams_count     = fetch_one("SELECT COUNT(*) AS count FROM exams")["count"]
+        results_count   = fetch_one("SELECT COUNT(*) AS count FROM results")["count"]
+        responses_count = fetch_one("SELECT COUNT(*) AS count FROM responses")["count"]
         return jsonify({
             "total_users":     users_count,
             "total_exams":     exams_count,
@@ -262,23 +258,26 @@ def users_analytics_data_api():
         # Instead of fetching all 200K rows, use DB-level date filter
         # and fetch in ONE paginated batch (max ~50K for analytics is fine)
 
-        q = supabase.table("results").select(
-            "id, student_id, exam_id, score, max_score, percentage, completed_at"
-        ).order("completed_at", desc=True)
-
-        # Apply DB-level filters immediately
+        where, params = [], []
         if exam_filter:
-            q = q.eq("exam_id", exam_filter)
+            where.append("exam_id=%s"); params.append(exam_filter)
 
         if time_period == "today":
-            q = q.gte("completed_at", now.strftime("%Y-%m-%d"))
+            where.append("completed_at >= %s"); params.append(now.strftime("%Y-%m-%d"))
         elif time_period == "week":
             week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
-            q = q.gte("completed_at", week_start)
+            where.append("completed_at >= %s"); params.append(week_start)
         elif time_period == "month":
-            q = q.gte("completed_at", now.strftime("%Y-%m-01"))
+            where.append("completed_at >= %s"); params.append(now.strftime("%Y-%m-01"))
         elif time_period == "custom" and start_date and end_date:
-            q = q.gte("completed_at", start_date).lte("completed_at", end_date + "T23:59:59")
+            where.append("completed_at >= %s AND completed_at <= %s")
+            params += [start_date, end_date + "T23:59:59"]
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        base_query = (
+            f"SELECT id, student_id, exam_id, score, max_score, percentage, completed_at "
+            f"FROM results {where_sql} ORDER BY completed_at DESC"
+        )
 
         # ── Step 2: Paginated fetch with 1000-row chunks ──────────────
         PAGE = 1000
@@ -286,7 +285,7 @@ def users_analytics_data_api():
         all_results = []
 
         while True:
-            batch = q.range(offset, offset + PAGE - 1).execute().data or []
+            batch = fetch_all(f"{base_query} LIMIT %s OFFSET %s", params + [PAGE, offset])
             all_results.extend(batch)
             if len(batch) < PAGE:
                 break
@@ -364,7 +363,7 @@ def users_analytics_data_api():
         for r in sorted(all_results, key=lambda x: x.get("completed_at",""), reverse=True)[:20]:
             u = user_map.get(str(r.get("student_id", "")), {})
             recent.append({
-                "created_at": r.get("completed_at", ""),
+                "created_at": format_display(r.get("completed_at")),
                 "username":   u.get("username") or f"User {r.get('student_id','')}",
                 "full_name":  u.get("full_name", ""),
                 "exam_name":  exam_map.get(str(r.get("exam_id", "")), "Unknown"),

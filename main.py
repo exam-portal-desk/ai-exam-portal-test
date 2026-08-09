@@ -17,6 +17,7 @@ if __name__ == "__main__":
     socketio.run(
         app,
         debug=config.DEBUG,
+        use_reloader=False,  # Werkzeug's reloader hangs without binding under gevent on Windows
         host="0.0.0.0",
         port=int(__import__("os").environ.get("PORT", 5000)),
     )

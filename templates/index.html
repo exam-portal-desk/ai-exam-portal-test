@@ -5,50 +5,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SmartAIExam</title>
-    <script>(function(){var t=localStorage.getItem('landingTheme')||'emerald';document.documentElement.setAttribute('data-landing-theme',t);})();</script>
+    <script>(function(){var t=localStorage.getItem('landingTheme')||'sunset';document.documentElement.setAttribute('data-theme',t==='paper'?'light':t);})();</script>
+    <link href="{{ url_for('static', filename='theme.css') }}" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
     <style>
-/* ══ LANDING THEME TOKENS ══ */
-[data-landing-theme="paper"]{
-  --bg:#f4f5f7;--bg2:#fff;--surface:rgba(255,255,255,.9);--border:rgba(0,0,0,.09);
-  --ink:#111827;--ink2:#4b5563;--ink3:#9ca3af;
-  --accent:#4c6ef5;--accent2:#3b5bdb;--accent-rgb:76,110,245;
-  --glow:rgba(76,110,245,.12);--card-bg:rgba(255,255,255,.85);
-  --hero-bg:linear-gradient(160deg,#f0f4ff 0%,#f4f5f7 100%);
-  --nav-bg:rgba(255,255,255,.88);--pill-bg:#e9ecef;--pill-c:#495057;
-}
-[data-landing-theme="dark"]{
-  --bg:#0c0c10;--bg2:#111116;--surface:rgba(22,22,30,.9);--border:rgba(255,255,255,.07);
-  --ink:#f1f3f9;--ink2:rgba(241,243,249,.55);--ink3:rgba(241,243,249,.28);
-  --accent:#4c6ef5;--accent2:#3b5bdb;--accent-rgb:76,110,245;
-  --glow:rgba(76,110,245,.14);--card-bg:rgba(22,22,30,.85);
-  --hero-bg:linear-gradient(160deg,#0a0c1a 0%,#0c0c10 100%);
-  --nav-bg:rgba(12,12,16,.88);--pill-bg:rgba(255,255,255,.06);--pill-c:rgba(255,255,255,.5);
-}
-[data-landing-theme="midnight"]{
-  --bg:#080b18;--bg2:#0d1124;--surface:rgba(15,21,48,.9);--border:rgba(124,111,255,.14);
-  --ink:#e4e8f5;--ink2:rgba(228,232,245,.55);--ink3:rgba(228,232,245,.28);
-  --accent:#7c6fff;--accent2:#6a5dee;--accent-rgb:124,111,255;
-  --glow:rgba(124,111,255,.16);--card-bg:rgba(15,21,48,.85);
-  --hero-bg:linear-gradient(160deg,#06091a 0%,#080b18 100%);
-  --nav-bg:rgba(8,11,24,.88);--pill-bg:rgba(124,111,255,.1);--pill-c:rgba(228,232,245,.5);
-}
-[data-landing-theme="emerald"]{
-  --bg:#060d0a;--bg2:#0a1510;--surface:rgba(14,29,22,.9);--border:rgba(34,197,94,.13);
-  --ink:#f0fdf4;--ink2:rgba(240,253,244,.58);--ink3:rgba(240,253,244,.30);
-  --accent:#22c55e;--accent2:#16a34a;--accent-rgb:34,197,94;
-  --glow:rgba(34,197,94,.15);--card-bg:rgba(14,29,22,.88);
-  --hero-bg:linear-gradient(160deg,#030806 0%,#060d0a 100%);
-  --nav-bg:rgba(6,13,10,.88);--pill-bg:rgba(34,197,94,.1);--pill-c:rgba(240,253,244,.5);
-}
-[data-landing-theme="sunset"]{
-  --bg:#0f0805;--bg2:#1a0f07;--surface:rgba(31,18,8,.9);--border:rgba(240,120,48,.14);
-  --ink:#fdf0e0;--ink2:rgba(253,240,224,.55);--ink3:rgba(253,240,224,.28);
-  --accent:#f07830;--accent2:#d9622a;--accent-rgb:240,120,48;
-  --glow:rgba(240,120,48,.16);--card-bg:rgba(31,18,8,.85);
-  --hero-bg:linear-gradient(160deg,#0a0402 0%,#0f0805 100%);
-  --nav-bg:rgba(15,8,5,.88);--pill-bg:rgba(240,120,48,.1);--pill-c:rgba(253,240,224,.5);
+/* ══ LANDING TOKEN ALIASES — sourced from centralized theme.css ══ */
+:root{
+  --bg2:var(--bg-raised);--ink:var(--text-1);--ink2:var(--text-2);--ink3:var(--text-3);
+  --accent2:var(--accent-hover);
+  --glow:color-mix(in srgb,var(--accent) 15%,transparent);
+  --card-bg:color-mix(in srgb,var(--surface) 88%,transparent);
+  --hero-bg:linear-gradient(160deg,var(--surface) 0%,var(--bg) 100%);
+  --nav-bg:color-mix(in srgb,var(--bg) 88%,transparent);
+  --pill-bg:var(--surface-2);--pill-c:var(--text-2);
 }
 
 /* ══ RESET ══ */
@@ -77,29 +47,29 @@ a{text-decoration:none;color:var(--accent)}
 /* ══ THEME SELECTOR ══ */
 .landing-theme-selector{position:relative}
 .landing-theme-btn{width:32px;height:32px;border-radius:8px;background:rgba(128,128,128,.1);border:1px solid var(--border);color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.8rem;transition:all .12s}
-.landing-theme-btn:hover{background:rgba(var(--accent-rgb),.1);border-color:var(--accent);color:var(--accent)}
+.landing-theme-btn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent);color:var(--accent)}
 .landing-theme-dropdown{position:absolute;top:calc(100%+8px);right:0;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.35rem;min-width:130px;box-shadow:0 12px 40px rgba(0,0,0,.3);z-index:200;display:none}
 .landing-theme-dropdown.open{display:block;animation:ddIn .12s ease-out}
 @keyframes ddIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
 .landing-theme-option{display:flex;align-items:center;gap:.55rem;width:100%;padding:.42rem .7rem;border-radius:7px;border:none;background:none;font-family:inherit;font-size:.8rem;font-weight:500;color:var(--ink2);cursor:pointer;transition:background .1s,color .1s}
-.landing-theme-option:hover,.landing-theme-option.active{background:rgba(var(--accent-rgb),.1);color:var(--accent)}
+.landing-theme-option:hover,.landing-theme-option.active{background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
 .theme-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .dot-paper{background:#e8e6e0;border:1px solid #bbb}
 .dot-dark{background:#111116;border:1px solid #555}
 .dot-midnight{background:#7c6fff}
-.dot-emerald{background:#22c55e}
-.dot-sunset{background:#f07830}
+.dot-emerald{background:#2f9e74}
+.dot-sunset{background:#c15f3c}
 
 /* ══ BUTTONS ══ */
 .btn-primary{display:inline-flex;align-items:center;gap:.45rem;padding:.7rem 1.4rem;background:var(--accent);color:#fff;border-radius:10px;font-size:.9rem;font-weight:700;transition:background .12s,transform .1s,box-shadow .12s}
-.btn-primary:hover{background:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(var(--accent-rgb),.3)}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 30%,transparent)}
 .btn-secondary{display:inline-flex;align-items:center;gap:.45rem;padding:.68rem 1.35rem;border:1px solid var(--border);border-radius:10px;font-size:.9rem;font-weight:600;color:var(--ink2);transition:border-color .12s,color .12s,transform .1s}
 .btn-secondary:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
 .btn-white{display:inline-flex;align-items:center;gap:.45rem;padding:.7rem 1.4rem;background:#fff;color:#0f172a;border-radius:10px;font-size:.9rem;font-weight:700;transition:transform .1s,box-shadow .12s}
 .btn-white:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
 
 /* ══ HERO ══ */
-.hero{background:var(--hero-bg);padding:6rem 2rem 5rem;position:relative;overflow:hidden}
+.lp-hero{background:var(--hero-bg);padding:6rem 2rem 5rem;position:relative;overflow:hidden}
 .hero-grid-bg{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;opacity:.35;pointer-events:none}
 .hero-glow{position:absolute;top:-30%;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(ellipse,var(--glow),transparent 70%);pointer-events:none}
 .hero-inner{position:relative;z-index:1;max-width:780px;margin:0 auto;text-align:center}
@@ -125,8 +95,8 @@ a{text-decoration:none;color:var(--accent)}
 .features-header{margin-bottom:3rem}
 .features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem}
 .feat{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.5rem;backdrop-filter:blur(8px);transition:border-color .15s,transform .15s,box-shadow .15s}
-.feat:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 32px rgba(var(--accent-rgb),.12)}
-.feat-icon{width:42px;height:42px;border-radius:10px;background:rgba(var(--accent-rgb),.12);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:1rem}
+.feat:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 32px color-mix(in srgb,var(--accent) 12%,transparent)}
+.feat-icon{width:42px;height:42px;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:1rem}
 .feat-title{font-size:.92rem;font-weight:700;color:var(--ink);margin-bottom:.45rem}
 .feat-desc{font-size:.82rem;color:var(--ink2);line-height:1.6}
 
@@ -157,7 +127,7 @@ a{text-decoration:none;color:var(--accent)}
 .proof-quote em{color:var(--accent)}
 .proof-list{display:flex;flex-direction:column;gap:1.25rem}
 .proof-item{display:flex;align-items:flex-start;gap:1rem}
-.proof-item-icon{width:38px;height:38px;border-radius:10px;background:rgba(var(--accent-rgb),.12);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
+.proof-item-icon{width:38px;height:38px;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
 .proof-item-title{font-size:.88rem;font-weight:700;color:var(--ink);margin-bottom:.25rem}
 .proof-item-desc{font-size:.78rem;color:var(--ink2);line-height:1.5}
 
@@ -170,7 +140,7 @@ a{text-decoration:none;color:var(--accent)}
 .cta-sub{font-size:.92rem;color:rgba(255,255,255,.7);margin-bottom:2rem;line-height:1.6}
 
 /* ══ FOOTER ══ */
-.footer{background:var(--bg2);border-top:1px solid var(--border);padding:1.25rem 2rem}
+.lp-footer{background:var(--bg2);border-top:1px solid var(--border);padding:1.25rem 2rem}
 .footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;max-width:1100px;margin:0 auto}
 .footer-logo{display:flex;align-items:center}
 .footer-links-row{display:flex;gap:1.25rem;flex-wrap:wrap}
@@ -184,13 +154,13 @@ a{text-decoration:none;color:var(--accent)}
 
 /* ══ RESPONSIVE ══ */
 @media(max-width:768px){
-  .hero{padding:4rem 1.25rem 3rem}
+  .lp-hero{padding:4rem 1.25rem 3rem}
   .features,.exam-types{padding:3.5rem 1.25rem}
   .how,.proof,.cta-section{padding:3.5rem 1.25rem}
   .features-grid,.types-grid{grid-template-columns:1fr}
   .how-steps{grid-template-columns:1fr 1fr}
   .hero-stats{gap:.5rem 1rem}
-  .footer{padding:1rem 1.25rem}
+  .lp-footer{padding:1rem 1.25rem}
   .footer-inner{flex-direction:column;align-items:center;text-align:center}
   .footer-links-row{justify-content:center}
 }
@@ -219,6 +189,9 @@ a{text-decoration:none;color:var(--accent)}
                 <i class="fas fa-palette"></i>
             </button>
             <div class="landing-theme-dropdown" id="landingThemeDropdown">
+                <button class="landing-theme-option" data-theme="sunset">
+                    <span class="theme-dot dot-sunset"></span> Sunset
+                </button>
                 <button class="landing-theme-option" data-theme="paper">
                     <span class="theme-dot dot-paper"></span> Paper
                 </button>
@@ -230,9 +203,6 @@ a{text-decoration:none;color:var(--accent)}
                 </button>
                 <button class="landing-theme-option" data-theme="emerald">
                     <span class="theme-dot dot-emerald"></span> Emerald
-                </button>
-                <button class="landing-theme-option" data-theme="sunset">
-                    <span class="theme-dot dot-sunset"></span> Sunset
                 </button>
             </div>
         </div>
@@ -254,6 +224,9 @@ a{text-decoration:none;color:var(--accent)}
                     <i class="fas fa-palette"></i>
                 </button>
                 <div class="landing-theme-dropdown" id="landingThemeDropdownMobile">
+                    <button class="landing-theme-option" data-theme="sunset">
+                        <span class="theme-dot dot-sunset"></span> Sunset
+                    </button>
                     <button class="landing-theme-option" data-theme="paper">
                         <span class="theme-dot dot-paper"></span> Paper
                     </button>
@@ -266,9 +239,6 @@ a{text-decoration:none;color:var(--accent)}
                     <button class="landing-theme-option" data-theme="emerald">
                         <span class="theme-dot dot-emerald"></span> Emerald
                     </button>
-                    <button class="landing-theme-option" data-theme="sunset">
-                        <span class="theme-dot dot-sunset"></span> Sunset
-                    </button>
                 </div>
             </div>
         </div>
@@ -276,7 +246,7 @@ a{text-decoration:none;color:var(--accent)}
 </header>
 
 <!-- HERO -->
-<section class="hero">
+<section class="lp-hero">
     <div class="hero-grid-bg"></div>
     <div class="hero-glow"></div>
     <div class="hero-inner">
@@ -504,7 +474,7 @@ a{text-decoration:none;color:var(--accent)}
 </section>
 
 <!-- FOOTER -->
-<footer class="footer">
+<footer class="lp-footer">
     <div class="footer-inner">
         <a href="/" class="footer-logo">
             <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:26px;width:auto;"></video>
@@ -549,7 +519,7 @@ a{text-decoration:none;color:var(--accent)}
 </script>
 
 <script>
-/* ── Landing Page Theme System (isolated — uses data-landing-theme + landingTheme key) ── */
+/* ── Landing Page Theme System — shares data-theme + landingTheme key with the rest of the app ── */
 (function(){
     var KEY = 'landingTheme';
     var html = document.documentElement;
@@ -558,7 +528,7 @@ a{text-decoration:none;color:var(--accent)}
     var options = document.querySelectorAll('.landing-theme-option');
 
     function applyTheme(t) {
-        html.setAttribute('data-landing-theme', t);
+        html.setAttribute('data-theme', t === 'paper' ? 'light' : t);
         localStorage.setItem(KEY, t);
         syncActive(t);
     }
@@ -570,7 +540,7 @@ a{text-decoration:none;color:var(--accent)}
     }
 
     /* Init: theme was already applied in <head>; just sync the active state */
-    syncActive(html.getAttribute('data-landing-theme') || 'paper');
+    syncActive(localStorage.getItem(KEY) || 'sunset');
 
     /* Toggle dropdown open/close */
     btn.addEventListener('click', function(e) {

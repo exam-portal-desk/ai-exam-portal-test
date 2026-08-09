@@ -97,12 +97,16 @@ def create_app() -> Flask:
             flash("Please login as Admin to access Admin portal.", "warning")
             return redirect(url_for("auth.login"))
 
-    # ── Context processor ──────────────────────────────────────────────────
-    from datetime import datetime
+    # ── Date/time — central service + Jinja filters ────────────────────────
+    from app.utils.datetime_service import now_app_tz, format_display, format_display_date
+
+    app.jinja_env.filters["display_dt"] = format_display
+    app.jinja_env.filters["display_date"] = format_display_date
 
     @app.context_processor
     def inject_globals():
-        return {"CURRENT_YEAR": datetime.now().year}
+        return {"CURRENT_YEAR": now_app_tz().year, "DISPLAY_DATE_FORMAT": config.DISPLAY_DATE_FORMAT,
+                "DISPLAY_DATETIME_FORMAT": config.DISPLAY_DATETIME_FORMAT}
 
     # ── Error handlers ─────────────────────────────────────────────────────
     _register_error_handlers(app)
@@ -149,6 +153,9 @@ def _register_blueprints(app: Flask) -> None:
 
     from app.routes.explanation import explanation_bp
     app.register_blueprint(explanation_bp)
+
+    from app.routes.notes import notes_bp
+    app.register_blueprint(notes_bp)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(categories_bp)
@@ -217,6 +224,8 @@ def _start_periodic_cleanup() -> None:
             try:
                 time.sleep(300)
                 cleanup_app_cache()
+                from app.services.notes_service import cleanup_expired_trash
+                cleanup_expired_trash()
             except Exception as e:
                 print(f"[CLEANUP] Error: {e}")
 

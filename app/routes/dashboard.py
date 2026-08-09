@@ -103,17 +103,11 @@ def results_history():
 
         is_visible, pending_reason = can_user_see_result(exam_data, r)
 
-        completed_at_raw = r.get("completed_at","")
-        try:
-            completed_at = datetime.fromisoformat(completed_at_raw).strftime("%d %B %Y %I:%M:%S %p")
-        except Exception:
-            completed_at = completed_at_raw
-
         result_list.append({
             "id":                 int(r.get("id", 0)),
             "exam_id":            eid,
             "exam_name":          exam_data.get("name", f"Exam {eid}"),
-            "completed_at":       completed_at,
+            "completed_at":       r.get("completed_at",""),
             "score":              r.get("score", 0),
             "max_score":          r.get("max_score", 0),
             "percentage":         round(float(r.get("percentage", 0)), 2),

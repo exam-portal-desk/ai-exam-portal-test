@@ -312,7 +312,7 @@
               {% endif %}
             </td>
             <td>
-              <div class="meta-pill">{{ exam.date }}</div>
+              <div class="meta-pill">{{ exam.date | display_date if exam.date else exam.date }}</div>
               <div style="font-size:.75rem;color:var(--text-3);margin-top:3px">{{ exam.start_time }}</div>
             </td>
             <td><span class="meta-pill">{{ exam.duration }} min</span></td>

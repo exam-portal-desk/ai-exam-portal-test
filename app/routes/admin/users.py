@@ -3,11 +3,11 @@ app/routes/admin/users.py — User role management
 FIXED: Ghost user (id=-1, role='ghost', username='deleted_user') 
        is now blocked at backend level from any role updates.
 """
-from datetime import datetime
+from app.utils.datetime_service import now_utc_naive, format_display
 from flask import render_template, request, jsonify
 from app.routes.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
-from app.db import supabase
+from app.db import fetch_one, fetch_all, execute
 
 # Ghost user identifiers — must match user_deletion_service.py
 GHOST_USER_ID       = -1
@@ -45,31 +45,31 @@ def api_users_search():
 
     per_page = 50
     start    = (page - 1) * per_page
-    end      = start + per_page - 1
 
     try:
-        query = supabase.table("users").select(
-            "id, username, email, full_name, role, created_at, updated_at",
-            count="exact"
-        )
-
+        where, params = [], []
         if role_f == "user":
-            query = query.eq("role", "user")
+            where.append("role=%s"); params.append("user")
         elif role_f == "admin":
-            query = query.eq("role", "admin")
+            where.append("role=%s"); params.append("admin")
         elif role_f == "both":
-            query = query.eq("role", "user,admin")
+            where.append("role=%s"); params.append("user,admin")
 
         if q:
-            query = query.or_(
-                f"username.ilike.%{q}%,"
-                f"email.ilike.%{q}%,"
-                f"full_name.ilike.%{q}%"
-            )
+            where.append("(username ILIKE %s OR email ILIKE %s OR full_name ILIKE %s)")
+            params += [f"%{q}%", f"%{q}%", f"%{q}%"]
 
-        res   = query.order("created_at", desc=True).range(start, end).execute()
-        total = res.count or 0
-        users = res.data  or []
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+
+        total = fetch_one(f"SELECT COUNT(*) AS count FROM users {where_sql}", params)["count"]
+        users = fetch_all(
+            f"SELECT id, username, email, full_name, role, created_at, updated_at FROM users "
+            f"{where_sql} ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            params + [per_page, start],
+        )
+        for u in users:
+            u["created_at"] = format_display(u.get("created_at"))
+            u["updated_at"] = format_display(u.get("updated_at"))
 
         return jsonify({
             "users":       users,
@@ -89,10 +89,10 @@ def api_users_search():
 @require_admin_role
 def api_users_stats():
     try:
-        total  = (supabase.table("users").select("id", count="exact").execute().count or 0)
-        users  = (supabase.table("users").select("id", count="exact").eq("role", "user").execute().count or 0)
-        admins = (supabase.table("users").select("id", count="exact").eq("role", "admin").execute().count or 0)
-        both   = (supabase.table("users").select("id", count="exact").eq("role", "user,admin").execute().count or 0)
+        total  = fetch_one("SELECT COUNT(*) AS count FROM users")["count"]
+        users  = fetch_one("SELECT COUNT(*) AS count FROM users WHERE role=%s", ("user",))["count"]
+        admins = fetch_one("SELECT COUNT(*) AS count FROM users WHERE role=%s", ("admin",))["count"]
+        both   = fetch_one("SELECT COUNT(*) AS count FROM users WHERE role=%s", ("user,admin",))["count"]
         return jsonify({
             "total_users": total,
             "user_role":   users,
@@ -124,17 +124,14 @@ def update_user_role():
 
     try:
         # Double-check in DB that this isn't the ghost (in case id was spoofed)
-        row = supabase.table("users").select("username, role").eq("id", user_id).execute()
-        if row.data and _is_ghost(username=row.data[0].get("username"), role=row.data[0].get("role")):
+        row = fetch_one("SELECT username, role FROM users WHERE id=%s", (user_id,))
+        if row and _is_ghost(username=row.get("username"), role=row.get("role")):
             return jsonify({
                 "success": False,
                 "message": "System account cannot be modified."
             }), 403
 
-        supabase.table("users").update({
-            "role":       new_role,
-            "updated_at": datetime.now().isoformat(),
-        }).eq("id", user_id).execute()
+        execute("UPDATE users SET role=%s, updated_at=%s WHERE id=%s", (new_role, now_utc_naive().isoformat(), user_id))
         return jsonify({"success": True, "message": f"Role updated to {new_role}"})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -169,15 +166,12 @@ def bulk_update_user_roles():
 
         try:
             # DB-level ghost check
-            row = supabase.table("users").select("username, role").eq("id", uid).execute()
-            if row.data and _is_ghost(username=row.data[0].get("username"), role=row.data[0].get("role")):
+            row = fetch_one("SELECT username, role FROM users WHERE id=%s", (uid,))
+            if row and _is_ghost(username=row.get("username"), role=row.get("role")):
                 skipped += 1
                 continue
 
-            supabase.table("users").update({
-                "role":       role,
-                "updated_at": datetime.now().isoformat(),
-            }).eq("id", uid).execute()
+            execute("UPDATE users SET role=%s, updated_at=%s WHERE id=%s", (role, now_utc_naive().isoformat(), uid))
             updated += 1
         except Exception as e:
             errors.append(f"uid={uid}: {e}")

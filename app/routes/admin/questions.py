@@ -16,7 +16,6 @@ from app.db.questions import (
     create_question, create_questions_bulk,
     update_question, delete_question, delete_questions_bulk,
 )
-from app.db import supabase
 from app.utils.helpers import safe_float, safe_int
 from app.utils.sanitize import sanitize_html
 
@@ -249,24 +248,24 @@ def import_questions_csv():
             skipped += 1
             errors.append(f"Row {idx+2}: skipped")
             continue
-        try:
-            supabase.table("questions").insert({
-                "exam_id":        eid,
-                "question_text":  qt,
-                "option_a":       str(row.get("option_a","")).strip() if pd.notna(row.get("option_a")) else "",
-                "option_b":       str(row.get("option_b","")).strip() if pd.notna(row.get("option_b")) else "",
-                "option_c":       str(row.get("option_c","")).strip() if pd.notna(row.get("option_c")) else "",
-                "option_d":       str(row.get("option_d","")).strip() if pd.notna(row.get("option_d")) else "",
-                "correct_answer": str(row.get("correct_answer","")).strip() if pd.notna(row.get("correct_answer")) else "",
-                "question_type":  str(row.get("question_type","MCQ")).strip(),
-                "image_path":     str(row.get("image_path","")).strip() if pd.notna(row.get("image_path")) else "",
-                "positive_marks": int(float(row.get("positive_marks",4))) if pd.notna(row.get("positive_marks")) else 4,
-                "negative_marks": float(row.get("negative_marks", 1) or 1) if pd.notna(row.get("negative_marks")) else 1.0,
-                "tolerance":      float(row.get("tolerance", 0) or 0) if pd.notna(row.get("tolerance")) else 0.0,
-            }).execute()
+        created = create_question({
+            "exam_id":        eid,
+            "question_text":  qt,
+            "option_a":       str(row.get("option_a","")).strip() if pd.notna(row.get("option_a")) else "",
+            "option_b":       str(row.get("option_b","")).strip() if pd.notna(row.get("option_b")) else "",
+            "option_c":       str(row.get("option_c","")).strip() if pd.notna(row.get("option_c")) else "",
+            "option_d":       str(row.get("option_d","")).strip() if pd.notna(row.get("option_d")) else "",
+            "correct_answer": str(row.get("correct_answer","")).strip() if pd.notna(row.get("correct_answer")) else "",
+            "question_type":  str(row.get("question_type","MCQ")).strip(),
+            "image_path":     str(row.get("image_path","")).strip() if pd.notna(row.get("image_path")) else "",
+            "positive_marks": int(float(row.get("positive_marks",4))) if pd.notna(row.get("positive_marks")) else 4,
+            "negative_marks": float(row.get("negative_marks", 1) or 1) if pd.notna(row.get("negative_marks")) else 1.0,
+            "tolerance":      float(row.get("tolerance", 0) or 0) if pd.notna(row.get("tolerance")) else 0.0,
+        })
+        if created:
             inserted += 1
-        except Exception as e:
-            skipped += 1; errors.append(f"Row {idx+2}: {e}")
+        else:
+            skipped += 1; errors.append(f"Row {idx+2}: insert failed")
 
     if inserted:
         msg = f"Imported {inserted} question(s)."

@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
-from app.db import supabase
+from app.db import fetch_one, fetch_all, execute, insert_returning
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def delete_user_completely(user_id: int) -> Tuple[bool, str]:
         # ai_usage_tracking, exam_attempts, results, responses,
         # chat_connections, chat_members, chat_unread,
         # chat_visibility, sessions
-        supabase.table("users").delete().eq("id", uid).execute()
+        execute("DELETE FROM users WHERE id=%s", (uid,))
 
         logger.info("[user_deletion] COMPLETE uid=%s", uid)
         return True, "Account deleted successfully"
@@ -83,17 +83,16 @@ def delete_user_completely(user_id: int) -> Tuple[bool, str]:
 def _ensure_ghost_user() -> None:
     """Insert permanent ghost user if not exists. Safe to call repeatedly."""
     try:
-        res = supabase.table("users").select("id").eq("id", GHOST_USER_ID).execute()
-        if res.data:
+        if fetch_one("SELECT id FROM users WHERE id=%s", (GHOST_USER_ID,)):
             return
-        supabase.table("users").insert({
+        insert_returning("users", {
             "id":        GHOST_USER_ID,
             "username":  GHOST_USERNAME,
             "email":     GHOST_EMAIL,
             "password":  "GHOST_ACCOUNT_NO_LOGIN_POSSIBLE",
             "full_name": GHOST_DISPLAY_NAME,
             "role":      "ghost",
-        }).execute()
+        })
         logger.info("[user_deletion] Ghost user created id=%s", GHOST_USER_ID)
     except Exception as e:
         logger.warning("[user_deletion] _ensure_ghost_user (may already exist): %s", e)
@@ -113,19 +112,11 @@ def _reassign_discussions(uid: int) -> None:
                   → user row deletion has nothing to cascade/nullify here
     """
     try:
-        result = (
-            supabase.table("question_discussions")
-            .update({
-                "user_id":    GHOST_USER_ID,      # ← THIS IS THE FIX
-                "username":   ANON_USERNAME,
-                "message":    ANON_MESSAGE,
-                "is_deleted": True,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            .eq("user_id", uid)
-            .execute()
+        count = execute(
+            "UPDATE question_discussions SET user_id=%s, username=%s, message=%s, is_deleted=%s, updated_at=%s "
+            "WHERE user_id=%s",
+            (GHOST_USER_ID, ANON_USERNAME, ANON_MESSAGE, True, datetime.now(timezone.utc).isoformat(), uid),
         )
-        count = len(result.data) if result.data else 0
         logger.info("[user_deletion] Reassigned %s discussions uid=%s → ghost", count, uid)
     except Exception as e:
         logger.error("[user_deletion] _reassign_discussions uid=%s: %s", uid, e)
@@ -136,23 +127,13 @@ def _reassign_discussions(uid: int) -> None:
 
 def _handle_conversations(uid: int) -> None:
     try:
-        members_res = (
-            supabase.table("chat_members")
-            .select("conversation_id")
-            .eq("user_id", uid)
-            .execute()
-        )
-        conv_ids = list({r["conversation_id"] for r in (members_res.data or [])})
+        members_res = fetch_all("SELECT conversation_id FROM chat_members WHERE user_id=%s", (uid,))
+        conv_ids = list({r["conversation_id"] for r in members_res})
         if not conv_ids:
             return
 
-        convs_res = (
-            supabase.table("chat_conversations")
-            .select("id, is_group, created_by")
-            .in_("id", conv_ids)
-            .execute()
-        )
-        convs_map = {c["id"]: c for c in (convs_res.data or [])}
+        convs_res = fetch_all("SELECT id, is_group, created_by FROM chat_conversations WHERE id = ANY(%s)", (conv_ids,))
+        convs_map = {c["id"]: c for c in convs_res}
 
         dm_ids = []
         grp_items = []
@@ -170,14 +151,10 @@ def _handle_conversations(uid: int) -> None:
             _purge_conversation(cid)
 
         for cid, conv in grp_items:
-            others_res = (
-                supabase.table("chat_members")
-                .select("user_id")
-                .eq("conversation_id", cid)
-                .neq("user_id", uid)
-                .execute()
+            others_res = fetch_all(
+                "SELECT user_id FROM chat_members WHERE conversation_id=%s AND user_id != %s", (cid, uid)
             )
-            others = [m["user_id"] for m in (others_res.data or [])]
+            others = [m["user_id"] for m in others_res]
             _handle_group(uid, cid, conv, others)
 
         logger.info("[user_deletion] %s DMs purged, %s groups handled uid=%s",
@@ -192,19 +169,17 @@ def _handle_group(uid: int, conv_id: int, conv: Dict, others: List[int]) -> None
         _purge_conversation(conv_id)
         return
     if conv.get("created_by") == uid:
-        supabase.table("chat_conversations").update(
-            {"created_by": others[0]}
-        ).eq("id", conv_id).execute()
+        execute("UPDATE chat_conversations SET created_by=%s WHERE id=%s", (others[0], conv_id))
 
 
 def _purge_conversation(conv_id: int) -> None:
     """Delete conversation + all children in FK-safe order."""
     try:
-        supabase.table("chat_messages").delete().eq("conversation_id", conv_id).execute()
-        supabase.table("chat_members").delete().eq("conversation_id", conv_id).execute()
-        supabase.table("chat_unread").delete().eq("conversation_id", conv_id).execute()
-        supabase.table("chat_visibility").delete().eq("conversation_id", conv_id).execute()
-        supabase.table("chat_conversations").delete().eq("id", conv_id).execute()
+        execute("DELETE FROM chat_messages WHERE conversation_id=%s", (conv_id,))
+        execute("DELETE FROM chat_members WHERE conversation_id=%s", (conv_id,))
+        execute("DELETE FROM chat_unread WHERE conversation_id=%s", (conv_id,))
+        execute("DELETE FROM chat_visibility WHERE conversation_id=%s", (conv_id,))
+        execute("DELETE FROM chat_conversations WHERE id=%s", (conv_id,))
     except Exception as e:
         logger.error("[user_deletion] _purge_conversation cid=%s: %s", conv_id, e)
         raise
@@ -218,13 +193,7 @@ def _delete_chat_messages(uid: int) -> None:
     already deleted in Step 2). sender_id is NOT NULL — no other option.
     """
     try:
-        result = (
-            supabase.table("chat_messages")
-            .delete()
-            .eq("sender_id", uid)
-            .execute()
-        )
-        count = len(result.data) if result.data else 0
+        count = execute("DELETE FROM chat_messages WHERE sender_id=%s", (uid,))
         logger.info("[user_deletion] Deleted %s chat_messages uid=%s", count, uid)
     except Exception as e:
         logger.error("[user_deletion] _delete_chat_messages uid=%s: %s", uid, e)
@@ -236,11 +205,11 @@ def _delete_chat_messages(uid: int) -> None:
 def _delete_string_keyed_records(email: str, username: str) -> None:
     try:
         if email:
-            supabase.table("pw_tokens").delete().eq("email", email).execute()
+            execute("DELETE FROM pw_tokens WHERE email=%s", (email,))
         if username:
-            supabase.table("login_attempts").delete().eq("identifier", username).execute()
+            execute("DELETE FROM login_attempts WHERE identifier=%s", (username,))
         if email:
-            supabase.table("login_attempts").delete().eq("identifier", email).execute()
+            execute("DELETE FROM login_attempts WHERE identifier=%s", (email,))
         _anonymize_requests(username, email)
     except Exception as e:
         logger.error("[user_deletion] _delete_string_keyed_records: %s", e)
@@ -249,25 +218,24 @@ def _delete_string_keyed_records(email: str, username: str) -> None:
 
 def _anonymize_requests(username: str, email: str) -> None:
     try:
-        conditions = []
+        conditions, params = [], []
         if username:
-            conditions.append(f"username.eq.{username}")
+            conditions.append("username=%s"); params.append(username)
         if email:
-            conditions.append(f"email.eq.{email}")
+            conditions.append("email=%s"); params.append(email)
         if not conditions:
             return
-        f = ",".join(conditions)
+        where_sql = " OR ".join(conditions)
         now = datetime.now(timezone.utc).isoformat()
-        supabase.table("requests_raised").update({
-            "request_status": "withdrawn",
-            "processed_date": now,
-            "processed_by":   "system:account_deleted",
-        }).or_(f).eq("request_status", "pending").execute()
-        supabase.table("requests_raised").update({
-            "username": "[deleted]",
-            "email":    "[deleted]",
-            "reason":   "[Content removed — account deleted by user]",
-        }).or_(f).execute()
+        execute(
+            f"UPDATE requests_raised SET request_status=%s, processed_date=%s, processed_by=%s "
+            f"WHERE ({where_sql}) AND request_status=%s",
+            ["withdrawn", now, "system:account_deleted"] + params + ["pending"],
+        )
+        execute(
+            f"UPDATE requests_raised SET username=%s, email=%s, reason=%s WHERE ({where_sql})",
+            ["[deleted]", "[deleted]", "[Content removed — account deleted by user]"] + params,
+        )
     except Exception as e:
         logger.error("[user_deletion] _anonymize_requests: %s", e)
         raise
@@ -277,13 +245,7 @@ def _anonymize_requests(username: str, email: str) -> None:
 
 def _fetch_user_meta(uid: int) -> Optional[Dict]:
     try:
-        res = (
-            supabase.table("users")
-            .select("id, email, username")
-            .eq("id", uid)
-            .execute()
-        )
-        return res.data[0] if res.data else None
+        return fetch_one("SELECT id, email, username FROM users WHERE id=%s", (uid,))
     except Exception as e:
         logger.error("[user_deletion] _fetch_user_meta uid=%s: %s", uid, e)
         return None
@@ -299,15 +261,9 @@ def setup_ghost_user_migration() -> Tuple[bool, str]:
     """
     try:
         _ensure_ghost_user()
-        check = (
-            supabase.table("users")
-            .select("id, username, role")
-            .eq("id", GHOST_USER_ID)
-            .execute()
-        )
-        if not check.data:
+        row = fetch_one("SELECT id, username, role FROM users WHERE id=%s", (GHOST_USER_ID,))
+        if not row:
             return False, f"Ghost user id={GHOST_USER_ID} could not be verified"
-        row = check.data[0]
         return True, f"Ghost user ready: id={row['id']} username={row['username']}"
     except Exception as e:
         return False, f"Ghost user setup failed: {e}"

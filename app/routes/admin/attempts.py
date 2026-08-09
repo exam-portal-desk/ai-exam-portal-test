@@ -1,10 +1,10 @@
 """app/routes/admin/attempts.py — Attempt management (AJAX, no cartesian product)"""
-from datetime import datetime
 from flask import render_template, request, jsonify
 from app.routes.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
 from app.db.exams import get_all_exams
-from app.db import supabase
+from app.db import fetch_all, execute, insert_returning
+from app.utils.datetime_service import now_utc_naive
 
 
 # ── Page load — zero data, AJAX se fetch hoga ───────────────────────────
@@ -44,22 +44,20 @@ def api_attempts_search():
     try:
         # ── Step 1: resolve matching user IDs ─────────────────────────
         if q:
-            ur = (supabase.table("users")
-                  .select("id, username")
-                  .or_(f"username.ilike.%{q}%,full_name.ilike.%{q}%")
-                  .limit(500)          # guard against huge result
-                  .execute())
-            users_data = ur.data or []
+            users_data = fetch_all(
+                "SELECT id, username FROM users WHERE username ILIKE %s OR full_name ILIKE %s LIMIT 500",
+                (f"%{q}%", f"%{q}%"),
+            )
         else:
             # No text search — we'll just get users from attempt records
             users_data = None   # signal: don't pre-filter
 
         # ── Step 2: build attempt counts query ───────────────────────
-        att_q = (supabase.table("exam_attempts")
-                 .select("student_id, exam_id, status"))
-
+        att_query = "SELECT student_id, exam_id, status FROM exam_attempts WHERE 1=1"
+        att_params = []
         if exam_id:
-            att_q = att_q.eq("exam_id", exam_id)
+            att_query += " AND exam_id=%s"
+            att_params.append(exam_id)
         if users_data is not None:
             uids = [u["id"] for u in users_data]
             if not uids:
@@ -68,9 +66,10 @@ def api_attempts_search():
                     "rows": [], "total": 0,
                     "page": page, "per_page": per_page, "total_pages": 1
                 })
-            att_q = att_q.in_("student_id", uids)
+            att_query += " AND student_id = ANY(%s)"
+            att_params.append(uids)
 
-        atts = att_q.execute().data or []
+        atts = fetch_all(att_query, att_params)
 
         # ── Step 3: aggregate attempt counts ─────────────────────────
         from collections import defaultdict
@@ -94,24 +93,15 @@ def api_attempts_search():
         if users_data is not None:
             user_map = {u["id"]: u["username"] for u in users_data}
         else:
-            ur2 = (supabase.table("users")
-                   .select("id, username")
-                   .in_("id", list(sid_set))
-                   .execute())
-            user_map = {u["id"]: u["username"] for u in (ur2.data or [])}
+            ur2 = fetch_all("SELECT id, username FROM users WHERE id = ANY(%s)", (list(sid_set),))
+            user_map = {u["id"]: u["username"] for u in ur2}
 
         # ── Step 5: fetch exam details (only for seen IDs) ────────────
         if exam_id:
-            exams_r = (supabase.table("exams")
-                       .select("id, name, max_attempts")
-                       .eq("id", exam_id)
-                       .execute())
+            exams_r = fetch_all("SELECT id, name, max_attempts FROM exams WHERE id=%s", (exam_id,))
         else:
-            exams_r = (supabase.table("exams")
-                       .select("id, name, max_attempts")
-                       .in_("id", list(eid_set))
-                       .execute())
-        exam_map = {e["id"]: e for e in (exams_r.data or [])}
+            exams_r = fetch_all("SELECT id, name, max_attempts FROM exams WHERE id = ANY(%s)", (list(eid_set),))
+        exam_map = {e["id"]: e for e in exams_r}
 
         # ── Step 6: build rows ────────────────────────────────────────
         all_rows = []
@@ -179,33 +169,29 @@ def attempts_modify():
     action     = p.get("action", "")
     amount     = int(p.get("amount") or 1)
 
-    current = (supabase.table("exam_attempts")
-               .select("id")
-               .eq("student_id", student_id)
-               .eq("exam_id", exam_id)
-               .execute().data or [])
+    current = fetch_all("SELECT id FROM exam_attempts WHERE student_id=%s AND exam_id=%s", (student_id, exam_id))
     used = len(current)
 
     if action == "reset":
         for a in current:
-            supabase.table("exam_attempts").delete().eq("id", a["id"]).execute()
+            execute("DELETE FROM exam_attempts WHERE id=%s", (a["id"],))
 
     elif action == "decrease":
         if used < amount:
             return jsonify({"success": False, "message": "Not enough attempts to remove"}), 400
         for a in sorted(current, key=lambda x: x["id"])[-amount:]:
-            supabase.table("exam_attempts").delete().eq("id", a["id"]).execute()
+            execute("DELETE FROM exam_attempts WHERE id=%s", (a["id"],))
 
     elif action == "increase":
         for i in range(amount):
-            supabase.table("exam_attempts").insert({
+            insert_returning("exam_attempts", {
                 "student_id":    int(student_id),
                 "exam_id":       int(exam_id),
                 "attempt_number": used + i + 1,
                 "status":        "manual_add",
-                "start_time":    datetime.now().isoformat(),
+                "start_time":    now_utc_naive().isoformat(),
                 "end_time":      None,
-            }).execute()
+            })
     else:
         return jsonify({"success": False, "message": "Invalid action"}), 400
 
@@ -225,30 +211,26 @@ def attempts_bulk_modify():
     for item in items:
         sid = str(item.get("student_id", ""))
         eid = str(item.get("exam_id", ""))
-        cur = (supabase.table("exam_attempts")
-               .select("id")
-               .eq("student_id", sid)
-               .eq("exam_id", eid)
-               .execute().data or [])
+        cur = fetch_all("SELECT id FROM exam_attempts WHERE student_id=%s AND exam_id=%s", (sid, eid))
         used = len(cur)
         try:
             if action == "reset":
                 for a in cur:
-                    supabase.table("exam_attempts").delete().eq("id", a["id"]).execute()
+                    execute("DELETE FROM exam_attempts WHERE id=%s", (a["id"],))
             elif action == "decrease":
                 if used < amount:
                     errors.append(f"uid={sid}/eid={eid}: not enough attempts"); continue
                 for a in sorted(cur, key=lambda x: x["id"])[-amount:]:
-                    supabase.table("exam_attempts").delete().eq("id", a["id"]).execute()
+                    execute("DELETE FROM exam_attempts WHERE id=%s", (a["id"],))
             elif action == "increase":
                 for i in range(amount):
-                    supabase.table("exam_attempts").insert({
+                    insert_returning("exam_attempts", {
                         "student_id":    int(sid),
                         "exam_id":       int(eid),
                         "attempt_number": used + i + 1,
                         "status":        "manual_add",
-                        "start_time":    datetime.now().isoformat(),
-                    }).execute()
+                        "start_time":    now_utc_naive().isoformat(),
+                    })
             ok += 1
         except Exception as e:
             errors.append(f"uid={sid}/eid={eid}: {e}")

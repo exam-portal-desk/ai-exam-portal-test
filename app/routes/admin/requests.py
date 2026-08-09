@@ -1,10 +1,10 @@
 """app/routes/admin/requests.py — Access request management"""
-from datetime import datetime
+from app.utils.datetime_service import now_utc_naive, format_display
 from flask import render_template, request, jsonify, session
 from app.routes.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
 from app.db.misc import update_request
-from app.db import supabase
+from app.db import fetch_one, fetch_all, execute
 
 
 @admin_bp.route("/requests")
@@ -25,19 +25,18 @@ def api_requests_list():
     page     = max(1, int(request.args.get("page", 1)))
     per_page = 25
 
-    query = supabase.table("requests_raised").select("*", count="exact")
-
     if status == "pending":
-        query = query.eq("request_status", "pending")
+        where, where_params = "request_status=%s", ["pending"]
     else:
-        query = query.in_("request_status", ["completed", "denied"])
+        where, where_params = "request_status = ANY(%s)", [["completed", "denied"]]
+
+    total = fetch_one(f"SELECT COUNT(*) AS count FROM requests_raised WHERE {where}", where_params)["count"]
 
     start = (page - 1) * per_page
-    query = query.order("request_date", desc=True).range(start, start + per_page - 1)
-
-    res   = query.execute()
-    total = res.count or 0
-    reqs  = res.data or []
+    reqs = fetch_all(
+        f"SELECT * FROM requests_raised WHERE {where} ORDER BY request_date DESC LIMIT %s OFFSET %s",
+        where_params + [per_page, start],
+    )
 
     formatted = [_fmt(r) for r in reqs]
 
@@ -57,11 +56,11 @@ def _fmt(r):
         "email":            r.get("email", ""),
         "current_access":   r.get("current_access", ""),
         "requested_access": r.get("requested_access", ""),
-        "request_date":     r.get("request_date", ""),
+        "request_date":     format_display(r.get("request_date")),
         "status":           r.get("request_status", ""),
         "reason":           r.get("reason", "") or "",
         "processed_by":     r.get("processed_by", "Admin"),
-        "processed_date":   r.get("processed_date", ""),
+        "processed_date":   format_display(r.get("processed_date")),
     }
 
 
@@ -73,24 +72,21 @@ def approve_request(request_id):
     if not approved:
         return jsonify({"success": False, "message": "Please select an access level"}), 400
 
-    req = supabase.table("requests_raised").select("*").eq("request_id", request_id).eq("request_status", "pending").execute().data
+    req = fetch_one("SELECT * FROM requests_raised WHERE request_id=%s AND request_status=%s", (request_id, "pending"))
     if not req:
         return jsonify({"success": False, "message": "Request not found or already processed"}), 404
-    req = req[0]
 
-    user_r = supabase.table("users").select("id").eq("username", req["username"]).eq("email", req["email"]).execute().data
+    user_r = fetch_one("SELECT id FROM users WHERE username=%s AND email=%s", (req["username"], req["email"]))
     if not user_r:
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    supabase.table("users").update({
-        "role": approved, "updated_at": datetime.now().isoformat()
-    }).eq("id", user_r[0]["id"]).execute()
+    execute("UPDATE users SET role=%s, updated_at=%s WHERE id=%s", (approved, now_utc_naive().isoformat(), user_r["id"]))
 
     reason = (req.get("reason", "") or "") + f"\n[ADMIN APPROVAL] Approved: {approved}"
     update_request(request_id, {
         "request_status": "completed", "reason": reason,
         "processed_by": session.get("username", "Admin"),
-        "processed_date": datetime.now().isoformat()
+        "processed_date": now_utc_naive().isoformat()
     })
     return jsonify({"success": True, "message": f"Approved. User now has {approved} access."})
 
@@ -103,16 +99,15 @@ def deny_request(request_id):
     if not reason:
         return jsonify({"success": False, "message": "Please provide a denial reason"}), 400
 
-    req = supabase.table("requests_raised").select("*").eq("request_id", request_id).eq("request_status", "pending").execute().data
+    req = fetch_one("SELECT * FROM requests_raised WHERE request_id=%s AND request_status=%s", (request_id, "pending"))
     if not req:
         return jsonify({"success": False, "message": "Not found or already processed"}), 404
-    req = req[0]
 
     final_reason = (req.get("reason", "") or "") + f"\n[ADMIN DENIAL] {reason}"
     update_request(request_id, {
         "request_status": "denied", "reason": final_reason,
         "processed_by": session.get("username", "Admin"),
-        "processed_date": datetime.now().isoformat()
+        "processed_date": now_utc_naive().isoformat()
     })
     return jsonify({"success": True, "message": "Request denied."})
 
@@ -120,7 +115,7 @@ def deny_request(request_id):
 @admin_bp.route("/api/requests/stats")
 @require_admin_role
 def api_requests_stats():
-    pending   = supabase.table("requests_raised").select("request_id", count="exact").eq("request_status", "pending").execute().count or 0
-    completed = supabase.table("requests_raised").select("request_id", count="exact").eq("request_status", "completed").execute().count or 0
-    denied    = supabase.table("requests_raised").select("request_id", count="exact").eq("request_status", "denied").execute().count or 0
+    pending   = fetch_one("SELECT COUNT(*) AS count FROM requests_raised WHERE request_status=%s", ("pending",))["count"]
+    completed = fetch_one("SELECT COUNT(*) AS count FROM requests_raised WHERE request_status=%s", ("completed",))["count"]
+    denied    = fetch_one("SELECT COUNT(*) AS count FROM requests_raised WHERE request_status=%s", ("denied",))["count"]
     return jsonify({"pending": pending, "completed": completed, "denied": denied, "total": pending + completed + denied})

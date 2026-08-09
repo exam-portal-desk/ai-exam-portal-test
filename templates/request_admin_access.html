@@ -104,7 +104,7 @@ function verifyUser() {
     if (d.requests && d.requests.length) {
       var rows = d.requests.map(function(r){
         var statusClass = r.status==='pending'?'ab-pending':r.status==='approved'?'ab-both':'ab-denied';
-        return '<tr><td style="font-size:.72rem;color:var(--text-3)">'+r.request_date.slice(0,10)+'</td><td>'+r.requested_access+'</td><td><span class="abadge '+statusClass+'">'+r.status+'</span></td></tr>';
+        return '<tr><td style="font-size:.72rem;color:var(--text-3)">'+r.request_date+'</td><td>'+r.requested_access+'</td><td><span class="abadge '+statusClass+'">'+r.status+'</span></td></tr>';
       }).join('');
       document.getElementById('prevReqBody').innerHTML = rows;
       document.getElementById('prevRequests').style.display = 'block';

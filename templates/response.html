@@ -134,7 +134,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .modal-title   { font-size:.9rem; font-weight:700; color:var(--text-1); }
 .modal-body    { padding:1.1rem; background:var(--surface); }
 .btn-close { filter:var(--btn-close-filter, none); }
-[data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close,[data-theme="sunset"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
+[data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
 
 /* AI Explanation */
 .ai-explain-section {
@@ -213,10 +213,37 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .expl-card-label { font-size:.78rem; font-weight:700; color:var(--text-1); flex:1; display:flex; align-items:center; gap:.4rem; }
 .expl-card-num { width:20px; height:20px; border-radius:50%; background:var(--accent); color:var(--accent-on); display:flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:700; flex-shrink:0; }
 .expl-card-meta { font-size:.68rem; color:var(--text-3); white-space:nowrap; }
+.expl-card-delete {
+  display:flex; align-items:center; justify-content:center;
+  width:24px; height:24px; padding:0; margin-left:.15rem;
+  border:0; border-radius:6px; background:transparent; color:var(--text-3);
+  font-size:.7rem; cursor:pointer; flex-shrink:0; transition:background .12s,color .12s;
+}
+.expl-card-delete:hover { background:var(--danger-bg); color:var(--danger-text); }
+.expl-card-deleting { opacity:.5; pointer-events:none; }
 .expl-card-chevron { color:var(--text-3); font-size:.65rem; transition:transform .15s; }
 .expl-card-chevron.open { transform:rotate(90deg); }
 .expl-card-body { }
-.expl-card-content { padding:.85rem .9rem; }
+.expl-card-content {
+  padding:.85rem .9rem;
+  overflow-x:auto;      /* long equations/LaTeX/chemistry scroll horizontally instead of breaking the page */
+  overflow-y:visible;   /* vertical scrolling stays the normal page scroll — unaffected */
+  max-width:100%;
+}
+/* Everything that can legitimately grow wider than the card (rendered KaTeX/MathJax
+   output, code blocks, tables) scrolls within the card instead of overflowing it;
+   normal text keeps wrapping naturally since word-wrap only kicks in on these. */
+.explain-panel-body mjx-container,
+.explain-panel-body .katex-display,
+.explain-panel-body pre,
+.explain-panel-body table {
+  max-width:100%;
+  overflow-x:auto;
+}
+.explain-panel-body p,
+.explain-panel-body li {
+  overflow-wrap:break-word;
+}
 .explain-panel-body p  { color:var(--text-1); font-size:.84rem; line-height:1.6; margin-bottom:.5rem; }
 .explain-panel-body ul { color:var(--text-1); font-size:.84rem; padding-left:1.2rem; margin-bottom:.5rem; }
 .explain-panel-body li { margin-bottom:.25rem; line-height:1.5; }
@@ -424,7 +451,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
               <div class="col-md-8">
                 <h3><i class="fas fa-clipboard-check" style="color:var(--gold-2)"></i> {{ exam.name }} - Response Analysis</h3>
                 <p class="mb-1 text-muted-light">Student: {{ session.full_name }}</p>
-                <p class="mb-0 text-muted-light">Completed: {{ result.completed_at | string | truncate(19, True, '') | replace('T', ' ') }}</p>
+                <p class="mb-0 text-muted-light">Completed: {{ result.completed_at | display_dt if result.completed_at else '—' }}</p>
               </div>
               <div class="col-md-4 text-md-end score-summary">
                 <div class="metric-glow">{{ result.score }} / {{ result.max_score }}</div>
@@ -1465,6 +1492,23 @@ function _renderContent(text) {
 }
 
 // ── MathJax ───────────────────────────────────────────────────────────────────
+// MathJax's typesetPromise() is NOT safe to call again while a previous call
+// is still in flight — doing so is exactly what was producing the repeated
+// "Cannot read properties of null (reading 'replaceChild')" console errors
+// (multiple questions' history loading concurrently on page load, each
+// re-rendering + typesetting independently, could race with each other and
+// with discWrapMath()'s own call). Every typesetting call in this file now
+// goes through this one serialized queue instead of calling
+// MathJax.typesetPromise directly, so only one ever runs at a time.
+let _mjQueue = Promise.resolve();
+function _mjTypeset(elements) {
+  _mjQueue = _mjQueue.then(() => {
+    if (window.MathJax && MathJax.typesetPromise) {
+      return MathJax.typesetPromise(elements);
+    }
+  }).catch(e => console.warn('[MathJax]', e));
+  return _mjQueue;
+}
 
 function discWrapMath() {
   document.querySelectorAll('[data-raw]:not([data-rendered])').forEach(el => {
@@ -1479,7 +1523,7 @@ function discWrapMath() {
   });
   (function _mj(n) {
     if (window.MathJax && MathJax.typesetPromise) {
-      MathJax.typesetPromise([...document.querySelectorAll('.math-wrap')]).catch(e => console.warn(e));
+      _mjTypeset([...document.querySelectorAll('.math-wrap')]);
     } else if (n > 0) setTimeout(() => _mj(n-1), 200);
   })(30);
 }
@@ -1518,6 +1562,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Per-question cache: { qid: { history: [], dailyRemaining, questionRemaining, resetTime, loaded } }
 const _explainState = {};
+// Extra defense-in-depth beyond btn.disabled: tracks which questions have a
+// generation request currently in flight, so explainToggle can never fire a
+// second request for the same question even if invoked from somewhere other
+// than the button's own click handler.
+const _explainInFlight = new Set();
 
 /**
  * Called on page load for each wrong-answer question.
@@ -1559,6 +1608,12 @@ async function explainToggle(qid, qtype, givenAnswer) {
   // If question limit reached, do nothing (button should already be disabled)
   if (state.questionRemaining === 0) return;
 
+  // Belt-and-suspenders duplicate-request guard, on top of btn.disabled:
+  // refuse to start a second generation for this question while one is
+  // already in flight.
+  if (_explainInFlight.has(qid)) return;
+  _explainInFlight.add(qid);
+
   const btn = document.getElementById(`explain-btn-${qid}`);
   _explainSetBtnLoading(btn, true);
   _explainShowPanel(qid);
@@ -1597,6 +1652,7 @@ async function explainToggle(qid, qtype, givenAnswer) {
     _explainShowError(qid, "Network error — please check your connection.", "");
   }
 
+  _explainInFlight.delete(qid);
   _explainSetBtnLoading(btn, false);
   _explainUpdateButtonState(qid);
 }
@@ -1637,6 +1693,70 @@ function explainCollapseToggle(historyId) {
     icon.textContent = isOpen ? "▶" : "▼";
     icon.classList.toggle("open", !isOpen);
   }
+}
+
+/** Delete ONE generated explanation. Only removes that explanation record —
+ *  the question, the student's answer, correctness, and other explanations
+ *  (this question's or any other question's) are untouched. */
+function explainDeleteOne(qid, explanationId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'disc-confirm-overlay';
+  overlay.innerHTML = `
+    <div class="disc-confirm-box">
+      <h6>🗑️ Delete Explanation?</h6>
+      <p>This only removes this generated explanation. Your answer and the question are unaffected.</p>
+      <div class="disc-confirm-btns">
+        <button class="disc-cb-cancel">Cancel</button>
+        <button class="disc-cb-delete">Delete</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.disc-cb-cancel').onclick = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('.disc-cb-delete').onclick = async () => {
+    overlay.remove();
+    const card = document.getElementById(`expl-card-${explanationId}`);
+    card?.classList.add('expl-card-deleting');
+    try {
+      const resp = await fetch(`/api/explain/${qid}/${explanationId}`, { method: 'DELETE' });
+
+      if (!resp.ok) {
+        // Distinguish "route unreachable" (404/405 — a wiring problem, not
+        // a real delete failure) from a real server-side error, since both
+        // would otherwise look identical to the user.
+        card?.classList.remove('expl-card-deleting');
+        console.error(`[explain] DELETE /api/explain/${qid}/${explanationId} -> HTTP ${resp.status}`);
+        const msg = (resp.status === 404 || resp.status === 405)
+          ? 'Delete isn\u2019t available right now (endpoint not found). Please contact support.'
+          : 'Could not delete this explanation. Please try again.';
+        _explainShowError(qid, msg, '');
+        return;
+      }
+
+      const data = await resp.json();
+      if (!data.success) {
+        card?.classList.remove('expl-card-deleting');
+        _explainShowError(qid, data.message || 'Could not delete this explanation.', '');
+        return;
+      }
+
+      const state = _explainState[qid] || {};
+      state.history = data.history || [];
+      _explainState[qid] = state;
+
+      _explainRenderHistory(qid);
+
+      // No explanations left for this question — return to the initial state.
+      if (!state.history.length) {
+        const panel = document.getElementById(`explain-panel-${qid}`);
+        if (panel) panel.style.display = 'none';
+      }
+    } catch (err) {
+      card?.classList.remove('expl-card-deleting');
+      console.error('[explain] delete request failed:', err);
+      _explainShowError(qid, 'Network error — please check your connection.', '');
+    }
+  };
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────
@@ -1730,6 +1850,10 @@ function _explainRenderHistory(qid) {
             ${label}
           </span>
           <span class="expl-card-meta">${dateStr}</span>
+          <button type="button" class="expl-card-delete" title="Delete this explanation"
+                  onclick="event.stopPropagation(); explainDeleteOne(${qid}, ${item.id});">
+            <i class="fas fa-trash-alt"></i>
+          </button>
           <span class="expl-card-chevron" id="expl-card-icon-${item.id}">${startOpen ? "▼" : "▶"}</span>
         </div>
         <div class="expl-card-body" id="expl-card-body-${item.id}" style="display:${startOpen ? "block" : "none"}">
@@ -1740,10 +1864,9 @@ function _explainRenderHistory(qid) {
       </div>`;
   }).join("");
 
-  // Typeset MathJax on all new content
-  if (window.MathJax && MathJax.typesetPromise) {
-    MathJax.typesetPromise([container]).catch(e => console.warn("[explain] MathJax:", e));
-  }
+  // Typeset MathJax on all new content — queued (see _mjTypeset above) so
+  // this can never race with another in-flight typeset call.
+  _mjTypeset([container]);
 }
 
 function _explainAppendSkeleton(qid) {
@@ -1806,13 +1929,23 @@ function _explainFormatDate(isoStr) {
 
 /**
  * Minimal Markdown → HTML converter with LaTeX protection.
- * Protects $$...$$ and $...$ from Markdown processing, then restores.
+ * Protects $$...$$, $...$, \[...\] and \(...\) (verbatim, delimiters
+ * included) from Markdown processing, then restores them untouched so
+ * subscripts/braces/mhchem syntax inside can never be corrupted by the
+ * bold/italic/list regexes below.
  */
 function _explainMarkdownToHtml(markdown) {
-  const lb = [], li = [];
-  let s = markdown
-    .replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => { lb.push(m); return "%%LB" + (lb.length-1) + "%%"; })
-    .replace(/\$([^\n$]+?)\$/g,     (_, m) => { li.push(m); return "%%LI" + (li.length-1) + "%%"; });
+  const math = [];
+  const protectMath = (re) => (str) => str.replace(re, m => {
+    math.push(m);
+    return "\u0000MATH" + (math.length - 1) + "\u0000";
+  });
+
+  let s = String(markdown);
+  s = protectMath(/\$\$[\s\S]+?\$\$/g)(s);   // $$...$$ (checked first: greedier delimiter)
+  s = protectMath(/\\\[[\s\S]+?\\\]/g)(s);   // \[...\]
+  s = protectMath(/\$[^\n$]+?\$/g)(s);       // $...$  (single line only)
+  s = protectMath(/\\\([\s\S]+?\\\)/g)(s);   // \(...\)
 
   s = s
     .replace(/^## (.+)$/gm,   "<h2>$1</h2>")
@@ -1828,9 +1961,11 @@ function _explainMarkdownToHtml(markdown) {
     .replace(/^(?!<[huolpd])(.+)$/gm, "<p>$1</p>")
     .replace(/<p><\/p>/g, "");
 
-  s = s
-    .replace(/%%LB(\d+)%%/g, (_, i) => "$$" + lb[i] + "$$")
-    .replace(/%%LI(\d+)%%/g, (_, i) => "$"  + li[i] + "$");
+  // Restore verbatim; escape < and > only so a stray "<=>" (mhchem
+  // equilibrium arrow) etc. can never be misread as an HTML tag.
+  s = s.replace(/\u0000MATH(\d+)\u0000/g, (_, i) =>
+    math[Number(i)].replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  );
   return s;
 }
 

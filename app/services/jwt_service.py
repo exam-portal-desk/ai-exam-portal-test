@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 import config
+from app.utils.datetime_service import now_utc_naive
 
 ACCESS_TOKEN_EXPIRY_MINUTES = 60
 REFRESH_TOKEN_EXPIRY_DAYS   = 30
@@ -110,7 +111,7 @@ def refresh_access_token(refresh_token: str) -> tuple:
         return False, "refresh_token_revoked", None
     try:
         exp = datetime.fromisoformat(str(row["expires_at"]).replace("Z", "").replace("+00:00", ""))
-        if datetime.now() > exp:
+        if now_utc_naive() > exp:
             return False, "refresh_token_expired", None
     except Exception:
         return False, "refresh_token_expired", None
@@ -129,8 +130,8 @@ def refresh_access_token(refresh_token: str) -> tuple:
 
 def revoke_refresh_token(token: str) -> None:
     try:
-        from app.db import supabase
-        supabase.table("jwt_refresh_tokens").update({"revoked": True}).eq("token", token).execute()
+        from app.db.jwt_tokens import revoke_refresh_token as _revoke
+        _revoke(token)
     except Exception as e:
         print(f"[jwt_service] revoke error: {e}")
 
@@ -141,13 +142,8 @@ def _create_refresh_token(user_id: int) -> tuple:
     token      = secrets.token_urlsafe(48)
     expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRY_DAYS)
     try:
-        from app.db import supabase
-        supabase.table("jwt_refresh_tokens").insert({
-            "user_id":    user_id,
-            "token":      token,
-            "expires_at": expires_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "revoked":    False,
-        }).execute()
+        from app.db.jwt_tokens import create_refresh_token
+        create_refresh_token(user_id, token, expires_at.strftime("%Y-%m-%d %H:%M:%S"))
     except Exception as e:
         print(f"[jwt_service] _create_refresh_token error: {e}")
     return token, expires_at
@@ -155,9 +151,8 @@ def _create_refresh_token(user_id: int) -> tuple:
 
 def _get_refresh_token(token: str) -> Optional[dict]:
     try:
-        from app.db import supabase
-        res = supabase.table("jwt_refresh_tokens").select("*").eq("token", token).execute()
-        return res.data[0] if res.data else None
+        from app.db.jwt_tokens import get_refresh_token
+        return get_refresh_token(token)
     except Exception as e:
         print(f"[jwt_service] _get_refresh_token error: {e}")
         return None

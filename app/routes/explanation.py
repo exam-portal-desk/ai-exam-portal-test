@@ -3,9 +3,10 @@ app/routes/explanation.py
 REST API endpoints for the AI Explanation Generator feature.
 
 Endpoints:
-  GET  /api/explain/limits/<question_id>     — rate-limit quota check
-  GET  /api/explain/history/<question_id>    — fetch all saved explanations (page load)
-  POST /api/explain/<question_id>            — generate new explanation
+  GET    /api/explain/limits/<question_id>                       — rate-limit quota check
+  GET    /api/explain/history/<question_id>                      — fetch all saved explanations (page load)
+  POST   /api/explain/<question_id>                               — generate new explanation
+  DELETE /api/explain/<question_id>/<explanation_id>              — delete one saved explanation
 
 All endpoints require a valid user session (@require_user_role).
 """
@@ -19,6 +20,7 @@ from app.services.explanation_service import (
     check_rate_limits,
     generate_explanation,
     fetch_history,
+    delete_explanation,
 )
 
 explanation_bp = Blueprint("explanation", __name__)
@@ -131,5 +133,37 @@ def api_generate_explanation(question_id: int):
     if not result["success"]:
         status_code = 429 if result.get("limit_reached") else 500
         return jsonify(result), status_code
+
+    return jsonify(result), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DELETE /api/explain/<question_id>/<explanation_id>
+# ─────────────────────────────────────────────────────────────────────────────
+
+@explanation_bp.route("/api/explain/<int:question_id>/<int:explanation_id>", methods=["DELETE"])
+@require_user_role
+def api_delete_explanation(question_id: int, explanation_id: int):
+    """
+    Delete ONE previously-generated explanation belonging to the current user.
+
+    Deletion is scoped to explanation_id + the session's user_id (see
+    explanation_service.delete_explanation / db.explanation.delete_explanation) —
+    never to question_id/user_id alone — so this can only ever remove the
+    exact explanation the student selected, never another explanation for
+    the same question, another question, or another user's data.
+
+    Response 200:
+        { "success": true, "history": list }   <- remaining explanations for this question
+
+    Response 404:
+        { "success": false, "message": str }   <- not found / not owned by this user
+    """
+    user_id = session["user_id"]
+
+    result = delete_explanation(user_id, question_id, explanation_id)
+
+    if not result["success"]:
+        return jsonify(result), 404
 
     return jsonify(result), 200

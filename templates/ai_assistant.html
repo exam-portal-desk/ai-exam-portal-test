@@ -296,6 +296,21 @@ const AiFormatter={
     {re:/^\[EXPLANATION\]/i,cls:'label-explain',title:'Explanation'},
   ],
   escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
+  // Matches any LaTeX/mhchem math region so it can be protected from the
+  // markdown bold/italic stripping below, which would otherwise mangle the
+  // underscores/asterisks/braces inside math (subscripts, \ce{...}, etc).
+  MATH_RE:/\$\$[\s\S]+?\$\$|\$[^\n$]+?\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\\ce\{(?:[^{}]|\{[^{}]*\})*\}/g,
+  _protectMath(text){
+    const store=[];
+    const out=String(text).replace(this.MATH_RE,m=>{store.push(m);return `\u0000MATH${store.length-1}\u0000`;});
+    return {out,store};
+  },
+  _restoreMath(html,store){
+    // Escape < and > within the restored math so the browser's HTML parser
+    // can't misread e.g. the "<=>" equilibrium arrow as a tag - everything
+    // else (backslashes, braces, _, ^, $) is written back untouched.
+    return html.replace(/\u0000MATH(\d+)\u0000/g,(_,i)=>store[Number(i)].replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+  },
   inlineFmt(l){
     l=l.replace(/\*\*(.+?)\*\*/g,'$1').replace(/__(.+?)__/g,'$1').replace(/\*(.+?)\*/g,'$1').replace(/_(.+?)_/g,'$1');
     l=l.replace(/`([^`]+)`/g,'<code>$1</code>');return l;
@@ -313,7 +328,8 @@ const AiFormatter={
     return h;
   },
   format(text){
-    const raw=text.split('\n');const sections=[];let cur=null;
+    const {out:protectedText,store}=this._protectMath(text);
+    const raw=protectedText.split('\n');const sections=[];let cur=null;
     for(const line of raw){
       let matched=false;
       for(const def of this.SECTIONS){if(def.re.test(line.trim())){if(cur)sections.push(cur);cur={cls:def.cls,title:def.title,lines:[]};matched=true;break;}}
@@ -326,7 +342,8 @@ const AiFormatter={
       const lbl=sec.title?`<span class="section-label ${sec.cls}">${sec.title}</span>`:'';
       h+=`<div class="msg-section">${lbl}<div class="section-body">${this.buildBody(sec.lines)}</div></div>`;
     }
-    return h||`<p>${this.inlineFmt(text)}</p>`;
+    h=h||`<p>${this.inlineFmt(protectedText)}</p>`;
+    return this._restoreMath(h,store);
   }
 };
 
@@ -366,7 +383,7 @@ class AIAssistant{
     mt.innerHTML=isUser?text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'):AiFormatter.format(text);
     bu.appendChild(mt);
     const tm=document.createElement('span');tm.className='message-time';
-    if(ts){try{const d=new Date(ts);tm.textContent=isNaN(d)?'':d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{}}
+    if(ts) tm.textContent=ts;
     else tm.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     wr.appendChild(bu);wr.appendChild(tm);g.appendChild(av);g.appendChild(wr);return g;
   }

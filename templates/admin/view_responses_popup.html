@@ -150,7 +150,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .modal-title   { font-size:.9rem; font-weight:700; color:var(--text-1); }
 .modal-body    { padding:1.1rem; background:var(--surface); }
 .btn-close { filter:var(--btn-close-filter, none); }
-[data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close,[data-theme="sunset"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
+[data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
 
 
 /* Skeleton */
@@ -352,7 +352,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
               <div class="col-md-8">
                 <h3><i class="fas fa-clipboard-check" style="color:var(--gold-2)"></i> {{ exam.name }} - Response Analysis</h3>
                 <p class="mb-1 text-muted-light">Student: {{ session.full_name }}</p>
-                <p class="mb-0 text-muted-light">Completed: {{ result.completed_at | string | truncate(19, True, '') | replace('T', ' ') }}</p>
+                <p class="mb-0 text-muted-light">Completed: {{ result.completed_at | display_dt if result.completed_at else '—' }}</p>
               </div>
               <div class="col-md-4 text-md-end score-summary">
                 <div class="metric-glow">{{ result.score }} / {{ result.max_score }}</div>

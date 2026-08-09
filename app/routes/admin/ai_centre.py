@@ -16,7 +16,7 @@ from flask import render_template, request, jsonify, Response
 from app.routes.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
 from app.db.exams import get_all_exams
-from app.db import supabase
+from app.db.questions import create_questions_bulk
 
 # ── In-memory job store ──────────────────────────────────────────────────────
 _jobs: dict = {}
@@ -209,13 +209,11 @@ def ai_save_questions():
         for q in questions
     ]
 
-    try:
-        supabase.table("questions").insert(rows).execute()
+    if create_questions_bulk(rows):
         return jsonify({"success": True,
                         "message": f"Saved {len(rows)} questions.",
                         "count":   len(rows)})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Save failed: {e}"}), 500
+    return jsonify({"success": False, "message": "Save failed."}), 500
 
 
 @admin_bp.route("/ai-command-centre/export-csv", methods=["POST"])

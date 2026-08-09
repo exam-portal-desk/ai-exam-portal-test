@@ -116,7 +116,7 @@
         {% set pct = (r.percentage or 0)|float %}
         {% set vis = r.result_visible if r.result_visible is defined else true %}
         <tr data-date="{{ r.completed_at }}" data-exam="{{ r.exam_name|lower }}" data-sub="{{ r.subject|lower }}">
-          <td style="color:var(--text-3);font-size:.73rem">{{ r.completed_at }}</td>
+          <td style="color:var(--text-3);font-size:.73rem">{{ r.completed_at | display_dt }}</td>
           <td class="exam-col">{{ r.exam_name }}</td>
           <td>{{ r.subject }}</td>
           {% if vis %}
@@ -167,7 +167,7 @@
     <div class="rh-card" data-date="{{ r.completed_at }}" data-exam="{{ r.exam_name|lower }}" data-sub="{{ r.subject|lower }}">
       <div class="rh-card-top">
         <div class="rh-card-name">{{ r.exam_name }}</div>
-        <div class="rh-card-date">{{ r.completed_at }}</div>
+        <div class="rh-card-date">{{ r.completed_at | display_dt }}</div>
       </div>
       {% if vis %}
       <div class="rh-card-meta">

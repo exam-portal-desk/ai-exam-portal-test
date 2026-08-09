@@ -1,12 +1,12 @@
 """
 app/db/auth.py
-Supabase queries for login_attempts and pw_tokens tables.
-Replaces both login_attempts_cache.py and the duplicate functions in supabase_db.py.
+PostgreSQL queries for login_attempts and pw_tokens tables.
 """
 
 from typing import Optional, Dict, Tuple
 from datetime import datetime, timedelta
-from app.db import supabase
+from app.db import fetch_one, fetch_all, execute, insert_returning
+from app.utils.datetime_service import now_utc_naive
 
 
 # ─────────────────────────────────────────────
@@ -23,18 +23,13 @@ def check_login_attempts(identifier: str, ip_address: str) -> Tuple[bool, str, i
     allowed=False means the login should be blocked.
     """
     try:
-        res = (
-            supabase.table("login_attempts")
-            .select("*")
-            .eq("identifier", identifier)
-            .eq("ip_address", ip_address)
-            .execute()
+        attempt = fetch_one(
+            "SELECT * FROM login_attempts WHERE identifier=%s AND ip_address=%s",
+            (identifier, ip_address),
         )
 
-        if not res.data:
+        if not attempt:
             return True, "", _MAX_ATTEMPTS
-
-        attempt = res.data[0]
 
         # Check active lockout
         blocked_until_raw = attempt.get("blocked_until")
@@ -46,25 +41,27 @@ def check_login_attempts(identifier: str, ip_address: str) -> Tuple[bool, str, i
             except Exception:
                 blocked_until = datetime.strptime(str(blocked_until_raw), "%Y-%m-%d %H:%M:%S.%f")
 
-            if datetime.now() < blocked_until:
-                remaining_mins = int((blocked_until - datetime.now()).total_seconds() / 60) + 1
+            if now_utc_naive() < blocked_until:
+                remaining_mins = int((blocked_until - now_utc_naive()).total_seconds() / 60) + 1
                 return False, f"Account locked. Try again in {remaining_mins} minutes.", 0
             else:
                 # Lock expired — reset
-                supabase.table("login_attempts").update(
-                    {"failed_count": 0, "blocked_until": None}
-                ).eq("identifier", identifier).eq("ip_address", ip_address).execute()
+                execute(
+                    "UPDATE login_attempts SET failed_count=%s, blocked_until=%s WHERE identifier=%s AND ip_address=%s",
+                    (0, None, identifier, ip_address),
+                )
                 return True, "", _MAX_ATTEMPTS
 
         failed_count = int(attempt.get("failed_count", 0))
 
         if failed_count >= _MAX_ATTEMPTS:
-            blocked_until = (datetime.now() + timedelta(minutes=_LOCKOUT_MINUTES)).strftime(
+            blocked_until = (now_utc_naive() + timedelta(minutes=_LOCKOUT_MINUTES)).strftime(
                 "%Y-%m-%d %H:%M:%S.%f"
             )
-            supabase.table("login_attempts").update({"blocked_until": blocked_until}).eq(
-                "identifier", identifier
-            ).eq("ip_address", ip_address).execute()
+            execute(
+                "UPDATE login_attempts SET blocked_until=%s WHERE identifier=%s AND ip_address=%s",
+                (blocked_until, identifier, ip_address),
+            )
             return False, f"Too many failed attempts. Account locked for {_LOCKOUT_MINUTES} minutes.", 0
 
         remaining = _MAX_ATTEMPTS - failed_count
@@ -77,41 +74,34 @@ def check_login_attempts(identifier: str, ip_address: str) -> Tuple[bool, str, i
 
 def record_failed_login(identifier: str, ip_address: str) -> None:
     try:
-        res = (
-            supabase.table("login_attempts")
-            .select("id,failed_count")
-            .eq("identifier", identifier)
-            .eq("ip_address", ip_address)
-            .execute()
+        row = fetch_one(
+            "SELECT id,failed_count FROM login_attempts WHERE identifier=%s AND ip_address=%s",
+            (identifier, ip_address),
         )
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        now_str = now_utc_naive().strftime("%Y-%m-%d %H:%M:%S.%f")
 
-        if res.data:
-            row = res.data[0]
+        if row:
             new_count = int(row.get("failed_count", 0)) + 1
-            supabase.table("login_attempts").update(
-                {"failed_count": new_count, "last_failed_at": now_str}
-            ).eq("id", row["id"]).execute()
+            execute(
+                "UPDATE login_attempts SET failed_count=%s, last_failed_at=%s WHERE id=%s",
+                (new_count, now_str, row["id"]),
+            )
         else:
-            supabase.table("login_attempts").insert(
-                {
-                    "identifier": identifier,
-                    "ip_address": ip_address,
-                    "failed_count": 1,
-                    "first_failed_at": now_str,
-                    "last_failed_at": now_str,
-                    "blocked_until": None,
-                }
-            ).execute()
+            insert_returning("login_attempts", {
+                "identifier": identifier,
+                "ip_address": ip_address,
+                "failed_count": 1,
+                "first_failed_at": now_str,
+                "last_failed_at": now_str,
+                "blocked_until": None,
+            })
     except Exception as e:
         print(f"[db.auth] record_failed_login error: {e}")
 
 
 def clear_login_attempts(identifier: str, ip_address: str) -> None:
     try:
-        supabase.table("login_attempts").delete().eq("identifier", identifier).eq(
-            "ip_address", ip_address
-        ).execute()
+        execute("DELETE FROM login_attempts WHERE identifier=%s AND ip_address=%s", (identifier, ip_address))
     except Exception as e:
         print(f"[db.auth] clear_login_attempts error: {e}")
 
@@ -122,16 +112,14 @@ def clear_login_attempts(identifier: str, ip_address: str) -> None:
 
 def create_password_token(email: str, token_type: str, token: str, expires_at: str) -> bool:
     try:
-        supabase.table("pw_tokens").insert(
-            {
-                "token": token,
-                "email": email.lower(),
-                "type": token_type,
-                "expires_at": expires_at,
-                "used": False,
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-        ).execute()
+        insert_returning("pw_tokens", {
+            "token": token,
+            "email": email.lower(),
+            "type": token_type,
+            "expires_at": expires_at,
+            "used": False,
+            "created_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
+        })
         return True
     except Exception as e:
         print(f"[db.auth] create_password_token error: {e}")
@@ -140,8 +128,7 @@ def create_password_token(email: str, token_type: str, token: str, expires_at: s
 
 def get_password_token(token: str) -> Optional[Dict]:
     try:
-        res = supabase.table("pw_tokens").select("*").eq("token", token).execute()
-        return res.data[0] if res.data else None
+        return fetch_one("SELECT * FROM pw_tokens WHERE token=%s", (token,))
     except Exception as e:
         print(f"[db.auth] get_password_token error: {e}")
         return None
@@ -149,7 +136,7 @@ def get_password_token(token: str) -> Optional[Dict]:
 
 def mark_token_used(token: str) -> bool:
     try:
-        supabase.table("pw_tokens").update({"used": True}).eq("token", token).execute()
+        execute("UPDATE pw_tokens SET used=%s WHERE token=%s", (True, token))
         return True
     except Exception as e:
         print(f"[db.auth] mark_token_used error: {e}")

@@ -1,0 +1,33 @@
+{
+  "text_models": [
+    {
+      "name": "assistant-default",
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile",
+      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+      "api_key_env": "TEXT_MODEL_ASSISTANT_API_KEY"
+    },
+    {
+      "name": "explanation-default",
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile",
+      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+      "api_key_env": "TEXT_MODEL_EXPLANATION_API_KEY"
+    },
+    {
+      "name": "question-generator-default",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "api_key_env": "TEXT_MODEL_QUESTIONGEN_API_KEY"
+    }
+  ],
+  "vision_models": [
+    {
+      "name": "explanation-vision-default",
+      "provider": "groq",
+      "model": "llama-4-scout-17b-16e-instruct",
+      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+      "api_key_env": "VISION_MODEL_EXPLANATION_API_KEY"
+    }
+  ]
+}

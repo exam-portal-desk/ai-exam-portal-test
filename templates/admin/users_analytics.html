@@ -504,12 +504,12 @@ function toggleCustomRange(v) {
 }
 
 function _themeColors() {
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const s = getComputedStyle(document.documentElement);
   return {
-    tick:           isLight ? 'rgba(0,0,0,0.6)'   : 'rgba(255,255,255,0.5)',
-    grid:           isLight ? 'rgba(0,0,0,0.08)'  : 'rgba(255,255,255,0.07)',
-    doughnutBorder: isLight ? '#f0f2f8'            : '#111118',
-    legendColor:    isLight ? '#374151'            : 'rgba(255,255,255,0.75)',
+    tick:           s.getPropertyValue('--text-3').trim(),
+    grid:           s.getPropertyValue('--border').trim(),
+    doughnutBorder: s.getPropertyValue('--surface-2').trim(),
+    legendColor:    s.getPropertyValue('--text-2').trim(),
   };
 }
 
@@ -668,7 +668,7 @@ function _renderTables(t) {
       ? '<tr><td colspan="5" class="loading-row">No recent activity</td></tr>'
       : ra.map(a => {
           const pct  = Number(a.percentage||0);
-          const time = a.created_at ? new Date(a.created_at).toLocaleString() : '—';
+          const time = a.created_at || '—';
           return `<tr>
             <td style="font-size:.73rem;color:var(--text-3)">${_esc(time)}</td>
             <td style="font-weight:600">${_esc(a.username||'')}</td>

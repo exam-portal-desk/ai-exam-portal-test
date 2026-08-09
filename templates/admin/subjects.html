@@ -330,7 +330,7 @@
                 </span>
               </td>
               <td style="color:var(--text-muted);font-size:0.8rem">
-                {{ subject.subject_folder_created_at[:16].replace('T', '  ') if subject.subject_folder_created_at else '-' }}
+                {{ subject.subject_folder_created_at | display_dt if subject.subject_folder_created_at else '-' }}
               </td>
               <td>
                 <div class="action-btns">

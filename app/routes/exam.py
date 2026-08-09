@@ -20,6 +20,7 @@ FIX (session bleed-through between attempts):
 import json
 import logging
 from datetime import datetime
+from app.utils.datetime_service import now_utc_naive
 
 from flask import (
     Blueprint, render_template, redirect, url_for,
@@ -180,7 +181,7 @@ def start_exam(exam_id):
     # Next attempt number — derive from DB, never from session
     all_atts     = get_all_attempts_for_exam(user_id, exam_id)
     next_att_num = max((int(a.get("attempt_number", 0)) for a in all_atts), default=0) + 1
-    start_iso    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    start_iso    = now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")
 
     created = create_exam_attempt({
         "student_id":     int(user_id),
@@ -298,12 +299,12 @@ def exam_page(exam_id):
                 )
             except Exception:
                 start_dt = datetime.strptime(str(start_time_str), "%Y-%m-%d %H:%M:%S")
-            elapsed           = (datetime.now() - start_dt).total_seconds()
+            elapsed           = (now_utc_naive() - start_dt).total_seconds()
             remaining_seconds = max(0, duration_secs - int(elapsed))
             if remaining_seconds <= 0:
                 update_exam_attempt(db_attempt_id, {
                     "status":   "completed",
-                    "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "end_time": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
                 })
                 _purge_exam_session(exam_id)
                 flash("Your exam time has expired.", "warning")
@@ -489,7 +490,7 @@ def submit_exam(exam_id):
             )
         except Exception:
             start_dt = datetime.strptime(str(start_str), "%Y-%m-%d %H:%M:%S")
-        time_taken = max(0, int((datetime.now() - start_dt).total_seconds() / 60))
+        time_taken = max(0, int((now_utc_naive() - start_dt).total_seconds() / 60))
     except Exception:
         time_taken = 0
 
@@ -500,7 +501,7 @@ def submit_exam(exam_id):
         "max_score":            int(round(max_score)),
         "percentage":           round(percentage, 2),
         "grade":                grade,
-        "completed_at":         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "completed_at":         now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
         "time_taken_minutes":   time_taken,
         "correct_answers":      correct_ans,
         "incorrect_answers":    incorrect_ans,
@@ -520,7 +521,7 @@ def submit_exam(exam_id):
     # Mark attempt complete
     update_exam_attempt(int(attempt_id), {
         "status":   "completed",
-        "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "end_time": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
     })
 
     # ── Complete session purge ───────────────────────────────────────────────
@@ -537,7 +538,7 @@ def submit_exam(exam_id):
     flash("Exam submitted successfully!", "success")
 
     visible, _ = can_user_see_result(
-        exam, {"completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        exam, {"completed_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")}
     )
     if visible:
         return redirect(url_for("result.result", exam_id=exam_id))

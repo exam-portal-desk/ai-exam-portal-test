@@ -13,7 +13,7 @@ from app.db.exams import (
     release_exam_results,
 )
 from app.db.results import get_results_by_exam
-from app.db import supabase
+from app.db import fetch_all, execute
 from app.utils.helpers import parse_max_attempts
 from app.db.categories import get_all_categories
 
@@ -110,15 +110,15 @@ def delete_exam_route(exam_id):
     try:
         results = get_results_by_exam(exam_id)
         for r in results:
-            supabase.table("responses").delete().eq("result_id", r["id"]).execute()
-        supabase.table("results").delete().eq("exam_id", exam_id).execute()
-        supabase.table("exam_attempts").delete().eq("exam_id", exam_id).execute()
-        q_ids = [q["id"] for q in (supabase.table("questions").select("id").eq("exam_id", exam_id).execute().data or [])]
+            execute("DELETE FROM responses WHERE result_id=%s", (r["id"],))
+        execute("DELETE FROM results WHERE exam_id=%s", (exam_id,))
+        execute("DELETE FROM exam_attempts WHERE exam_id=%s", (exam_id,))
+        q_ids = [q["id"] for q in fetch_all("SELECT id FROM questions WHERE exam_id=%s", (exam_id,))]
         if q_ids:
-            supabase.table("question_discussions").delete().in_("question_id", q_ids).execute()
-            supabase.table("discussion_counts").delete().in_("question_id", q_ids).execute()
-        supabase.table("questions").delete().eq("exam_id", exam_id).execute()
-        supabase.table("exams").delete().eq("id", exam_id).execute()
+            execute("DELETE FROM question_discussions WHERE question_id = ANY(%s)", (q_ids,))
+            execute("DELETE FROM discussion_counts WHERE question_id = ANY(%s)", (q_ids,))
+        execute("DELETE FROM questions WHERE exam_id=%s", (exam_id,))
+        execute("DELETE FROM exams WHERE id=%s", (exam_id,))
         
         flash("Exam deleted successfully.", "info")
         return jsonify({"success": True, "message": f"Exam '{exam['name']}' deleted."})

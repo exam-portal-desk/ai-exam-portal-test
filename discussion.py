@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify, session
 from flask_socketio import SocketIO, join_room, leave_room, emit
-from supabase_db import supabase
+from app.db import fetch_one, fetch_all, execute, insert_returning, insert_many
 import threading, time, html, re, uuid
-from datetime import datetime
+from app.utils.datetime_service import now_utc_naive
 from collections import defaultdict, deque
 
 discussion_bp = Blueprint('discussion', __name__)
@@ -41,7 +41,7 @@ def _flush_buffer():
             batch = list(_msg_buffer)
             _msg_buffer.clear()
         try:
-            supabase.table('question_discussions').insert(batch).execute()
+            insert_many('question_discussions', batch)
             for rec in batch:
                 _sync_count_db(rec['question_id'], +1)
         except Exception as e:
@@ -53,12 +53,12 @@ threading.Thread(target=_flush_buffer, daemon=True).start()
 
 def _sync_count_db(question_id, delta):
     try:
-        existing = supabase.table('discussion_counts').select('count').eq('question_id', question_id).execute()
-        if existing.data:
-            new_val = max(0, existing.data[0]['count'] + delta)
-            supabase.table('discussion_counts').update({'count': new_val}).eq('question_id', question_id).execute()
+        existing = fetch_one('SELECT count FROM discussion_counts WHERE question_id=%s', (question_id,))
+        if existing:
+            new_val = max(0, existing['count'] + delta)
+            execute('UPDATE discussion_counts SET count=%s WHERE question_id=%s', (new_val, question_id))
         else:
-            supabase.table('discussion_counts').insert({'question_id': question_id, 'count': max(0, delta)}).execute()
+            insert_returning('discussion_counts', {'question_id': question_id, 'count': max(0, delta)})
     except Exception as e:
         print(f"[Disc] count sync error: {e}")
 
@@ -71,8 +71,8 @@ def _get_count(question_id):
         if question_id in _count_cache:
             return _count_cache[question_id]
     try:
-        res = supabase.table('discussion_counts').select('count').eq('question_id', question_id).execute()
-        count = res.data[0]['count'] if res.data else 0
+        row = fetch_one('SELECT count FROM discussion_counts WHERE question_id=%s', (question_id,))
+        count = row['count'] if row else 0
         with _count_lock:
             _count_cache[question_id] = count
         return count
@@ -132,13 +132,12 @@ def get_discussion(question_id):
         # Fetch ALL non-deleted rows PLUS ghost user rows (is_deleted can be
         # true for ghost — we include them anyway so thread structure is intact)
         # Strategy: fetch where is_deleted=false OR user_id=GHOST_USER_ID
-        res = supabase.table('question_discussions')\
-            .select('id,question_id,exam_id,user_id,username,message,parent_id,is_pinned,is_best_answer,is_edited,created_at,updated_at,is_deleted')\
-            .eq('question_id', question_id)\
-            .order('created_at', desc=False)\
-            .execute()
-
-        all_rows = res.data or []
+        all_rows = fetch_all(
+            'SELECT id,question_id,exam_id,user_id,username,message,parent_id,is_pinned,is_best_answer,'
+            'is_edited,created_at,updated_at,is_deleted FROM question_discussions '
+            'WHERE question_id=%s ORDER BY created_at ASC',
+            (question_id,),
+        )
         current_uid = session['user_id']
 
         display_rows = []
@@ -191,7 +190,7 @@ def post_comment(question_id):
         return jsonify({'success': False, 'message': f'Max {MAX_MSG_LEN} characters allowed'}), 400
     msg = _sanitize(msg)
     username = session.get('full_name') or session.get('username', 'User')
-    now_iso = datetime.utcnow().isoformat()
+    now_iso = now_utc_naive().isoformat()
     temp_id = str(uuid.uuid4())
     record = {
         'question_id': question_id,
@@ -209,8 +208,8 @@ def post_comment(question_id):
     }
 
     try:
-        result = supabase.table('question_discussions').insert(record).execute()
-        real_id = result.data[0]['id'] if result.data else None
+        result = insert_returning('question_discussions', record)
+        real_id = result['id'] if result else None
         _sync_count_db(question_id, +1)
     except Exception as e:
         print(f"[Disc] insert error: {e}")
@@ -257,13 +256,14 @@ def edit_comment(comment_id):
         return jsonify({'success': False, 'message': 'Invalid message'}), 400
     msg = _sanitize(msg)
     try:
-        row = supabase.table('question_discussions').select('user_id,question_id').eq('id', comment_id).execute()
-        if not row.data or (row.data[0]['user_id'] != uid and not _is_admin()):
+        row = fetch_one('SELECT user_id,question_id FROM question_discussions WHERE id=%s', (comment_id,))
+        if not row or (row['user_id'] != uid and not _is_admin()):
             return jsonify({'success': False, 'message': 'Forbidden'}), 403
-        supabase.table('question_discussions').update({
-            'message': msg, 'is_edited': True, 'updated_at': datetime.utcnow().isoformat()
-        }).eq('id', comment_id).execute()
-        qid = row.data[0]['question_id']
+        execute(
+            'UPDATE question_discussions SET message=%s, is_edited=%s, updated_at=%s WHERE id=%s',
+            (msg, True, now_utc_naive().isoformat(), comment_id),
+        )
+        qid = row['question_id']
         if socketio:
             socketio.emit('edit_message', {'comment_id': comment_id, 'message': msg}, room=f'q_{qid}')
         return jsonify({'success': True})
@@ -277,13 +277,13 @@ def delete_comment(comment_id):
         return jsonify({'success': False}), 401
     uid = session['user_id']
     try:
-        row = supabase.table('question_discussions').select('user_id,question_id').eq('id', comment_id).execute()
-        if not row.data:
+        row = fetch_one('SELECT user_id,question_id FROM question_discussions WHERE id=%s', (comment_id,))
+        if not row:
             return jsonify({'success': False}), 404
-        if row.data[0]['user_id'] != uid and not _is_admin():
+        if row['user_id'] != uid and not _is_admin():
             return jsonify({'success': False, 'message': 'Forbidden'}), 403
-        supabase.table('question_discussions').update({'is_deleted': True}).eq('id', comment_id).execute()
-        qid = row.data[0]['question_id']
+        execute('UPDATE question_discussions SET is_deleted=%s WHERE id=%s', (True, comment_id))
+        qid = row['question_id']
         _sync_count(qid, -1)
         _sync_count_db(qid, -1)
         if socketio:
@@ -298,12 +298,12 @@ def admin_pin(comment_id):
     if not _is_admin():
         return jsonify({'success': False}), 403
     try:
-        row = supabase.table('question_discussions').select('is_pinned,question_id').eq('id', comment_id).execute()
-        if not row.data:
+        row = fetch_one('SELECT is_pinned,question_id FROM question_discussions WHERE id=%s', (comment_id,))
+        if not row:
             return jsonify({'success': False}), 404
-        new_val = not row.data[0]['is_pinned']
-        qid = row.data[0]['question_id']
-        supabase.table('question_discussions').update({'is_pinned': new_val}).eq('id', comment_id).execute()
+        new_val = not row['is_pinned']
+        qid = row['question_id']
+        execute('UPDATE question_discussions SET is_pinned=%s WHERE id=%s', (new_val, comment_id))
         if socketio:
             socketio.emit('pin_message', {'comment_id': comment_id, 'is_pinned': new_val}, room=f'q_{qid}')
         return jsonify({'success': True, 'is_pinned': new_val})
@@ -316,14 +316,14 @@ def admin_best(comment_id):
     if not _is_admin():
         return jsonify({'success': False}), 403
     try:
-        row = supabase.table('question_discussions').select('is_best_answer,question_id').eq('id', comment_id).execute()
-        if not row.data:
+        row = fetch_one('SELECT is_best_answer,question_id FROM question_discussions WHERE id=%s', (comment_id,))
+        if not row:
             return jsonify({'success': False}), 404
-        qid = row.data[0]['question_id']
-        new_val = not row.data[0]['is_best_answer']
+        qid = row['question_id']
+        new_val = not row['is_best_answer']
         if new_val:
-            supabase.table('question_discussions').update({'is_best_answer': False}).eq('question_id', qid).execute()
-        supabase.table('question_discussions').update({'is_best_answer': new_val}).eq('id', comment_id).execute()
+            execute('UPDATE question_discussions SET is_best_answer=%s WHERE question_id=%s', (False, qid))
+        execute('UPDATE question_discussions SET is_best_answer=%s WHERE id=%s', (new_val, comment_id))
         if socketio:
             socketio.emit('best_message', {'comment_id': comment_id, 'is_best_answer': new_val}, room=f'q_{qid}')
         return jsonify({'success': True, 'is_best_answer': new_val})
@@ -340,11 +340,8 @@ def bulk_counts():
     if not qids or len(qids) > 100:
         return jsonify({'success': False}), 400
     try:
-        res = supabase.table('discussion_counts')\
-            .select('question_id,count')\
-            .in_('question_id', qids)\
-            .execute()
-        counts = {row['question_id']: row['count'] for row in (res.data or [])}
+        res = fetch_all('SELECT question_id,count FROM discussion_counts WHERE question_id = ANY(%s)', (qids,))
+        counts = {row['question_id']: row['count'] for row in res}
         result = {str(qid): counts.get(qid, 0) for qid in qids}
         return jsonify({'success': True, 'counts': result})
     except Exception as e:

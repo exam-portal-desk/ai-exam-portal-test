@@ -18,6 +18,7 @@ from app.db.auth import (
     get_password_token as db_get_token,
     mark_token_used as db_mark_used,
 )
+from app.utils.datetime_service import now_utc_naive
 
 
 # ─────────────────────────────────────────────
@@ -80,7 +81,7 @@ def create_password_token(email: str, token_type: str) -> str:
     Raises Exception if persistence fails.
     """
     token = secrets.token_urlsafe(32)
-    expires_at = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = (now_utc_naive() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
 
     if not db_create_token(email, token_type, token, expires_at):
         raise Exception(f"Failed to save {token_type} token for {email}")
@@ -109,7 +110,7 @@ def validate_and_use_token(token: str) -> Tuple[bool, str, Dict]:
         except Exception:
             return False, "Token expiry format unreadable", {}
 
-    if datetime.now() > expires_at:
+    if now_utc_naive() > expires_at:
         return False, "Token has expired", {}
 
     if not db_mark_used(token):

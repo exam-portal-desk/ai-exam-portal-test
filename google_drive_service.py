@@ -4,6 +4,7 @@ import time
 import random
 import threading
 from datetime import datetime
+from app.utils.datetime_service import now_utc_naive
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 from google.oauth2.credentials import Credentials as UserCredentials
@@ -429,7 +430,7 @@ def create_subject_folder(service, subject_name: str):
         for f in res.get("files", []):
             if f["name"].strip().lower() == subject_name.strip().lower():
                 print(f"Reusing existing folder: {f['name']} ({f['id']})")
-                return f["id"], datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                return f["id"], now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         print(f"List subject folders warn: {e}")
 
@@ -442,4 +443,4 @@ def create_subject_folder(service, subject_name: str):
         fields="id"
     ).execute()
     print(f"Created subject folder '{subject_name}': {f.get('id')}")
-    return f.get("id"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return f.get("id"), now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")

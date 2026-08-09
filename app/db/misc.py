@@ -1,11 +1,10 @@
 """
 app/db/misc.py
-Supabase queries for subjects and requests_raised tables.
+PostgreSQL queries for subjects and requests_raised tables.
 """
 
 from typing import Optional, List, Dict
-from datetime import datetime
-from app.db import supabase
+from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
 
 
 # ─────────────────────────────────────────────
@@ -14,13 +13,10 @@ from app.db import supabase
 
 def get_all_subjects() -> List[Dict]:
     try:
-        res = (
-            supabase.table("subjects")
-            .select("id,subject_name,subject_folder_id,subject_folder_created_at")
-            .order("subject_name")
-            .execute()
+        return fetch_all(
+            "SELECT id,subject_name,subject_folder_id,subject_folder_created_at "
+            "FROM subjects ORDER BY subject_name"
         )
-        return res.data or []
     except Exception as e:
         print(f"[db.misc] get_all_subjects error: {e}")
         return []
@@ -28,8 +24,7 @@ def get_all_subjects() -> List[Dict]:
 
 def get_subject_by_name(name: str) -> Optional[Dict]:
     try:
-        res = supabase.table("subjects").select("*").eq("subject_name", name).execute()
-        return res.data[0] if res.data else None
+        return fetch_one("SELECT * FROM subjects WHERE subject_name=%s", (name,))
     except Exception as e:
         print(f"[db.misc] get_subject_by_name error: {e}")
         return None
@@ -38,8 +33,8 @@ def get_subject_by_name(name: str) -> Optional[Dict]:
 def get_subject_folder_id_by_name(name: str) -> Optional[str]:
     """Case-insensitive subject name → folder_id lookup. Used for image loading."""
     try:
-        res = supabase.table("subjects").select("subject_name,subject_folder_id").execute()
-        for row in res.data or []:
+        rows = fetch_all("SELECT subject_name,subject_folder_id FROM subjects")
+        for row in rows:
             if str(row.get("subject_name", "")).strip().lower() == name.strip().lower():
                 return str(row.get("subject_folder_id", "")).strip() or None
         return None
@@ -50,8 +45,7 @@ def get_subject_folder_id_by_name(name: str) -> Optional[str]:
 
 def create_subject(subject_data: Dict) -> Optional[Dict]:
     try:
-        res = supabase.table("subjects").insert(subject_data).execute()
-        return res.data[0] if res.data else None
+        return insert_returning("subjects", subject_data)
     except Exception as e:
         print(f"[db.misc] create_subject error: {e}")
         return None
@@ -59,7 +53,8 @@ def create_subject(subject_data: Dict) -> Optional[Dict]:
 
 def update_subject(subject_id: int, updates: Dict) -> bool:
     try:
-        supabase.table("subjects").update(updates).eq("id", subject_id).execute()
+        sc, params = set_clause(updates)
+        execute(f"UPDATE subjects SET {sc} WHERE id=%s", params + [subject_id])
         return True
     except Exception as e:
         print(f"[db.misc] update_subject error: {e}")
@@ -68,7 +63,7 @@ def update_subject(subject_id: int, updates: Dict) -> bool:
 
 def delete_subject(subject_id: int) -> bool:
     try:
-        supabase.table("subjects").delete().eq("id", subject_id).execute()
+        execute("DELETE FROM subjects WHERE id=%s", (subject_id,))
         return True
     except Exception as e:
         print(f"[db.misc] delete_subject error: {e}")
@@ -81,14 +76,9 @@ def delete_subject(subject_id: int) -> bool:
 
 def get_pending_requests() -> List[Dict]:
     try:
-        res = (
-            supabase.table("requests_raised")
-            .select("*")
-            .eq("request_status", "pending")
-            .order("request_date", desc=True)
-            .execute()
+        return fetch_all(
+            "SELECT * FROM requests_raised WHERE request_status=%s ORDER BY request_date DESC", ("pending",)
         )
-        return res.data or []
     except Exception as e:
         print(f"[db.misc] get_pending_requests error: {e}")
         return []
@@ -96,14 +86,10 @@ def get_pending_requests() -> List[Dict]:
 
 def get_processed_requests() -> List[Dict]:
     try:
-        res = (
-            supabase.table("requests_raised")
-            .select("*")
-            .in_("request_status", ["completed", "denied"])
-            .order("request_date", desc=True)
-            .execute()
+        return fetch_all(
+            "SELECT * FROM requests_raised WHERE request_status = ANY(%s) ORDER BY request_date DESC",
+            (["completed", "denied"],),
         )
-        return res.data or []
     except Exception as e:
         print(f"[db.misc] get_processed_requests error: {e}")
         return []
@@ -111,15 +97,10 @@ def get_processed_requests() -> List[Dict]:
 
 def get_requests_by_user(username: str, email: str) -> List[Dict]:
     try:
-        res = (
-            supabase.table("requests_raised")
-            .select("*")
-            .eq("username", username)
-            .eq("email", email)
-            .order("request_date", desc=True)
-            .execute()
+        return fetch_all(
+            "SELECT * FROM requests_raised WHERE username=%s AND email=%s ORDER BY request_date DESC",
+            (username, email),
         )
-        return res.data or []
     except Exception as e:
         print(f"[db.misc] get_requests_by_user error: {e}")
         return []
@@ -127,8 +108,7 @@ def get_requests_by_user(username: str, email: str) -> List[Dict]:
 
 def create_request(request_data: Dict) -> Optional[Dict]:
     try:
-        res = supabase.table("requests_raised").insert(request_data).execute()
-        return res.data[0] if res.data else None
+        return insert_returning("requests_raised", request_data)
     except Exception as e:
         print(f"[db.misc] create_request error: {e}")
         return None
@@ -136,7 +116,8 @@ def create_request(request_data: Dict) -> Optional[Dict]:
 
 def update_request(request_id: int, updates: Dict) -> bool:
     try:
-        supabase.table("requests_raised").update(updates).eq("request_id", request_id).execute()
+        sc, params = set_clause(updates)
+        execute(f"UPDATE requests_raised SET {sc} WHERE request_id=%s", params + [request_id])
         return True
     except Exception as e:
         print(f"[db.misc] update_request error: {e}")

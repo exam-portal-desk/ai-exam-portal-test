@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Tuple, List, Dict, Optional
 
 import pandas as pd
+from app.utils.datetime_service import now_utc_naive, format_display
 
 
 # ─────────────────────────────────────────────
@@ -53,7 +54,7 @@ def can_user_see_result(exam: dict, result: dict) -> Tuple[bool, str]:
                 submitted_dt = completed_at
 
             visible_after = submitted_dt + timedelta(minutes=delay_minutes)
-            now = datetime.now()
+            now = now_utc_naive()
 
             if now >= visible_after:
                 return True, ""
@@ -126,7 +127,7 @@ def calculate_student_analytics(
 
         def _fmt(val) -> Optional[str]:
             try:
-                return val.strftime("%d %b %Y, %H:%M")
+                return format_display(val) or None
             except Exception:
                 return None
 

@@ -1,6 +1,6 @@
 """
 app/db/explanation.py
-Supabase queries for AI Explanation feature.
+PostgreSQL queries for AI Explanation feature.
 
 Tables:
   ai_explanation_usage   — tracks daily rate limits (user+question+date)
@@ -12,50 +12,13 @@ Public API:
   increment_explanation_usage(user_id, question_id)  -> bool
   save_explanation(user_id, question_id, text)        -> dict | None
   get_explanation_history(user_id, question_id)      -> list[dict]
+  delete_explanation(explanation_id, user_id)        -> bool
 """
 
-from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, List
 
-from app.db import supabase
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# IST timezone helper  (UTC+5:30)
-# ─────────────────────────────────────────────────────────────────────────────
-
-_IST = timezone(timedelta(hours=5, minutes=30))
-
-
-def _today_ist() -> str:
-    """Return today's date in IST as 'YYYY-MM-DD'."""
-    return datetime.now(_IST).strftime("%Y-%m-%d")
-
-
-def get_reset_time_str() -> str:
-    """
-    Return a human-readable string for when the daily limit resets.
-    The limit resets at midnight IST (00:00 IST = 18:30 UTC previous day).
-
-    Example outputs:
-        "resets today at 12:00 AM IST"
-        "resets tomorrow at 12:00 AM IST"
-    """
-    now_ist      = datetime.now(_IST)
-    midnight_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-    delta        = midnight_ist - now_ist
-
-    hours   = int(delta.total_seconds() // 3600)
-    minutes = int((delta.total_seconds() % 3600) // 60)
-
-    if hours >= 20:
-        when = "tomorrow"
-    elif hours == 0:
-        when = f"in {minutes} min"
-    else:
-        when = f"in {hours}h {minutes}m"
-
-    return f"Resets {when} at 12:00 AM IST"
+from app.db import fetch_one, fetch_all, execute, insert_returning
+from app.utils.datetime_service import today_app_date, daily_reset_message as get_reset_time_str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -64,37 +27,28 @@ def get_reset_time_str() -> str:
 
 def get_explanation_usage(user_id: int, question_id: int) -> Optional[Dict]:
     """
-    Return today's (IST) usage row for (user_id, question_id), or None.
+    Return today's usage row for (user_id, question_id), or None.
     Shape: {id, user_id, question_id, date, used_count}
     """
     try:
-        res = (
-            supabase.table("ai_explanation_usage")
-            .select("id, user_id, question_id, date, used_count")
-            .eq("user_id", user_id)
-            .eq("question_id", question_id)
-            .eq("date", _today_ist())
-            .execute()
+        return fetch_one(
+            "SELECT id, user_id, question_id, date, used_count FROM ai_explanation_usage "
+            "WHERE user_id=%s AND question_id=%s AND date=%s",
+            (user_id, question_id, today_app_date()),
         )
-        return res.data[0] if res.data else None
     except Exception as e:
         print(f"[db.explanation] get_explanation_usage error: {e}")
         return None
 
 
 def get_daily_total_usage(user_id: int) -> int:
-    """Sum of used_count for this user across all questions today (IST)."""
+    """Sum of used_count for this user across all questions today."""
     try:
-        res = (
-            supabase.table("ai_explanation_usage")
-            .select("used_count")
-            .eq("user_id", user_id)
-            .eq("date", _today_ist())
-            .execute()
+        rows = fetch_all(
+            "SELECT used_count FROM ai_explanation_usage WHERE user_id=%s AND date=%s",
+            (user_id, today_app_date()),
         )
-        if not res.data:
-            return 0
-        return sum(int(row.get("used_count", 0)) for row in res.data)
+        return sum(int(row.get("used_count", 0)) for row in rows)
     except Exception as e:
         print(f"[db.explanation] get_daily_total_usage error: {e}")
         return 0
@@ -102,31 +56,26 @@ def get_daily_total_usage(user_id: int) -> int:
 
 def increment_explanation_usage(user_id: int, question_id: int) -> bool:
     """
-    Upsert today's (IST) usage row and increment used_count by 1.
+    Upsert today's usage row and increment used_count by 1.
     Two round-trips: fetch existing row, then insert or update.
     UNIQUE constraint prevents duplicates under concurrent requests.
     """
     try:
-        today    = _today_ist()
-        existing = (
-            supabase.table("ai_explanation_usage")
-            .select("id, used_count")
-            .eq("user_id", user_id)
-            .eq("question_id", question_id)
-            .eq("date", today)
-            .execute()
+        today    = today_app_date()
+        existing = fetch_one(
+            "SELECT id, used_count FROM ai_explanation_usage WHERE user_id=%s AND question_id=%s AND date=%s",
+            (user_id, question_id, today),
         )
 
-        if existing.data:
-            row = existing.data[0]
-            supabase.table("ai_explanation_usage").update(
-                {"used_count": int(row.get("used_count", 0)) + 1}
-            ).eq("id", row["id"]).execute()
+        if existing:
+            execute(
+                "UPDATE ai_explanation_usage SET used_count=%s WHERE id=%s",
+                (int(existing.get("used_count", 0)) + 1, existing["id"]),
+            )
         else:
-            supabase.table("ai_explanation_usage").insert(
-                {"user_id": user_id, "question_id": question_id,
-                 "date": today, "used_count": 1}
-            ).execute()
+            insert_returning("ai_explanation_usage", {
+                "user_id": user_id, "question_id": question_id, "date": today, "used_count": 1,
+            })
 
         return True
     except Exception as e:
@@ -144,16 +93,11 @@ def save_explanation(user_id: int, question_id: int, explanation_text: str) -> O
     Returns the inserted row dict, or None on failure.
     """
     try:
-        res = (
-            supabase.table("ai_explanation_history")
-            .insert({
-                "user_id":     user_id,
-                "question_id": question_id,
-                "explanation": explanation_text,
-            })
-            .execute()
-        )
-        return res.data[0] if res.data else None
+        return insert_returning("ai_explanation_history", {
+            "user_id":     user_id,
+            "question_id": question_id,
+            "explanation": explanation_text,
+        })
     except Exception as e:
         print(f"[db.explanation] save_explanation error: {e}")
         return None
@@ -167,15 +111,34 @@ def get_explanation_history(user_id: int, question_id: int) -> List[Dict]:
     Each item: {id, explanation, generated_at}
     """
     try:
-        res = (
-            supabase.table("ai_explanation_history")
-            .select("id, explanation, generated_at")
-            .eq("user_id", user_id)
-            .eq("question_id", question_id)
-            .order("generated_at", desc=False)
-            .execute()
+        return fetch_all(
+            "SELECT id, explanation, generated_at FROM ai_explanation_history "
+            "WHERE user_id=%s AND question_id=%s ORDER BY generated_at ASC",
+            (user_id, question_id),
         )
-        return res.data or []
     except Exception as e:
         print(f"[db.explanation] get_explanation_history error: {e}")
         return []
+
+
+def delete_explanation(explanation_id, user_id: int) -> bool:
+    """
+    Permanently delete ONE explanation row, scoped to its primary key
+    (`id`) AND the owning user_id — never by question_id/user_id alone,
+    since a user can have multiple explanations for the same question
+    (up to EXPLANATION_PER_QUESTION_LIMIT/day) and question_id is not
+    unique per row. The user_id filter is what prevents one student from
+    being able to delete another student's explanation by guessing/
+    tampering with an id — the WHERE clause only deletes rows matching
+    BOTH conditions, so a mismatched id/user_id pair deletes nothing.
+
+    Returns True only if a row was actually deleted.
+    """
+    try:
+        return execute(
+            "DELETE FROM ai_explanation_history WHERE id=%s AND user_id=%s",
+            (explanation_id, user_id),
+        ) > 0
+    except Exception as e:
+        print(f"[db.explanation] delete_explanation error: {e}")
+        return False
