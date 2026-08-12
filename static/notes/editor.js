@@ -38,6 +38,9 @@ window.__notesReadOnly = false;    // read by drawing-tools.js to suppress pen/e
       the server's 1-hour signed-URL lifetime (see notes_storage_service.py)
       so we never hand out a URL we can't be reasonably sure is still valid.
 */
+// Custom fabric properties this app relies on — shared by save (objectRecord), undo/redo
+// (snapshot), and copy/paste/export so every serialize/enliven round-trip stays identical.
+const NOTES_PROPS = ['objectId', 'objectType', 'themeText', 'themeSticky', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg', 'strokeOnly'];
 const pageObjectsCache = new Map();   // pageId -> { objects: fabric.Object[], cachedAt: number }
 const assetUrlCache = new Map();      // assetId -> { url: string, expiresAt: number }
 const PAGE_CACHE_TTL_MS = 50 * 60 * 1000;  // must stay comfortably under the 1h signed-URL TTL
@@ -115,16 +118,55 @@ function token(name) { return getComputedStyle(document.documentElement).getProp
 async function ensureTextMetrics() { await fontMetricsPromise; canvas.getObjects().forEach(object => { if (object.type === 'i-text' || object.type === 'textbox') object.initDimensions(); }); canvas.requestRenderAll(); }
 function textSelectionOffsets(element) { const selection = window.getSelection(); if (!selection?.rangeCount || !element.contains(selection.anchorNode)) return { start: 0, end: 0 }; const offsetAt = (node, offset) => { const range = document.createRange(); range.selectNodeContents(element); range.setEnd(node, offset); return range.toString().length; }; const start = offsetAt(selection.anchorNode, selection.anchorOffset); const end = offsetAt(selection.focusNode, selection.focusOffset); return { start: Math.min(start, end), end: Math.max(start, end) }; }
 function placeCaretAtPoint(element, clientX, clientY) { let range = null; if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(clientX, clientY); else if (document.caretPositionFromPoint) { const pos = document.caretPositionFromPoint(clientX, clientY); if (pos && pos.offsetNode) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); } } if (!range || !element.contains(range.startContainer)) return false; const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); return true; }
+const BULLET_RE = /^([•◦▪–✔]\s|\d+\.\s)/;
+function setCaretOffset(element, offset) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let count = 0, node = walker.nextNode(); const range = document.createRange(); while (node) { if (count + node.length >= offset) { range.setStart(node, offset - count); range.collapse(true); break; } count += node.length; node = walker.nextNode(); } if (!node) { range.selectNodeContents(element); range.collapse(false); } const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); }
+function selectOffsetRange(element, start, end) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let count = 0, node = walker.nextNode(), started = false; const range = document.createRange(); while (node) { const len = node.length; if (!started && count + len >= start) { range.setStart(node, start - count); started = true; } if (count + len >= end) { range.setEnd(node, end - count); break; } count += len; node = walker.nextNode(); } if (!started) range.setStart(element, 0); if (!node) range.setEnd(element, element.childNodes.length); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); }
+/* Bullet/numbered-list continuation: Enter on a bulleted line repeats the bullet (auto-
+   incrementing "N. " numbers); Backspace right after a bullet on an otherwise-empty line
+   removes just the bullet instead of merging into the previous line. Plain-text architecture
+   (see toggleLinePrefix in drawing-tools.js), so this operates on line text, not a list model. */
+function handleListContinuation(event, element, sync) {
+  if (event.key !== 'Enter' && event.key !== 'Backspace') return false;
+  const offsets = textSelectionOffsets(element);
+  if (offsets.start !== offsets.end) return false;
+  const text = element.innerText.replace(/\n$/, '');
+  const lineStart = text.lastIndexOf('\n', Math.max(0, offsets.start - 1)) + 1;
+  const lineEndIdx = text.indexOf('\n', offsets.start);
+  const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx;
+  const line = text.slice(lineStart, lineEnd);
+  const m = line.match(BULLET_RE);
+  if (!m || offsets.start < lineStart + m[0].length) return false;
+  const prefix = m[0];
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    if (line === prefix) { selectOffsetRange(element, lineStart, lineStart + prefix.length); document.execCommand('delete'); }
+    else { const next = /^\d+\./.test(prefix) ? `${parseInt(prefix, 10) + 1}. ` : prefix; document.execCommand('insertText', false, '\n' + next); }
+    sync(); return true;
+  }
+  if (event.key === 'Backspace' && offsets.start === lineStart + prefix.length) {
+    event.preventDefault();
+    selectOffsetRange(element, lineStart, lineStart + prefix.length);
+    document.execCommand('delete');
+    sync(); return true;
+  }
+  return false;
+}
 function finishNativeTextEdit() { const edit = nativeTextEditor; if (!edit) return; const { object, element } = edit; const offsets = textSelectionOffsets(element); object.selectionStart = offsets.start; object.selectionEnd = offsets.end; object.set('text', element.innerText.replace(/\n$/, '')); object.opacity = 1; object.dirty = true; object._clearCache && object._clearCache(); object.initDimensions(); clampTextHeight(object); object.setCoords(); element.remove(); nativeTextEditor = null; canvas.requestRenderAll(); markDirty(); }
-function repositionNativeTextEditor() { if (!nativeTextEditor) return; const { object, element } = nativeTextEditor; const bounds = object.getBoundingRect(true, true); const zoom = canvas.getZoom(); element.style.left = `${bounds.left}px`; element.style.top = `${bounds.top}px`; element.style.fontSize = `${(object.fontSize || 18) * zoom}px`; }
-function beginNativeTextEdit(object, point) { if (currentMode === 'read') return; if (!object || !['i-text', 'textbox'].includes(object.type)) return; if (nativeTextEditor?.object === object) { nativeTextEditor.element.focus(); if (point) placeCaretAtPoint(nativeTextEditor.element, point.x, point.y); return; } finishNativeTextEdit(); const bounds = object.getBoundingRect(true, true); const wrapper = canvas.wrapperEl; const zoom = canvas.getZoom(); const element = document.createElement('div'); element.className = 'native-text-editor'; element.contentEditable = 'true'; element.spellcheck = true; element.textContent = object.text || ''; element.style.left = `${bounds.left}px`; element.style.top = `${bounds.top}px`; element.style.width = `${Math.max(36, bounds.width)}px`; element.style.minHeight = `${Math.max(28, bounds.height)}px`; element.style.fontFamily = object.fontFamily || 'DM Sans'; element.style.fontSize = `${(object.fontSize || 18) * zoom}px`; element.style.fontWeight = object.fontWeight || 'normal'; element.style.fontStyle = object.fontStyle || 'normal'; element.style.lineHeight = object.lineHeight || 1.2; element.style.textAlign = object.textAlign || 'left'; element.style.color = object.fill || token('--text-1'); element.style.background = object.backgroundColor || (object.themeSticky ? token('--warning-bg') : 'transparent'); element.style.padding = `${object.padding || 0}px`; object.opacity = 0; canvas.setActiveObject(object); canvas.requestRenderAll(); wrapper.append(element); nativeTextEditor = { object, element }; const sync = () => { object.set('text', element.innerText.replace(/\n$/, '')); const offsets = textSelectionOffsets(element); object.selectionStart = offsets.start; object.selectionEnd = offsets.end; element.style.height = 'auto'; const contentHeight = Math.max(28, element.scrollHeight); element.style.height = `${contentHeight}px`; const growZoom = canvas.getZoom() || 1; const nextHeight = Math.max(object.minHeight || 0, contentHeight / growZoom); if (Math.abs((object.height || 0) - nextHeight) > 0.5) { object.set('height', nextHeight); object.dirty = true; object.setCoords(); canvas.requestRenderAll(); } }; element.addEventListener('input', sync); element.addEventListener('keyup', sync); element.addEventListener('mouseup', sync); element.addEventListener('blur', () => setTimeout(() => { if (nativeTextEditor?.element === element && !element.contains(document.activeElement)) finishNativeTextEdit(); }, 0)); element.focus(); if (!point || !placeCaretAtPoint(element, point.x, point.y)) { const range = document.createRange(); range.selectNodeContents(element); range.collapse(false); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); } sync(); requestAnimationFrame(() => { if (nativeTextEditor?.element !== element) return; if (document.activeElement !== element) element.focus(); if (point) placeCaretAtPoint(element, point.x, point.y); }); }
+function repositionNativeTextEditor() { if (!nativeTextEditor) return; const { object, element } = nativeTextEditor; const bounds = object.getBoundingRect(false, true); const zoom = canvas.getZoom(); element.style.left = `${bounds.left}px`; element.style.top = `${bounds.top}px`; element.style.fontSize = `${(object.fontSize || 18) * zoom}px`; }
+function beginNativeTextEdit(object, point) { if (currentMode === 'read') return; if (!object || !['i-text', 'textbox'].includes(object.type)) return; if (nativeTextEditor?.object === object) { nativeTextEditor.element.focus(); if (point) placeCaretAtPoint(nativeTextEditor.element, point.x, point.y); return; } finishNativeTextEdit(); const bounds = object.getBoundingRect(false, true); const wrapper = canvas.wrapperEl; const zoom = canvas.getZoom(); const element = document.createElement('div'); element.className = 'native-text-editor'; element.contentEditable = 'true'; element.spellcheck = true; element.textContent = object.text || '';
+  /* ROOT CAUSE of Ctrl+A / Shift+Arrow / drag-select "selecting the whole canvas" bug:
+     Fabric.js sets canvas.wrapperEl.onselectstart = falseFunction to stop native drag-select
+     while manipulating canvas objects. selectstart bubbles, so it silently killed selection
+     in this overlay too (independent of any CSS user-select value). Stop it right here. */
+  element.addEventListener('selectstart', e => e.stopPropagation()); element.style.left = `${bounds.left}px`; element.style.top = `${bounds.top}px`; element.style.width = `${Math.max(36, bounds.width - 4)}px`; element.style.minHeight = `${Math.max(28, bounds.height)}px`; element.style.fontFamily = object.fontFamily || 'DM Sans'; element.style.fontSize = `${(object.fontSize || 18) * zoom}px`; element.style.fontWeight = object.fontWeight || 'normal'; element.style.fontStyle = object.fontStyle || 'normal'; element.style.textDecoration = object.underline ? 'underline' : 'none'; element.style.lineHeight = object.lineHeight || 1.2; element.style.textAlign = object.textAlign || 'left'; element.style.color = object.fill || token('--text-1'); element.style.background = object.backgroundColor || (object.themeSticky ? token('--warning-bg') : 'transparent'); element.style.padding = `${object.padding || 0}px`; object.opacity = 0; canvas.setActiveObject(object); canvas.requestRenderAll(); wrapper.append(element); const sync = () => { object.set('text', element.innerText.replace(/\n$/, '')); const offsets = textSelectionOffsets(element); object.selectionStart = offsets.start; object.selectionEnd = offsets.end; element.style.height = 'auto'; const contentHeight = Math.max(28, element.scrollHeight); element.style.height = `${contentHeight}px`; const growZoom = canvas.getZoom() || 1; const nextHeight = Math.max(object.minHeight || 0, contentHeight / growZoom); if (Math.abs((object.height || 0) - nextHeight) > 0.5) { object.set('height', nextHeight); object.dirty = true; object.setCoords(); canvas.requestRenderAll(); } }; nativeTextEditor = { object, element, sync }; element.addEventListener('keydown', event => handleListContinuation(event, element, sync)); element.addEventListener('input', sync); element.addEventListener('keyup', sync); element.addEventListener('mouseup', sync); element.addEventListener('blur', () => setTimeout(() => { if (nativeTextEditor?.element === element && !element.contains(document.activeElement)) finishNativeTextEdit(); }, 0)); element.focus(); if (!point || !placeCaretAtPoint(element, point.x, point.y)) { const range = document.createRange(); range.selectNodeContents(element); range.collapse(false); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); } sync(); requestAnimationFrame(() => { if (nativeTextEditor?.element !== element) return; if (document.activeElement !== element) element.focus(); if (point) placeCaretAtPoint(element, point.x, point.y); }); }
 function configureNormalText(text) { text.set({ width: Math.max(220, text.width || 0), editable: false, lockUniScaling: false, lockScalingFlip: true, borderColor: token('--accent'), cornerColor: token('--accent'), transparentCorners: false }); text.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: true, mb: true, ml: true, mr: true }); }
 function configureStickyNote(text) { text.set({ width: Math.max(220, text.width || 0), editable: false, lockUniScaling: false, lockScalingFlip: true, borderColor: token('--accent'), cornerColor: token('--accent'), transparentCorners: false }); text.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: true, mb: true, ml: true, mr: true }); }
-async function createEditableText(options, type) { if (currentMode === 'read') return null; await fontMetricsPromise; fabric.util.clearFabricFontCache('DM Sans'); const TextModel = type === 'rich_text' || type === 'sticky_note' ? fabric.Textbox : fabric.IText; const text = new TextModel('', { fontFamily: 'DM Sans', fontWeight: 400, fontStyle: 'normal', lineHeight: 1.2, editable: false, ...options, fill: window.__notesTextColor || options.fill }); if (type === 'rich_text') configureNormalText(text); if (type === 'sticky_note') configureStickyNote(text); addObject(text, type); text.initDimensions(); canvas.calcOffset(); beginNativeTextEdit(text); return text; }
-function syncNativeTextOverlay() { if (!nativeTextEditor) return; const { object, element } = nativeTextEditor; element.style.fontSize = `${(object.fontSize || 18) * canvas.getZoom()}px`; element.style.fontWeight = object.fontWeight || 'normal'; element.style.fontStyle = object.fontStyle || 'normal'; element.style.textAlign = object.textAlign || 'left'; element.style.color = object.fill || token('--text-1'); }
+async function createEditableText(options, type) { if (currentMode === 'read') return null; await fontMetricsPromise; fabric.util.clearFabricFontCache('DM Sans'); const TextModel = type === 'rich_text' || type === 'sticky_note' ? fabric.Textbox : fabric.IText; const text = new TextModel('', { fontFamily: window.__notesDefaultFont || 'DM Sans', fontWeight: 400, fontStyle: 'normal', lineHeight: 1.2, editable: false, ...options, fill: window.__notesTextColor || options.fill }); if (type === 'rich_text') configureNormalText(text); if (type === 'sticky_note') configureStickyNote(text); addObject(text, type); text.initDimensions(); canvas.calcOffset(); beginNativeTextEdit(text); return text; }
+function syncNativeTextOverlay() { if (!nativeTextEditor) return; const { object, element } = nativeTextEditor; element.style.fontSize = `${(object.fontSize || 18) * canvas.getZoom()}px`; element.style.fontFamily = object.fontFamily || 'DM Sans'; element.style.fontWeight = object.fontWeight || 'normal'; element.style.fontStyle = object.fontStyle || 'normal'; element.style.textDecoration = object.underline ? 'underline' : 'none'; element.style.textAlign = object.textAlign || 'left'; element.style.color = object.fill || token('--text-1'); }
 function applyTextColor(color) { if (currentMode === 'read') return; window.__notesTextColor = color; const object = nativeTextEditor?.object || canvas.getActiveObject(); if (!object || !['i-text', 'textbox'].includes(object.type)) return; const { start, end } = nativeTextEditor ? textSelectionOffsets(nativeTextEditor.element) : { start: object.selectionStart || 0, end: object.selectionEnd || 0 }; if (start !== end) { object.setSelectionStyles({ fill: color }, start, end); if (nativeTextEditor) document.execCommand('foreColor', false, color); } else object.set({ fill: color }); object.customColor = true; syncNativeTextOverlay(); object.initDimensions(); canvas.fire('object:modified', { target: object }); canvas.requestRenderAll(); markDirty(); }
 function applyStickyBackground(color) { if (currentMode === 'read') return; window.__notesStickyBgColor = color; const object = canvas.getActiveObject(); if (!object || object.objectType !== 'sticky_note') return; object.set({ backgroundColor: color }); object.customBg = true; object.initDimensions(); if (nativeTextEditor?.object === object) nativeTextEditor.element.style.background = color; canvas.fire('object:modified', { target: object }); canvas.requestRenderAll(); markDirty(); }
 window.__notesBeginNativeTextEdit = beginNativeTextEdit; window.__notesApplyTextColor = applyTextColor; window.__notesSyncActiveTextOverlay = syncNativeTextOverlay; window.__notesApplyStickyBackground = applyStickyBackground;
+window.__notesGetNativeEditor = () => nativeTextEditor; window.__notesTextSelectionOffsets = textSelectionOffsets; window.__notesSetCaretOffset = setCaretOffset;
 function applyCanvasTheme() { canvas.getObjects().forEach(o => { if (o.themeText && !o.customColor) o.set('fill', token('--text-1')); if (o.themeSticky) { if (!o.customColor) o.set('fill', token('--warning-text')); if (!o.customBg) o.set('backgroundColor', token('--warning-bg')); } }); canvas.requestRenderAll(); }
 
 /* ════════════════════════════════════════════════════════════════
@@ -300,6 +342,83 @@ document.getElementById('readModeBtn')?.addEventListener('click', () => setMode(
 document.getElementById('fullscreenBtn')?.addEventListener('click', toggleFullscreen);
 document.getElementById('toolbarToggleBtn')?.addEventListener('click', () => { if (currentMode === 'read') return; setToolbarVisible(!toolbarVisible); });
 
+/* Export whole notebook as PDF — renders each page to a PNG (tightly cropped to its actual
+   content) on a private off-screen StaticCanvas, never touching the live canvas/objects, then
+   posts the images to the server to be assembled into one multi-page PDF by the existing
+   ReportLab-based pdf_service (build_notebook_pdf) — reusing that service rather than
+   re-implementing PDF generation, while getting pixel-accurate layout fidelity for free since
+   Fabric itself does the rendering. Every page is re-serialized via toObject(NOTES_PROPS) +
+   enlivenObjects (the same round-trip already used by save/undo), so this can't corrupt or
+   leak live object instances into another canvas. */
+async function getPageObjectsForExport(pageId) {
+  if (pageId === activePageId) return canvas.getObjects().map(o => o.toObject(NOTES_PROPS));
+  const cached = pageObjectsCache.get(pageId);
+  if (cached) return cached.objects.map(o => o.toObject(NOTES_PROPS));
+  const data = await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`);
+  return data.objects.map(buildRawFabricEntry);
+}
+async function exportNotebookPdf() {
+  if (!pageCache.length) { toast('No pages to export.', 'error'); return; }
+  const btn = document.getElementById('exportPdfBtn');
+  const originalIcon = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+  const offEl = document.createElement('canvas');
+  const offCanvas = new fabric.StaticCanvas(offEl, { renderOnAddRemove: false });
+  try {
+    const rendered = [];
+    for (const page of pageCache) {
+      const raw = await getPageObjectsForExport(page.id);
+      const objects = await new Promise((resolve, reject) => {
+        const result = fabric.util.enlivenObjects(raw, resolve);
+        if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
+      });
+      let bounds = { left: 0, top: 0, width: 900, height: 650 };
+      if (objects.length) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        objects.forEach(o => { const r = o.getBoundingRect(true, true); minX = Math.min(minX, r.left); minY = Math.min(minY, r.top); maxX = Math.max(maxX, r.left + r.width); maxY = Math.max(maxY, r.top + r.height); });
+        const pad = 40;
+        bounds = { left: minX - pad, top: minY - pad, width: Math.max(200, (maxX - minX) + pad * 2), height: Math.max(150, (maxY - minY) + pad * 2) };
+      }
+      offCanvas.clear();
+      offCanvas.setDimensions({ width: bounds.width, height: bounds.height });
+      objects.forEach(o => { o.set({ left: (o.left || 0) - bounds.left, top: (o.top || 0) - bounds.top }); o.setCoords(); offCanvas.add(o); });
+      offCanvas.renderAll();
+      const image = offCanvas.toDataURL({ format: 'png', multiplier: 2 });
+      rendered.push({ title: page.title, image });
+    }
+    // Submitted as a real HTML form POST (into a hidden iframe) instead of fetch+Blob+
+    // createObjectURL — that path made Chrome open the PDF through a blob: URL, whose
+    // download could fail with "network error". A native form submission lets the browser
+    // handle the response as a direct file download itself, driven by the server's
+    // Content-Disposition header, with no blob: URL involved at any point.
+    let frame = document.getElementById('notesPdfExportFrame');
+    if (!frame) { frame = document.createElement('iframe'); frame.name = frame.id = 'notesPdfExportFrame'; frame.style.display = 'none'; document.body.appendChild(frame); }
+    const form = document.createElement('form');
+    form.method = 'POST'; form.action = `${apiBase}/${notebookId}/export-pdf`; form.target = 'notesPdfExportFrame'; form.style.display = 'none';
+    const input = document.createElement('input');
+    input.type = 'hidden'; input.name = 'pages'; input.value = JSON.stringify(rendered);
+    form.appendChild(input);
+    // A successful download (Content-Disposition: attachment) never navigates the iframe, so
+    // no 'load' fires for it; an error response (JSON) does navigate it, and — being
+    // same-origin — its body is readable here, letting a real failure surface instead of
+    // always claiming success.
+    let settled = false;
+    const finish = (ok, message) => { if (settled) return; settled = true; toast(ok ? 'Notebook exported as PDF.' : (message || 'Unable to export this notebook.'), ok ? 'success' : 'error'); };
+    frame.onload = () => {
+      let text = ''; try { text = frame.contentDocument?.body?.innerText || ''; } catch (e) {}
+      if (text.trim()) { let message; try { message = JSON.parse(text).message; } catch (e) {} finish(false, message); }
+    };
+    document.body.append(form); form.submit(); form.remove();
+    setTimeout(() => finish(true), 1200);
+  } catch (error) {
+    toast(error.message || 'Unable to export this notebook.', 'error');
+  } finally {
+    offCanvas.dispose();
+    if (btn) { btn.disabled = false; btn.innerHTML = originalIcon; }
+  }
+}
+document.getElementById('exportPdfBtn')?.addEventListener('click', exportNotebookPdf);
+
 /* Pages sidebar — collapsible, independent of Mode/Screen/Toolbar state. Never destroys or
    recreates the Fabric canvas; just frees horizontal space and lets the existing resize()
    logic grow the canvas into it. Zoom/pan and object positions are untouched. */
@@ -317,7 +436,7 @@ document.getElementById('pagesCollapseBtn')?.addEventListener('click', () => set
 /* ════════════════════════════════════════════════════════════════ */
 
 function markDirty() { if (loading) return; dirty = true; clearTimeout(saveTimer); if (autoSaveEnabled) { status('Saving…', 'saving'); saveTimer = setTimeout(save, 1400); } else status('Unsaved changes', 'saving'); snapshot(); }
-function snapshot() { if (loading) return; const state = JSON.stringify(canvas.toJSON(['objectId', 'objectType', 'themeText', 'themeSticky', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg'])); if (history[historyIndex] === state) { updateUndoRedoUI(); return; } history = history.slice(0, historyIndex + 1); history.push(state); historyIndex = history.length - 1; if (history.length > 40) { history.shift(); historyIndex -= 1; } updateUndoRedoUI(); }
+function snapshot() { if (loading) return; const state = JSON.stringify(canvas.toJSON(NOTES_PROPS)); if (history[historyIndex] === state) { updateUndoRedoUI(); return; } history = history.slice(0, historyIndex + 1); history.push(state); historyIndex = history.length - 1; if (history.length > 40) { history.shift(); historyIndex -= 1; } updateUndoRedoUI(); }
 /* Shared by loadPage() and restoreHistory() so a page load and an Undo/Redo
    reconstruct objects through the exact same finalization — this is the one
    place that decides editable/lockScaling/control-visibility/min-height for
@@ -330,7 +449,7 @@ function finalizeLoadedObject(o) {
 }
 function setTool(name) { activeTool=name; window.__notesEraserActive = false; document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === name)); canvas.isDrawingMode = name === 'draw' && currentMode === 'edit'; canvas.selection = name === 'select' && currentMode === 'edit'; const cursor = name === 'select' ? 'default' : name === 'draw' ? 'crosshair' : 'text'; canvas.defaultCursor = cursor; canvas.hoverCursor = cursor; canvas.freeDrawingCursor = cursor; }
 function addObject(object, type) { if (currentMode === 'read') return; object.objectId = object.objectId || uid(); object.objectType = type; canvas.add(object).setActiveObject(object); canvas.requestRenderAll(); markDirty(); }
-function objectRecord(object) { return { id: object.objectId || (object.objectId = uid()), object_type: object.objectType || 'shape', asset_id: object.assetId || null, transform: { left: object.left || 0, top: object.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0 }, payload: { fabric: object.toObject(['objectId', 'objectType', 'themeText', 'themeSticky', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg']) } }; }
+function objectRecord(object) { return { id: object.objectId || (object.objectId = uid()), object_type: object.objectType || 'shape', asset_id: object.assetId || null, transform: { left: object.left || 0, top: object.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0 }, payload: { fabric: object.toObject(NOTES_PROPS) } }; }
 
 async function save() { if (isPublicView) return; if (!dirty || saving || !activePageId) return; saving = true; status('Saving…', 'saving'); try { const objects = canvas.getObjects().map(objectRecord); await api(`${apiBase}/${notebookId}/pages/${activePageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects, deleted_ids: deletedIds }) }); dirty = false; deletedIds = []; status('Saved'); } catch (error) { status('Save failed', 'failed'); toast(error.message, 'error'); } finally { saving = false; } }
 async function loadPage(id) {
@@ -470,8 +589,7 @@ function showUnsavedChangesDialog(action) { if (!dirty) return action(); pending
 function clampTextHeight(object) { if (!['sticky_note', 'rich_text'].includes(object?.objectType)) return; if (object.minHeight && object.height < object.minHeight) object.set('height', object.minHeight); }
 function preserveStickyTextSize(object) { if (!['sticky_note', 'rich_text'].includes(object?.objectType) || object.type !== 'textbox') return; const scaleX = Math.abs(object.scaleX || 1), scaleY = Math.abs(object.scaleY || 1); if (scaleX === 1 && scaleY === 1) return; const requestedWidth = Math.max(140, object.width * scaleX); const requestedHeight = Math.max(40, object.height * scaleY); object.set({ width: requestedWidth, scaleX: 1, scaleY: 1 }); object.initDimensions(); if (scaleY !== 1) object.minHeight = Math.max(requestedHeight, object.height); clampTextHeight(object); object.setCoords(); }
 canvas.on('object:added', event => { growWorkspaceFor(event.target); markDirty(); }); canvas.on('object:scaling', event => preserveStickyTextSize(event.target)); canvas.on('object:modified', event => { preserveStickyTextSize(event.target); growWorkspaceFor(event.target); markDirty(); }); canvas.on('object:removed', e => { if (!loading && e.target?.objectId) deletedIds.push(e.target.objectId); markDirty(); }); canvas.on('path:created', e => { e.path.objectId = uid(); e.path.objectType = 'drawing'; }); canvas.on('mouse:dblclick', event => { if (currentMode === 'read') return; if (['i-text', 'textbox'].includes(event.target?.type)) { event.e.preventDefault(); beginNativeTextEdit(event.target, { x: event.e.clientX, y: event.e.clientY }); } });
-let reclickCandidate = null, reclickStart = null;
-canvas.on('mouse:down', async e => { if (e.e.altKey) { pan = true; lastPan = e.e; canvas.selection = false; return; } if (currentMode === 'read') { reclickCandidate = null; reclickStart = null; return; } if (e.target && ['i-text', 'textbox'].includes(e.target.type)) { e.e.preventDefault(); } if (e.target && ['i-text', 'textbox'].includes(e.target.type) && canvas.getActiveObject() === e.target && nativeTextEditor?.object !== e.target) { reclickCandidate = e.target; reclickStart = { x: e.e.clientX, y: e.e.clientY }; } else { reclickCandidate = null; reclickStart = null; } if (!e.target && !window.__notesEraserActive && !window.__notesShapeToolActive && !canvas.isDrawingMode && activeTool !== 'image' && activeTool !== 'rect') { const p = canvas.getPointer(e.e); await createEditableText({ left: p.x, top: p.y, fontSize: window.__notesDefaultSize || 22, fill: token('--text-1'), themeText: true }, 'rich_text'); } }); canvas.on('mouse:move', e => { if (!pan) return; const v = canvas.viewportTransform; v[4] += e.e.clientX - lastPan.clientX; v[5] += e.e.clientY - lastPan.clientY; lastPan = e.e; canvas.requestRenderAll(); }); canvas.on('mouse:up', event => { pan = false; canvas.selection = currentMode === 'edit'; if (currentMode === 'read') { reclickCandidate = null; reclickStart = null; return; } if (reclickCandidate && reclickStart && event.target === reclickCandidate) { const moved = Math.hypot(event.e.clientX - reclickStart.x, event.e.clientY - reclickStart.y); if (moved < 4) { event.e.preventDefault(); beginNativeTextEdit(reclickCandidate, { x: event.e.clientX, y: event.e.clientY }); } } reclickCandidate = null; reclickStart = null; });
+canvas.on('mouse:down', async e => { if (e.e.altKey) { pan = true; lastPan = e.e; canvas.selection = false; return; } if (currentMode === 'read') return; if (e.target && ['i-text', 'textbox'].includes(e.target.type)) { e.e.preventDefault(); } if (!e.target && !window.__notesEraserActive && !window.__notesShapeToolActive && !canvas.isDrawingMode && activeTool !== 'image' && activeTool !== 'rect') { const p = canvas.getPointer(e.e); await createEditableText({ left: p.x, top: p.y, fontSize: window.__notesDefaultSize || 22, fill: token('--text-1'), themeText: true }, 'rich_text'); } }); canvas.on('mouse:move', e => { if (!pan) return; const v = canvas.viewportTransform; v[4] += e.e.clientX - lastPan.clientX; v[5] += e.e.clientY - lastPan.clientY; lastPan = e.e; canvas.requestRenderAll(); }); canvas.on('mouse:up', () => { pan = false; canvas.selection = currentMode === 'edit'; });
 canvas.on('mouse:wheel', e => { const shell = document.getElementById('canvasShell'); if (e.e.ctrlKey) { let z = canvas.getZoom() * (0.999 ** e.e.deltaY); z = Math.min(3, Math.max(.25, z)); canvas.zoomToPoint({ x: e.e.offsetX, y: e.e.offsetY }, z); canvas.zoomToPoint({ x: e.e.offsetX, y: e.e.offsetY }, z); repositionNativeTextEditor(); document.getElementById('zoomValue').textContent = `${Math.round(z * 100)}%`; e.e.preventDefault(); e.e.stopPropagation(); return; } if (e.e.shiftKey) { shell.scrollLeft += e.e.deltaY; e.e.preventDefault(); } });
 document.addEventListener('keydown', event => {
   if (currentMode === 'read') return;
@@ -507,15 +625,65 @@ document.addEventListener('keydown', event => {
   event.preventDefault();
   if (isUndo) performUndo(); else performRedo();
 }, true);
-document.querySelectorAll('[data-tool="draw"],[data-tool="rect"]').forEach(button => button.remove());
+/* Copy/Paste for canvas objects — Ctrl+C/Ctrl+V. Uses an in-memory clipboard (not the OS
+   clipboard, which the existing 'paste' listener above already owns for image files) so the
+   two features can never collide. Clones via fabric's own object.clone() — for images this
+   reuses the already-loaded element instantly instead of re-fetching the asset URL (which
+   was silently slow/unreliable and made image paste look broken); every other object type
+   clones just as fast. A pasted object is added via canvas.add(), which already triggers the
+   existing object:added -> markDirty()/snapshot() handling, so persistence and undo "just work". */
+let clipboard = [], pasteOffset = 0;
+function copySelection() {
+  const selected = canvas.getActiveObjects();
+  if (!selected.length) return;
+  const set = new Set(selected);
+  selected.forEach(o => {
+    if (o.shapeTextId) { const label = canvas.getObjects().find(c => c.objectId === o.shapeTextId); if (label) set.add(label); }
+    if (o.shapeTextFor) { const shape = canvas.getObjects().find(c => c.objectId === o.shapeTextFor); if (shape) set.add(shape); }
+  });
+  clipboard = [...set];
+  pasteOffset = 0;
+}
+function cloneObject(o) { return new Promise(resolve => o.clone(resolve, NOTES_PROPS)); }
+async function pasteClipboard() {
+  if (currentMode === 'read' || !clipboard.length) return;
+  pasteOffset += 20;
+  const idMap = new Map(clipboard.map(o => [o.objectId, uid()]));
+  const clones = await Promise.all(clipboard.map(cloneObject));
+  clones.forEach((clone, i) => {
+    const original = clipboard[i];
+    clone.set({ objectId: idMap.get(original.objectId), left: (original.left || 0) + pasteOffset, top: (original.top || 0) + pasteOffset });
+    if (clone.shapeTextId && idMap.has(clone.shapeTextId)) clone.set('shapeTextId', idMap.get(clone.shapeTextId));
+    if (clone.shapeTextFor && idMap.has(clone.shapeTextFor)) clone.set('shapeTextFor', idMap.get(clone.shapeTextFor));
+  });
+  clones.forEach(clone => { finalizeLoadedObject(clone); canvas.add(clone); });
+  canvas.discardActiveObject();
+  // A single pasted object is selected immediately. For multiple, deliberately not
+  // auto-wrapped in a fabric.ActiveSelection: constructing one from objects already
+  // individually canvas.add()'d corrupts their absolute left/top (confirmed via testing —
+  // a real Fabric.js quirk, not something to build around here). Positions/pairing are
+  // already correct post-paste; the user can still drag-select them together manually.
+  if (clones.length === 1) canvas.setActiveObject(clones[0]);
+  canvas.requestRenderAll();
+}
+document.addEventListener('keydown', event => {
+  if (currentMode === 'read') return;
+  const key = event.key.toLowerCase();
+  const isCopy = (event.ctrlKey || event.metaKey) && key === 'c';
+  const isPaste = (event.ctrlKey || event.metaKey) && key === 'v';
+  if (!isCopy && !isPaste) return;
+  if (nativeTextEditor || isTypingContext(document.activeElement)) return;
+  event.preventDefault();
+  if (isCopy) copySelection(); else pasteClipboard();
+}, true);
 if (!isPublicView) {
-  const manualSaveButton = document.createElement('button'); manualSaveButton.type = 'button'; manualSaveButton.id = 'manualSaveBtn'; manualSaveButton.title = 'Save changes'; manualSaveButton.innerHTML = '<i class="fas fa-save"></i>'; manualSaveButton.addEventListener('click', () => { if (currentMode === 'read') return; save(); }); document.querySelector('.object-toolbar').append(manualSaveButton);
-  const autoSaveLabel = document.createElement('label'); autoSaveLabel.className = 'notes-auto-save'; autoSaveLabel.innerHTML = 'Auto Save <input type="checkbox" aria-label="Auto Save"><span></span>'; const autoSaveToggle = autoSaveLabel.querySelector('input'); autoSaveToggle.checked = false; autoSaveToggle.addEventListener('change', () => { if (currentMode === 'read') { autoSaveToggle.checked = autoSaveEnabled; return; } autoSaveEnabled = autoSaveToggle.checked; if (autoSaveEnabled && dirty) { clearTimeout(saveTimer); saveTimer = setTimeout(save, 1400); } }); document.querySelector('.object-toolbar').append(autoSaveLabel);
+  const manualSaveButton = document.createElement('button'); manualSaveButton.type = 'button'; manualSaveButton.id = 'manualSaveBtn'; manualSaveButton.title = 'Save changes'; manualSaveButton.innerHTML = '<i class="fas fa-save"></i>'; manualSaveButton.addEventListener('click', () => { if (currentMode === 'read') return; save(); }); document.querySelector('[data-group="other"]').append(manualSaveButton);
+  const autoSaveLabel = document.createElement('label'); autoSaveLabel.className = 'notes-auto-save'; autoSaveLabel.innerHTML = 'Auto Save <input type="checkbox" aria-label="Auto Save"><span></span>'; const autoSaveToggle = autoSaveLabel.querySelector('input'); autoSaveToggle.checked = false; autoSaveToggle.addEventListener('change', () => { if (currentMode === 'read') { autoSaveToggle.checked = autoSaveEnabled; return; } autoSaveEnabled = autoSaveToggle.checked; if (autoSaveEnabled && dirty) { clearTimeout(saveTimer); saveTimer = setTimeout(save, 1400); } }); document.querySelector('[data-group="other"]').append(autoSaveLabel);
 }
 const paletteColors = ['#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#d9d9d9', '#efefef', '#ffffff', '#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff', '#e06666', '#f6b26b', '#93c47d', '#76a5af'];
 const palette = document.createElement('div'); palette.className = 'notes-color-palette'; palette.title = 'Text color presets'; palette.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;max-width:150px;padding:2px 4px;align-items:center';
 paletteColors.forEach(hex => { const swatch = document.createElement('button'); swatch.type = 'button'; swatch.title = hex; swatch.setAttribute('aria-label', `Text color ${hex}`); swatch.style.cssText = `width:15px;height:15px;border-radius:3px;border:1px solid var(--border);background:${hex};padding:0;cursor:pointer`; swatch.addEventListener('click', () => applyTextColor(hex)); palette.appendChild(swatch); });
-document.querySelector('.object-toolbar').append(palette);
+document.querySelector('[data-group="color"]').append(palette);
 document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', async () => { if (currentMode === 'read') return; const t = b.dataset.tool; setTool(t); if (t === 'text') { activeTool='text'; } if (t === 'sticky') await createEditableText({ left: 180, top: 150, fontSize: window.__notesDefaultSize || 18, fill: token('--warning-text'), backgroundColor: window.__notesStickyBgColor || token('--warning-bg'), padding: 14, themeSticky: true }, 'sticky_note'); if (t === 'image') document.getElementById('imageInput').click(); }));
 document.getElementById('deleteObjectBtn').addEventListener('click', () => { if (currentMode === 'read') return; const selected = canvas.getActiveObjects(); if (!selected.length) return; selected.forEach(object => { const pairedId = object.shapeTextId || object.shapeTextFor; const paired = pairedId && canvas.getObjects().find(candidate => candidate.objectId === pairedId || candidate.objectId === object.shapeTextFor); canvas.remove(object); if (paired && paired !== object) canvas.remove(paired); }); canvas.discardActiveObject(); canvas.requestRenderAll(); });
 async function uploadImageFile(file) {

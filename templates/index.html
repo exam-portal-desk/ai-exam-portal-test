@@ -63,10 +63,16 @@ a{text-decoration:none;color:var(--accent)}
 /* ══ BUTTONS ══ */
 .btn-primary{display:inline-flex;align-items:center;gap:.45rem;padding:.7rem 1.4rem;background:var(--accent);color:#fff;border-radius:10px;font-size:.9rem;font-weight:700;transition:background .12s,transform .1s,box-shadow .12s}
 .btn-primary:hover{background:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 30%,transparent)}
-.btn-secondary{display:inline-flex;align-items:center;gap:.45rem;padding:.68rem 1.35rem;border:1px solid var(--border);border-radius:10px;font-size:.9rem;font-weight:600;color:var(--ink2);transition:border-color .12s,color .12s,transform .1s}
-.btn-secondary:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+.btn-secondary{display:inline-flex;align-items:center;gap:.45rem;padding:.68rem 1.35rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:.9rem;font-weight:600;color:var(--ink2);transition:background .12s,border-color .12s,color .12s,transform .1s}
+.btn-secondary:hover{background:var(--bg2);border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
 .btn-white{display:inline-flex;align-items:center;gap:.45rem;padding:.7rem 1.4rem;background:#fff;color:#0f172a;border-radius:10px;font-size:.9rem;font-weight:700;transition:transform .1s,box-shadow .12s}
 .btn-white:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+/* Outline button for use on a solid accent-colored section (e.g. the CTA band) —
+   dedicated class instead of inline-styling .btn-secondary, since that class's
+   own :hover sets color/border to var(--accent), which would vanish against an
+   accent-colored background. */
+.btn-outline-onaccent{display:inline-flex;align-items:center;gap:.45rem;padding:.68rem 1.35rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.45);border-radius:10px;font-size:.9rem;font-weight:600;color:#fff;transition:background .12s,border-color .12s,transform .1s}
+.btn-outline-onaccent:hover{background:rgba(255,255,255,.18);border-color:#fff;transform:translateY(-2px)}
 
 /* ══ HERO ══ */
 .lp-hero{background:var(--hero-bg);padding:6rem 2rem 5rem;position:relative;overflow:hidden}
@@ -466,7 +472,7 @@ a{text-decoration:none;color:var(--accent)}
             <a href="{{ url_for('auth.create_account') }}" class="btn-white">
                 <i class="fas fa-user-plus"></i> Create account
             </a>
-            <a href="{{ url_for('admin.admin_login') }}" class="btn-secondary" style="border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);">
+            <a href="{{ url_for('admin.admin_login') }}" class="btn-outline-onaccent">
                 <i class="fas fa-user-shield"></i> Admin portal
             </a>
         </div>
@@ -482,6 +488,7 @@ a{text-decoration:none;color:var(--accent)}
         <div class="footer-links-row">
             <a href="{{ url_for('misc.privacy_policy') }}" class="footer-link">Privacy</a>
             <a href="{{ url_for('misc.terms_of_service') }}" class="footer-link">Terms</a>
+            <a href="{{ url_for('misc.account_deletion_policy') }}" class="footer-link">Account &amp; Data Deletion</a>
             <a href="{{ url_for('misc.support') }}" class="footer-link">Support</a>
             <a href="{{ url_for('misc.contact') }}" class="footer-link">Contact</a>
             <a href="{{ url_for('misc.about') }}" class="footer-link">About</a>

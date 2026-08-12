@@ -207,8 +207,8 @@
 
   .brand-text { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
   .brand-text.sb-hide { display: none; }
-  .brand-name { font-family: 'DM Serif Display', serif; font-size: 0.88rem; color: #fff; line-height: 1.25; white-space: nowrap; }
-  .brand-sub  { font-size: 0.56rem; color: rgba(255,255,255,0.28); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+  .brand-name { font-family: 'DM Serif Display', serif; font-size: 0.88rem; color: var(--sb-text-hover); line-height: 1.25; white-space: nowrap; }
+  .brand-sub  { font-size: 0.56rem; color: var(--sb-section); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
 
   /* Toggle button */
   .sb-toggle {
@@ -278,8 +278,13 @@
   .sb-nav .nav-link:hover .nav-icon { opacity: 1; }
 
   /* Active */
-  .sb-nav .nav-link.active { background: var(--sb-active-bg); color: #fff; border-color: var(--sb-active-border); }
+  .sb-nav .nav-link.active { background: var(--sb-active-bg); color: var(--accent); border-color: var(--sb-active-border); font-weight: 700; }
   .sb-nav .nav-link.active .nav-icon { opacity: 1; background: var(--sb-active-bg); }
+
+  /* Focus */
+  .sb-nav .nav-link:focus-visible,
+  .sb-toggle:focus-visible,
+  .sb-mobile-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Logout */
   .sb-nav .nav-link.nav-logout { color: var(--danger-text); opacity: 0.7; }
@@ -317,7 +322,7 @@
   .mobile-menu-toggle {
     display: none; position: fixed; top: 14px; left: 14px; z-index: 1001;
     background: var(--accent); border: none; border-radius: 9px;
-    width: 38px; height: 38px; color: #fff; font-size: 0.9rem;
+    width: 38px; height: 38px; color: var(--accent-on); font-size: 0.9rem;
     cursor: pointer; align-items: center; justify-content: center;
   }
   .mobile-overlay {
@@ -353,10 +358,11 @@
     .sb-mobile-close {
       display: flex; align-items: center; justify-content: center;
       width: 32px; height: 32px; margin-left: auto; flex-shrink: 0;
-      border-radius: 8px; background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.55);
+      border-radius: 8px; background: var(--sb-toggle-bg);
+      border: 1px solid var(--sb-border); color: var(--sb-toggle-c);
       cursor: pointer; font-size: 0.75rem;
     }
+    .sb-mobile-close:hover { background: var(--sb-hover-bg); color: var(--sb-text-hover); }
     .sidebar.mobile-open .sb-nav .nav-link { justify-content: flex-start !important; padding: 6px 8px !important; gap: 10px !important; }
     .content-wrap { padding: 4.5rem 1rem 1.5rem; }
   }
@@ -450,7 +456,7 @@
 
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.dashboard') %}active{% endif %}"
-             href="{{ url_for('admin.dashboard') }}" data-tooltip="Dashboard">
+             href="{{ url_for('admin.dashboard') }}" data-tooltip="Dashboard" aria-label="Dashboard">
             <span class="nav-icon"><i class="fas fa-home"></i></span>
             <span class="nav-label">Dashboard</span>
           </a>
@@ -460,41 +466,41 @@
 
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.categories') %}active{% endif %}"
-             href="{{ url_for('admin.categories') }}" data-tooltip="Manage Categories">
+             href="{{ url_for('admin.categories') }}" data-tooltip="Manage Categories" aria-label="Manage Categories">
             <span class="nav-icon"><i class="fas fa-layer-group"></i></span>
             <span class="nav-label">Manage Categories</span>
           </a>
         </li>
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.exams') %}active{% endif %}"
-             href="{{ url_for('admin.exams') }}" data-tooltip="Manage Exams">
+             href="{{ url_for('admin.exams') }}" data-tooltip="Manage Exams" aria-label="Manage Exams">
             <span class="nav-icon"><i class="fas fa-file-alt"></i></span>
             <span class="nav-label">Manage Exams</span>
           </a>
         </li>
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.subjects') %}active{% endif %}"
-             href="{{ url_for('admin.subjects') }}" data-tooltip="Manage Subjects">
+             href="{{ url_for('admin.subjects') }}" data-tooltip="Manage Subjects" aria-label="Manage Subjects">
             <span class="nav-icon"><i class="fas fa-book"></i></span>
             <span class="nav-label">Manage Subjects</span>
           </a>
         </li>
         <li>
           <a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.questions') or request.endpoint == 'admin.questions_index') %}active{% endif %}"
-             href="{{ url_for('admin.questions_index') }}" data-tooltip="Manage Questions">
+             href="{{ url_for('admin.questions_index') }}" data-tooltip="Manage Questions" aria-label="Manage Questions">
             <span class="nav-icon"><i class="fas fa-question-circle"></i></span>
             <span class="nav-label">Manage Questions</span>
           </a>
         </li>
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.upload_images') %}active{% endif %}"
-             href="{{ url_for('admin.upload_images_page') }}" data-tooltip="Upload Images">
+             href="{{ url_for('admin.upload_images_page') }}" data-tooltip="Upload Images" aria-label="Upload Images">
             <span class="nav-icon"><i class="fas fa-images"></i></span>
             <span class="nav-label">Upload Images</span>
           </a>
         </li>
         <li>
-          <button id="open-latex-editor-admin-base" class="nav-link" data-tooltip="LaTeX Editor">
+          <button id="open-latex-editor-admin-base" class="nav-link" data-tooltip="LaTeX Editor" aria-label="LaTeX Editor">
             <span class="nav-icon"><i class="fas fa-square-root-alt"></i></span>
             <span class="nav-label">LaTeX Editor</span>
           </button>
@@ -504,7 +510,7 @@
 
         <li>
           <a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.requests') or request.endpoint.startswith('admin.new_requests') or request.endpoint.startswith('admin.requests_history')) %}active{% endif %}"
-             href="{{ url_for('admin.requests_dashboard') }}" data-tooltip="Users & Requests">
+             href="{{ url_for('admin.requests_dashboard') }}" data-tooltip="Users & Requests" aria-label="Users & Requests">
             <span class="nav-icon"><i class="fas fa-user-plus"></i></span>
             <span class="nav-label">Users &amp; Requests</span>
             <span class="nav-badge" id="requestsBadge" style="display:none">0</span>
@@ -512,7 +518,7 @@
         </li>
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.attempts') %}active{% endif %}"
-             href="{{ url_for('admin.attempts') }}" data-tooltip="Manage Attempts">
+             href="{{ url_for('admin.attempts') }}" data-tooltip="Manage Attempts" aria-label="Manage Attempts">
             <span class="nav-icon"><i class="fas fa-list-ol"></i></span>
             <span class="nav-label">Manage Attempts</span>
           </a>
@@ -522,21 +528,21 @@
 
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.users_analytics') %}active{% endif %}"
-             href="{{ url_for('admin.users_analytics') }}" data-tooltip="Users Analytics">
+             href="{{ url_for('admin.users_analytics') }}" data-tooltip="Users Analytics" aria-label="Users Analytics">
             <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
             <span class="nav-label">Users Analytics</span>
           </a>
         </li>
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
-             href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre">
+             href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre" aria-label="AI Command Centre">
             <span class="nav-icon"><i class="fas fa-robot"></i></span>
             <span class="nav-label">AI Command Centre</span>
           </a>
         </li>
 
         <li>
-          <button class="nav-link" id="accountSettingsBtn" data-tooltip="Account Settings">
+          <button class="nav-link" id="accountSettingsBtn" data-tooltip="Account Settings" aria-label="Account Settings">
             <span class="nav-icon"><i class="fas fa-cog"></i></span>
             <span class="nav-label">Account Settings</span>
           </button>
@@ -580,6 +586,7 @@
       <div class="footer-links">
         <a href="{{ url_for('misc.privacy_policy') }}">Privacy</a>
         <a href="{{ url_for('misc.terms_of_service') }}">Terms</a>
+        <a href="{{ url_for('misc.account_deletion_policy') }}">Account &amp; Data Deletion</a>
         <a href="{{ url_for('misc.support') }}">Support</a>
         <a href="{{ url_for('misc.contact') }}">Contact</a>
         <a href="{{ url_for('misc.about') }}">About</a>

@@ -242,7 +242,7 @@ def get_public_notebook(notebook_id: str) -> Optional[Dict[str, Any]]:
 def search_public_notebooks(term: str, limit: int = 30) -> List[Dict[str, Any]]:
     query = (
         "SELECT id,title,description,subject,department,semester,course,topic,tags,"
-        "author_display_name,published_at,updated_at FROM notes_notebooks "
+        "author_display_name,author_deleted,published_at,updated_at FROM notes_notebooks "
         "WHERE visibility=%s AND published_at IS NOT NULL AND deleted_at IS NULL"
     )
     params: List[Any] = ["public"]

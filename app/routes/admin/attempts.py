@@ -106,7 +106,7 @@ def api_attempts_search():
         # ── Step 6: build rows ────────────────────────────────────────
         all_rows = []
         for (sid, eid), used in count_map.items():
-            uname = user_map.get(sid, str(sid))
+            uname = user_map.get(sid, "Deleted User")
             exam  = exam_map.get(eid, {})
             ename = exam.get("name", f"Exam {eid}")
             max_r = exam.get("max_attempts")

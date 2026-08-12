@@ -607,7 +607,7 @@
       <span style="font-weight:700;color:var(--text-1)">SmartAIExam</span>
     </div>
     <div style="display:flex;gap:1.1rem;flex-wrap:wrap">
-      {% for n,e in [('Privacy','misc.privacy_policy'),('Terms','misc.terms_of_service'),('Support','misc.support'),('Contact','misc.contact'),('About','misc.about')] %}
+      {% for n,e in [('Privacy','misc.privacy_policy'),('Terms','misc.terms_of_service'),('Data Deletion','misc.account_deletion_policy'),('Support','misc.support'),('Contact','misc.contact'),('About','misc.about')] %}
       <a href="{{ url_for(e) }}" style="color:var(--text-3);text-decoration:none" onmouseover="this.style.color='var(--text-1)'" onmouseout="this.style.color='var(--text-3)'">{{ n }}</a>
       {% endfor %}
     </div>
@@ -672,10 +672,17 @@
       <div class="del-warn">
         <div class="del-warn-t"><i class="fas fa-exclamation-triangle"></i> This is IRREVERSIBLE</div>
         <ul>
-          <li>Account permanently deleted</li>
-          <li>All exam results and responses lost</li>
-          <li>All chat history erased</li>
+          <li>Your account, login, and profile information are permanently deleted</li>
+          <li>Your exam attempts, results, and answers are permanently deleted</li>
+          <li>Your private notebooks and private AI conversations are permanently deleted</li>
+          <li>Your account cannot be recovered after this</li>
         </ul>
+      </div>
+      <div style="font-size:.76rem;color:var(--text-3);margin-bottom:.85rem;line-height:1.5">
+        <i class="fas fa-info-circle"></i> Public Notebooks and comments you've shared may remain available to other
+        students, since they may still be useful to them — but they will no longer be linked to your account and
+        will be shown as posted by a <strong>Deleted User</strong>.
+        <a href="{{ url_for('misc.account_deletion_policy') }}" target="_blank" style="color:var(--accent)">Read the full policy</a>.
       </div>
       <div style="font-size:.78rem;color:var(--text-2);font-weight:600;margin-bottom:.4rem">
         Type <span style="color:var(--danger-text);font-family:monospace">DELETE</span> to confirm:
@@ -840,7 +847,24 @@ function doDelete(){
   b.disabled=true; b.innerHTML='<i class="fas fa-spinner fa-spin"></i> Deleting…';
   fetch('/api/delete-account',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'DELETE'})})
   .then(function(r){return r.json();}).then(function(d){
-    if(d.success){window.location.href='/';}
+    if(d.success){
+      // Show a professional confirmation in place of the confirm dialog before
+      // navigating away — this is the only reliable place to show it, since the
+      // page we redirect to (the logged-out landing page) has no flash-message UI.
+      var box=document.querySelector('#delModal .modal-box');
+      if(box) box.innerHTML=
+        '<div class="modal-hdr" style="background:var(--success-bg)">'+
+          '<h5 style="color:var(--success-text)"><i class="fas fa-check-circle"></i> Account Deleted</h5>'+
+        '</div>'+
+        '<div class="modal-bdy">'+
+          '<p style="color:var(--text-2);font-size:.85rem;line-height:1.7;margin:0">'+
+            'Your account has been permanently deleted. Private account data associated with your '+
+            'account has been removed. Public contributions that remain available on the platform are '+
+            'no longer associated with an active account.'+
+          '</p>'+
+        '</div>';
+      setTimeout(function(){window.location.href='/';},3200);
+    }
     else{b.disabled=false;b.innerHTML='<i class="fas fa-trash-alt"></i> Delete My Account';alert(d.message||'Error.');}
   }).catch(function(){b.disabled=false;b.innerHTML='<i class="fas fa-trash-alt"></i> Delete My Account';alert('Network error.');});
 }

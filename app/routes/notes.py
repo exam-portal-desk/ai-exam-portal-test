@@ -306,6 +306,32 @@ def import_notebook_api():
         return _api_error("Unable to import this notebook. Please try again.", 500)
 
 
+@notes_bp.route("/api/notes/notebooks/<notebook_id>/export-pdf", methods=["POST"])
+@require_user_role
+def export_notebook_pdf_api(notebook_id: str):
+    try:
+        notebook = notes_service.get_editor_notebook(session["user_id"], notebook_id)
+        if not notebook:
+            return _api_error("Notebook not found.", 404)
+        if "pages" in request.form:
+            try:
+                pages = json.loads(request.form["pages"])
+            except ValueError:
+                return _api_error("Send a valid JSON object.", 400)
+        else:
+            pages = _payload().get("pages", [])
+        if not pages:
+            return _api_error("Nothing to export.", 400)
+        from app.services.pdf_service import build_notebook_pdf
+        pdf = build_notebook_pdf(notebook.get("title") or "Notebook", pages)
+        safe_name = "".join(ch for ch in (notebook.get("title") or "notebook") if ch.isalnum() or ch in " -_").strip() or "notebook"
+        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'})
+    except (NotesValidationError, ValueError) as exc:
+        return _api_error(str(exc))
+    except Exception:
+        return _api_error("Unable to export this notebook as PDF. Please try again.", 500)
+
+
 @notes_bp.route("/api/notes/notebooks/<notebook_id>/permanent", methods=["DELETE"])
 @require_user_role
 def permanently_delete_notebook_api(notebook_id: str):

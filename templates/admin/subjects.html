@@ -187,6 +187,67 @@
 }
 
 /* =========================
+   THEME-SYNCED FLAT BUTTONS
+   (Bootstrap's own .btn-primary/.btn-secondary/.btn-danger load AFTER
+   theme.css in admin_base.html, so they win the cascade and are NOT
+   theme-token driven — this local component is the same pattern already
+   used elsewhere in the admin portal, e.g. categories.html.)
+========================= */
+
+.btn-flat{
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:.5rem 1rem;
+  border-radius:var(--radius);
+  border:none;
+  font-family:inherit;
+  font-size:.82rem;
+  font-weight:600;
+  cursor:pointer;
+  transition:background .12s,transform .1s,box-shadow .15s;
+  text-decoration:none;
+  white-space:nowrap;
+}
+.btn-flat:disabled{ opacity:.5; cursor:not-allowed; transform:none !important; }
+.btn-flat.primary{ background:var(--accent); color:var(--accent-on); }
+.btn-flat.primary:hover{ background:var(--accent-hover); transform:translateY(-1px); }
+.btn-flat.secondary{
+  background:var(--surface-2);
+  color:var(--text-2);
+  border:1px solid var(--border);
+}
+.btn-flat.secondary:hover{ border-color:var(--accent); color:var(--accent); }
+.btn-flat.danger{
+  background:var(--danger-bg);
+  color:var(--danger-text);
+  border:1px solid var(--danger-border);
+}
+.btn-flat.danger:hover{ background:var(--danger); color:#fff; border-color:var(--danger); }
+
+/* ── Delete warning (theme-token driven, matches categories.html) ── */
+.del-warn{
+  background:var(--danger-bg);
+  border:1px solid var(--danger-border);
+  border-radius:var(--radius);
+  padding:.85rem 1rem;
+  margin-bottom:.75rem;
+}
+.del-warn-t{
+  font-size:.85rem;
+  font-weight:700;
+  color:var(--danger-text);
+  margin-bottom:.4rem;
+}
+.del-warn ul{
+  margin:0;
+  padding-left:1.2rem;
+  font-size:.82rem;
+  color:var(--text-2);
+  line-height:1.85;
+}
+
+/* =========================
    MODAL
 ========================= */
 
@@ -295,7 +356,7 @@
     <h1><i class="fas fa-book me-2" style="color:var(--accent)"></i>Manage Subjects</h1>
     <p>Organize question image folders by subject.</p>
   </div>
-  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+  <button class="btn-flat primary" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
     <i class="fas fa-plus me-1"></i> Add Subject
   </button>
 </div>
@@ -378,13 +439,13 @@
         <div class="modal-body">
           <label class="form-label">Subject Name</label>
           <input type="text" class="form-control" name="subject_name" value="{{ subject.subject_name }}" required>
-          <div class="form-text" style="margin-top:0.4rem;color:var(--text-muted);font-size:0.78rem">
+          <div class="form-text" style="margin-top:0.4rem;font-size:0.78rem">
             <i class="fas fa-info-circle me-1"></i>Updating the name will create a new folder if needed.
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Save Changes</button>
+          <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-flat primary"><i class="fas fa-save me-1"></i>Save Changes</button>
         </div>
       </form>
     </div>
@@ -407,7 +468,7 @@
             <input type="text" class="form-control" name="subject_name" placeholder="e.g. Physics, Mathematics, Chemistry" required>
           </div>
           <div class="info-box">
-            <strong style="color:var(--text-primary)">What happens when you add a subject?</strong>
+            <strong>What happens when you add a subject?</strong>
             <ul>
               <li>A new folder is created in Google Drive</li>
               <li>You can upload images for this subject</li>
@@ -416,8 +477,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Create Subject</button>
+          <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-flat primary"><i class="fas fa-plus me-1"></i>Create Subject</button>
         </div>
       </form>
     </div>
@@ -470,25 +531,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal fade" id="deleteSubjectModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header" style="background:#ef4444">
-        <h5 class="modal-title" style="color:white"><i class="fas fa-trash me-2"></i>Delete Subject</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:brightness(0) invert(1)"></button>
+      <div class="modal-header" style="background:var(--danger-bg);border-bottom:1px solid var(--danger-border) !important">
+        <h5 class="modal-title" style="color:var(--danger-text) !important"><i class="fas fa-trash me-2"></i>Delete Subject</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(0.4) sepia(1) saturate(3) hue-rotate(315deg) brightness(.8)"></button>
       </div>
       <div class="modal-body">
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:0.5rem">You are about to delete:</p>
-        <p id="subjectNameToDelete" style="color:#ef4444;font-weight:700;font-size:1rem;margin-bottom:1rem"></p>
-        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:0.9rem 1rem;margin-bottom:0.75rem">
-          <p style="color:#ef4444;font-weight:600;font-size:0.85rem;margin:0 0 0.4rem">This will permanently delete:</p>
-          <ul style="color:var(--text-secondary);font-size:0.82rem;margin:0;padding-left:1.2rem">
+        <p style="color:var(--text-2);font-size:0.9rem;margin-bottom:0.5rem">You are about to delete:</p>
+        <p id="subjectNameToDelete" style="color:var(--danger-text);font-weight:700;font-size:1rem;margin-bottom:1rem"></p>
+        <div class="del-warn">
+          <p class="del-warn-t">This will permanently delete:</p>
+          <ul>
             <li>The subject and its folder reference</li>
             <li>All associated image links</li>
           </ul>
         </div>
-        <p style="color:var(--text-muted);font-size:0.78rem;margin:0;text-align:center"><i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.</p>
+        <p style="color:var(--text-3);font-size:0.78rem;margin:0;text-align:center"><i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-danger btn-sm" id="confirmSubjectDeleteBtn">
+        <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-flat danger" id="confirmSubjectDeleteBtn">
           <i class="fas fa-trash me-1"></i>Delete Subject
         </button>
       </div>

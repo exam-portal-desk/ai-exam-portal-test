@@ -18,6 +18,7 @@ def home():
 for _name, _path in [
     ("privacy_policy",  "privacy_policy.html"),
     ("terms_of_service","terms_of_service.html"),
+    ("account_deletion_policy", "account_deletion_policy.html"),
     ("support",         "support.html"),
     ("contact",         "contact.html"),
     ("about",           "about.html"),

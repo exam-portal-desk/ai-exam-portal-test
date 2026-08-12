@@ -60,15 +60,16 @@ body:has(.ai-page) {
 
 /* Chat area */
 .ai-messages {
-  flex:1; overflow-y:auto; padding:1.25rem 1.5rem;
-  display:flex; flex-direction:column; gap:.85rem;
+  flex:1; overflow-y:auto; overflow-x:hidden; padding:1.25rem 1.5rem;
+  display:flex; flex-direction:column; gap:.85rem; min-width:0;
   scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  scroll-behavior:smooth;
 }
 .ai-messages::-webkit-scrollbar { width:4px; }
 .ai-messages::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
 
 /* Message groups */
-.message-group { display:flex; align-items:flex-start; gap:.65rem; }
+.message-group { display:flex; align-items:flex-start; gap:.65rem; min-width:0; max-width:100%; }
 .user-message-group { flex-direction:row-reverse; }
 
 .message-avatar {
@@ -79,13 +80,23 @@ body:has(.ai-page) {
 .ai-avatar-msg  { background:var(--accent-subtle); color:var(--accent); border-radius:9px; }
 .user-avatar-msg { background:var(--accent); color:var(--accent-on); }
 
-.message-wrapper { display:flex; flex-direction:column; gap:.25rem; max-width:75%; }
+/* min-width:0 is required here: flex items default to min-width:auto, which lets long
+   unbreakable content (URLs, code, LaTeX) refuse to shrink and push the page wider even
+   with overflow-wrap set below — this is what caused the mobile horizontal overflow. */
+.message-wrapper { display:flex; flex-direction:column; gap:.25rem; max-width:75%; min-width:0; }
 .user-message-group .message-wrapper { align-items:flex-end; }
 
 .message-bubble {
   padding:.65rem .9rem; border-radius:12px;
   font-size:.85rem; line-height:1.55;
+  overflow-wrap:break-word; word-break:break-word;
+  min-width:0; max-width:100%;
 }
+/* KaTeX renders wide formulas with white-space:nowrap by design (so they don't break
+   mid-expression) — without this, a wide formula overflows the bubble/viewport instead
+   of scrolling within its own small box. */
+.message-bubble .katex-display { overflow-x:auto; overflow-y:hidden; max-width:100%; }
+.message-bubble .katex { max-width:100%; }
 .ai-bubble {
   background:var(--surface); border:1px solid var(--border);
   color:var(--text-1); border-top-left-radius:3px;
@@ -152,27 +163,31 @@ body:has(.ai-page) {
 .ai-input-row {
   display:flex; align-items:flex-end; gap:.6rem;
   background:var(--bg); border:1px solid var(--border);
-  border-radius:calc(var(--radius)+2px); padding:.55rem .65rem;
+  border-radius:calc(var(--radius)+6px); padding:.6rem .7rem;
+  box-shadow:var(--shadow-md);
   transition:border-color .15s, box-shadow .15s;
 }
 .ai-input-row:focus-within { border-color:var(--border-focus); box-shadow:0 0 0 3px var(--accent-subtle); }
 .chat-input {
   flex:1; background:none; border:none; outline:none;
-  color:var(--text-1); font-family:inherit; font-size:.875rem;
-  resize:none; max-height:120px; scrollbar-width:thin; line-height:1.5;
-  padding:.15rem 0;
+  color:var(--text-1); font-family:inherit; font-size:.9rem;
+  resize:none; max-height:160px; min-height:22px; scrollbar-width:thin; line-height:1.5;
+  padding:.25rem 0; overflow-wrap:break-word;
+  transition:opacity .15s;
 }
 .chat-input::placeholder { color:var(--text-3); }
+.chat-input:disabled, .chat-input.is-busy { opacity:.55; }
 .send-btn {
-  width:34px; height:34px; flex-shrink:0;
+  width:36px; height:36px; flex-shrink:0;
   background:var(--accent); color:var(--accent-on);
-  border:none; border-radius:var(--radius);
+  border:none; border-radius:calc(var(--radius) + 2px);
   cursor:pointer; display:flex; align-items:center; justify-content:center;
-  transition:background .12s; flex-shrink:0;
+  transition:background .12s, transform .1s, opacity .15s;
 }
-.send-btn:hover { background:var(--accent-hover); }
+.send-btn:hover:not(:disabled) { background:var(--accent-hover); transform:scale(1.06); }
+.send-btn:active:not(:disabled) { transform:scale(.94); }
 .send-btn:disabled { opacity:.4; cursor:not-allowed; }
-.ai-input-hint { font-size:.68rem; color:var(--text-3); margin-top:.4rem; display:flex; justify-content:space-between; }
+.ai-input-hint { font-size:.68rem; color:var(--text-3); margin-top:.45rem; display:flex; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
 
 /* Confirm modal (override base modal for this page) */
 .confirmation-modal {
@@ -210,6 +225,9 @@ body:has(.ai-page) {
   .ai-input-area { padding:.6rem 1rem; }
   .ai-stats { display:none; }
   .message-wrapper { max-width:88%; }
+  /* font-size must be >=16px or iOS Safari zooms the whole page in on focus */
+  .chat-input { font-size:16px; }
+  .send-btn { width:38px; height:38px; }
 }
 </style>
 
@@ -265,7 +283,7 @@ body:has(.ai-page) {
     </div>
     <div class="ai-input-hint">
       <span id="hintText">Loading…</span>
-      <span>Powered by Groq AI</span>
+      <span>AI responses may be inaccurate — verify important details</span>
     </div>
   </div>
 
@@ -362,7 +380,10 @@ class AIAssistant{
         const frag=document.createDocumentFragment();
         d.history.forEach(m=>frag.appendChild(this._buildMsg(m.text,m.isUser,m.timestamp)));
         document.getElementById('chatMessages').appendChild(frag);
-        this._scroll();this.renderMath();
+        this._scroll();
+        // Defer the KaTeX pass over (up to 50) history messages to the next frame so it
+        // never blocks the very first click/focus the user makes right as the page loads.
+        requestAnimationFrame(()=>this.renderMath());
       }
     }catch(e){this._rmSkeleton();}
   }
@@ -387,11 +408,11 @@ class AIAssistant{
     else tm.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     wr.appendChild(bu);wr.appendChild(tm);g.appendChild(av);g.appendChild(wr);return g;
   }
-  addMsg(text,isUser){const c=document.getElementById('chatMessages');c.appendChild(this._buildMsg(text,isUser,null));this._scroll();if(!isUser)requestAnimationFrame(()=>this.renderMath());}
+  addMsg(text,isUser){const c=document.getElementById('chatMessages');const g=this._buildMsg(text,isUser,null);c.appendChild(g);this._scroll();if(!isUser)requestAnimationFrame(()=>this.renderMath(g));}
   _scroll(){const c=document.getElementById('chatMessages');requestAnimationFrame(()=>{c.scrollTop=c.scrollHeight;});}
   showTyping(){const c=document.getElementById('chatMessages');const t=document.createElement('div');t.id='typingIndicator';t.className='message-group';t.innerHTML='<div class="message-avatar ai-avatar-msg"><i class="fas fa-robot" style="font-size:.8rem"></i></div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';c.appendChild(t);this._scroll();}
   hideTyping(){document.getElementById('typingIndicator')?.remove();}
-  _busy(b){this.isSending=b;const btn=document.getElementById('sendBtn'),inp=document.getElementById('chatInput');if(btn)btn.disabled=b;if(inp)inp.disabled=b;}
+  _busy(b){this.isSending=b;const btn=document.getElementById('sendBtn'),inp=document.getElementById('chatInput');if(btn)btn.disabled=b;if(inp){inp.readOnly=b;inp.classList.toggle('is-busy',b);}}
   async sendMessage(msg=null){
     if(this.isSending)return;
     const inp=document.getElementById('chatInput');
@@ -411,10 +432,10 @@ class AIAssistant{
   }
   setupEventListeners(){
     const inp=document.getElementById('chatInput');if(!inp)return;
-    inp.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';});
+    inp.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px';});
     inp.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();this.sendMessage();}});
   }
-  renderMath(){const c=document.getElementById('chatMessages');if(!c||!window.renderMathInElement)return;try{renderMathInElement(c,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false,ignoredTags:['script','noscript','style','textarea','pre']});}catch(e){}}
+  renderMath(root){const c=root||document.getElementById('chatMessages');if(!c||!window.renderMathInElement)return;try{renderMathInElement(c,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false,ignoredTags:['script','noscript','style','textarea','pre']});}catch(e){}}
   async clearHistory(){
     try{
       const r=await fetch('/api/clear-chat-history',{method:'POST',headers:{'Content-Type':'application/json'}});
@@ -425,8 +446,11 @@ class AIAssistant{
   }
 }
 
-let assistant;
-document.addEventListener('DOMContentLoaded',()=>{assistant=new AIAssistant();});
+// Started immediately, not on DOMContentLoaded: this script tag runs after its own
+// markup (#chatInput/#chatMessages already parsed above it), and DOMContentLoaded on
+// this app waits for base.html's unrelated, non-deferred socket.io <script> to finish
+// downloading first — needlessly chaining chat startup to that unrelated network fetch.
+let assistant=new AIAssistant();
 function sendMessage(){if(assistant)assistant.sendMessage();}
 function confirmClearChat(){document.getElementById('confirmModal').classList.add('show');}
 function closeConfirmModal(){document.getElementById('confirmModal').classList.remove('show');}

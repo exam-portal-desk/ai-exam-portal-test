@@ -56,6 +56,32 @@ def _cursor(commit=False):
         _pool.putconn(conn)
 
 
+@contextmanager
+def transaction():
+    """Yield a RealDictCursor for a multi-statement transaction: every
+    statement run against it via cur.execute(...)/cur.fetchall() shares one
+    connection and commits together at the end, or rolls back together if
+    any statement raises. Use this (instead of the fetch_one/fetch_all/
+    execute helpers, which each open and commit their own connection) for
+    operations — like full account deletion — that must be all-or-nothing.
+    Rows come back as plain RealDictRow; callers that need the ISO-string
+    date normalization fetch_all() applies should call dict(row) plus
+    _normalize_row(dict(row)) themselves if they serialize dates to JSON."""
+    conn = _pool.getconn()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            yield cur
+            conn.commit()
+        finally:
+            cur.close()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        _pool.putconn(conn)
+
+
 def fetch_one(query, params=None):
     with _cursor() as cur:
         cur.execute(query, params)

@@ -30,6 +30,9 @@ def create_app() -> Flask:
 
     # ── Core config ────────────────────────────────────────────────────────
     app.secret_key = config.SECRET_KEY
+    # Werkzeug caps in-memory form fields at 500KB by default; Notebook PDF export posts
+    # page images (base64) as a form field and was hitting that cap, surfacing as a 500.
+    app.config["MAX_FORM_MEMORY_SIZE"] = 50 * 1024 * 1024
 
     # ── Server-side session ────────────────────────────────────────────────
     os.makedirs(config.SESSION_FILE_DIR, exist_ok=True)

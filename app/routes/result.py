@@ -217,10 +217,11 @@ def response_pdf(exam_id):
         username=username,
     )
 
+    exam_name = str(exam.get("name") or "exam").replace(" ", "_")
     return Response(
         pdf,
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=exam_{exam_id}_response_{username}.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={exam_name}_response_{username}.pdf"},
     )
 
 

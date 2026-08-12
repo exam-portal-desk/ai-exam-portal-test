@@ -4,107 +4,135 @@
 {% block content %}
 <style>
 .res-page { background:var(--bg); padding:2rem 1rem; min-height:100%; }
-.res-wrap { max-width:760px; margin:0 auto; }
+.res-wrap { max-width:880px; margin:0 auto; }
 
-/* Back link */
-.res-back {
-  display:inline-flex; align-items:center; gap:.4rem;
-  font-size:.78rem; font-weight:600; color:var(--text-3);
-  text-decoration:none; margin-bottom:1.25rem;
-  transition:color .15s;
-}
-.res-back:hover { color:var(--text-1); }
-
-/* Trophy header */
+/* ── Hero: completion status ─────────────────────────────────────── */
 .res-hero {
-  text-align:center; padding:1.75rem 1.5rem 1.5rem;
+  display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+  padding:1.1rem 1.35rem;
   background:var(--surface); border:1px solid var(--border);
-  border-radius:calc(var(--radius)+4px); margin-bottom:1rem;
+  border-radius:var(--radius); margin-bottom:.85rem;
+}
+.res-hero-left { display:flex; align-items:center; gap:.9rem; min-width:0; }
+.res-hero-icon {
+  flex-shrink:0; width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--success-bg); color:var(--success-text); font-size:1.15rem;
+}
+.res-hero-body { min-width:0; }
+
+/* Action toolbar — compact icon-only buttons, same component as Response Analysis page */
+.icon-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:.4rem; flex-wrap:wrap; }
+.icon-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:var(--radius); border:1px solid; cursor:pointer; text-decoration:none; font-size:.85rem; transition:background .12s,transform .1s; }
+.icon-btn:hover { transform:translateY(-1px); }
+.icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.icon-btn.ib-accent { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
+.icon-btn.ib-accent:hover { background:var(--accent); color:var(--accent-on); border-color:var(--accent); }
+.icon-btn.ib-success { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.icon-btn.ib-success:hover { background:var(--success); color:#fff; border-color:var(--success); }
+.icon-btn.ib-danger { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+.icon-btn.ib-danger:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
+.res-hero-tag {
+  font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--success-text); margin-bottom:.15rem;
+}
+.res-hero h1 {
+  font-size:1.15rem; font-weight:700; color:var(--text-1);
+  margin:0 0 .2rem; word-break:break-word;
+}
+.res-hero-meta { font-size:.78rem; color:var(--text-3); }
+
+/* ── Score hero: the main focus of the page ──────────────────────── */
+.res-score-hero {
+  text-align:center; padding:1.5rem 1.25rem;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:calc(var(--radius) + 4px); margin-bottom:.85rem;
   position:relative; overflow:hidden;
 }
-.res-hero::before {
+.res-score-hero::before {
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
   background:linear-gradient(90deg,transparent,var(--accent),transparent);
 }
-.res-trophy { font-size:2.5rem; margin-bottom:.75rem; display:block; }
-.res-hero h1 { font-size:1.25rem; font-weight:700; color:var(--text-1); margin-bottom:.25rem; }
-.res-exam-name { font-size:.85rem; color:var(--text-3); }
-
-/* Info grid */
-.res-info {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:.75rem; background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius); padding:1rem 1.25rem; margin-bottom:1rem;
+.res-score-main {
+  font-size:clamp(2.1rem,7vw,2.75rem); font-weight:800; color:var(--text-1); line-height:1;
 }
-.res-info-row { display:flex; justify-content:space-between; align-items:center; font-size:.82rem; padding:.25rem 0; }
-.res-info-row:not(:last-child) { border-bottom:1px solid var(--border); }
-.res-info-lbl { color:var(--text-3); font-weight:500; }
-.res-info-val { color:var(--text-1); font-weight:600; }
+.res-score-sep { color:var(--text-3); font-weight:600; margin:0 .3rem; }
+.res-score-pct { font-size:1.05rem; font-weight:700; color:var(--accent); margin-top:.35rem; }
+.res-score-bar { height:6px; border-radius:3px; background:var(--surface-2); overflow:hidden; max-width:320px; margin:.75rem auto .95rem; }
+.res-score-bar-fill { height:100%; border-radius:3px; }
+.res-score-bar-fill.tier-excellent { background:var(--success); }
+.res-score-bar-fill.tier-good      { background:var(--info); }
+.res-score-bar-fill.tier-fair      { background:var(--warning); }
+.res-score-bar-fill.tier-poor      { background:var(--danger); }
+.res-score-tier { display:flex; align-items:center; justify-content:center; gap:.5rem; flex-wrap:wrap; }
 
-/* Score cards */
-.score-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; margin-bottom:1rem; }
-.score-card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius); padding:1rem .75rem; text-align:center;
-}
-.score-card-val { font-size:1.6rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:.35rem; }
-.score-card-lbl { font-size:.7rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
-
-/* Grade badge */
-.grade-display { text-align:center; margin-bottom:1rem; }
 .grade-badge {
-  display:inline-flex; align-items:center; gap:.5rem;
-  padding:.45rem 1.25rem; border-radius:20px;
-  font-size:1.1rem; font-weight:800; border:2px solid;
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.32rem .85rem; border-radius:20px;
+  font-size:.85rem; font-weight:800; border:1px solid;
 }
 .grade-A,.grade-Ap { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
 .grade-B  { background:var(--info-bg);    color:var(--info-text);    border-color:var(--info-border); }
 .grade-C  { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
 .grade-D,.grade-F { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
 
-/* Performance section */
+.tier-chip {
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.32rem .7rem; border-radius:20px;
+  font-size:.78rem; font-weight:700; border:1px solid;
+}
+.tier-chip.tier-excellent { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.tier-chip.tier-good      { background:var(--info-bg);    color:var(--info-text);    border-color:var(--info-border); }
+.tier-chip.tier-fair      { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.tier-chip.tier-poor      { background:var(--danger-bg);  color:var(--danger-text);  border-color:var(--danger-border); }
+
+/* ── Performance summary ──────────────────────────────────────────── */
 .perf-section {
   background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius); overflow:hidden; margin-bottom:1rem;
+  border-radius:var(--radius); overflow:hidden; margin-bottom:.85rem;
 }
 .perf-header {
-  background:var(--surface-2); padding:.7rem 1.1rem;
+  background:var(--surface-2); padding:.65rem 1.1rem;
   border-bottom:1px solid var(--border);
-  font-size:.78rem; font-weight:700; text-transform:uppercase;
+  font-size:.76rem; font-weight:700; text-transform:uppercase;
   letter-spacing:.06em; color:var(--text-3);
   display:flex; align-items:center; gap:.4rem;
 }
 .perf-header i { color:var(--accent); }
-.perf-grid { display:grid; grid-template-columns:repeat(3,1fr); }
-.perf-item {
-  padding:1rem; text-align:center;
-  border-right:1px solid var(--border);
-}
-.perf-item:last-child { border-right:none; }
-.perf-icon { font-size:1.25rem; margin-bottom:.5rem; display:block; }
-.perf-val  { font-size:1.4rem; font-weight:800; color:var(--text-1); line-height:1; margin-bottom:.25rem; }
-.perf-lbl  { font-size:.7rem; color:var(--text-3); font-weight:600; }
+.perf-body { padding:1rem 1.1rem 1.1rem; }
+.perf-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; }
+.perf-item { text-align:center; padding:.35rem 0; }
+.perf-icon { font-size:1.1rem; margin-bottom:.4rem; display:block; }
+.perf-icon.ico-success { color:var(--success-text); }
+.perf-icon.ico-danger  { color:var(--danger-text); }
+.perf-icon.ico-muted   { color:var(--text-3); }
+.perf-val  { font-size:1.3rem; font-weight:800; color:var(--text-1); line-height:1; margin-bottom:.2rem; }
+.perf-lbl  { font-size:.68rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
 
-/* Stats section */
-.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; margin-bottom:1rem; }
-.stat-box {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius); padding:.85rem 1rem;
-  text-align:center; position:relative; overflow:hidden;
-}
-.stat-box::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
-.stat-box.attempt::before { background:linear-gradient(90deg,var(--accent),#6366f1); }
-.stat-box.accuracy::before { background:linear-gradient(90deg,var(--success),#06b6d4); }
-.stat-box.overall::before  { background:linear-gradient(90deg,var(--warning),#ef4444); }
-.stat-box-val { font-size:1.35rem; font-weight:800; color:var(--text-1); margin-bottom:.25rem; }
-.stat-box-lbl { font-size:.7rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+.perf-dist { display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--surface-2); margin:.9rem 0 1.05rem; }
+.perf-dist-seg.seg-success { background:var(--success); }
+.perf-dist-seg.seg-danger  { background:var(--danger); }
+.perf-dist-seg.seg-muted   { background:var(--text-3); }
 
-/* Feedback alert */
+.perf-grid-sub { border-top:1px solid var(--border); padding-top:.85rem; }
+.perf-grid-sub .perf-val { font-size:1.05rem; }
+
+/* ── Exam metadata — de-emphasized supporting info ───────────────── */
+.res-meta {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:.5rem; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.85rem 1.1rem; margin-bottom:.85rem;
+}
+.res-meta-item { text-align:center; }
+.res-meta-lbl { font-size:.66rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.2rem; }
+.res-meta-val { font-size:.82rem; color:var(--text-1); font-weight:600; }
+
+/* ── Feedback ─────────────────────────────────────────────────────── */
 .res-feedback {
   display:flex; align-items:flex-start; gap:.6rem;
   padding:.8rem 1rem; border-radius:var(--radius);
-  border:1px solid; font-size:.83rem; font-weight:500;
-  margin-bottom:1rem;
+  border:1px solid; border-left-width:3px; font-size:.82rem; font-weight:500;
+  margin-bottom:.85rem;
 }
 .res-feedback i { flex-shrink:0; margin-top:.1rem; }
 .res-feedback.excellent { background:var(--success-bg); border-color:var(--success-border); color:var(--success-text); }
@@ -112,11 +140,11 @@
 .res-feedback.fair      { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning-text); }
 .res-feedback.poor      { background:var(--danger-bg);  border-color:var(--danger-border);  color:var(--danger-text); }
 
-/* Loading bar */
+/* ── Loading bar (shown while View Response prepares) ────────────── */
 .loading-bar-wrap {
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--radius); padding:1rem 1.1rem;
-  margin-bottom:1rem; display:none;
+  margin-bottom:.85rem; display:none;
 }
 .loading-bar-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.65rem; }
 .loading-bar-title { font-size:.85rem; font-weight:700; color:var(--text-1); margin-bottom:.15rem; }
@@ -126,128 +154,49 @@
 .loading-bar-fill  { height:100%; background:var(--success); border-radius:3px; transition:width .3s ease; width:0%; }
 .loading-bar-detail { font-size:.72rem; color:var(--text-3); }
 
-/* Actions */
-.res-actions { display:flex; flex-wrap:wrap; gap:.6rem; justify-content:center; }
-.res-btn {
-  display:inline-flex; align-items:center; gap:.4rem;
-  padding:.55rem 1.1rem; border-radius:var(--radius);
-  font-size:.82rem; font-weight:600; font-family:inherit;
-  border:none; cursor:pointer; text-decoration:none;
-  transition:background .12s, transform .1s;
-}
-.res-btn:hover { transform:translateY(-1px); }
-.res-btn.success { background:var(--success); color:#fff; }
-.res-btn.success:hover { background:#27ae60; color:#fff; }
-.res-btn.primary { background:var(--accent);  color:var(--accent-on); }
-.res-btn.primary:hover { background:var(--accent-hover); color:var(--accent-on); }
-.res-btn.ghost   { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border); }
-.res-btn.ghost:hover { border-color:var(--accent); color:var(--accent); }
-.res-hint { text-align:center; font-size:.72rem; color:var(--text-3); margin-top:.6rem; }
-
 @media(max-width:600px){
-  .score-grid { grid-template-columns:repeat(2,1fr); }
-  .perf-grid  { grid-template-columns:1fr 1fr; }
-  .perf-item:nth-child(3) { border-right:none; grid-column:span 2; }
-  .stat-row   { grid-template-columns:1fr; }
-  .res-info   { grid-template-columns:1fr; }
+  .perf-grid, .perf-grid-sub { grid-template-columns:repeat(3,1fr); gap:.35rem; }
+  .res-meta { grid-template-columns:repeat(2,1fr); }
+  .res-hero { align-items:flex-start; }
+  .icon-toolbar { justify-content:flex-start; width:100%; }
+}
+@media(max-width:360px){
+  .perf-grid, .perf-grid-sub { grid-template-columns:1fr 1fr; }
+  .perf-grid .perf-item:nth-child(3), .perf-grid-sub .perf-item:nth-child(3) { grid-column:span 2; }
 }
 </style>
+
+{% set correct = result.correct_answers if result.correct_answers is defined else 0 %}
+{% set incorrect = result.incorrect_answers if result.incorrect_answers is defined else 0 %}
+{% set unanswered = result.unanswered_questions if result.unanswered_questions is defined else 0 %}
+{% set attempted = correct + incorrect %}
+{% set pct = result.percentage %}
+{% set tier = 'excellent' if pct >= 80 else 'good' if pct >= 60 else 'fair' if pct >= 40 else 'poor' %}
+{% set tier_label = 'Excellent' if tier == 'excellent' else 'Good' if tier == 'good' else 'Fair' if tier == 'fair' else 'Needs Improvement' %}
+{% set tier_icon = 'trophy' if tier == 'excellent' else 'thumbs-up' if tier == 'good' else 'info-circle' if tier == 'fair' else 'exclamation-triangle' %}
 
 <div class="res-page">
 <div class="res-wrap">
 
-  <a href="javascript:window.close()" class="res-back">
-    <i class="fas fa-arrow-left" style="font-size:.7rem"></i> Back
-  </a>
-
-  {# Hero #}
+  {# Hero: completion status + action toolbar (top-right) #}
   <div class="res-hero">
-    <span class="res-trophy"><i class="fas fa-trophy" style="color:#f59e0b"></i></span>
-    <h1>Exam Completed</h1>
-    <div class="res-exam-name">{{ exam.name }}</div>
-  </div>
-
-  {# Info grid #}
-  <div class="res-info">
-    <div>
-      <div class="res-info-row"><span class="res-info-lbl">Date</span><span class="res-info-val">{{ exam.date | display_date if exam.date else exam.date }}</span></div>
-      <div class="res-info-row"><span class="res-info-lbl">Duration</span><span class="res-info-val">{{ exam.duration }} min</span></div>
-    </div>
-    <div>
-      <div class="res-info-row"><span class="res-info-lbl">Submitted</span><span class="res-info-val">{{ result.completed_at | display_dt if result.completed_at else '—' }}</span></div>
-      <div class="res-info-row"><span class="res-info-lbl">Time Taken</span><span class="res-info-val">{{ result.time_taken_minutes }} min</span></div>
-    </div>
-  </div>
-
-  {# Score cards #}
-  <div class="score-grid">
-    <div class="score-card"><div class="score-card-val">{{ result.score }}</div><div class="score-card-lbl">Score</div></div>
-    <div class="score-card"><div class="score-card-val">{{ result.max_score }}</div><div class="score-card-lbl">Max Score</div></div>
-    <div class="score-card"><div class="score-card-val">{{ result.total_questions }}</div><div class="score-card-lbl">Questions</div></div>
-    <div class="score-card"><div class="score-card-val">{{ result.percentage }}%</div><div class="score-card-lbl">Percentage</div></div>
-  </div>
-
-  {# Grade #}
-  <div class="grade-display">
-    <span class="grade-badge grade-{{ result.grade | replace('+','p') }}">
-      <i class="fas fa-star" style="font-size:.9rem"></i>
-      Grade {{ result.grade }}
-    </span>
-  </div>
-
-  {# Performance #}
-  <div class="perf-section">
-    <div class="perf-header"><i class="fas fa-chart-pie"></i> Performance Analysis</div>
-    <div class="perf-grid">
-      <div class="perf-item">
-        <span class="perf-icon" style="color:var(--success-text)"><i class="fas fa-check-circle"></i></span>
-        <div class="perf-val">{{ result.correct_answers if result.correct_answers is defined else 0 }}</div>
-        <div class="perf-lbl">Correct</div>
-      </div>
-      <div class="perf-item">
-        <span class="perf-icon" style="color:var(--danger-text)"><i class="fas fa-times-circle"></i></span>
-        <div class="perf-val">{{ result.incorrect_answers if result.incorrect_answers is defined else 0 }}</div>
-        <div class="perf-lbl">Incorrect</div>
-      </div>
-      <div class="perf-item">
-        <span class="perf-icon" style="color:var(--text-3)"><i class="fas fa-question-circle"></i></span>
-        <div class="perf-val">{{ result.unanswered_questions if result.unanswered_questions is defined else 0 }}</div>
-        <div class="perf-lbl">Unanswered</div>
+    <div class="res-hero-left">
+      <span class="res-hero-icon"><i class="fas fa-check-circle"></i></span>
+      <div class="res-hero-body">
+        <div class="res-hero-tag">Exam Completed</div>
+        <h1>{{ exam.name }}</h1>
+        <div class="res-hero-meta">{{ user.full_name }} &nbsp;·&nbsp; Completed {{ result.completed_at | display_dt if result.completed_at else '—' }}</div>
       </div>
     </div>
-  </div>
-
-  {# Detailed stats #}
-  {% set correct = result.correct_answers if result.correct_answers is defined else 0 %}
-  {% set incorrect = result.incorrect_answers if result.incorrect_answers is defined else 0 %}
-  {% set attempted = correct + incorrect %}
-  <div class="stat-row">
-    <div class="stat-box attempt">
-      <div class="stat-box-val">{{ attempted }} / {{ result.total_questions }}</div>
-      <div class="stat-box-lbl">Attempted</div>
-    </div>
-    <div class="stat-box accuracy">
-      <div class="stat-box-val">{% if attempted > 0 %}{{ (correct / attempted * 100) | round(1) }}%{% else %}N/A{% endif %}</div>
-      <div class="stat-box-lbl">Accuracy</div>
-    </div>
-    <div class="stat-box overall">
-      <div class="stat-box-val">{{ result.percentage }}%</div>
-      <div class="stat-box-lbl">Overall Score</div>
+    <div class="icon-toolbar">
+      <a href="javascript:window.close()" class="icon-btn ib-accent" title="Back" aria-label="Back"><i class="fas fa-arrow-left"></i></a>
+      <button id="viewResponseBtn" class="icon-btn ib-success" onclick="openResponse()" title="View Response" aria-label="View Response"><i class="fas fa-clipboard-check"></i></button>
+      <button class="icon-btn ib-accent" onclick="window.print()" title="Print" aria-label="Print"><i class="fas fa-print"></i></button>
+      <button class="icon-btn ib-danger" onclick="window.close()" title="Close" aria-label="Close"><i class="fas fa-times"></i></button>
     </div>
   </div>
 
-  {# Feedback #}
-  <div class="res-feedback {% if result.percentage >= 80 %}excellent{% elif result.percentage >= 60 %}good{% elif result.percentage >= 40 %}fair{% else %}poor{% endif %}">
-    <i class="fas fa-{% if result.percentage >= 80 %}trophy{% elif result.percentage >= 60 %}thumbs-up{% elif result.percentage >= 40 %}info-circle{% else %}exclamation-triangle{% endif %}"></i>
-    <div>
-      {% if result.percentage >= 80 %}<strong>Excellent Performance!</strong> You have demonstrated a strong understanding of the subject matter.
-      {% elif result.percentage >= 60 %}<strong>Good Job!</strong> You have a solid grasp of the concepts. Keep up the good work!
-      {% elif result.percentage >= 40 %}<strong>Fair Performance.</strong> There is room for improvement. Review the topics you missed.
-      {% else %}<strong>Needs Improvement.</strong> We recommend studying the material more thoroughly.{% endif %}
-    </div>
-  </div>
-
-  {# Loading bar #}
+  {# Loading bar — shown while View Response prepares #}
   <div class="loading-bar-wrap" id="loadingBar">
     <div class="loading-bar-top">
       <div>
@@ -260,19 +209,82 @@
     <div class="loading-bar-detail" id="lbDetail">Fetching response data…</div>
   </div>
 
-  {# Actions #}
-  <div class="res-actions">
-<button class="res-btn success" id="viewResponseBtn" onclick="openResponse()">
-    <i class="fas fa-clipboard-check"></i> View Response
-  </button>
-  <button class="res-btn ghost" onclick="window.close()">
-    <i class="fas fa-times"></i> Close
-  </button>
-    <button class="res-btn ghost" onclick="window.print()">
-      <i class="fas fa-print"></i> Print
-    </button>
+  {# Score — the main focus #}
+  <div class="res-score-hero">
+    <div class="res-score-main">{{ result.score }}<span class="res-score-sep">/</span>{{ result.max_score }}</div>
+    <div class="res-score-pct">{{ result.percentage }}%</div>
+    <div class="res-score-bar"><div class="res-score-bar-fill tier-{{ tier }}" style="width:{{ result.percentage }}%"></div></div>
+    <div class="res-score-tier">
+      <span class="grade-badge grade-{{ result.grade | replace('+','p') }}"><i class="fas fa-star"></i> Grade {{ result.grade }}</span>
+      <span class="tier-chip tier-{{ tier }}"><i class="fas fa-{{ tier_icon }}"></i> {{ tier_label }}</span>
+    </div>
   </div>
-  <div class="res-hint"><i class="fas fa-info-circle"></i> Click "View Response" to see your answers and correct solutions.</div>
+
+  {# Performance summary #}
+  <div class="perf-section">
+    <div class="perf-header"><i class="fas fa-chart-pie"></i> Performance Summary</div>
+    <div class="perf-body">
+      <div class="perf-grid">
+        <div class="perf-item">
+          <span class="perf-icon ico-success"><i class="fas fa-check-circle"></i></span>
+          <div class="perf-val">{{ correct }}</div>
+          <div class="perf-lbl">Correct</div>
+        </div>
+        <div class="perf-item">
+          <span class="perf-icon ico-danger"><i class="fas fa-times-circle"></i></span>
+          <div class="perf-val">{{ incorrect }}</div>
+          <div class="perf-lbl">Incorrect</div>
+        </div>
+        <div class="perf-item">
+          <span class="perf-icon ico-muted"><i class="fas fa-question-circle"></i></span>
+          <div class="perf-val">{{ unanswered }}</div>
+          <div class="perf-lbl">Unanswered</div>
+        </div>
+      </div>
+
+      {% if result.total_questions %}
+      <div class="perf-dist" role="img" aria-label="{{ correct }} correct, {{ incorrect }} incorrect, {{ unanswered }} unanswered out of {{ result.total_questions }} questions">
+        <div class="perf-dist-seg seg-success" style="width:{{ (correct / result.total_questions * 100) }}%"></div>
+        <div class="perf-dist-seg seg-danger"  style="width:{{ (incorrect / result.total_questions * 100) }}%"></div>
+        <div class="perf-dist-seg seg-muted"   style="width:{{ (unanswered / result.total_questions * 100) }}%"></div>
+      </div>
+      {% endif %}
+
+      <div class="perf-grid perf-grid-sub">
+        <div class="perf-item">
+          <div class="perf-val">{{ attempted }}/{{ result.total_questions }}</div>
+          <div class="perf-lbl">Attempted</div>
+        </div>
+        <div class="perf-item">
+          <div class="perf-val">{% if attempted > 0 %}{{ (correct / attempted * 100) | round(1) }}%{% else %}N/A{% endif %}</div>
+          <div class="perf-lbl">Accuracy</div>
+        </div>
+        <div class="perf-item">
+          <div class="perf-val">{{ result.percentage }}%</div>
+          <div class="perf-lbl">Overall Score</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Exam metadata #}
+  <div class="res-meta">
+    <div class="res-meta-item"><div class="res-meta-lbl">Exam Date</div><div class="res-meta-val">{{ exam.date | display_date if exam.date else exam.date }}</div></div>
+    <div class="res-meta-item"><div class="res-meta-lbl">Submitted</div><div class="res-meta-val">{{ result.completed_at | display_dt if result.completed_at else '—' }}</div></div>
+    <div class="res-meta-item"><div class="res-meta-lbl">Duration</div><div class="res-meta-val">{{ exam.duration }} min</div></div>
+    <div class="res-meta-item"><div class="res-meta-lbl">Time Taken</div><div class="res-meta-val">{{ result.time_taken_minutes }} min</div></div>
+  </div>
+
+  {# Feedback message — exact original wording per tier, preserved #}
+  <div class="res-feedback {{ tier }}">
+    <i class="fas fa-{{ tier_icon }}"></i>
+    <div>
+      {% if tier == 'excellent' %}<strong>Excellent Performance!</strong> You have demonstrated a strong understanding of the subject matter.
+      {% elif tier == 'good' %}<strong>Good Job!</strong> You have a solid grasp of the concepts. Keep up the good work!
+      {% elif tier == 'fair' %}<strong>Fair Performance.</strong> There is room for improvement. Review the topics you missed.
+      {% else %}<strong>Needs Improvement.</strong> We recommend studying the material more thoroughly.{% endif %}
+    </div>
+  </div>
 
 </div>
 </div>
@@ -283,7 +295,7 @@ function openResponse() {
   var btn = document.getElementById('viewResponseBtn');
   bar.style.display = 'block';
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
   var steps = [
     {p:15, t:"Fetching Your Responses…",   s:"Retrieving submitted answers",      d:"Loading from database"},
@@ -306,7 +318,7 @@ function openResponse() {
     else setTimeout(function(){
       bar.style.display = 'none';
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-clipboard-check"></i> View Response';
+      btn.innerHTML = '<i class="fas fa-clipboard-check"></i>';
       var w = screen.availWidth*.9, h = screen.availHeight*.9;
       var win = window.open(
         '{{ url_for("admin.users_analytics_view_responses", exam_id=exam.id, result_id=result.id) }}',

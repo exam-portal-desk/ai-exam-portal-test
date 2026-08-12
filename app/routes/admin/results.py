@@ -15,6 +15,21 @@ from app.db.questions import get_questions_by_exam
 from app.db import fetch_one, fetch_all
 from app.utils.datetime_service import format_display
 
+DELETED_USER_LABEL = "Deleted User"
+
+
+def _display_username(user: dict) -> str:
+    """Username/handle to show for a result/response row's owner. Never
+    falls back to a raw id (e.g. "User 4") — per the Account & Data
+    Deletion Policy, private exam data no longer exists once its owner is
+    deleted, so this only triggers for genuinely missing/legacy user
+    records, and even then must read as a clean deleted-user label."""
+    return user.get("username") or DELETED_USER_LABEL
+
+
+def _display_full_name(user: dict) -> str:
+    return user.get("full_name") or user.get("username") or DELETED_USER_LABEL
+
 
 # ── Analytics dashboard ───────────────────────────────────────────────────
 
@@ -43,8 +58,8 @@ def users_analytics():
         u = um.get(str(r.get("student_id","")),{}); e = em.get(str(r.get("exam_id","")),{})
         results_page.append({
             "id":         int(r.get("id",0)),
-            "username":   u.get("username","Unknown"),
-            "full_name":  u.get("full_name",""),
+            "username":   _display_username(u),
+            "full_name":  _display_full_name(u),
             "exam_id":    int(r.get("exam_id",0)),
             "exam_name":  e.get("name","Unknown"),
             "score":      r.get("score",0),
@@ -141,8 +156,8 @@ def users_analytics_results():
             tt  = r.get("time_taken_minutes")
             results_list.append({
                 "id":          int(r.get("id", 0)),
-                "username":    u.get("username",  "Unknown"),
-                "full_name":   u.get("full_name", ""),
+                "username":    _display_username(u),
+                "full_name":   _display_full_name(u),
                 "exam_id":     int(r.get("exam_id", 0)),
                 "exam_name":   e.get("name",      "Unknown Exam"),
                 "score":       r.get("score",     0),
@@ -353,8 +368,8 @@ def users_analytics_data_api():
             u = user_map.get(str(sid), {})
             top.append({
                 "student_id": sid,
-                "username":   u.get("username") or f"User {sid}",
-                "full_name":  u.get("full_name", ""),
+                "username":   _display_username(u),
+                "full_name":  _display_full_name(u),
                 "avgScore":   round(sum(scores)/len(scores), 2),
                 "attempts":   len(scores),
             })
@@ -364,8 +379,8 @@ def users_analytics_data_api():
             u = user_map.get(str(r.get("student_id", "")), {})
             recent.append({
                 "created_at": format_display(r.get("completed_at")),
-                "username":   u.get("username") or f"User {r.get('student_id','')}",
-                "full_name":  u.get("full_name", ""),
+                "username":   _display_username(u),
+                "full_name":  _display_full_name(u),
                 "exam_name":  exam_map.get(str(r.get("exam_id", "")), "Unknown"),
                 "score":      r.get("score"),
                 "max_score":  r.get("max_score"),
@@ -417,7 +432,7 @@ def users_analytics_data_api():
 def users_analytics_view_result(result_id, exam_id):
     result = get_result_by_id(result_id)
     if not result: abort(404)
-    user  = get_user_by_id(result.get("student_id")) or {"id":result.get("student_id"),"username":"Unknown","full_name":"Unknown","email":""}
+    user  = get_user_by_id(result.get("student_id")) or {"id":result.get("student_id"),"username":DELETED_USER_LABEL,"full_name":DELETED_USER_LABEL,"email":""}
     exam  = get_exam_by_id(exam_id) or {"id":exam_id,"name":"Unknown Exam"}
     resps = get_responses_by_result(result_id)
     norm  = {k: (int(result.get(k,0)) if k in ("id","student_id","total_questions","correct_answers","incorrect_answers","unanswered_questions")
@@ -435,7 +450,7 @@ def users_analytics_view_responses(result_id, exam_id):
 
     result = get_result_by_id(result_id)
     if not result: abort(404)
-    user  = get_user_by_id(result.get("student_id")) or {"id": result.get("student_id"), "username": "Unknown"}
+    user  = get_user_by_id(result.get("student_id")) or {"id": result.get("student_id"), "username": DELETED_USER_LABEL, "full_name": DELETED_USER_LABEL}
     exam  = get_exam_by_id(exam_id) or {"id": exam_id, "name": "Unknown Exam"}
     resps = get_responses_by_result(result_id)
     qs    = get_questions_by_exam(exam_id)
@@ -531,7 +546,7 @@ def users_analytics_download_result(result_id):
         exam=exam,
         responses=resps,
         questions_map=qmap,
-        student_name=user.get("full_name", user.get("username","Unknown")),
+        student_name=_display_full_name(user),
         username=user.get("username","student"),
     )
 

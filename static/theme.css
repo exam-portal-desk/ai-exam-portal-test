@@ -293,20 +293,23 @@
 
 
 /* ================================================================
-   ADMIN SIDEBAR — always dark regardless of theme
-   These tokens are only used inside .sidebar
+   ADMIN SIDEBAR — theme-synced
+   These tokens alias the real semantic tokens (not fixed hex/rgba)
+   so the sidebar adapts with every theme, same as the rest of the app.
+   Kept as a separate --sb-* indirection layer since admin_base.html's
+   sidebar CSS already references these names — only their values change.
    ================================================================ */
 :root {
-  --sb-bg:         #0d0d12;
-  --sb-border:     rgba(255,255,255,0.07);
-  --sb-text:       rgba(255,255,255,0.5);
-  --sb-text-hover: rgba(255,255,255,0.9);
-  --sb-hover-bg:   rgba(255,255,255,0.06);
-  --sb-active-bg:  rgba(76,110,245,0.15);
-  --sb-active-border: rgba(76,110,245,0.3);
-  --sb-section:    rgba(255,255,255,0.18);
-  --sb-toggle-bg:  rgba(255,255,255,0.07);
-  --sb-toggle-c:   rgba(255,255,255,0.4);
+  --sb-bg:         var(--surface);
+  --sb-border:     var(--border);
+  --sb-text:       var(--text-2);
+  --sb-text-hover: var(--text-1);
+  --sb-hover-bg:   var(--surface-2);
+  --sb-active-bg:  var(--accent-subtle);
+  --sb-active-border: var(--accent);
+  --sb-section:    var(--text-3);
+  --sb-toggle-bg:  var(--surface-2);
+  --sb-toggle-c:   var(--text-3);
 }
 
 

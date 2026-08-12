@@ -46,9 +46,13 @@
 .tbl-btn { display:inline-flex; align-items:center; gap:.3rem; padding:.28rem .6rem; border-radius:var(--radius); font-size:.7rem; font-weight:600; font-family:inherit; border:1px solid; cursor:pointer; text-decoration:none; transition:background .12s; margin-right:.25rem; }
 .tbl-btn.view { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
 .tbl-btn.view:hover { background:var(--accent); color:var(--accent-on); border-color:var(--accent); }
-.tbl-btn.resp { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.tbl-btn.resp { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); position:relative; }
 .tbl-btn.resp:hover { background:var(--success); color:#fff; border-color:var(--success); }
+.tbl-btn.resp.loading { opacity:.65; pointer-events:none; }
 .tbl-btn.pend { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.tbl-btn-bar { position:absolute; left:0; right:0; top:100%; margin-top:3px; height:3px; border-radius:2px; background:var(--success-bg); overflow:hidden; }
+.tbl-btn-bar span { display:block; height:100%; width:40%; background:var(--success-text); border-radius:2px; animation:tblBarLoad .9s ease-in-out infinite; }
+@keyframes tblBarLoad { 0%{margin-left:-40%;} 100%{margin-left:100%;} }
 
 .rh-pager { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; padding:.7rem 1rem; border-top:1px solid var(--border); background:var(--surface-2); }
 .rh-pager-btns { display:flex; gap:.3rem; }
@@ -243,6 +247,22 @@ document.addEventListener('DOMContentLoaded',function(){
     var fr=filt(aR);var sz=ps===0?fr.length||1:ps;pg=Math.max(1,Math.ceil(fr.length/sz));render();
   });
   document.getElementById('pgSize')&&document.getElementById('pgSize').addEventListener('change',function(){ps=this.value==='0'?0:parseInt(this.value);pg=1;render();});
+
+  document.querySelectorAll('a.tbl-btn.resp').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      if(btn.classList.contains('loading')){e.preventDefault();return;}
+      e.preventDefault();
+      btn.classList.add('loading');
+      var href=btn.href;
+      var bar=document.createElement('div'); bar.className='tbl-btn-bar'; bar.innerHTML='<span></span>'; btn.appendChild(bar);
+      fetch(href,{credentials:'same-origin'}).then(function(r){return r.text();}).then(function(html){
+        var doc=new DOMParser().parseFromString(html,'text/html');
+        var srcs=Array.from(doc.images).map(function(im){return im.src;}).filter(Boolean);
+        return Promise.all(srcs.map(function(src){return new Promise(function(res){var im=new Image();im.onload=im.onerror=res;im.src=src;});}));
+      }).catch(function(){}).then(function(){window.location.href=href;});
+    });
+  });
+
   render();
 });
 </script>
