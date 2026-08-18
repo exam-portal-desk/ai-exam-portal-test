@@ -16,7 +16,7 @@ from typing import Tuple, List, Dict, Optional
 
 from flask import session
 
-import config
+import app.config as config
 from app.db.exams import get_exam_by_id
 from app.db.questions import get_questions_by_exam
 from app.utils.helpers import safe_float, safe_int
@@ -87,16 +87,16 @@ def purge_exam_session_cache(exam_id: int) -> None:
     Evict every cache layer associated with exam_id for the current session.
 
     Layers addressed:
-      1. Flask session key  — exam_data_{exam_id}  (server-side session file
-         or Redis session store depending on SESSION_TYPE).
-      2. App-level Redis/in-memory cache — keyed by exam_id so it is shared
-         across workers. We do NOT clear this layer here because it holds
-         static exam+question data that is safe to reuse across attempts and
-         users.  Only the per-session answer/timer state needs purging.
+      1. Flask session key  — exam_data_{exam_id}  (server-side session file,
+         per SESSION_TYPE).
+      2. App-level in-memory cache — keyed by exam_id so it is shared across
+         requests. We do NOT clear this layer here because it holds static
+         exam+question data that is safe to reuse across attempts and users.
+         Only the per-session answer/timer state needs purging.
 
     The function is intentionally narrow: it only removes the preloaded data
     block from the Flask session, which is the cache layer that caused the
-    bug.  Question data in Redis is read-only and does not carry attempt state.
+    bug. Cached question data is read-only and does not carry attempt state.
     """
     key = f"exam_data_{exam_id}"
     if key in session:
@@ -221,8 +221,8 @@ def preload_exam_data(exam_id: int) -> Tuple[bool, str]:
 
 def _process_image(image_path: str) -> Tuple[bool, Optional[str]]:
     try:
-        from app.services.drive_service import get_image_url
-        return get_image_url(image_path)
+        from app.services.image_storage_service import resolve_question_image_url
+        return resolve_question_image_url(image_path)
     except Exception as e:
         log.warning("[exam_service] _process_image error: %s", e)
         return False, None

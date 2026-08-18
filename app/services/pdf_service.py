@@ -150,20 +150,100 @@ def build_student_response_pdf(
 # Notes — export whole notebook as multi-page PDF
 # ─────────────────────────────────────────────
 
-def build_notebook_pdf(title: str, pages: list) -> bytes:
+def _safe_color(value, fallback_hex):
+    """Parse a CSS color string ('#rrggbb' or 'rgb(a)(...)', as raw-copied from a live
+    getComputedStyle() custom-property read on the client — see editor.js exportNotebookPdf)
+    into a reportlab Color, tolerating whatever the client actually sent instead of trusting it.
     """
-    pages: [{"title": str, "image": "data:image/png;base64,..."}], one per notebook page,
-    in order. Each image is a client-rendered snapshot of that page's actual canvas content
-    (see editor.js exportNotebookPdf) — reusing the browser's own Fabric.js rendering gives
-    pixel-accurate layout/position fidelity for free, instead of re-implementing a canvas
-    renderer server-side. This function only assembles those images into one PDF (via the
-    same reportlab dependency the rest of this service already uses), one page each,
-    scaled to fit and centered.
+    from reportlab.lib import colors
+    import re as _re
+    if isinstance(value, str):
+        value = value.strip()
+        try:
+            return colors.HexColor(value)
+        except Exception:
+            pass
+        # Alpha (the optional 4th rgba() component) must be captured and carried through: dark
+        # themes define --border as a low-alpha rgba (e.g. "rgba(255,255,255,0.07)") so the dot
+        # grid stays subtle against a dark --bg, same as it renders on the live canvas. Dropping
+        # it here made every dot render fully opaque — the theme's intended ~6-14% dot suddenly
+        # painted at 100% strength, which is what actually made dark-theme PDFs unreadable (light
+        # themes use solid opaque hex for --border, so they never hit this branch and were never
+        # affected). The alpha carried on this Color is consumed by _flatten_over() below, not by
+        # reportlab's own alpha/ExtGState machinery — see that function for why.
+        m = _re.match(r"^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s]+([\d.]+))?\s*\)?", value)
+        if m:
+            r, g, b = (min(255.0, max(0.0, float(x))) / 255.0 for x in m.groups()[:3])
+            a = m.group(4)
+            alpha = min(1.0, max(0.0, float(a))) if a is not None else 1.0
+            return colors.Color(r, g, b, alpha=alpha)
+    return colors.HexColor(fallback_hex)
+
+
+def _flatten_over(fg, bg):
+    """Alpha-composite fg (an rgba Color, alpha possibly <1) over an opaque bg Color, returning
+    a fully opaque Color with the same math a browser uses to paint a translucent color over a
+    solid one underneath.
+
+    Needed because the dot-grid fill (see beginForm/endForm below) is painted inside a PDF Form
+    XObject, and reportlab's PDFFormXObject.format() never copies the ExtGState it was given
+    into the form's own Resources dict (unlike a page, which does) — so setFillAlpha()/a Color's
+    alpha component has no visible effect on anything drawn inside a form in this reportlab
+    version; the alpha is silently dropped and the fill paints fully opaque regardless. Dark
+    themes define their dot-grid color (--border) as a low-alpha rgba specifically so the grid
+    stays subtle against a dark background, same as it renders on the live canvas — pre-blending
+    it into an opaque color here reproduces that exact intended appearance without depending on
+    the broken transparency path.
+    """
+    a = fg.alpha if fg.alpha is not None else 1.0
+    if a >= 1.0:
+        return fg
+    from reportlab.lib import colors
+    return colors.Color(
+        fg.red * a + bg.red * (1 - a),
+        fg.green * a + bg.green * (1 - a),
+        fg.blue * a + bg.blue * (1 - a),
+    )
+
+
+# Must mirror PAGE_WIDTH/PAGE_HEIGHT in static/notes/editor.js — that constant is the ONE
+# canonical, fixed size for every notebook page's canvas (see PAGE_WIDTH/PAGE_HEIGHT and
+# constrainObjectToPage() there). Nothing here derives a page size from content or from an
+# individual exported image — this module just reads the same fixed numbers the editor already
+# enforces, so a PDF page is always exactly the notebook's real, fixed page geometry.
+_CANVAS_PX_W, _CANVAS_PX_H = 2400, 1600
+# Canvas coordinates are plain CSS px at 100% zoom; 72/96 = 0.75pt per px is the standard
+# CSS-px-to-PDF-pt conversion (same one a browser's own "print to PDF" uses), so content lands
+# on the page at exactly the size/position it has in the notebook — no resize, no reflow.
+_CANVAS_PX_TO_PT = 0.75
+_GRID_SPACING_PT = 20 * _CANVAS_PX_TO_PT  # matches editor.css .canvas-shell's 20px background-size
+_GRID_DOT_RADIUS_PT = 1 * _CANVAS_PX_TO_PT  # matches its 1px radial-gradient dot
+
+
+def build_notebook_pdf(title: str, pages: list, grid_theme: dict = None) -> bytes:
+    """
+    pages: [{"title": str, "image": "data:image/png;base64,..."}], one per notebook page, in
+    order. Each image is a client-rendered snapshot of just that page's Fabric objects — a
+    transparent PNG that's always exactly PAGE_WIDTH x PAGE_HEIGHT (see _CANVAS_PX_W/H above),
+    the notebook's one fixed page size, enforced by the editor itself — so reusing the browser's
+    own Fabric.js rendering gives pixel-accurate content fidelity for free, instead of
+    re-implementing a canvas renderer server-side, while every PDF page ends up exactly the same
+    fixed size, matching every notebook page.
+
+    The notebook's dot-grid page background is deliberately NOT part of that raster: it's
+    rendered here as a single reusable PDF Form XObject (build once, stamp on every page — see
+    beginForm/doForm below), which is both the "proper PDF" way to represent a repeating vector
+    pattern and the fix for the old approach's dominant file-size cost — a full-page dot pattern
+    baked into every page's raster compresses far worse (much higher entropy) than the mostly-
+    transparent content-only PNG this now embeds instead.
+
+    grid_theme: optional {"bg": "...", "dot": "..."} — the live --bg/--border CSS custom
+    property values read from the notebook at export time, so the PDF's background matches
+    whichever theme (light/dark/etc.) the user was actually viewing.
     """
     import base64
     import re
     from reportlab.pdfgen import canvas as pdf_canvas
-    from reportlab.lib.pagesizes import letter
     from reportlab.lib.utils import ImageReader
     from reportlab.lib import colors
 
@@ -172,25 +252,43 @@ def build_notebook_pdf(title: str, pages: list) -> bytes:
     buffer = BytesIO()
     margin = 36
     header_h = 26
-    # Bounded content area, in points, that each page's size is derived from — matching the
-    # page to the actual notebook content's aspect ratio (instead of forcing every page into
-    # portrait Letter) is what eliminates the huge blank top/bottom margins on wide pages.
-    MAX_DIM, MIN_DIM = 1000, 400
-    c = pdf_canvas.Canvas(buffer, pagesize=letter)
+    content_w = _CANVAS_PX_W * _CANVAS_PX_TO_PT  # fixed for every page
+    content_h = _CANVAS_PX_H * _CANVAS_PX_TO_PT  # fixed for every page
+    page_w = content_w + 2 * margin
+    page_h = content_h + 2 * margin + header_h
     total = len(pages)
+
+    c = pdf_canvas.Canvas(buffer, pagesize=(page_w, page_h))
+
+    # Built once, then stamped on every page via doForm — a genuine shared PDF resource, so its
+    # cost doesn't scale with page count.
+    grid_theme = grid_theme or {}
+    bg_color = _safe_color(grid_theme.get("bg"), "#f4f5f7")
+    dot_color = _safe_color(grid_theme.get("dot"), "#e1e4e8")
+    c.beginForm("notebookGrid", 0, 0, content_w, content_h)
+    c.setFillColor(bg_color)
+    c.rect(0, 0, content_w, content_h, fill=1, stroke=0)
+    c.setFillColor(_flatten_over(dot_color, bg_color))
+    # Squares, not circle() — at this size (~1.5pt across) a filled square and a filled circle
+    # are visually indistinguishable, but circle() emits a ~4-curve bezier approximation per dot
+    # (reportlab has no native circle primitive) vs. rect()'s single 're' operator, and this form
+    # draws thousands of dots — that operator-count difference is what actually determines the
+    # compressed size of this one-time shared resource.
+    dot_side = _GRID_DOT_RADIUS_PT * 2
+    y = _GRID_SPACING_PT / 2
+    while y < content_h:
+        x = _GRID_SPACING_PT / 2
+        while x < content_w:
+            c.rect(x - _GRID_DOT_RADIUS_PT, y - _GRID_DOT_RADIUS_PT, dot_side, dot_side, fill=1, stroke=0)
+            x += _GRID_SPACING_PT
+        y += _GRID_SPACING_PT
+    c.endForm()
 
     for idx, page in enumerate(pages):
         match = re.match(r"^data:image/\w+;base64,(.+)$", page.get("image", ""), re.S)
         if not match:
             continue
         img = ImageReader(BytesIO(base64.b64decode(match.group(1))))
-        img_w, img_h = img.getSize()
-
-        content_w = min(MAX_DIM, max(MIN_DIM, img_w))
-        content_h = min(MAX_DIM, max(MIN_DIM, content_w * img_h / img_w)) if img_w else content_w
-        page_w = content_w + 2 * margin
-        page_h = content_h + 2 * margin + header_h
-        c.setPageSize((page_w, page_h))
 
         c.setFont(_FONT_BOLD, 11)
         c.setFillColor(colors.HexColor("#2c3e50"))
@@ -198,13 +296,11 @@ def build_notebook_pdf(title: str, pages: list) -> bytes:
         c.setStrokeColor(colors.HexColor("#dddddd"))
         c.line(margin, page_h - margin, page_w - margin, page_h - margin)
 
-        avail_w = page_w - 2 * margin
-        avail_h = page_h - 2 * margin - header_h
-        scale = min(avail_w / img_w, avail_h / img_h) if img_w and img_h else 1
-        draw_w, draw_h = img_w * scale, img_h * scale
-        x = (page_w - draw_w) / 2
-        y = margin + (avail_h - draw_h) / 2
-        c.drawImage(img, x, y, width=draw_w, height=draw_h, preserveAspectRatio=True, mask="auto")
+        c.saveState()
+        c.translate(margin, margin)
+        c.doForm("notebookGrid")
+        c.restoreState()
+        c.drawImage(img, margin, margin, width=content_w, height=content_h, mask="auto")
 
         c.setFont(_FONT_REGULAR, 8)
         c.setFillColor(colors.HexColor("#999999"))

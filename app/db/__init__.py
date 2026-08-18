@@ -10,7 +10,7 @@ from datetime import date, datetime, time
 import psycopg2
 from psycopg2 import pool as _pg_pool
 from psycopg2.extras import RealDictCursor, Json
-import config
+import app.config as config
 
 # Match the previous Supabase/PostgREST JSON behaviour: numeric columns
 # come back as float, not Decimal (which jsonify() can't serialize).

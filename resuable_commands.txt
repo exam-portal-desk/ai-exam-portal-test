@@ -1,0 +1,18 @@
+# 1. Create the virtual environment (named "venv")
+python -m venv venv
+
+# 2. Activate the virtual environment
+.\venv\Scripts\Activate.ps1
+
+# 3. Upgrade pip and install all project dependencies
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+#4. Folder structure
+Tree /F > project_structure.txt
+
+#5. Expect specific folder
+tree /F | findstr /V /I /C:".claude" /C:"__pycache__" /C:"venv" > project_structure_except.txt
+
+6. Powershell folder structure command
+function Get-Tree($path, $indent="") { Get-ChildItem $path | Where-Object { $_.Name -notmatch '^(__pycache__|venv|\.claude)$' } | ForEach-Object { $item = $_; $indent + " |-- " + $item.Name | Out-File -Append project_structure.txt; if ($item.PSIsContainer) { Get-Tree $item.FullName ($indent + " |   ") } } }; Remove-Item -ErrorAction SilentlyContinue project_structure.txt; Get-Tree .

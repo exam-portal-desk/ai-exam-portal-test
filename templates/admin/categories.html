@@ -345,7 +345,7 @@
         </div>
         <div class="m-field" style="margin-bottom:0">
           <label class="m-label">
-            Image <span class="opt">(optional · max 5 MB)</span>
+            Image <span class="opt">(optional · max {{ max_image_size_kb }} KB)</span>
           </label>
           <input type="file" id="addImage" class="m-file" accept="image/*"
                  onchange="previewImage(this,'addPreviewWrap','addPreviewImg')">
@@ -498,7 +498,7 @@
     var img = document.getElementById('addImage').files[0];
     if (img) fd.append('image', img);
     setLoading('addBtn', true, '<i class="fas fa-plus"></i> Create');
-    fetch('/admin/categories/create', { method: 'POST', body: fd })
+    fetch('/api/v01/admin/categories', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         setLoading('addBtn', false, '<i class="fas fa-plus"></i> Create');
@@ -539,7 +539,7 @@
     if (name) fd.append('name', name);
     if (img)  fd.append('image', img);
     setLoading('editBtn', true, '<i class="fas fa-save"></i> Save Changes');
-    fetch('/admin/categories/update/' + id, { method: 'POST', body: fd })
+    fetch('/api/v01/admin/categories/' + id, { method: 'PATCH', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         setLoading('editBtn', false, '<i class="fas fa-save"></i> Save Changes');
@@ -566,7 +566,7 @@
   window.submitDelete = function () {
     var id = document.getElementById('deleteId').value;
     setLoading('deleteBtn', true, '<i class="fas fa-trash"></i> Delete');
-    fetch('/admin/categories/delete/' + id, { method: 'POST' })
+    fetch('/api/v01/admin/categories/' + id, { method: 'DELETE' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         setLoading('deleteBtn', false, '<i class="fas fa-trash"></i> Delete');

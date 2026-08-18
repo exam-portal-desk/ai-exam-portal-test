@@ -30,16 +30,19 @@ def get_subject_by_name(name: str) -> Optional[Dict]:
         return None
 
 
-def get_subject_folder_id_by_name(name: str) -> Optional[str]:
-    """Case-insensitive subject name → folder_id lookup. Used for image loading."""
+def get_subject_by_id(subject_id: int) -> Optional[Dict]:
     try:
-        rows = fetch_all("SELECT subject_name,subject_folder_id FROM subjects")
-        for row in rows:
-            if str(row.get("subject_name", "")).strip().lower() == name.strip().lower():
-                return str(row.get("subject_folder_id", "")).strip() or None
-        return None
+        return fetch_one("SELECT * FROM subjects WHERE id=%s", (subject_id,))
     except Exception as e:
-        print(f"[db.misc] get_subject_folder_id_by_name error: {e}")
+        print(f"[db.misc] get_subject_by_id error: {e}")
+        return None
+
+
+def get_subject_by_folder_id(folder_id: str) -> Optional[Dict]:
+    try:
+        return fetch_one("SELECT * FROM subjects WHERE subject_folder_id=%s", (folder_id,))
+    except Exception as e:
+        print(f"[db.misc] get_subject_by_folder_id error: {e}")
         return None
 
 

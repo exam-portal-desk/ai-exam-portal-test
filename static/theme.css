@@ -1332,6 +1332,7 @@ body.sidebar-open .sidebar-overlay { display: block; }
 .mdot-get    { background: var(--success); }
 .mdot-post   { background: var(--info); }
 .mdot-put    { background: var(--warning); }
+.mdot-patch  { background: var(--warning); }
 .mdot-delete { background: var(--danger); }
 .mdot-info   { background: var(--text-3); }
 
@@ -1447,6 +1448,7 @@ body.sidebar-open .sidebar-overlay { display: block; }
 .mb-GET    { background: var(--success-bg);  color: var(--success-text); border: 1px solid var(--success-border); }
 .mb-POST   { background: var(--info-bg);     color: var(--info-text);    border: 1px solid var(--info-border); }
 .mb-PUT    { background: var(--warning-bg);  color: var(--warning-text); border: 1px solid var(--warning-border); }
+.mb-PATCH  { background: var(--warning-bg);  color: var(--warning-text); border: 1px solid var(--warning-border); }
 .mb-DELETE { background: var(--danger-bg);   color: var(--danger-text);  border: 1px solid var(--danger-border); }
 .ep-path { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-1); font-size: .88rem; flex: 1; min-width: 0; }
 .ep-summary { font-size: .78rem; color: var(--text-3); }

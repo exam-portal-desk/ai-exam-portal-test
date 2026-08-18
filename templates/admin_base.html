@@ -505,6 +505,13 @@
             <span class="nav-label">LaTeX Editor</span>
           </button>
         </li>
+        <li>
+          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.object_storage') %}active{% endif %}"
+             href="{{ url_for('admin.object_storage') }}" data-tooltip="Object Storage" aria-label="Object Storage">
+            <span class="nav-icon"><i class="fas fa-hdd"></i></span>
+            <span class="nav-label">Object Storage</span>
+          </a>
+        </li>
 
         <li><span class="section-label">Management</span></li>
 
@@ -784,7 +791,7 @@
 <script>
 (function(){
   function upd(){
-    fetch('/admin/api/requests/stats').then(function(r){return r.json();}).then(function(d){
+    fetch('/api/v01/admin/access-requests/stats').then(function(r){return r.json();}).then(function(d){
       var b=document.getElementById('requestsBadge');
       if(!b) return;
       var n=d.pending||0;

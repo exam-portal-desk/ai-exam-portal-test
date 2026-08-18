@@ -12,7 +12,7 @@ from typing import Tuple
 
 from flask import render_template
 
-import config
+import app.config as config
 from app.utils.datetime_service import now_app_tz
 
 

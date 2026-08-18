@@ -80,6 +80,21 @@ def resolve_asset_for_serving(user_id: int, storage_path: str) -> Optional[Dict[
     return None
 
 
+def resolve_asset_for_serving_by_id(user_id: int, asset_id: str) -> Optional[Dict[str, Any]]:
+    """Same authorization as resolve_asset_for_serving, keyed by asset_id instead of
+    storage_path — used by the PDF export same-origin asset proxy (see asset_file_api) so the
+    frontend never needs to know the raw storage_path, and so this works identically regardless
+    of which storage backend (local disk or an S3-compatible bucket) is configured."""
+    asset = notes_db.get_asset(asset_id)
+    if not asset:
+        return None
+    if asset.get("owner_id") == user_id:
+        return asset
+    if notes_db.get_public_notebook(asset["notebook_id"]):
+        return asset
+    return None
+
+
 def get_my_notebooks(user_id: int) -> List[Dict[str, Any]]:
     return notes_db.list_notebooks_for_owner(int(user_id))
 
@@ -193,8 +208,13 @@ def import_notebook(user_id: int, raw_payload: Dict[str, Any]) -> Dict[str, Any]
                 records.append({"page_id": new_page["id"], "object_type": obj["object_type"], "z_index": 0, "transform": obj["transform"], "payload": payload, "asset_id": asset_id})
             for index, record in enumerate(records):
                 record["z_index"] = index
-            if records:
-                notes_db.create_objects_bulk(records)
+            # Chunked the same way as an editor save (MAX_OBJECTS_PER_PAGE per request/batch) —
+            # a page can hold any number of objects; this only bounds a single INSERT's size.
+            from app.utils.notes_validation import MAX_OBJECTS_PER_PAGE
+            for start in range(0, len(records), MAX_OBJECTS_PER_PAGE):
+                batch = records[start:start + MAX_OBJECTS_PER_PAGE]
+                if batch:
+                    notes_db.create_objects_bulk(batch)
         return notes_db.get_owned_notebook(notebook_id, int(user_id))
     except Exception:
         import traceback
@@ -215,7 +235,7 @@ def permanently_delete_notebook(user_id: int, notebook_id: str) -> bool:
 
 def cleanup_expired_trash() -> int:
     from datetime import datetime, timedelta, timezone
-    import config
+    import app.config as config
     if not config.NOTES_TRASH_CLEANUP_ENABLED:
         return 0
     cutoff = (datetime.now(timezone.utc) - timedelta(days=config.NOTES_TRASH_RETENTION_DAYS)).isoformat()
@@ -251,14 +271,28 @@ def get_pages(user_id: int, notebook_id: str) -> List[Dict[str, Any]]:
     return notes_db.list_pages(notebook["id"])
 
 
-def create_page(user_id: int, notebook_id: str, title: str) -> Optional[Dict[str, Any]]:
+def _next_untitled_title(notebook_id: str) -> str:
+    existing = {page["title"] for page in notes_db.list_pages(notebook_id)}
+    if "Untitled" not in existing:
+        return "Untitled"
+    suffix = 2
+    while f"Untitled {suffix}" in existing:
+        suffix += 1
+    return f"Untitled {suffix}"
+
+
+def create_page(user_id: int, notebook_id: str, title: Optional[str] = None) -> Optional[Dict[str, Any]]:
     notebook = get_editor_notebook(user_id, notebook_id)
     if not notebook:
         return None
     title = str(title or "").strip()
-    if not title or len(title) > 160:
+    if not title:
+        # Instant-create flow (the "+" button): no title required up front,
+        # a student can rename the page later — see update_page().
+        title = _next_untitled_title(notebook["id"])
+    elif len(title) > 160:
         raise ValueError("Page titles must contain 1–160 characters.")
-    if notes_db.page_name_exists(notebook["id"], title):
+    elif notes_db.page_name_exists(notebook["id"], title):
         raise ValueError("A page with this name already exists in this notebook.")
     pages = notes_db.list_pages(notebook["id"])
     next_position = max((int(page.get("position") or 0) for page in pages), default=-1) + 1
@@ -290,7 +324,13 @@ def get_page_objects(user_id: int, notebook_id: str, page_id: str) -> Optional[L
     return _refresh_image_urls(notes_db.list_page_objects(page_id))
 
 
-def save_page_objects(user_id: int, notebook_id: str, page_id: str, objects: List[Dict[str, Any]], deleted_ids: List[str]) -> Optional[List[Dict[str, Any]]]:
+def save_page_objects(user_id: int, notebook_id: str, page_id: str, objects: List[Dict[str, Any]], deleted_ids: List[str], start_index: int = 0) -> Optional[List[Dict[str, Any]]]:
+    """A page has no cap on total objects — only a single save REQUEST does (see
+    MAX_OBJECTS_PER_PAGE / notes_validation.py). A page bigger than that chunk size is saved
+    as several sequential calls here (editor.js splits canvas.getObjects() client-side), each
+    one this many objects and tagged with its own `start_index` so z_index — and therefore
+    draw/stacking order on reload — stays correct and non-colliding across chunks, instead of
+    every chunk restarting from 0."""
     current = get_page_objects(user_id, notebook_id, page_id)
     if current is None:
         return None
@@ -298,12 +338,12 @@ def save_page_objects(user_id: int, notebook_id: str, page_id: str, objects: Lis
         raise ValueError("Invalid canvas save data.")
     from app.utils.notes_validation import ALLOWED_OBJECT_TYPES, MAX_OBJECTS_PER_PAGE
     if len(objects) > MAX_OBJECTS_PER_PAGE:
-        raise ValueError(f"A page can contain at most {MAX_OBJECTS_PER_PAGE} objects.")
+        raise ValueError("Too many objects in a single save request.")
     saved = []
     for index, item in enumerate(objects):
         if not isinstance(item, dict) or item.get("object_type") not in ALLOWED_OBJECT_TYPES:
             raise ValueError("Invalid canvas object.")
-        record = {"page_id": page_id, "object_type": item["object_type"], "z_index": index, "transform": item.get("transform") or {}, "payload": item.get("payload") or {}, "asset_id": item.get("asset_id")}
+        record = {"page_id": page_id, "object_type": item["object_type"], "z_index": start_index + index, "transform": item.get("transform") or {}, "payload": item.get("payload") or {}, "asset_id": item.get("asset_id")}
         if item.get("id"):
             record["id"] = str(item["id"])
         saved.append(record)

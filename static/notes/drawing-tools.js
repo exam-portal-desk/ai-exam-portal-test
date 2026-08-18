@@ -13,16 +13,29 @@ setTimeout(() => {
      an actively-open text editor (root cause of Highlight/Bold/etc silently no-op'ing). */
   const button = (label, icon, handler, group = 'format') => { const item = document.createElement('button'); item.type = 'button'; item.title = label; item.setAttribute('aria-label', label); item.innerHTML = `<i class="${icon}"></i>`; item.addEventListener('mousedown', event => event.preventDefault()); item.addEventListener('click', (...args) => { if (window.__notesReadOnly) return; handler(...args); }); return insert(item, group); };
   /* Defaults for NEW content only — changing these never recolors/resizes existing objects.
-     Text size and pen thickness are intentionally separate state (window.__notesDefaultSize
-     vs window.__notesPenSize) so adjusting one never affects the other. */
+     Text size and ink stroke width are intentionally separate state (window.__notesDefaultSize
+     vs window.__notesInkSizes below) so adjusting one never affects the other. */
   window.__notesDefaultSize = window.__notesDefaultSize || 18;
   window.__notesDefaultFont = window.__notesDefaultFont || 'DM Sans';
-  window.__notesPenSize = window.__notesPenSize || 6;
   window.__notesShapeColor = window.__notesShapeColor || getComputedStyle(document.documentElement).getPropertyValue('--accent-subtle').trim();
   window.__notesStickyBgColor = window.__notesStickyBgColor || getComputedStyle(document.documentElement).getPropertyValue('--warning-bg').trim();
+  /* Ink tool state — 'pen' | 'pencil' | 'highlighter' | 'eraser'. Exposed on window (like the
+     other __notes* flags already used across editor.js/drawing-tools.js) so editor.js's single
+     path:created handler can read it to tag a freshly-drawn stroke — no second listener needed.
+     Each ink tool remembers its own stroke width independently, so switching tools never makes
+     you re-pick a width (a highlighter needs to stay wide even after a thin pen stroke). */
+  window.__notesInkTool = window.__notesInkTool || 'pen';
+  window.__notesInkSizes = window.__notesInkSizes || { pen: 6, pencil: 3, highlighter: 22 };
+  const hexToRgba = (hex, alpha) => { const v = hex.replace('#', ''); const full = v.length === 3 ? v.split('').map(c => c + c).join('') : v; const n = parseInt(full, 16); return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`; };
 
   const color = document.createElement('input'); color.type = 'color'; color.value = '#000000'; color.title = 'Text / ink color'; color.style.cssText = 'width:28px;height:28px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--surface)'; insert(color, 'color');
-  const highlightColor = document.createElement('input'); highlightColor.type = 'color'; window.__notesHighlightColor = window.__notesHighlightColor || '#ffff00'; highlightColor.value = window.__notesHighlightColor; highlightColor.title = 'Highlight color'; highlightColor.style.cssText = 'width:28px;height:28px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--surface)'; highlightColor.addEventListener('input', () => { window.__notesHighlightColor = highlightColor.value; }); insert(highlightColor, 'color');
+  const highlightColor = document.createElement('input'); highlightColor.type = 'color'; window.__notesHighlightColor = window.__notesHighlightColor || '#ffff00'; highlightColor.value = window.__notesHighlightColor; highlightColor.title = 'Highlight color (text highlight & Highlighter pen)'; highlightColor.style.cssText = 'width:28px;height:28px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--surface)'; highlightColor.addEventListener('input', () => { window.__notesHighlightColor = highlightColor.value; if (canvas.freeDrawingBrush && window.__notesInkTool === 'highlighter') canvas.freeDrawingBrush.color = hexToRgba(highlightColor.value, .35); }); insert(highlightColor, 'color');
+  /* Quick ink-color swatches for Pen/Pencil — sets the same `color` input used everywhere
+     else (recoloring a selected drawing, text color, live brush color), so there's exactly
+     one source of truth; a swatch click just drives that existing input. */
+  const INK_SWATCHES = ['#1a1a1a', '#c0392b', '#e67e22', '#2980b9', '#27ae60', '#8e44ad'];
+  const inkPalette = document.createElement('div'); inkPalette.title = 'Quick ink colors'; inkPalette.style.cssText = 'display:flex;gap:3px;align-items:center';
+  INK_SWATCHES.forEach(hex => { const swatch = document.createElement('button'); swatch.type = 'button'; swatch.title = hex; swatch.setAttribute('aria-label', `Ink color ${hex}`); swatch.style.cssText = `width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:${hex};padding:0;cursor:pointer`; swatch.addEventListener('mousedown', event => event.preventDefault()); swatch.addEventListener('click', () => { if (window.__notesReadOnly) return; color.value = hex; color.dispatchEvent(new Event('input')); }); inkPalette.appendChild(swatch); }); insert(inkPalette, 'color');
   const fillColor = document.createElement('input'); fillColor.type = 'color'; fillColor.value = window.__notesShapeColor.startsWith('#') ? window.__notesShapeColor : '#4a86e8'; fillColor.title = 'Fill / background color (shapes, sticky note background)'; fillColor.style.cssText = 'width:28px;height:28px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--surface)'; insert(fillColor, 'shape');
   const eraserSize = document.createElement('select'); eraserSize.title = 'Eraser size'; [['Small', 10], ['Medium', 22], ['Large', 38]].forEach(([name, value]) => eraserSize.add(new Option(name, value))); eraserSize.style.cssText = 'height:28px;max-width:76px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(eraserSize, 'pen');
   // Regular n-gon helper (radius r, first vertex pointing up) — used for Pentagon/Octagon/Star so
@@ -80,7 +93,7 @@ setTimeout(() => {
   fontSelect.addEventListener('change', () => { window.__notesDefaultFont = fontSelect.value; updateText({ fontFamily: fontSelect.value }); });
 
   /* Integer size control — free typing, +/-1 steps, valid range only. TEXT SIZE ONLY —
-     pen thickness is a fully separate control/state below (window.__notesPenSize), so
+     ink stroke width is a fully separate control/state below (window.__notesInkSizes), so
      changing one never affects the other. */
   const SIZE_MIN = 1, SIZE_MAX = 300;
   const clampSize = value => { const n = Math.round(Number(value)); return Number.isFinite(n) ? Math.min(SIZE_MAX, Math.max(SIZE_MIN, n)) : window.__notesDefaultSize || 18; };
@@ -109,17 +122,32 @@ setTimeout(() => {
   [['Normal', ''], ['Heading 1', 'h1'], ['Heading 2', 'h2'], ['Heading 3', 'h3']].forEach(([name, value]) => headingSelect.add(new Option(name, value)));
   headingSelect.style.cssText = 'height:28px;max-width:104px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(headingSelect, 'format');
   headingSelect.addEventListener('change', () => { const level = headingSelect.value; updateText({ fontSize: HEADING_SIZES[level] || window.__notesDefaultSize || 18, fontWeight: level ? 'bold' : 'normal' }); headingSelect.value = ''; });
-  /* PEN THICKNESS — 4 quick presets, fully separate from text size (window.__notesPenSize). */
-  const penThickness = document.createElement('select'); penThickness.title = 'Pen thickness'; [['Very Thin', 2], ['Thin', 6], ['Medium', 12], ['Thick', 22]].forEach(([name, value]) => penThickness.add(new Option(name, value))); penThickness.value = String(window.__notesPenSize); penThickness.style.cssText = 'height:28px;max-width:100px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(penThickness, 'pen');
-  const applyPenSize = next => {
+  /* STROKE WIDTH — quick preset buttons, one row per ink tool (a highlighter needs a much
+     wider range than a pencil), fully separate from text size (window.__notesDefaultSize). */
+  const WIDTH_PRESETS = { pen: [1, 2, 6, 12, 22], pencil: [1, 2, 4, 7], highlighter: [10, 18, 26, 36] };
+  const widthRow = document.createElement('div'); widthRow.className = 'notes-width-row'; widthRow.title = 'Stroke width'; insert(widthRow, 'pen');
+  const currentInkSize = () => window.__notesInkSizes[window.__notesInkTool] ?? 6;
+  const setInkSize = value => {
     if (window.__notesReadOnly) return;
-    const value = Number(next) || window.__notesPenSize;
-    window.__notesPenSize = value;
+    window.__notesInkSizes[window.__notesInkTool] = value;
     if (canvas.freeDrawingBrush) canvas.freeDrawingBrush.width = value;
+    refreshWidthButtons();
     const active = canvas.getActiveObject();
     if (active && active.objectType === 'drawing' && 'strokeWidth' in active) { active.set({ strokeWidth: value }); active.dirty = true; canvas.requestRenderAll(); canvas.fire('object:modified', { target: active }); }
   };
-  penThickness.addEventListener('change', () => applyPenSize(penThickness.value));
+  function refreshWidthButtons() {
+    const presets = WIDTH_PRESETS[window.__notesInkTool] || WIDTH_PRESETS.pen;
+    widthRow.innerHTML = '';
+    widthRow.hidden = window.__notesInkTool === 'eraser';
+    const active = currentInkSize();
+    presets.forEach(value => {
+      const dotBtn = document.createElement('button'); dotBtn.type = 'button'; dotBtn.title = `${value}px`; dotBtn.className = 'notes-width-btn';
+      dotBtn.classList.toggle('active', value === active);
+      const dot = document.createElement('span'); dot.className = 'notes-width-dot'; const size = Math.max(4, Math.min(18, value)); dot.style.width = `${size}px`; dot.style.height = `${size}px`;
+      dotBtn.appendChild(dot); dotBtn.addEventListener('mousedown', event => event.preventDefault()); dotBtn.addEventListener('click', () => { if (window.__notesReadOnly) return; setInkSize(value); });
+      widthRow.appendChild(dotBtn);
+    });
+  }
   const syncSizeDisplay = () => {
     const active = canvas.getActiveObject();
     if (!active) return;
@@ -127,9 +155,34 @@ setTimeout(() => {
   };
   canvas.on('selection:created', syncSizeDisplay); canvas.on('selection:updated', syncSizeDisplay);
   let erasing = false;
-  const penCursor = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M14.7 3.3a1.5 1.5 0 0 1 2.1 0l3.9 3.9a1.5 1.5 0 0 1 0 2.1L9.5 20.5 3 22l1.5-6.5z' fill='%23ffffff' stroke='%235a6472' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M12.9 5.1l4.9 4.9' stroke='%235a6472' stroke-width='1.6'/%3E%3C/svg%3E\") 3 21, crosshair";
+  /* Small, precise crosshair cursor for every ink tool (Pen/Pencil/Highlighter) — a large pen
+     icon obstructs handwriting and can't show the exact draw point. Hotspot "10 10" is the
+     exact center of the diamond, matching the true Fabric.js drawing coordinate. */
+  const inkCursor = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='8' fill='white' fill-opacity='.35'/%3E%3Cline x1='10' y1='2' x2='10' y2='6.5' stroke='%235a6472' stroke-width='1.3' stroke-linecap='round'/%3E%3Cline x1='10' y1='13.5' x2='10' y2='18' stroke='%235a6472' stroke-width='1.3' stroke-linecap='round'/%3E%3Cline x1='2' y1='10' x2='6.5' y2='10' stroke='%235a6472' stroke-width='1.3' stroke-linecap='round'/%3E%3Cline x1='13.5' y1='10' x2='18' y2='10' stroke='%235a6472' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M10 7.3 L12.7 10 L10 12.7 L7.3 10 Z' fill='%23ffffff' stroke='%235a6472' stroke-width='1.1'/%3E%3C/svg%3E\") 10 10, crosshair";
   const eraserCursor = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 16 13 5l7 7-9 9H4z' fill='%23ffffff' stroke='%235a6472' stroke-width='2'/%3E%3Cpath d='M3 21h12' stroke='%235a6472' stroke-width='2'/%3E%3C/svg%3E\") 4 20, crosshair";
-  const activatePen = () => { erasing = false; window.__notesEraserActive = false; canvas.selection = false; canvas.isDrawingMode = true; canvas.freeDrawingCursor = penCursor; canvas.defaultCursor = penCursor; canvas.hoverCursor = penCursor; canvas.freeDrawingBrush = new fabric.PencilBrush(canvas); canvas.freeDrawingBrush.color = color.value; canvas.freeDrawingBrush.width = window.__notesPenSize || 6; };
+  let inkButtons = {};
+  const setActiveInkButton = kind => { Object.entries(inkButtons).forEach(([k, btn]) => btn.classList.toggle('active', k === kind)); };
+  /* Pen / Pencil / Highlighter share one freehand-brush code path — only the resulting
+     stroke's color/width/blend differ (tagged at creation time in editor.js's path:created
+     handler via window.__notesInkTool, so eraser/save/undo logic needs zero special-casing:
+     every stroke is still just an objectType:'drawing' fabric.Path). */
+  const activateBrush = kind => {
+    erasing = false; window.__notesEraserActive = false; window.__notesInkTool = kind;
+    canvas.selection = false; canvas.isDrawingMode = true;
+    canvas.freeDrawingCursor = inkCursor; canvas.defaultCursor = inkCursor; canvas.hoverCursor = inkCursor;
+    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+    /* ROOT CAUSE of "Pencil looks dark while drawing, then turns lighter the instant you lift
+       the pen": the live in-progress stroke is painted straight from this brush color — PencilBrush
+       has no separate "opacity" of its own — while the finished stroke used to get its lighter look
+       from a fabric.Object opacity applied only after path:created (see editor.js), a moment the
+       live preview never went through. Baking the same alpha into the brush's own color (exactly
+       how Highlighter already gets its live translucency below) makes the live preview and the
+       finished stroke identical from the very first pixel, with no post-hoc opacity step needed. */
+    canvas.freeDrawingBrush.color = kind === 'highlighter' ? hexToRgba(window.__notesHighlightColor || '#ffff00', .35) : kind === 'pencil' ? hexToRgba(color.value, .82) : color.value;
+    canvas.freeDrawingBrush.width = currentInkSize();
+    setActiveInkButton(kind);
+    refreshWidthButtons();
+  };
   const eraseAt = pointer => {
     const radius = Number(eraserSize.value) / 2;
     canvas.getObjects().filter(object => object.objectType === 'drawing').filter(object => {
@@ -137,11 +190,25 @@ setTimeout(() => {
     }).forEach(object => canvas.remove(object));
     canvas.requestRenderAll();
   };
-  const activateEraser = () => { erasing = true; window.__notesEraserActive = true; canvas.isDrawingMode = false; canvas.selection = false; canvas.defaultCursor = eraserCursor; canvas.hoverCursor = eraserCursor; };
+  const activateEraser = () => { erasing = true; window.__notesEraserActive = true; window.__notesInkTool = 'eraser'; canvas.isDrawingMode = false; canvas.selection = false; canvas.defaultCursor = eraserCursor; canvas.hoverCursor = eraserCursor; setActiveInkButton('eraser'); refreshWidthButtons(); };
+  // Called by editor.js's setTool() when switching to Select/Text/Sticky/Image — otherwise
+  // the Pen/Eraser highlighting (and the eraser's own armed state) would stay stuck "active"
+  // even though the canvas is no longer in drawing/erasing mode.
+  window.__notesDeactivateInkTools = () => { erasing = false; setActiveInkButton(null); };
+  /* Text Highlight (background on the SELECTED characters only) — distinct from the freehand
+     Highlighter ink tool above, which draws translucent strokes on the canvas itself. Reads the
+     selection the same live way applyTextColor() does (window.__notesGetNativeEditor's overlay,
+     not a possibly-stale object.selectionStart) so it stays correctly scoped even right after
+     picking a color from the swatch/picker mid-edit. */
   const applyHighlight = () => {
-    const text = canvas.getActiveObject();
-    if (!text || !['i-text', 'textbox'].includes(text.type) || text.selectionStart === text.selectionEnd) return;
-    text.setSelectionStyles({ textBackgroundColor: highlightColor.value }, text.selectionStart, text.selectionEnd); text.initDimensions(); canvas.fire('object:modified', { target: text }); canvas.requestRenderAll();
+    const editorState = window.__notesGetNativeEditor?.();
+    const text = editorState?.object || canvas.getActiveObject();
+    if (!text || !['i-text', 'textbox'].includes(text.type)) return;
+    const { start, end } = editorState ? window.__notesTextSelectionOffsets(editorState.element) : { start: text.selectionStart || 0, end: text.selectionEnd || 0 };
+    if (start === end) return;
+    text.setSelectionStyles({ textBackgroundColor: highlightColor.value }, start, end);
+    if (editorState) document.execCommand('backColor', false, highlightColor.value);
+    text.initDimensions(); canvas.fire('object:modified', { target: text }); canvas.requestRenderAll();
   };
   /* Bullet / numbered lists — this is a plain-text canvas (no block/structural text
      model), so "list" means toggling a line-prefix, applied to EVERY line the current
@@ -191,12 +258,80 @@ setTimeout(() => {
     const shapeId = shape.objectId || id();
     shape.set(keepOrigin ? { left: centerX, top: centerY, objectId: shapeId, objectType: 'shape' } : { left: centerX, top: centerY, originX: 'center', originY: 'center', objectId: shapeId, objectType: 'shape' });
     shape.setCoords();
-    const label = new fabric.Textbox('', { left: shape.left, top: shape.top, originX: 'center', originY: 'center', width: Math.max(80, (shape.width || 160) * Math.abs(shape.scaleX || 1) * .78), fontFamily: 'DM Sans', fontSize: 18, lineHeight: 1.2, textAlign: 'center', fill: getComputedStyle(document.documentElement).getPropertyValue('--text-1').trim(), objectId: id(), objectType: 'shape', shapeTextFor: shapeId });
+    const label = new fabric.Textbox('', { left: shape.left, top: shape.top, originX: 'center', originY: 'center', width: Math.max(80, (shape.width || 160) * Math.abs(shape.scaleX || 1) * .78), fontFamily: 'DM Sans', fontSize: 18, lineHeight: 1.2, textAlign: 'center', fill: getComputedStyle(document.documentElement).getPropertyValue('--text-1').trim(), editable: false, objectCaching: false, charSpacing: 1, objectId: id(), objectType: 'shape', shapeTextFor: shapeId });
     shape.shapeTextId = label.objectId; canvas.add(label); canvas.setActiveObject(shape); canvas.requestRenderAll();
   };
   const syncShapeLabel = shape => { if (!shape?.shapeTextId) return; const label = canvas.getObjects().find(object => object.objectId === shape.shapeTextId); if (!label) return; label.set({ left: shape.left, top: shape.top, width: Math.max(80, (shape.width || 160) * Math.abs(shape.scaleX || 1) * .78), scaleX: 1, scaleY: 1, angle: shape.angle }); label.initDimensions(); label.setCoords(); };
   const selectedText = () => { const object = canvas.getActiveObject(); return object && ['i-text', 'textbox'].includes(object.type) ? object : null; };
-  const updateText = changes => { if (window.__notesReadOnly) return; const text = selectedText(); if (!text) return; const hasSelection = text.selectionStart !== text.selectionEnd; if (hasSelection) text.setSelectionStyles(changes, text.selectionStart, text.selectionEnd); else text.set(changes); text.initDimensions(); window.__notesSyncActiveTextOverlay?.(); canvas.fire('object:modified', { target: text }); canvas.requestRenderAll(); };
+  /* fontSize/fontFamily have no document.execCommand equivalent that maps to real CSS pixel
+     sizes/font names (the legacy 'fontSize'/'fontName' commands only support HTML's 1-7 relative
+     scale), so previewOverlayFormat wraps the current DOM selection in a styled <span> by hand
+     instead — same end result as execCommand's own approach (wrap the selected text nodes),
+     just for the two properties execCommand can't express directly. Re-reads the selection fresh
+     each call (not cached) so it composes correctly when chained after a bold/italic/underline/
+     color execCommand already wrapped the same text in <b>/<font> tags moments earlier. */
+  const wrapSelectionWithStyle = styleProps => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return;
+    const span = document.createElement('span');
+    Object.assign(span.style, styleProps);
+    try {
+      range.surroundContents(span);
+    } catch (e) {
+      // surroundContents throws if the range's boundaries fall inside different elements
+      // (e.g. it partially overlaps a <b>/<font> tag from a just-applied format) — extractContents
+      // handles arbitrarily-structured ranges, so fall back to it for that case.
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+    }
+    const restored = document.createRange();
+    restored.selectNodeContents(span);
+    selection.removeAllRanges();
+    selection.addRange(restored);
+  };
+  /* Live preview during active editing: the contenteditable overlay has no notion of Fabric's
+     per-character `styles` map, so without this a range-scoped Bold/Italic/Underline is
+     invisible until the user finishes editing — easy to mistake for "nothing happened" (or,
+     worse, to then act as if the whole box needs formatting instead). execCommand only ever
+     touches the DOM text NODES' presentation (never the extracted plain-text sync() reads),
+     mirroring the same technique applyTextColor() already uses for foreColor. */
+  const previewOverlayFormat = changes => {
+    if (!window.__notesGetNativeEditor?.()) return;
+    if ('fontWeight' in changes) document.execCommand('bold');
+    if ('fontStyle' in changes) document.execCommand('italic');
+    if ('underline' in changes) document.execCommand('underline');
+    if ('fontSize' in changes) wrapSelectionWithStyle({ fontSize: `${changes.fontSize * canvas.getZoom()}px` });
+    if ('fontFamily' in changes) wrapSelectionWithStyle({ fontFamily: changes.fontFamily });
+  };
+  /* Applies a formatting change to exactly the current selection (per-character `styles` map
+     via setSelectionStyles), or to the whole object when nothing is selected (legacy
+     convention, unchanged). text.selectionStart/selectionEnd are kept live by the
+     native-text-editor overlay's own sync() (see beginNativeTextEdit in editor.js) on every
+     input/keyup/mouseup, so they're still correct here even right after a toolbar control
+     briefly steals DOM focus away from the overlay. */
+  const updateText = changes => {
+    if (window.__notesReadOnly) return;
+    const text = selectedText();
+    if (!text) return;
+    const hasSelection = text.selectionStart !== text.selectionEnd;
+    if (hasSelection) { text.setSelectionStyles(changes, text.selectionStart, text.selectionEnd); previewOverlayFormat(changes); }
+    else text.set(changes);
+    text.initDimensions();
+    window.__notesSyncActiveTextOverlay?.();
+    canvas.fire('object:modified', { target: text });
+    canvas.requestRenderAll();
+  };
+  /* Bold/Italic/Underline need to know the CURRENT state at the selection/caret to decide which
+     way to toggle — reading only the object-level property (the old bug) was wrong whenever the
+     caret sat inside an already-styled run that overrides the object default. */
+  const selectionHasFormat = (text, prop, value) => {
+    const start = text.selectionStart || 0, end = text.selectionEnd || 0;
+    if (start === end) return text[prop] === value;
+    const styles = text.getSelectionStyles(start, end, true);
+    return styles.length > 0 && styles.every(s => s[prop] === value);
+  };
   canvas.on('object:scaling', event => syncShapeLabel(event.target)); canvas.on('object:modified', event => syncShapeLabel(event.target));
   canvas.on('mouse:dblclick', event => { if (window.__notesReadOnly) return; const shape = event.target; if (!shape?.shapeTextId) return; const label = canvas.getObjects().find(object => object.objectId === shape.shapeTextId); if (!label) return; canvas.setActiveObject(label); window.__notesBeginNativeTextEdit?.(label); });
   canvas.on('mouse:down', event => {
@@ -262,9 +397,9 @@ setTimeout(() => {
     exitShapePlacement();
     canvas.requestRenderAll();
   });
-  button('Bold selected text', 'fas fa-bold', () => { const text = selectedText(); if (text) updateText({ fontWeight: text.fontWeight === 'bold' ? 'normal' : 'bold' }); }, 'format');
-  button('Italic selected text', 'fas fa-italic', () => { const text = selectedText(); if (text) updateText({ fontStyle: text.fontStyle === 'italic' ? 'normal' : 'italic' }); }, 'format');
-  button('Underline selected text', 'fas fa-underline', () => { const text = selectedText(); if (text) updateText({ underline: !text.underline }); }, 'format');
+  button('Bold selected text', 'fas fa-bold', () => { const text = selectedText(); if (text) updateText({ fontWeight: selectionHasFormat(text, 'fontWeight', 'bold') ? 'normal' : 'bold' }); }, 'format');
+  button('Italic selected text', 'fas fa-italic', () => { const text = selectedText(); if (text) updateText({ fontStyle: selectionHasFormat(text, 'fontStyle', 'italic') ? 'normal' : 'italic' }); }, 'format');
+  button('Underline selected text', 'fas fa-underline', () => { const text = selectedText(); if (text) updateText({ underline: !selectionHasFormat(text, 'underline', true) }); }, 'format');
   const bulletStyle = document.createElement('select'); bulletStyle.title = 'Bullet style';
   [['•', '• '], ['◦', '◦ '], ['▪', '▪ '], ['–', '– '], ['✔', '✔ ']].forEach(([label, value]) => bulletStyle.add(new Option(label, value)));
   bulletStyle.style.cssText = 'height:28px;max-width:44px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(bulletStyle, 'format');
@@ -275,7 +410,21 @@ setTimeout(() => {
   button('Align right', 'fas fa-align-right', () => updateText({ textAlign: 'right' }), 'format');
   button('Justify text', 'fas fa-align-justify', () => updateText({ textAlign: 'justify' }), 'format');
   button('Highlight selected text', 'fas fa-highlighter', applyHighlight, 'color');
-  button('Pen', 'fas fa-pen', activatePen, 'pen'); button('Eraser', 'fas fa-eraser', activateEraser, 'pen');
+  inkButtons = {
+    pen: button('Pen', 'fas fa-pen', () => activateBrush('pen'), 'pen'),
+    pencil: button('Pencil', 'fas fa-pencil-alt', () => activateBrush('pencil'), 'pen'),
+    // Deliberately a different icon from "Highlight selected text" below (fa-highlighter) —
+    // the two are easy to conflate (same word, same yellow-marker concept) but do very
+    // different things: this draws a translucent freehand stroke on the canvas; that one
+    // colors the background of a text selection. A shared icon was making it easy to reach
+    // for this tool while actually meaning the other, coloring far more than intended.
+    highlighter: button('Highlighter pen (draws over handwriting/drawings)', 'fas fa-marker', () => activateBrush('highlighter'), 'pen'),
+    eraser: button('Eraser', 'fas fa-eraser', activateEraser, 'pen'),
+  };
+  // Select is the true active tool at load (see the static "select" data-tool button in
+  // editor.html) — no ink tool is actually engaged yet, so none of these show as active
+  // until the user picks one. Only the width row needs an initial render.
+  refreshWidthButtons();
   shapeButton = button('Draw shape (click-drag on canvas)', 'far fa-square', beginShapePlacement, 'shape');
   /* Unified color system: the existing text/ink swatch keeps controlling text color and pen
      ink, and now also recolors a selected freehand drawing or a stroke-only shape (line/arrow).
@@ -285,13 +434,24 @@ setTimeout(() => {
   color.addEventListener('input', () => {
     if (window.__notesReadOnly) return;
     const active = canvas.getActiveObject();
-    if (active && active.objectType === 'drawing') { active.set({ stroke: color.value }); active.dirty = true; canvas.requestRenderAll(); canvas.fire('object:modified', { target: active }); }
+    if (active && active.objectType === 'drawing') {
+      // Recoloring a translucent (Pencil) stroke must keep its existing translucency instead of
+      // swapping in a fully-opaque color — the alpha now lives in the stroke color itself (see
+      // activateBrush), so it has to be read back off the CURRENT stroke and reapplied, same as
+      // it was already implicitly preserved via object.opacity before this fix.
+      const currentAlpha = /^rgba\(/.test(String(active.stroke || '')) ? parseFloat(String(active.stroke).split(',')[3]) : NaN;
+      active.set({ stroke: currentAlpha >= 0 && currentAlpha < 1 ? hexToRgba(color.value, currentAlpha) : color.value });
+      active.dirty = true; canvas.requestRenderAll(); canvas.fire('object:modified', { target: active });
+    }
     else if (active && active.objectType === 'shape' && active.strokeOnly) { active.set({ stroke: color.value }); canvas.requestRenderAll(); canvas.fire('object:modified', { target: active }); }
     else { window.__notesApplyTextColor?.(color.value); }
-    /* Update the live brush's color directly rather than rebuilding it via
-       activatePen() — keeps pen color changeable at any time, independent of
-       theme or which object (if any) happens to be selected. */
-    if (canvas.freeDrawingBrush) canvas.freeDrawingBrush.color = color.value;
+    /* Update the live brush's color directly rather than rebuilding it via activateBrush() —
+       keeps pen/pencil color changeable at any time. Highlighter reads its own color input
+       (see highlightColor above) and must never be overwritten by this one. Pencil keeps its
+       live-preview alpha baked in here too, for the same reason activateBrush does — otherwise
+       switching color mid-session would arm the brush with a fully-opaque color for the next
+       stroke, reintroducing the exact live/finished mismatch this fix removes. */
+    if (canvas.freeDrawingBrush && window.__notesInkTool !== 'highlighter') canvas.freeDrawingBrush.color = window.__notesInkTool === 'pencil' ? hexToRgba(color.value, .82) : color.value;
   });
   fillColor.addEventListener('input', () => {
     if (window.__notesReadOnly) return;

@@ -1042,7 +1042,7 @@ document.getElementById('aiGenForm').onsubmit = async (e) => {
   genModal.hide();
   _showLoading('Submitting to AI Engine...');
   try {
-    const res  = await fetch('/admin/ai-command-centre/generate', { method: 'POST', body: formData });
+    const res  = await fetch('/api/v01/admin/ai/generate', { method: 'POST', body: formData });
     const data = await res.json();
     if (!data.success) {
       _hideLoading();
@@ -1078,7 +1078,7 @@ function _hideLoading() {
 function _pollJob(jobId) {
   _pollTimer = setInterval(async () => {
     try {
-      const res = await fetch(`/admin/ai-command-centre/status/${jobId}`);
+      const res = await fetch(`/api/v01/admin/ai/status/${jobId}`);
       const job = await res.json();
       _updateLoadingUI(job);
 
@@ -1565,7 +1565,7 @@ async function saveToDatabase() {
     okLabel: '<i class="fas fa-save me-1"></i>Save',
     onOk: async () => {
       try {
-        const res = await fetch('/admin/ai-command-centre/save', {
+        const res = await fetch('/api/v01/admin/ai/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ questions: generatedQuestions })
@@ -1603,7 +1603,7 @@ function exportToCSV() {
 
 async function accExecuteExport() {
   try {
-    const res = await fetch('/admin/ai-command-centre/export-csv', {
+    const res = await fetch('/api/v01/admin/ai/export-csv', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ questions: generatedQuestions })

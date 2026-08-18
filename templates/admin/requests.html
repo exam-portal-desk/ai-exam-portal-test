@@ -527,7 +527,7 @@ function fetchRequests(status, page) {
   tbody.innerHTML = skeletonRows(9);
   pgDiv.innerHTML = '';
 
-  fetch(`/admin/api/requests/list?status=${status}&page=${page}`)
+  fetch(`/api/v01/admin/access-requests?status=${status}&page=${page}`)
     .then(r => r.json())
     .then(d => {
       isP ? renderPendingRows(d.requests) : renderHistoryRows(d.requests);
@@ -622,7 +622,7 @@ function handleApprove() {
   if (!access) { adminToast('Select an access level', 'warning'); return; }
   const btn = document.getElementById('confirmApproval');
   setLoading(btn, true);
-  fetch(`/admin/requests/approve/${_reqId}`, {
+  fetch(`/api/v01/admin/access-requests/${_reqId}/approve`, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({approved_access: access})
   }).then(r=>r.json()).then(d => {
@@ -641,7 +641,7 @@ function handleDeny() {
   if (!reason) { toast('Enter a reason', 'warning'); return; }
   const btn = document.getElementById('confirmDenial');
   setLoading(btn, true);
-  fetch(`/admin/requests/deny/${_reqId}`, {
+  fetch(`/api/v01/admin/access-requests/${_reqId}/deny`, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({reason})
   }).then(r=>r.json()).then(d => {
@@ -659,7 +659,7 @@ function handleDeny() {
    HEADER STATS (pills top-right) — AJAX
 ═══════════════════════════════════════════════ */
 function loadHeaderStats() {
-  fetch('/admin/api/requests/stats').then(r=>r.json()).then(d => {
+  fetch('/api/v01/admin/access-requests/stats').then(r=>r.json()).then(d => {
     document.getElementById('hdrPending').textContent  = d.pending   ?? '—';
     document.getElementById('hdrApproved').textContent = d.completed ?? '—';
     document.getElementById('hdrDenied').textContent   = d.denied    ?? '—';
@@ -686,7 +686,7 @@ function umFetch(page) {
   tbody.innerHTML = skeletonRows(7);
 
   const params = new URLSearchParams({page, q, role});
-  fetch(`/admin/api/users/search?${params}`)
+  fetch(`/api/v01/admin/users/search?${params}`)
     .then(r => r.json())
     .then(d => {
       renderUsers(d.users || []);
@@ -751,7 +751,7 @@ function renderUsers(users) {
 }
 
 function umLoadStats() {
-  fetch('/admin/api/users/stats').then(r=>r.json()).then(d => {
+  fetch('/api/v01/admin/users/stats').then(r=>r.json()).then(d => {
     document.getElementById('umTotal').textContent  = d.total_users ?? '—';
     document.getElementById('umUsers').textContent  = d.user_role   ?? '—';
     document.getElementById('umAdmins').textContent = d.admin_role  ?? '—';
@@ -772,7 +772,7 @@ function doUpdateRole(btn) {
   if (!sel.value) return;
   const orig = btn.innerHTML;
   btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>';
-  fetch('/admin/users/update-role', {
+  fetch('/api/v01/admin/users/update-role', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({user_id:uid, new_role:sel.value})
   }).then(r=>r.json()).then(d => {
@@ -866,7 +866,7 @@ function executeBulkUpdate() {
   const btn  = document.getElementById('applyBulkBtn');
   const orig = btn.innerHTML; btn.disabled=true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating…';
-  fetch('/admin/users/bulk-update-roles', {
+  fetch('/api/v01/admin/users/bulk-update-roles', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({updates: safeIds.map(id=>({user_id:id,new_role:role}))})
   }).then(r=>r.json()).then(d=>{

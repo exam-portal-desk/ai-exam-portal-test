@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict
 from uuid import uuid4
 
-import config
+import app.config as config
 from app.db import notes as notes_db
 from app.storage import get_storage
 
@@ -21,9 +21,8 @@ def upload_image(owner_id: int, notebook_id: str, file_storage) -> Dict[str, Any
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise ValueError("Use a PNG, JPEG, GIF, or WebP image.")
     content = file_storage.read()
-    max_bytes = config.NOTES_MAX_IMAGE_SIZE_MB * 1024 * 1024
-    if not content or len(content) > max_bytes:
-        raise ValueError(f"Images must be smaller than {config.NOTES_MAX_IMAGE_SIZE_MB} MB.")
+    if not content or len(content) > config.MAX_IMAGE_SIZE_BYTES:
+        raise ValueError(f"Images must be smaller than {config.MAX_IMAGE_SIZE_KB} KB.")
 
     suffix = Path(file_storage.filename).suffix.lower() or ".img"
     asset_id = str(uuid4())

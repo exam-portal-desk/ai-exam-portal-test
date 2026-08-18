@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function fetchAttemptStatus() {
         try {
-            const r = await fetch(`/api/exam-attempts-status/${examId}`, { 
+            const r = await fetch(`/api/v01/exams/${examId}/attempt-status`, {
                 cache: 'no-store',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
@@ -445,7 +445,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (loadingPercentage) loadingPercentage.textContent = '10%';
 
         try {
-            const response = await fetch(`/preload-exam/${examId}`, { 
+            const response = await fetch(`/api/v01/exams/${examId}/preload`, {
                 method: 'GET', 
                 headers: { 'Content-Type': 'application/json' },
                 cache: 'no-store'
@@ -505,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             await startActualPreloading();
             
-            const resp = await fetch(`/start-exam/${examId}`, {
+            const resp = await fetch(`/api/v01/exams/${examId}/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ client_ts: Date.now() })

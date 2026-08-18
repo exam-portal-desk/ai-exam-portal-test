@@ -21,5 +21,10 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
-DB_Clone_SQL_Queries.sql
+FullDBReplication.sql
 supabase_schema.txt
+
+# Local object storage (uploaded assets)
+/storage/
+.claude/
+database/

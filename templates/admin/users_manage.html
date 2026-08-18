@@ -203,7 +203,7 @@ function fetchUsers(page) {
   tbody.innerHTML = Array(5).fill(0).map(() =>
     `<tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
   ).join('');
-  fetch(`/admin/api/users/search?${new URLSearchParams({page,q,role})}`)
+  fetch(`/api/v01/admin/users/search?${new URLSearchParams({page,q,role})}`)
     .then(r=>r.json())
     .then(data => { renderTable(data.users||[]); renderPaginator(data.page,data.total_pages,data.total); })
     .catch(()=>{
@@ -316,7 +316,7 @@ function doUpdateRole(btn) {
   if(!sel.value) return;
   const orig=btn.innerHTML; btn.disabled=true;
   btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>';
-  fetch('/admin/users/update-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,new_role:sel.value})})
+  fetch('/api/v01/admin/users/update-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,new_role:sel.value})})
     .then(r=>r.json()).then(d=>{
       if(d.success){toast(d.message||'Role updated successfully.','success');loadStats();fetchUsers(_currentPage);}
       else toast(d.message||'Update failed.','danger');
@@ -403,7 +403,7 @@ function executeBulkUpdate() {
   const btn=document.getElementById('applyBulkBtn');
   const orig=btn.innerHTML;btn.disabled=true;
   btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Updating…';
-  fetch('/admin/users/bulk-update-roles',{method:'POST',headers:{'Content-Type':'application/json'},
+  fetch('/api/v01/admin/users/bulk-update-roles',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({updates:safeIds.map(id=>({user_id:id,new_role:role}))})})
     .then(r=>r.json()).then(d=>{
       if(d.success){
@@ -432,7 +432,7 @@ function removeToast(el){
 }
 
 function loadStats() {
-  fetch('/admin/api/users/stats').then(r=>r.json()).then(d=>{
+  fetch('/api/v01/admin/users/stats').then(r=>r.json()).then(d=>{
     document.getElementById('totalUsers').textContent=d.total_users??'—';
     document.getElementById('userCount').textContent=d.user_role??'—';
     document.getElementById('adminCount').textContent=d.admin_role??'—';

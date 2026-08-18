@@ -918,7 +918,7 @@ function discToggle(qid, examId) {
 
 async function discLoad(qid, examId) {
   try {
-    const r = await fetch(`/api/discussion/${qid}`);
+    const r = await fetch(`/api/v01/discussions/${qid}`);
     const d = await r.json();
     if (!d.success) return;
     document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = d.count);
@@ -1001,7 +1001,7 @@ async function discPost(qid, examId) {
 </div>`);
 
   try {
-    const r = await fetch(`/api/discussion/${qid}`, {
+    const r = await fetch(`/api/v01/discussions/${qid}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: msg, exam_id: examId})
     });
@@ -1055,7 +1055,7 @@ async function discReply(parentId, qid, examId) {
   document.getElementById(`rbox-${parentId}`)?.classList.remove('open');
 
   try {
-    const r = await fetch(`/api/discussion/${qid}`, {
+    const r = await fetch(`/api/v01/discussions/${qid}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: msg, exam_id: examId, parent_id: parentId})
     });
@@ -1119,7 +1119,7 @@ async function discEditSubmit(commentId, qid, examId) {
   if (!msg) { discToast('Message cannot be empty','err'); return; }
   ta.disabled = true;
   try {
-    const r = await fetch(`/api/discussion/edit/${commentId}`, {
+    const r = await fetch(`/api/v01/discussions/comments/${commentId}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: msg})
     });
@@ -1158,7 +1158,7 @@ function discDelete(commentId, qid, examId) {
   overlay.querySelector('.disc-cb-delete').onclick = async () => {
     overlay.remove();
     try {
-      const r = await fetch(`/api/discussion/delete/${commentId}`, {method:'DELETE'});
+      const r = await fetch(`/api/v01/discussions/comments/${commentId}`, {method:'DELETE'});
       const d = await r.json();
       if (d.success) {
         document.getElementById(`ccard-${commentId}`)?.remove();
@@ -1172,7 +1172,7 @@ function discDelete(commentId, qid, examId) {
 
 async function discAdminPin(commentId, qid, examId) {
   try {
-    const r = await fetch(`/api/discussion/admin/pin/${commentId}`, {method:'PUT'});
+    const r = await fetch(`/api/v01/admin/discussions/comments/${commentId}/pin`, {method:'PUT'});
     const d = await r.json();
     if (d.success) discLoad(qid, examId);
   } catch(e) {}
@@ -1180,7 +1180,7 @@ async function discAdminPin(commentId, qid, examId) {
 
 async function discAdminBest(commentId, qid, examId) {
   try {
-    const r = await fetch(`/api/discussion/admin/best/${commentId}`, {method:'PUT'});
+    const r = await fetch(`/api/v01/admin/discussions/comments/${commentId}/best`, {method:'PUT'});
     const d = await r.json();
     if (d.success) discLoad(qid, examId);
   } catch(e) {}
@@ -1340,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const qids   = [...badges].map(b => parseInt(b.id.replace('disc-cnt-','')));
   if (!qids.length) return;
   try {
-    const r = await fetch('/api/discussion/counts/bulk', {
+    const r = await fetch('/api/v01/discussions/counts', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({question_ids: qids})
     });

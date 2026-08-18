@@ -520,7 +520,6 @@
             <li>All passwords are hashed using bcrypt — we never store plaintext passwords</li>
             <li>HTTPS enforced across the entire platform — no unencrypted data transmission</li>
             <li>Database access is restricted to application-level service accounts with least-privilege roles</li>
-            <li>Redis session store is isolated and not publicly accessible</li>
             <li>Rate limiting on login endpoints to prevent brute-force attacks</li>
             <li>Single-device session enforcement — logging in on a new device invalidates previous sessions</li>
           </ul>

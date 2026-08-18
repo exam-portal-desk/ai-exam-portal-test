@@ -1070,7 +1070,7 @@ function discToggle(qid, examId) {
 
 async function discLoad(qid, examId) {
   try {
-    const r = await fetch(`/api/discussion/${qid}`);
+    const r = await fetch(`/api/v01/discussions/${qid}`);
     const d = await r.json();
     if (!d.success) return;
     document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = d.count);
@@ -1153,7 +1153,7 @@ async function discPost(qid, examId) {
 </div>`);
 
   try {
-    const r = await fetch(`/api/discussion/${qid}`, {
+    const r = await fetch(`/api/v01/discussions/${qid}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: msg, exam_id: examId})
     });
@@ -1207,7 +1207,7 @@ async function discReply(parentId, qid, examId) {
   document.getElementById(`rbox-${parentId}`)?.classList.remove('open');
 
   try {
-    const r = await fetch(`/api/discussion/${qid}`, {
+    const r = await fetch(`/api/v01/discussions/${qid}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: msg, exam_id: examId, parent_id: parentId})
     });
@@ -1271,7 +1271,7 @@ async function discEditSubmit(commentId, qid, examId) {
   if (!msg) { discToast('Message cannot be empty','err'); return; }
   ta.disabled = true;
   try {
-    const r = await fetch(`/api/discussion/edit/${commentId}`, {
+    const r = await fetch(`/api/v01/discussions/comments/${commentId}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: msg})
     });
@@ -1310,7 +1310,7 @@ function discDelete(commentId, qid, examId) {
   overlay.querySelector('.disc-cb-delete').onclick = async () => {
     overlay.remove();
     try {
-      const r = await fetch(`/api/discussion/delete/${commentId}`, {method:'DELETE'});
+      const r = await fetch(`/api/v01/discussions/comments/${commentId}`, {method:'DELETE'});
       const d = await r.json();
       if (d.success) {
         document.getElementById(`ccard-${commentId}`)?.remove();
@@ -1324,7 +1324,7 @@ function discDelete(commentId, qid, examId) {
 
 async function discAdminPin(commentId, qid, examId) {
   try {
-    const r = await fetch(`/api/discussion/admin/pin/${commentId}`, {method:'PUT'});
+    const r = await fetch(`/api/v01/admin/discussions/comments/${commentId}/pin`, {method:'PUT'});
     const d = await r.json();
     if (d.success) discLoad(qid, examId);
   } catch(e) {}
@@ -1332,7 +1332,7 @@ async function discAdminPin(commentId, qid, examId) {
 
 async function discAdminBest(commentId, qid, examId) {
   try {
-    const r = await fetch(`/api/discussion/admin/best/${commentId}`, {method:'PUT'});
+    const r = await fetch(`/api/v01/admin/discussions/comments/${commentId}/best`, {method:'PUT'});
     const d = await r.json();
     if (d.success) discLoad(qid, examId);
   } catch(e) {}
@@ -1488,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const qids   = [...badges].map(b => parseInt(b.id.replace('disc-cnt-','')));
   if (!qids.length) return;
   try {
-    const r = await fetch('/api/discussion/counts/bulk', {
+    const r = await fetch('/api/v01/discussions/counts', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({question_ids: qids})
     });
@@ -1501,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // AI EXPLANATION SYSTEM
 // Features:
 //   - On page load: fetches saved history from DB (no API call)
-//   - Generate button: calls POST /api/explain/<qid> → saves + returns history
+//   - Generate button: calls POST /api/v01/explanations/<qid> → saves + returns history
 //   - Each generation shown as a collapsible card below the previous
 //   - In-memory cache prevents redundant DB calls within same page session
 //   - Reset time shown from server (IST-based, exact countdown)
@@ -1521,7 +1521,7 @@ const _explainInFlight = new Set();
  */
 async function explainLoadHistory(qid) {
   try {
-    const resp = await fetch(`/api/explain/history/${qid}`);
+    const resp = await fetch(`/api/v01/explanations/${qid}`);
     const data = await resp.json();
     if (!data.success) return;
 
@@ -1572,7 +1572,7 @@ async function explainToggle(qid, qtype, givenAnswer) {
     const body = {};
     if (givenAnswer) body.given_answer = givenAnswer;
 
-    const resp = await fetch(`/api/explain/${qid}`, {
+    const resp = await fetch(`/api/v01/explanations/${qid}`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),
@@ -1665,14 +1665,14 @@ function explainDeleteOne(qid, explanationId) {
     const card = document.getElementById(`expl-card-${explanationId}`);
     card?.classList.add('expl-card-deleting');
     try {
-      const resp = await fetch(`/api/explain/${qid}/${explanationId}`, { method: 'DELETE' });
+      const resp = await fetch(`/api/v01/explanations/${qid}/${explanationId}`, { method: 'DELETE' });
 
       if (!resp.ok) {
         // Distinguish "route unreachable" (404/405 — a wiring problem, not
         // a real delete failure) from a real server-side error, since both
         // would otherwise look identical to the user.
         card?.classList.remove('expl-card-deleting');
-        console.error(`[explain] DELETE /api/explain/${qid}/${explanationId} -> HTTP ${resp.status}`);
+        console.error(`[explain] DELETE /api/v01/explanations/${qid}/${explanationId} -> HTTP ${resp.status}`);
         const msg = (resp.status === 404 || resp.status === 405)
           ? 'Delete isn\u2019t available right now (endpoint not found). Please contact support.'
           : 'Could not delete this explanation. Please try again.';

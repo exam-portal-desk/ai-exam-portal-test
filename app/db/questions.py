@@ -67,6 +67,21 @@ def update_question(question_id: int, updates: Dict) -> bool:
         return False
 
 
+def update_questions_by_type(exam_id: int, question_type: str, updates: Dict) -> int:
+    """Set-based update for every question of a given type within an exam —
+    one statement instead of fetch-all + per-row update_question() calls
+    (flagged in the architecture audit). Returns the number of rows updated."""
+    try:
+        sc, params = set_clause(updates)
+        return execute(
+            f"UPDATE questions SET {sc} WHERE exam_id=%s AND UPPER(question_type)=UPPER(%s)",
+            params + [exam_id, question_type],
+        )
+    except Exception as e:
+        print(f"[db.questions] update_questions_by_type error: {e}")
+        return 0
+
+
 def _purge_question_children(question_id: int) -> None:
     """
     Delete all FK-dependent child rows for a question BEFORE deleting

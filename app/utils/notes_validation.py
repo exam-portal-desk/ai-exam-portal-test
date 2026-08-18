@@ -14,6 +14,9 @@ MAX_DESCRIPTION_LENGTH = 2_000
 # Shared by notes_service.save_page_objects() (editor autosave) and the
 # notebook importer below, so the two can never silently drift apart.
 ALLOWED_OBJECT_TYPES = {"rich_text", "drawing", "image", "sticky_note", "shape"}
+# Max objects in a SINGLE save request/payload — not a cap on a page's total content. A page
+# with more than this is saved as several chunked requests (see editor.js save()), each one
+# this size at most; notes_service.import_notebook() chunks its bulk inserts the same way.
 MAX_OBJECTS_PER_PAGE = 500
 
 # export_notebook() stamps this into every export; the importer checks
@@ -147,8 +150,6 @@ def validate_notebook_import(raw: Any) -> Dict[str, Any]:
         objects_in = page.get("objects", [])
         if not isinstance(objects_in, list):
             raise NotesValidationError(_INVALID_FILE_MESSAGE)
-        if len(objects_in) > MAX_OBJECTS_PER_PAGE:
-            raise NotesValidationError(f"A page can contain at most {MAX_OBJECTS_PER_PAGE} objects.")
 
         clean_objects: List[Dict[str, Any]] = []
         for obj in objects_in:

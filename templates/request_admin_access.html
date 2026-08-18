@@ -55,6 +55,10 @@
       </button>
     </div>
 
+    <div id="bothAccessMsg" style="display:none">
+      <div class="auth-alert success"><i class="fas fa-check-circle" style="flex-shrink:0;font-size:.75rem;margin-top:.1rem"></i><span>You already have both user and admin access.</span></div>
+    </div>
+
     <div id="pendingMsg" style="display:none">
       <div class="auth-alert warning"><i class="fas fa-clock" style="flex-shrink:0;font-size:.75rem;margin-top:.1rem"></i><span>You already have a pending request. Please wait for admin review.</span></div>
     </div>
@@ -85,7 +89,7 @@ function verifyUser() {
   if (!un || !em) { showAlert('step1Alerts','Username and email are required.','danger'); return; }
   var btn = document.getElementById('verifyBtn');
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying…';
-  fetch('/api/validate-user-for-request', {
+  fetch('/api/v01/access-requests/validate-user', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({username:un, email:em})
   }).then(function(r){return r.json();}).then(function(d){
@@ -109,8 +113,13 @@ function verifyUser() {
       document.getElementById('prevReqBody').innerHTML = rows;
       document.getElementById('prevRequests').style.display = 'block';
     }
-    // Show form or pending msg
-    if (d.has_pending_request || !d.can_request) {
+    // Show form, "already have both", or pending msg — existing-access check MUST run before
+    // the pending-request check, otherwise a dual-role user (can_request is false simply
+    // because there's nothing left to request) falls through to the pending-request message
+    // even when they have no pending request at all.
+    if (d.has_both_access) {
+      document.getElementById('bothAccessMsg').style.display = 'block';
+    } else if (d.has_pending_request || !d.can_request) {
       document.getElementById('pendingMsg').style.display = 'block';
     } else {
       var sel = document.getElementById('raAccessLevel');
@@ -126,7 +135,7 @@ function submitRequest() {
   if (!reason) { alert('Please provide a reason.'); return; }
   var btn = document.getElementById('submitBtn');
   btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Submitting…';
-  fetch('/api/submit-access-request', {
+  fetch('/api/v01/access-requests', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({username:_userData.user.username, email:_userData.user.email, current_access:_userData.user.current_access, requested_access:level, user_reason:reason})
   }).then(function(r){return r.json();}).then(function(d){
@@ -147,6 +156,7 @@ function resetForm() {
   document.getElementById('prevRequests').style.display='none';
   document.getElementById('requestForm').style.display='none';
   document.getElementById('pendingMsg').style.display='none';
+  document.getElementById('bothAccessMsg').style.display='none';
   document.getElementById('raUsername').value='';
   document.getElementById('raEmail').value='';
 }

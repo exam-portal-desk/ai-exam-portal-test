@@ -891,7 +891,7 @@
     const fd=new FormData();
     fd.append('csv_file',new Blob([hdr+'\n'+rows],{type:'text/csv'}),'questions.csv');
     try {
-      const res=await fetch('/admin/questions/import-csv',{method:'POST',body:fd});
+      const res=await fetch('/api/v01/admin/questions/import-csv',{method:'POST',body:fd});
       const data=await res.json();
       if(data.success){
         csvToast(`Saved successfully!`, 'success', `Inserted: ${data.inserted} · Skipped: ${data.skipped}`);

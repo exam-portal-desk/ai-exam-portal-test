@@ -4,13 +4,13 @@ S3-compatible object storage provider (AWS S3, Cloudflare R2, MinIO,
 Supabase Storage's S3 interface, etc.) via boto3 — no vendor SDKs.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import boto3
 from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
 
-import config
+import app.config as config
 from app.storage.service import StorageProvider
 
 
@@ -56,3 +56,25 @@ class S3StorageProvider(StorageProvider):
         # Presigning is a local HMAC computation, not a network call — a loop
         # here is already O(1) round trips, no bulk API needed.
         return {key: self.signed_url(key, expires_in) for key in keys}
+
+    def list_objects(
+        self, prefix: str = "", cursor: Optional[str] = None, limit: int = 100,
+        delimiter: Optional[str] = None,
+    ) -> dict:
+        kwargs = {"Bucket": self.bucket, "Prefix": prefix, "MaxKeys": limit}
+        if cursor:
+            kwargs["ContinuationToken"] = cursor
+        if delimiter:
+            kwargs["Delimiter"] = delimiter
+        resp = self.client.list_objects_v2(**kwargs)
+        objects = [
+            {
+                "key": obj["Key"],
+                "size": obj["Size"],
+                "last_modified": obj["LastModified"].isoformat() if obj.get("LastModified") else None,
+            }
+            for obj in resp.get("Contents", [])
+        ]
+        prefixes = [p["Prefix"] for p in resp.get("CommonPrefixes", [])]
+        next_cursor = resp.get("NextContinuationToken") if resp.get("IsTruncated") else None
+        return {"objects": objects, "prefixes": prefixes, "next_cursor": next_cursor}

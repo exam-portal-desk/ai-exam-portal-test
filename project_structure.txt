@@ -1,0 +1,201 @@
+ |-- app
+ |    |-- db
+ |    |    |-- __init__.py
+ |    |    |-- ai.py
+ |    |    |-- attempts.py
+ |    |    |-- auth.py
+ |    |    |-- categories.py
+ |    |    |-- chat.py
+ |    |    |-- discussion.py
+ |    |    |-- exams.py
+ |    |    |-- explanation.py
+ |    |    |-- jwt_tokens.py
+ |    |    |-- misc.py
+ |    |    |-- notes.py
+ |    |    |-- questions.py
+ |    |    |-- results.py
+ |    |    |-- sessions.py
+ |    |    |-- users.py
+ |    |-- middleware
+ |    |    |-- jwt_middleware.py
+ |    |    |-- session_guard.py
+ |    |-- routes
+ |    |    |-- api
+ |    |    |    |-- v01
+ |    |    |    |    |-- admin
+ |    |    |    |    |    |-- __init__.py
+ |    |    |    |    |    |-- ai_centre.py
+ |    |    |    |    |    |-- analytics.py
+ |    |    |    |    |    |-- attempts.py
+ |    |    |    |    |    |-- categories.py
+ |    |    |    |    |    |-- exams.py
+ |    |    |    |    |    |-- images.py
+ |    |    |    |    |    |-- questions.py
+ |    |    |    |    |    |-- requests.py
+ |    |    |    |    |    |-- storage.py
+ |    |    |    |    |    |-- users.py
+ |    |    |    |    |-- __init__.py
+ |    |    |    |    |-- access_requests.py
+ |    |    |    |    |-- assistant.py
+ |    |    |    |    |-- auth.py
+ |    |    |    |    |-- chat.py
+ |    |    |    |    |-- discussions.py
+ |    |    |    |    |-- exams.py
+ |    |    |    |    |-- explanations.py
+ |    |    |    |    |-- images.py
+ |    |    |    |    |-- notebooks.py
+ |    |    |    |-- __init__.py
+ |    |    |-- web
+ |    |    |    |-- admin
+ |    |    |    |    |-- __init__.py
+ |    |    |    |    |-- ai_centre.py
+ |    |    |    |    |-- attempts.py
+ |    |    |    |    |-- auth.py
+ |    |    |    |    |-- categories.py
+ |    |    |    |    |-- dashboard.py
+ |    |    |    |    |-- exams.py
+ |    |    |    |    |-- images.py
+ |    |    |    |    |-- latex_editor.py
+ |    |    |    |    |-- questions.py
+ |    |    |    |    |-- requests.py
+ |    |    |    |    |-- results.py
+ |    |    |    |    |-- storage.py
+ |    |    |    |    |-- subjects.py
+ |    |    |    |    |-- users.py
+ |    |    |    |-- __init__.py
+ |    |    |    |-- ai_assistant.py
+ |    |    |    |-- auth.py
+ |    |    |    |-- categories.py
+ |    |    |    |-- chat.py
+ |    |    |    |-- dashboard.py
+ |    |    |    |-- exams.py
+ |    |    |    |-- misc.py
+ |    |    |    |-- notes.py
+ |    |    |    |-- results.py
+ |    |-- services
+ |    |    |-- ai_provider.py
+ |    |    |-- ai_question_generator.py
+ |    |    |-- ai_service.py
+ |    |    |-- auth_service.py
+ |    |    |-- chat_service.py
+ |    |    |-- discussion_service.py
+ |    |    |-- email_service.py
+ |    |    |-- exam_service.py
+ |    |    |-- explanation_service.py
+ |    |    |-- image_storage_service.py
+ |    |    |-- jwt_service.py
+ |    |    |-- notes_service.py
+ |    |    |-- notes_storage_service.py
+ |    |    |-- pdf_service.py
+ |    |    |-- result_service.py
+ |    |    |-- user_deletion_service.py
+ |    |-- storage
+ |    |    |-- __init__.py
+ |    |    |-- local.py
+ |    |    |-- s3.py
+ |    |    |-- service.py
+ |    |-- utils
+ |    |    |-- cache.py
+ |    |    |-- datetime_service.py
+ |    |    |-- helpers.py
+ |    |    |-- latex.py
+ |    |    |-- notes_validation.py
+ |    |    |-- sanitize.py
+ |    |-- __init__.py
+ |    |-- config.py
+ |-- config
+ |    |-- ai_models.json
+ |-- static
+ |    |-- fonts
+ |    |    |-- DejaVuSans-Bold.ttf
+ |    |    |-- DejaVuSans.ttf
+ |    |    |-- LICENSE_DEJAVU.txt
+ |    |-- notes
+ |    |    |-- drawing-tools.js
+ |    |    |-- editor.css
+ |    |    |-- editor.js
+ |    |    |-- library.js
+ |    |    |-- notebooks.js
+ |    |    |-- notes.css
+ |    |    |-- trash.js
+ |    |-- favicon.png
+ |    |-- logo.mp4
+ |    |-- logo.png
+ |    |-- theme.css
+ |-- storage
+ |    |-- Category
+ |    |-- Sub
+ |-- templates
+ |    |-- admin
+ |    |    |-- admin_login.html
+ |    |    |-- ai_command_centre.html
+ |    |    |-- attempts.html
+ |    |    |-- backup-admin_base.html
+ |    |    |-- categories.html
+ |    |    |-- csv_upload.html
+ |    |    |-- dashboard.html
+ |    |    |-- exams.html
+ |    |    |-- latex_editor.html
+ |    |    |-- new_requests.html
+ |    |    |-- object_storage.html
+ |    |    |-- questions.html
+ |    |    |-- requests_history.html
+ |    |    |-- requests.html
+ |    |    |-- subjects.html
+ |    |    |-- upload_images.html
+ |    |    |-- users_analytics_analytics.html
+ |    |    |-- users_analytics_responses.html
+ |    |    |-- users_analytics_results_table.html
+ |    |    |-- users_analytics_results.html
+ |    |    |-- users_analytics.html
+ |    |    |-- users_manage.html
+ |    |    |-- view_responses_popup.html
+ |    |    |-- view_result_popup.html
+ |    |-- emails
+ |    |    |-- password_reset.html
+ |    |    |-- password_setup.html
+ |    |-- notes
+ |    |    |-- editor.html
+ |    |    |-- index.html
+ |    |    |-- library.html
+ |    |    |-- trash.html
+ |    |-- about.html
+ |    |-- account_deletion_policy.html
+ |    |-- admin_base.html
+ |    |-- ai_assistant.html
+ |    |-- api_docs.html
+ |    |-- base.html
+ |    |-- categories.html
+ |    |-- chat.html
+ |    |-- contact.html
+ |    |-- create_account.html
+ |    |-- dashboard.html
+ |    |-- error.html
+ |    |-- exam_instructions.html
+ |    |-- exam_page.html
+ |    |-- index.html
+ |    |-- login.html
+ |    |-- logout_redirect.html
+ |    |-- password_reset_form.html
+ |    |-- password_reset.html
+ |    |-- password_setup_form.html
+ |    |-- privacy_policy.html
+ |    |-- registration_success.html
+ |    |-- request_admin_access.html
+ |    |-- response.html
+ |    |-- result_pending.html
+ |    |-- result.html
+ |    |-- results_history.html
+ |    |-- select_portal.html
+ |    |-- student_analytics.html
+ |    |-- support.html
+ |    |-- terms_of_service.html
+ |-- uploads_tmp
+ |-- .env
+ |-- .gitignore
+ |-- LICENSE
+ |-- main.py
+ |-- project_structure.txt
+ |-- README.md
+ |-- requirements.txt
+ |-- resuable_commands.txt

@@ -342,7 +342,7 @@ function setStatCard(bigId, exactId, value) {
 }
 
 function loadStatCards() {
-  fetch('/admin/api/users-analytics/stats')
+  fetch('/api/v01/admin/analytics/stats')
     .then(r => r.json())
     .then(d => {
       setStatCard('sc-users',    'sc-users-exact',    d.total_users     || 0);
@@ -390,7 +390,7 @@ function fetchUserSuggestions() {
 
   if (q.length < 2) { dd.classList.remove('open'); return; }
 
-  fetch(`/admin/api/users/search?q=${encodeURIComponent(q)}&page=1`)
+  fetch(`/api/v01/admin/users/search?q=${encodeURIComponent(q)}&page=1`)
     .then(r => r.json())
     .then(d => {
       const users = d.users || [];
@@ -542,7 +542,7 @@ function loadAnalytics() {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:.9rem"></i>';
   });
-  fetch('/admin/api/users-analytics/data?' + params)
+  fetch('/api/v01/admin/analytics/data?' + params)
     .then(r => r.json())
     .then(d => {
       _renderSummary(d.summary || {});

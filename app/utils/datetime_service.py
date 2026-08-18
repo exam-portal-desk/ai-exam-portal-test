@@ -7,7 +7,7 @@ server's physical timezone never determines what a user sees.
 
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-import config
+import app.config as config
 
 _APP_TZ = ZoneInfo(config.APP_TIMEZONE)
 

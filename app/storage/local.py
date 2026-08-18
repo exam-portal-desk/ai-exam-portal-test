@@ -7,11 +7,12 @@ that re-checks ownership/visibility before streaming the file.
 
 import os
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import quote
 
-import config
+import app.config as config
 from app.storage.service import StorageProvider
 
 
@@ -54,3 +55,48 @@ class LocalStorageProvider(StorageProvider):
 
     def signed_urls_bulk(self, keys: List[str], expires_in: int = 3600) -> Dict[str, str]:
         return {key: self.signed_url(key, expires_in) for key in keys}
+
+    def list_objects(
+        self, prefix: str = "", cursor: Optional[str] = None, limit: int = 100,
+        delimiter: Optional[str] = None,
+    ) -> dict:
+        if delimiter:
+            # Folder-style: only direct children of prefix, one level of
+            # sub-prefixes as "folders" (mirrors S3 Delimiter semantics).
+            base = self._path(prefix) if prefix else self.root
+            objects, prefixes = [], []
+            if base.is_dir():
+                for child in sorted(base.iterdir()):
+                    key = child.relative_to(self.root).as_posix()
+                    if child.is_dir():
+                        prefixes.append(key + "/")
+                    elif child.is_file():
+                        stat = child.stat()
+                        objects.append({
+                            "key": key,
+                            "size": stat.st_size,
+                            "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                        })
+            start = int(cursor) if cursor else 0
+            page = objects[start:start + limit]
+            next_cursor = str(start + limit) if start + limit < len(objects) else None
+            return {"objects": page, "prefixes": prefixes, "next_cursor": next_cursor}
+
+        matches = []
+        for path in self.root.rglob("*"):
+            if not path.is_file():
+                continue
+            key = path.relative_to(self.root).as_posix()
+            if key.startswith(prefix):
+                stat = path.stat()
+                matches.append({
+                    "key": key,
+                    "size": stat.st_size,
+                    "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                })
+        matches.sort(key=lambda o: o["key"])
+
+        start = int(cursor) if cursor else 0
+        page = matches[start:start + limit]
+        next_cursor = str(start + limit) if start + limit < len(matches) else None
+        return {"objects": page, "prefixes": [], "next_cursor": next_cursor}

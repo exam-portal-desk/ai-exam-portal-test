@@ -22,7 +22,7 @@ import base64
 import threading
 import requests as _requests
 
-import config
+import app.config as config
 from app.db.explanation import (
     get_explanation_usage,
     get_daily_total_usage,
@@ -32,7 +32,7 @@ from app.db.explanation import (
     delete_explanation as db_delete_explanation,
     get_reset_time_str,
 )
-from app.services.drive_service import get_image_url
+from app.services.image_storage_service import resolve_question_image_url as get_image_url
 from app.services import ai_provider
 from app.utils.helpers import strip_ai_reasoning
 

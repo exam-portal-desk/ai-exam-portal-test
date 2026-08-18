@@ -290,7 +290,7 @@ function fetchAttempts(page) {
   badge.style.display = (q || examId || status) ? 'inline-flex' : 'none';
 
   const params = new URLSearchParams({ page, q, exam_id: examId, status });
-  fetch(`/admin/api/attempts/search?${params}`)
+  fetch(`/api/v01/admin/attempts/search?${params}`)
     .then(r => r.json())
     .then(d => {
       if (d.success === false) { renderError(d.message); return; }
@@ -470,7 +470,7 @@ async function confirmAction() {
   const btn = document.getElementById('confirmBtn'), orig = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
   try {
-    const r = await fetch("{{ url_for('admin.attempts_modify') }}", {
+    const r = await fetch("{{ url_for('admin_api.attempts_modify') }}", {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         student_id: _currentSid, exam_id: _currentEid,
@@ -535,7 +535,7 @@ async function confirmBulkAction() {
     const [s,e] = k.split('-'); return {student_id:s, exam_id:e};
   });
   try {
-    const r = await fetch("{{ url_for('admin.attempts_bulk_modify') }}", {
+    const r = await fetch("{{ url_for('admin_api.attempts_bulk_modify') }}", {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         items, action: _currentBulkAction,

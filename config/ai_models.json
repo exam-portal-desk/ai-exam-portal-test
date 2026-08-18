@@ -3,14 +3,14 @@
     {
       "name": "assistant-default",
       "provider": "groq",
-      "model": "llama-3.3-70b-versatile",
+      "model": "openai/gpt-oss-120b",
       "endpoint": "https://api.groq.com/openai/v1/chat/completions",
       "api_key_env": "TEXT_MODEL_ASSISTANT_API_KEY"
     },
     {
       "name": "explanation-default",
       "provider": "groq",
-      "model": "llama-3.3-70b-versatile",
+      "model": "openai/gpt-oss-120b",
       "endpoint": "https://api.groq.com/openai/v1/chat/completions",
       "api_key_env": "TEXT_MODEL_EXPLANATION_API_KEY"
     },

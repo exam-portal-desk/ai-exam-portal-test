@@ -515,7 +515,7 @@ function toggleDropdown(id){document.getElementById(id).classList.toggle('show')
 document.addEventListener('click',e=>{if(!e.target.closest('.dropdown'))document.querySelectorAll('.dropdown-menu.show').forEach(m=>m.classList.remove('show'));});
 
 async function loadConversations(){
-  const res=await fetch('/api/chat/conversations');
+  const res=await fetch('/api/v01/chat/conversations');
   const data=await res.json();
   const list=document.getElementById('convList');
   list.innerHTML='';
@@ -559,7 +559,7 @@ async function openConversation(convId,name,otherId,isGroup=false,createdBy=null
   document.getElementById('emptyState').style.display='none';
   document.getElementById('activeChat').style.display='flex';
   if(otherId){
-    fetch(`/api/chat/online_status?ids=${otherId}`).then(r=>r.json()).then(d=>{
+    fetch(`/api/v01/chat/online-status?ids=${otherId}`).then(r=>r.json()).then(d=>{
       if(d.success){onlineMap[otherId]=d.status[otherId];const s=document.getElementById('headerStatus');if(s)s.innerHTML=d.status[otherId]?'<span style="color:var(--success)">● Online</span>':'Offline';}
     });
   }
@@ -601,7 +601,7 @@ async function openConversation(convId,name,otherId,isGroup=false,createdBy=null
 }
 
 async function fetchMessages(convId,before=null){
-  let url=`/api/chat/messages/${convId}`;
+  let url=`/api/v01/chat/conversations/${convId}/messages`;
   if(before)url+=`?before=${encodeURIComponent(before)}`;
   const res=await fetch(url);const data=await res.json();
   if(!data.success)return;
@@ -678,7 +678,7 @@ function closeEditModal(){document.getElementById('editModal').classList.remove(
 async function submitEdit(){
   const newText=document.getElementById('editInput').value.trim();
   if(!newText||!editingMsgId)return;
-  const res=await fetch(`/api/chat/messages/${editingMsgId}/edit`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:newText})});
+  const res=await fetch(`/api/v01/chat/messages/${editingMsgId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:newText})});
   const data=await res.json();
   if(data.success){
     closeEditModal();
@@ -692,7 +692,7 @@ async function submitEdit(){
 
 async function deleteMsg(msgId){
   showConfirm('Delete Message','This message will be deleted for everyone.',async()=>{
-    const res=await fetch(`/api/chat/messages/${msgId}`,{method:'DELETE'});
+    const res=await fetch(`/api/v01/chat/messages/${msgId}`,{method:'DELETE'});
     const data=await res.json();
     if(data.success){document.querySelector(`[data-msg-id="${msgId}"]`)?.remove();showToast('Message deleted.','success');}
     else showToast('Failed to delete.','error');
@@ -702,7 +702,7 @@ async function deleteMsg(msgId){
 async function clearChat(){
   document.getElementById('headerMenu').classList.remove('show');
   showConfirm('Clear Chat','Messages will be cleared only for you. The other person\'s chat will remain unchanged.',async()=>{
-    const res=await fetch(`/api/chat/conversations/${activeConvId}/clear`,{method:'DELETE'});
+    const res=await fetch(`/api/v01/chat/conversations/${activeConvId}/clear`,{method:'DELETE'});
     const data=await res.json();
     if(data.success){
       const area=document.getElementById('messagesArea');
@@ -716,7 +716,7 @@ async function removeFriend(){
   document.getElementById('headerMenu').classList.remove('show');
   if(!activeOtherId)return;
   showConfirm('Remove Friend','This will remove your connection and delete the conversation.',async()=>{
-    const res=await fetch(`/api/chat/friend/${activeOtherId}`,{method:'DELETE'});
+    const res=await fetch(`/api/v01/chat/friends/${activeOtherId}`,{method:'DELETE'});
     const data=await res.json();
     if(data.success){
       activeConvId=null;activeOtherId=null;
@@ -730,7 +730,7 @@ async function removeFriend(){
 async function exitGroup(){
   document.getElementById('headerMenu').classList.remove('show');
   showConfirm('Exit Group','You will leave this group and lose access to messages.',async()=>{
-    const res=await fetch(`/api/chat/group/${activeConvId}/exit`,{method:'DELETE'});
+    const res=await fetch(`/api/v01/chat/groups/${activeConvId}/exit`,{method:'DELETE'});
     const data=await res.json();
     if(data.success){
       activeConvId=null;
@@ -744,7 +744,7 @@ async function exitGroup(){
 async function deleteGroup(){
   document.getElementById('headerMenu').classList.remove('show');
   showConfirm('Delete Group','This will permanently delete the group and all messages for everyone.',async()=>{
-    const res=await fetch(`/api/chat/group/${activeConvId}`,{method:'DELETE'});
+    const res=await fetch(`/api/v01/chat/groups/${activeConvId}`,{method:'DELETE'});
     const data=await res.json();
     if(data.success){
       activeConvId=null;
@@ -771,7 +771,7 @@ function searchAddMember(q){
   const el=document.getElementById('addMemberResults');
   if(q.length<2){el.innerHTML='';return;}
   _addMemberTimer=setTimeout(async()=>{
-    const r=await fetch(`/api/chat/search?q=${encodeURIComponent(q)}`).then(x=>x.json());
+    const r=await fetch(`/api/v01/chat/users/search?q=${encodeURIComponent(q)}`).then(x=>x.json());
     if(!r.users||!r.users.length){
       el.innerHTML='<div class="list-empty">No users found</div>';
       return;
@@ -790,7 +790,7 @@ function searchAddMember(q){
 
 async function addMemberToGroup(userId,userName){
   if(!activeConvId)return;
-  const res=await fetch(`/api/chat/group/${activeConvId}/members`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
+  const res=await fetch(`/api/v01/chat/groups/${activeConvId}/members`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
   const data=await res.json();
   if(data.success){
     closeAddMemberModal();
@@ -809,7 +809,7 @@ async function sendMessage(){
   const payload={message:msg};
   if(replyTo){payload.reply_to_id=replyTo.id;payload.reply_to_text=replyTo.text;payload.reply_to_name=replyTo.name;}
   cancelReply();
-  const res=await fetch(`/api/chat/messages/${activeConvId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const res=await fetch(`/api/v01/chat/conversations/${activeConvId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const data=await res.json();
   if(data.success){
     if(data.message.id)_sentMsgIds.add(data.message.id);
@@ -834,7 +834,7 @@ document.getElementById('searchInput').addEventListener('input',function(){
 document.addEventListener('click',e=>{if(!e.target.closest('.search-box'))document.getElementById('searchResults').style.display='none';});
 
 async function searchUsers(q){
-  const res=await fetch(`/api/chat/search?q=${encodeURIComponent(q)}`);
+  const res=await fetch(`/api/v01/chat/users/search?q=${encodeURIComponent(q)}`);
   const data=await res.json();
   const box=document.getElementById('searchResults');
   if(!data.success||!data.users.length){box.style.display='none';return;}
@@ -852,7 +852,7 @@ async function handleUserClick(u){
   document.getElementById('searchResults').style.display='none';
   document.getElementById('searchInput').value='';
   if(u.connection_status==='accepted'){
-    const res=await fetch('/api/chat/conversations');const data=await res.json();
+    const res=await fetch('/api/v01/chat/conversations');const data=await res.json();
     if(data.success){const conv=data.conversations.find(c=>!c.is_group&&c.other_id===u.id);if(conv){openConversation(conv.id,conv.name,u.id,false,conv.created_by);return;}}
     showToast('Conversation not found. Try refreshing.','warning');return;
   }
@@ -860,7 +860,7 @@ async function handleUserClick(u){
   const userName=u.full_name||u.username,userId=u.id;
   showConfirm('Send Chat Request',`Send a chat request to ${userName}?`,async()=>{
     try{
-      const res=await fetch('/api/chat/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipient_id:userId})});
+      const res=await fetch('/api/v01/chat/friend-requests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipient_id:userId})});
       const data=await res.json();
       if(data.success)showToast(`Request sent to ${userName}!`,'success');
       else showToast(data.message||'Failed to send request','error');
@@ -869,7 +869,7 @@ async function handleUserClick(u){
 }
 
 async function openInbox(){
-  const res=await fetch('/api/chat/requests/inbox');const data=await res.json();
+  const res=await fetch('/api/v01/chat/friend-requests/inbox');const data=await res.json();
   const list=document.getElementById('inboxList');list.innerHTML='';
   if(!data.success||!data.requests.length){
     list.innerHTML='<div class="inbox-empty"><i class="fas fa-inbox" style="display:block;font-size:1.5rem;margin-bottom:.5rem;opacity:.3"></i>No pending requests</div>';
@@ -886,7 +886,7 @@ function closeInbox(){document.getElementById('inboxModal').classList.remove('sh
 
 async function respondRequest(connId,action,btn){
   btn.disabled=true;
-  const res=await fetch(`/api/chat/request/${connId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+  const res=await fetch(`/api/v01/chat/friend-requests/${connId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
   const data=await res.json();
   if(data.success){
     document.getElementById(`req-${connId}`)?.remove();
@@ -907,7 +907,7 @@ async function searchGroupMembers(){
   const box=document.getElementById('groupMemberResults');
   if(q.length<2){box.innerHTML='';return;}
   groupSearchDebounce=setTimeout(async()=>{
-    const res=await fetch(`/api/chat/search?q=${encodeURIComponent(q)}`);const data=await res.json();
+    const res=await fetch(`/api/v01/chat/users/search?q=${encodeURIComponent(q)}`);const data=await res.json();
     box.innerHTML='';
     (data.users||[]).forEach(u=>{
       if(selectedGroupMembers[u.id])return;
@@ -931,7 +931,7 @@ async function createGroup(){
   const name=document.getElementById('groupName').value.trim();const ids=Object.keys(selectedGroupMembers).map(Number);
   if(!name){showToast('Please enter a group name.','warning');return;}
   if(!ids.length){showToast('Add at least one member.','warning');return;}
-  const res=await fetch('/api/chat/group',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,member_ids:ids})});
+  const res=await fetch('/api/v01/chat/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,member_ids:ids})});
   const data=await res.json();
   if(data.success){closeGroupModal();showToast(`Group "${name}" created!`,'success');await loadConversations();openConversation(data.conv_id,name,null,true,{{ session.get('user_id',0) }});}
   else showToast(data.message||'Failed to create group.','error');
@@ -939,7 +939,7 @@ async function createGroup(){
 
 async function loadUnreadCount(){
   try{
-    const res=await fetch('/api/chat/unread_count');const data=await res.json();
+    const res=await fetch('/api/v01/chat/unread-count');const data=await res.json();
     const badge=document.getElementById('inboxBadge'),navBadge=document.getElementById('navChatBadge');
     const req=data.requests||0,unread=data.unread||0;
     if(req>0){badge.textContent=req;badge.style.display='block';}else badge.style.display='none';

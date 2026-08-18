@@ -12,7 +12,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
-import config
+import app.config as config
 from app.utils.datetime_service import now_utc_naive
 
 ACCESS_TOKEN_EXPIRY_MINUTES = 60

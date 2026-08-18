@@ -1189,7 +1189,7 @@ window.MathJax = {
     const prev = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
     try {
-      const resp = await fetch("{{ url_for('admin.questions_batch_add') }}", {
+      const resp = await fetch("{{ url_for('admin_api.questions_batch_add') }}", {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const data = await resp.json();
@@ -1243,7 +1243,7 @@ window.MathJax = {
         deleteSelectedBtn.disabled  = true;
         deleteSelectedBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
         try {
-          const resp = await fetch("{{ url_for('admin.delete_multiple_questions') }}", {
+          const resp = await fetch("{{ url_for('admin_api.delete_multiple_questions') }}", {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
           });
           const data = await resp.json();
@@ -1289,7 +1289,7 @@ window.MathJax = {
         const prev = applyListBtn.innerHTML;
         applyListBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Applying...';
         try {
-          const resp = await fetch("{{ url_for('admin.questions_bulk_update') }}", {
+          const resp = await fetch("{{ url_for('admin_api.questions_bulk_update') }}", {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ exam_id: parseInt(exam_id, 10), question_type: qtype, positive_marks: pos || null, negative_marks: neg || null, tolerance: tol || null })
           });
@@ -1384,7 +1384,7 @@ async function openEditQuestionModal(questionId) {
   modal.show();
 
   try {
-    const resp = await fetch('/admin/questions/get/' + questionId);
+    const resp = await fetch('/api/v01/admin/questions/' + questionId);
     const data = await resp.json();
     if (!data.success) throw new Error(data.message || 'Failed to load question');
     const q = data.question;
@@ -1441,11 +1441,12 @@ async function submitQuestionModal() {
   form.append('image_path',     _qField('qf-image-path').value);
 
   const url = _qModalMode === 'add'
-    ? '/admin/questions/add-ajax'
-    : '/admin/questions/edit-ajax/' + _qEditId;
+    ? '/api/v01/admin/questions'
+    : '/api/v01/admin/questions/' + _qEditId;
+  const method = _qModalMode === 'add' ? 'POST' : 'PATCH';
 
   try {
-    const resp = await fetch(url, { method: 'POST', body: form });
+    const resp = await fetch(url, { method: method, body: form });
     const data = await resp.json();
     if (!data.success) throw new Error(data.message || 'Save failed');
     bootstrap.Modal.getInstance(_qField('questionFormModal')).hide();
@@ -1717,7 +1718,7 @@ document.addEventListener('DOMContentLoaded', function() {
           importBtn.disabled  = true;
           importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing...';
           try {
-            const resp = await fetch('/admin/questions/import-csv', { method: 'POST', body: formData });
+            const resp = await fetch('/api/v01/admin/questions/import-csv', { method: 'POST', body: formData });
             const data = await resp.json();
             if (data.success) {
               showCsvAlert('Import Complete',

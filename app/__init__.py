@@ -14,7 +14,7 @@ from flask import Flask, request
 from flask_session import Session
 from flask_socketio import SocketIO
 
-import config
+import app.config as config
 
 # ─── Single global SocketIO instance ───────────────────────────────────────
 socketio = SocketIO()
@@ -70,7 +70,9 @@ def create_app() -> Flask:
     # ── After-request: disable browser caching ─────────────────────────────
     @app.after_request
     def add_cache_control(response):
-        if not app.config.get("TESTING") and not request.path.startswith("/static/"):
+        if (not app.config.get("TESTING")
+                and not request.path.startswith("/static/")
+                and not request.path.startswith("/api/v01/images/")):
             response.headers["Cache-Control"] = (
                 "no-store, no-cache, must-revalidate, "
                 "post-check=0, pre-check=0, max-age=0"
@@ -117,9 +119,6 @@ def create_app() -> Flask:
     # ── Periodic background cache cleanup ──────────────────────────────────
     _start_periodic_cleanup()
 
-    # ── Initialize Drive service once at startup ───────────────────────────
-    _init_drive_at_startup()
-
     return app
 
 
@@ -128,38 +127,54 @@ def create_app() -> Flask:
 # ───────────────────────────────────────────────────────────────────────────
 
 def _register_blueprints(app: Flask) -> None:
-    """Import and register every blueprint."""
+    """
+    Import and register every blueprint.
+
+    Web (HTML) blueprints live under app/routes/web/ (registered with no
+    extra prefix, except admin which is mounted at /admin). JSON API
+    blueprints (versioned) live under app/routes/api/v01/ (each carries
+    its own /api/v01/... url_prefix, set on the Blueprint itself).
+    """
     from flask import request  # needed inside after_request / before_request
 
-    # User-facing routes
-    from app.routes.auth import auth_bp
-    from app.routes.dashboard import dashboard_bp
-    from app.routes.exam import exam_bp
-    from app.routes.result import result_bp
-    from app.routes.ai_assistant import ai_bp
-    from app.routes.misc import misc_bp
+    # ── Web (HTML) ───────────────────────────────────────────────────────────
+    from app.routes.web.auth import auth_bp
+    from app.routes.web.dashboard import dashboard_bp
+    from app.routes.web.categories import categories_bp
+    from app.routes.web.misc import misc_bp
+    from app.routes.web.ai_assistant import ai_bp
+    from app.routes.web.results import result_bp
+    from app.routes.web.exams import exam_bp
+    from app.routes.web.notes import notes_bp
+    from app.routes.web.chat import chat_bp
+    from app.routes.web.admin import admin_bp
 
-    # Chat & discussion (kept as standalone blueprints)
-    from chat import chat_bp
-    from discussion import discussion_bp
+    # ── API v01 ──────────────────────────────────────────────────────────────
+    from app.routes.api.v01.auth import api_auth_bp
+    from app.routes.api.v01.access_requests import access_requests_bp
+    from app.routes.api.v01.assistant import assistant_api_bp
+    from app.routes.api.v01.explanations import explanation_bp
+    from app.routes.api.v01.exams import exam_api_bp, ping_api_bp
+    from app.routes.api.v01.images import images_api_bp
+    from app.routes.api.v01.notebooks import notes_api_bp
+    from app.routes.api.v01.discussions import discussion_bp, discussion_admin_bp
+    from app.routes.api.v01.chat import chat_api_bp
+    from app.routes.api.v01.admin import admin_api_bp
 
-    # Admin routes
-    from app.routes.admin import admin_bp as new_admin_bp
-
-    # LaTeX editor (kept simple)
-    from latex_editor import latex_bp
-
-    from app.routes.categories import categories_bp
-    
-    from app.routes.api_auth import api_auth_bp
     app.register_blueprint(api_auth_bp)
-
-    from app.routes.explanation import explanation_bp
+    app.register_blueprint(access_requests_bp)
+    app.register_blueprint(assistant_api_bp)
     app.register_blueprint(explanation_bp)
+    app.register_blueprint(exam_api_bp)
+    app.register_blueprint(ping_api_bp)
+    app.register_blueprint(images_api_bp)
+    app.register_blueprint(notes_api_bp)
+    app.register_blueprint(discussion_bp)
+    app.register_blueprint(discussion_admin_bp)
+    app.register_blueprint(chat_api_bp)
+    app.register_blueprint(admin_api_bp)
 
-    from app.routes.notes import notes_bp
     app.register_blueprint(notes_bp)
-
     app.register_blueprint(auth_bp)
     app.register_blueprint(categories_bp)
     app.register_blueprint(dashboard_bp)
@@ -168,15 +183,13 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(ai_bp)
     app.register_blueprint(misc_bp)
     app.register_blueprint(chat_bp)
-    app.register_blueprint(discussion_bp)
-    app.register_blueprint(new_admin_bp, url_prefix="/admin")
-    app.register_blueprint(latex_bp)
+    app.register_blueprint(admin_bp, url_prefix="/admin")
 
 
 def _register_socket_events() -> None:
     """Wire up SocketIO event handlers for chat and discussion."""
-    from chat import init_chat_socketio, register_chat_socketio_events
-    from discussion import init_socketio, register_socketio_events
+    from app.routes.api.v01.chat import init_chat_socketio, register_chat_socketio_events
+    from app.routes.api.v01.discussions import init_socketio, register_socketio_events
 
     init_socketio(socketio)
     register_socketio_events(socketio)
@@ -259,15 +272,3 @@ def _init_google_oauth(app: Flask) -> None:
         print("✅ Google OAuth: ACTIVE")
     except Exception as e:
         print(f"❌ Google OAuth init error: {e}")
-
-
-def _init_drive_at_startup() -> None:
-    """Initialize Google Drive service once when the process starts."""
-    try:
-        from app.services.drive_service import init_drive_service
-        if init_drive_service():
-            print("✅ Google Drive integration: ACTIVE")
-        else:
-            print("❌ Google Drive integration: INACTIVE — app runs in limited mode")
-    except Exception as e:
-        print(f"❌ Drive init error at startup: {e}")

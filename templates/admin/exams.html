@@ -669,8 +669,8 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function (
   const btn = this;
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
-  fetch('/admin/exams/delete/' + _examIdToDelete, {
-    method: 'POST',
+  fetch('/api/v01/admin/exams/' + _examIdToDelete, {
+    method: 'DELETE',
     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
   })
   .then(r => r.json())
@@ -783,7 +783,7 @@ document.getElementById('confirmReleaseBtn').addEventListener('click', function 
   const btn = this;
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
-  fetch('/admin/exams/' + _releaseExamId + '/release-results', {
+  fetch('/api/v01/admin/exams/' + _releaseExamId + '/release-results', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
   })

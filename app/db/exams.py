@@ -22,6 +22,16 @@ def get_all_exams() -> List[Dict]:
         return []
 
 
+def get_exams_count() -> int:
+    """Total exam count via COUNT query — no data fetch."""
+    try:
+        row = fetch_one("SELECT COUNT(*) AS count FROM exams")
+        return row["count"] if row else 0
+    except Exception as e:
+        print(f"[db.exams] get_exams_count error: {e}")
+        return 0
+
+
 def get_exams_for_dropdown() -> List[Dict]:
     """Minimal projection for exam select elements."""
     try:

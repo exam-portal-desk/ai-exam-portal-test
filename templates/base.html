@@ -845,7 +845,7 @@ function checkDel(){ var v=(document.getElementById('delInp')||{}).value||''; va
 function doDelete(){
   var b=document.getElementById('delBtn');
   b.disabled=true; b.innerHTML='<i class="fas fa-spinner fa-spin"></i> Deleting…';
-  fetch('/api/delete-account',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'DELETE'})})
+  fetch('/api/v01/auth/me',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'DELETE'})})
   .then(function(r){return r.json();}).then(function(d){
     if(d.success){
       // Show a professional confirmation in place of the confirm dialog before
@@ -889,7 +889,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script>
 (function(){
   function ping(){
-    fetch('/_ping',{method:'POST',credentials:'same-origin'}).then(function(r){
+    fetch('/api/v01/ping',{method:'POST',credentials:'same-origin'}).then(function(r){
       if(r.status===401) r.json().then(function(j){ window.location.href=(j&&j.reason==='other_device')?'/login?reason=other_device':'/login'; }).catch(function(){window.location.href='/login';});
     }).catch(function(){});
   }
@@ -902,7 +902,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script>
 (function(){
   function poll(){
-    fetch('/api/chat/unread_count').then(function(r){return r.json();}).then(function(d){
+    fetch('/api/v01/chat/unread-count').then(function(r){return r.json();}).then(function(d){
       var n=(d.unread||0)+(d.requests||0);
       var el=document.getElementById('sbChatBadge');
       if(el){el.textContent=n;el.style.display=n?'inline':'none';}

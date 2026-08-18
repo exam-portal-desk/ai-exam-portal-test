@@ -1,16 +1,44 @@
 .note-editor{height:calc(100vh - 48px);display:flex;flex-direction:column;background:var(--bg)}.editor-top{height:54px;display:flex;align-items:center;gap:.65rem;padding:0 .85rem;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}.editor-back{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;color:var(--text-2)}.editor-back:hover{background:var(--surface-2);color:var(--accent)}.editor-title-wrap{min-width:0;display:flex;align-items:center;gap:.65rem;flex:1}.editor-title-wrap input{min-width:0;width:100%;max-width:360px;border:1px solid transparent;background:transparent;color:var(--text-1);padding:.35rem .45rem;border-radius:var(--radius);font:600 .88rem inherit;outline:0}.editor-title-wrap input:focus{background:var(--bg-raised);border-color:var(--border-focus)}.editor-title-wrap input[readonly]{cursor:default;background:transparent}.save-state{font-size:.68rem;color:var(--success-text);white-space:nowrap}.save-state.saving{color:var(--warning-text)}.save-state.failed{color:var(--danger-text)}.editor-top-actions{display:flex;align-items:center;gap:.3rem}.editor-top-actions .sbtn{padding:.35rem .55rem}.editor-top-actions .sbtn.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent)}.editor-top-actions .sbtn:disabled{opacity:.4;cursor:not-allowed}.zoom-value{min-width:38px;text-align:center;font-size:.7rem;color:var(--text-3)}.editor-layout{min-height:0;display:flex;flex:1}.page-rail{width:190px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .15s ease}.page-rail-head{display:flex;align-items:center;gap:.3rem;padding:.7rem .75rem;border-bottom:1px solid var(--border);font-size:.67rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3)}.page-rail-head span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-rail-head button{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;border:0;border-radius:6px;background:var(--accent-subtle);color:var(--accent);cursor:pointer;flex-shrink:0}.page-rail-collapse-btn{background:transparent!important;color:var(--text-3)!important}.page-rail-collapse-btn:hover{background:var(--surface-2)!important;color:var(--text-1)!important}.page-list{padding:.35rem;overflow:auto}
-/* Collapsible Pages sidebar — independent of Edit/Read mode and Full Screen state */
-.page-rail.collapsed{width:38px}
+/* Collapsible Pages sidebar — independent of Edit/Read mode and Full Screen state.
+   Collapsed stays compact (52px, not the 190px expanded rail) but keeps full page
+   management reachable via #collapsedPageControls below, instead of hiding it all
+   behind "expand the sidebar first". */
+.page-rail.collapsed{width:52px}
 .page-rail.collapsed .page-rail-head{justify-content:center;padding:.7rem .25rem}
 .page-rail.collapsed .page-rail-head span,
 .page-rail.collapsed #newPageBtn,
 .page-rail.collapsed .page-list{display:none}
-.page-rail.collapsed .page-rail-collapse-btn i{transform:rotate(180deg)}.page-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.4rem;padding:.5rem .55rem;border:0;border-radius:7px;background:transparent;color:var(--text-2);font:500 .76rem inherit;text-align:left;cursor:pointer}.page-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-item i{font-size:.6rem;opacity:0}.page-item:hover{background:var(--surface-2);color:var(--text-1)}.page-item:hover i,.page-item.active i{opacity:.6}.page-item.active{background:var(--accent-subtle);color:var(--accent);font-weight:600}.editor-workspace{min-width:0;flex:1;position:relative;display:flex;flex-direction:column}.object-toolbar{display:flex;align-items:center;gap:.25rem;padding:.45rem .7rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}.tool-group{display:flex;align-items:center;gap:.25rem}.object-toolbar[hidden]{display:none!important}.object-toolbar button{width:30px;height:30px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text-2);cursor:pointer;font-size:.78rem}.object-toolbar button:hover,.object-toolbar button.active{background:var(--accent-subtle);color:var(--accent)}.tool-divider{height:20px;width:1px;background:var(--border);margin:0 .2rem}.canvas-shell{position:relative;min-height:0;flex:1;overflow:hidden;background-color:var(--bg);background-image:radial-gradient(var(--border) 1px,transparent 1px);background-size:20px 20px}.canvas-container{position:absolute!important;inset:0}.canvas-container canvas{position:absolute!important}.canvas-loading{position:absolute;z-index:3;inset:0;display:flex;align-items:center;justify-content:center;gap:.5rem;background:var(--bg);font-size:.78rem;color:var(--text-3);pointer-events:none}.canvas-loading[hidden]{display:none}@media(max-width:768px){.note-editor{height:calc(100vh - 48px)}.editor-top{padding:0 .55rem}.editor-top-actions .sbtn:nth-child(-n+2){display:none}.save-state{display:none}.editor-title-wrap input{font-size:.8rem}.page-rail{width:142px}.object-toolbar{overflow-x:auto;padding:.4rem}.canvas-shell{background-size:16px 16px}}
+.page-rail.collapsed .page-rail-collapse-btn i{transform:rotate(180deg)}.page-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.4rem;padding:.5rem .55rem;border:0;border-radius:7px;background:transparent;color:var(--text-2);font:500 .76rem inherit;text-align:left;cursor:pointer}.page-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-item>span:last-of-type{flex:1;min-width:0}.page-item i{font-size:.6rem;opacity:0}
+.page-item-num{flex-shrink:0;min-width:15px;text-align:center;font-size:.6rem;font-weight:700;color:var(--text-3);background:var(--surface-2);border-radius:4px;padding:1px 4px}
+.page-item.active .page-item-num{color:var(--accent)}
+/* Collapsed-rail compact controls: add / prev / current page (click = jump popover) / next / actions.
+   Hidden by default, shown only while the rail is collapsed — never widened to fit them. */
+.page-rail-collapsed-controls{display:none}
+.page-rail.collapsed .page-rail-collapsed-controls{display:flex;flex-direction:column;align-items:center;gap:7px;padding:.6rem .25rem}
+.page-rail-collapsed-controls button{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--text-2);cursor:pointer;font-size:.74rem;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.page-rail-collapsed-controls button:hover{background:var(--surface-2);color:var(--text-1)}
+.page-rail-collapsed-controls button:disabled{opacity:.35;cursor:not-allowed;background:transparent}
+#collapsedNewPageBtn{background:var(--accent-subtle);color:var(--accent)}
+.page-rail-page-number{min-width:32px;height:26px;padding:0 3px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-1);font:700 .74rem inherit}
+.page-rail-page-number.compact-num{font-size:.56rem}.page-item:hover{background:var(--surface-2);color:var(--text-1)}.page-item:hover i,.page-item.active i{opacity:.6}.page-item.active{background:var(--accent-subtle);color:var(--accent);font-weight:600}.editor-workspace{min-width:0;flex:1;position:relative;display:flex;flex-direction:column}.object-toolbar{display:flex;align-items:center;gap:.25rem;padding:.45rem .7rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}.tool-group{display:flex;align-items:center;gap:.25rem}.object-toolbar[hidden]{display:none!important}.object-toolbar button{width:30px;height:30px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text-2);cursor:pointer;font-size:.78rem}.object-toolbar button:hover,.object-toolbar button.active{background:var(--accent-subtle);color:var(--accent)}.tool-divider{height:20px;width:1px;background:var(--border);margin:0 .2rem}.canvas-shell{position:relative;min-height:0;flex:1;overflow:hidden;background-color:var(--bg);background-image:radial-gradient(var(--border) 1px,transparent 1px);background-size:20px 20px}.canvas-container{position:absolute!important;inset:0}.canvas-container canvas{position:absolute!important}.canvas-loading{position:absolute;z-index:3;inset:0;display:flex;align-items:center;justify-content:center;gap:.5rem;background:var(--bg);font-size:.78rem;color:var(--text-3);pointer-events:none}.canvas-loading[hidden]{display:none}@media(max-width:768px){.note-editor{height:calc(100vh - 48px)}.editor-top{padding:0 .55rem}#undoBtn,#redoBtn{display:none}.save-state{display:none}.page-nav-label{min-width:0}.editor-title-wrap input{font-size:.8rem}.page-rail{width:142px}.object-toolbar{overflow-x:auto;padding:.4rem}.canvas-shell{background-size:16px 16px}}
 .canvas-empty-state{position:absolute;z-index:2;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.35rem;color:var(--text-3);background:var(--bg);font-size:.8rem;pointer-events:none}.canvas-empty-state i{font-size:1.5rem;color:var(--accent)}.canvas-empty-state strong{font-size:.9rem;color:var(--text-2)}.canvas-empty-state[hidden]{display:none}
-.canvas-shell{overflow:auto!important}.canvas-container{position:relative!important;inset:auto!important}.canvas-container canvas{position:absolute!important;left:0;top:0}.native-text-editor{position:absolute;z-index:20;pointer-events:auto;box-sizing:border-box;overflow:visible;white-space:pre-wrap;overflow-wrap:break-word;outline:none;border:0;border-radius:3px;margin:0;caret-color:currentColor;background:transparent;cursor:text;transform-origin:top left;user-select:text;-webkit-user-select:text}
+.canvas-shell{overflow:auto!important;scrollbar-width:auto;scrollbar-color:var(--text-3) var(--surface-2)}.canvas-shell::-webkit-scrollbar{width:14px;height:14px}.canvas-shell::-webkit-scrollbar-track{background:var(--surface-2)}.canvas-shell::-webkit-scrollbar-thumb{background:var(--text-3);border-radius:8px;border:3px solid var(--surface-2)}.canvas-shell::-webkit-scrollbar-thumb:hover{background:var(--text-2)}.canvas-container{position:relative!important;inset:auto!important}.canvas-container canvas{position:absolute!important;left:0;top:0}.native-text-editor{position:absolute;z-index:20;pointer-events:auto;box-sizing:border-box;overflow:visible;white-space:pre-wrap;overflow-wrap:break-word;outline:none;border:0;border-radius:3px;margin:0;caret-color:currentColor;background:transparent;cursor:text;transform-origin:top left;user-select:text;-webkit-user-select:text}.page-nav{display:flex;align-items:center;gap:.25rem}.page-nav-label{min-width:88px;text-align:center;font-size:.72rem;color:var(--text-2);white-space:nowrap}
+/* Visible notebook page boundary — .canvas-container is sized by Fabric to exactly the fixed
+   PAGE_WIDTH x PAGE_HEIGHT canvas (see editor.js), so this outline always traces the real
+   logical page edge, not a decorative guess: no separate JS positioning needed, and it stays
+   correctly aligned through zoom (Fabric zoom scales content via viewportTransform, not this
+   element's own size) and through scroll. outline (not border) is paint-only — it can't add to
+   the container's box size/scroll extent the way a border would. pointer-events isn't needed
+   either: outline never participates in hit-testing. */
+.canvas-container{outline:1.5px dashed var(--text-3);outline-offset:-1px}
 
-.native-text-resize-handle{position:absolute;z-index:9;width:11px;height:11px;border-radius:50%;background:var(--surface);border:1.5px solid var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.08);cursor:nwse-resize;touch-action:none}
 .notes-auto-save{display:inline-flex;align-items:center;gap:.35rem;margin-left:.35rem;color:var(--text-3);font-size:.68rem;white-space:nowrap}.notes-auto-save input{accent-color:var(--accent);cursor:pointer}
+
+/* Stroke-width quick presets (Pen/Pencil/Highlighter) — buttons inherit the standard
+   .object-toolbar button look/active-state automatically; only the inner dot needs styling. */
+.notes-width-row{display:flex;align-items:center;gap:2px}
+.notes-width-row[hidden]{display:none}
+.notes-width-dot{display:inline-block;border-radius:50%;background:currentColor}
 
 /* Integer size stepper — replaces the old fixed-dropdown font/stroke size control */
 .notes-size-stepper{display:inline-flex;align-items:center;gap:2px;height:28px;flex-shrink:0}
@@ -33,7 +61,9 @@
 
 /* Read Mode: hide structural/page-editing controls, keep page switching + reading available */
 .note-editor.read-mode .page-dots-btn,
-.note-editor.read-mode #newPageBtn{display:none}
+.note-editor.read-mode #newPageBtn,
+.note-editor.read-mode #collapsedNewPageBtn,
+.note-editor.read-mode #collapsedPageMenuBtn{display:none}
 .note-editor.read-mode .canvas-shell{cursor:default}
 
 /* Full Screen — element target is #noteEditor itself (native Fullscreen API).
@@ -54,4 +84,27 @@
   z-index:9999;
   height:100vh;
   width:100vw;
+}
+
+/* Export progress state for #exportPdfBtn/#exportJsonBtn — same .sbtn/.sbtn-ghost button,
+   just showing "Exporting PDF 42%" text in place of its usual bare icon while it runs, so it
+   stays readable (not dimmed like a normal :disabled button) instead of moving to a separate
+   modal/overlay. font-variant-numeric keeps the digits a fixed width so the button doesn't
+   jitter as the percentage counts up. */
+.editor-top-actions .sbtn.exporting:disabled{
+  opacity:1;
+  cursor:progress;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+
+/* Object count indicator next to Clear Page — same small secondary-text treatment as
+   #zoomValue, just with an icon. */
+.object-count{
+  display:inline-flex;
+  align-items:center;
+  gap:.3rem;
+  font-size:.7rem;
+  color:var(--text-3);
+  white-space:nowrap;
 }

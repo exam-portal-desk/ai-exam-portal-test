@@ -1,4 +1,4 @@
-const api = '/api/notes/notebooks';
+const api = '/api/v01/notebooks';
 let selectedNotebookId = null;
 
 function toast(message, type = 'success') {

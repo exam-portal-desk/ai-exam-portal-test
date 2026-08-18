@@ -1,14 +1,14 @@
 """
 main.py
 Thin application entry point.
-All configuration, blueprints, and initialization live in app/ and config.py.
+All configuration, blueprints, and initialization live in app/ (including app/config.py).
 """
 
 from gevent import monkey
 monkey.patch_all()
 
 from app import create_app, socketio
-import config
+import app.config as config
 
 app = create_app()
 

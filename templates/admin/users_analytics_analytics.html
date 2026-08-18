@@ -262,7 +262,7 @@ function updateAnalytics() {
     showLoadingState();
 
     const params = new URLSearchParams(filters);
-    fetch(`/admin/api/users-analytics/data?${params}`, { credentials: 'same-origin' })
+    fetch(`/api/v01/admin/analytics/data?${params}`, { credentials: 'same-origin' })
         .then(resp => {
             if (!resp.ok) throw new Error('Network response not ok');
             return resp.json();

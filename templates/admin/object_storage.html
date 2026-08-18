@@ -1,0 +1,364 @@
+{% extends "admin_base.html" %}
+{% block title %}Object Storage{% endblock %}
+
+{% block content %}
+
+<style>
+.page-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;
+}
+.page-top h1 {
+  font-size: 1.25rem; font-weight: 700; color: var(--text-1);
+  margin: 0 0 .25rem; display: flex; align-items: center; gap: .55rem;
+}
+.page-top p { font-size: .82rem; color: var(--text-3); margin: 0; }
+
+.btn-flat {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem 1rem; border-radius: var(--radius);
+  font-size: .8rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; border: none;
+  transition: background .12s, color .12s, transform .1s;
+  text-decoration: none; white-space: nowrap;
+}
+.btn-flat.primary { background: var(--accent); color: var(--accent-on); }
+.btn-flat.primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-flat.secondary { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+.btn-flat.secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-flat.danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+.btn-flat.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-flat:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.backend-pill {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--accent-subtle); color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px;
+  padding: .3rem .75rem; font-size: .74rem; font-weight: 700;
+}
+
+.os-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px); box-shadow: var(--shadow-md);
+  overflow: hidden; margin-bottom: 1.25rem;
+}
+.os-toolbar {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .9rem 1.1rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.os-search {
+  flex: 1; min-width: 220px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .5rem .8rem; font-size: .85rem;
+  color: var(--text-1); font-family: inherit;
+}
+.os-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+.os-stats { font-size: .78rem; color: var(--text-3); white-space: nowrap; }
+
+.os-breadcrumb {
+  display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
+  padding: .7rem 1.1rem; font-size: .82rem; color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+}
+.os-breadcrumb button {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font-size: .82rem; font-weight: 600; padding: 0; font-family: inherit;
+}
+.os-breadcrumb button:hover { text-decoration: underline; }
+.os-breadcrumb .sep { color: var(--text-3); }
+
+table.os-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+table.os-table th {
+  text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3); padding: .6rem 1rem;
+  border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+table.os-table td { padding: .6rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: middle; }
+table.os-table tr:last-child td { border-bottom: none; }
+table.os-table tr.folder-row { cursor: pointer; }
+table.os-table tr.folder-row:hover { background: var(--surface-2); }
+.os-name { color: var(--text-1); font-weight: 500; word-break: break-all; }
+.os-thumb {
+  width: 34px; height: 34px; border-radius: 6px; object-fit: cover;
+  border: 1px solid var(--border); background: var(--surface-2); flex-shrink: 0;
+}
+.os-icon { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; background: var(--surface-2); color: var(--text-3); flex-shrink: 0; }
+.os-name-cell { display: flex; align-items: center; gap: .6rem; }
+.os-row-actions { display: flex; gap: .4rem; justify-content: flex-end; }
+.os-icon-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-3); cursor: pointer;
+}
+.os-icon-btn:hover { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-bg); }
+
+.os-empty { padding: 3rem 1rem; text-align: center; color: var(--text-3); }
+.os-empty i { font-size: 2rem; opacity: .4; display: block; margin-bottom: .75rem; }
+
+.del-warn {
+  background: var(--danger-bg); border: 1px solid var(--danger-border);
+  border-radius: var(--radius); padding: .85rem 1rem; margin-bottom: .85rem;
+}
+.del-warn-t { font-size: .82rem; font-weight: 700; color: var(--danger-text); margin-bottom: .35rem; display: flex; align-items: center; gap: .35rem; }
+.del-warn ul { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--text-2); line-height: 1.85; }
+</style>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-hdd" style="color:var(--accent)"></i>Object Storage</h1>
+    <p>Browse, search, and manage objects in the active storage backend.</p>
+  </div>
+  <span class="backend-pill"><i class="fas fa-server"></i>{{ backend_label }} &middot; {{ bucket }}</span>
+</div>
+
+<div class="os-card">
+  <div class="os-toolbar">
+    <input type="text" id="osSearch" class="os-search" placeholder="Search object keys (searches within current folder)...">
+    <span class="os-stats" id="osStats">&nbsp;</span>
+    <button class="btn-flat secondary" id="osCalcUsage"><i class="fas fa-calculator"></i> Calculate usage</button>
+    <button class="btn-flat secondary" id="osRefresh"><i class="fas fa-sync-alt"></i> Refresh</button>
+    <button class="btn-flat danger" id="osBulkDelete" disabled><i class="fas fa-trash"></i> Delete selected (<span id="osSelCount">0</span>)</button>
+  </div>
+  <div class="os-breadcrumb" id="osBreadcrumb"></div>
+  <div id="osTableWrap"></div>
+  <div style="padding: .9rem 1.1rem; text-align:center;">
+    <button class="btn-flat secondary d-none" id="osLoadMore">Load more</button>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="osDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--danger-bg);border-bottom:1px solid var(--danger-border)!important">
+        <h5 class="modal-title" style="font-size:.92rem;font-weight:700;color:var(--danger-text);display:flex;align-items:center;gap:.45rem">
+          <i class="fas fa-trash"></i> Delete object(s)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                style="filter:invert(0.4) sepia(1) saturate(3) hue-rotate(315deg) brightness(.8)"></button>
+      </div>
+      <div class="modal-body">
+        <div class="del-warn">
+          <div class="del-warn-t"><i class="fas fa-exclamation-triangle"></i> Are you sure?</div>
+          <ul>
+            <li><strong id="osDeleteCount"></strong> object(s) will be permanently deleted from storage</li>
+            <li>Objects outside Category/ and subject folders may be in active use elsewhere (e.g. Notes attachments) — check the key before deleting</li>
+            <li>This action cannot be undone</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-flat danger" id="osConfirmDelete"><i class="fas fa-trash"></i> Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LIST_URL = '{{ url_for("admin_api.list_storage_objects") }}';
+  var STATS_URL = '{{ url_for("admin_api.storage_stats") }}';
+  var DELETE_URL = '{{ url_for("admin_api.delete_storage_objects") }}';
+
+  var state = { prefix: '', cursor: null, objects: [], prefixes: [], searching: false };
+  var selected = new Set();
+  var pendingDeleteKeys = [];
+  var delModal;
+
+  function fmtBytes(n) {
+    if (!n) return '0 B';
+    var k = 1024, s = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(n) / Math.log(k));
+    return parseFloat((n / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
+  }
+
+  function renderBreadcrumb() {
+    var el = document.getElementById('osBreadcrumb');
+    var parts = state.prefix ? state.prefix.replace(/\/$/, '').split('/') : [];
+    var html = '<button data-go=""><i class="fas fa-hdd"></i> root</button>';
+    var acc = '';
+    parts.forEach(function (p) {
+      acc += p + '/';
+      html += '<span class="sep">/</span><button data-go="' + acc + '">' + p + '</button>';
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () { navigateTo(b.getAttribute('data-go')); });
+    });
+  }
+
+  function renderTable(append) {
+    var wrap = document.getElementById('osTableWrap');
+    var hasContent = state.prefixes.length || state.objects.length;
+
+    if (!hasContent && !append) {
+      wrap.innerHTML = '<div class="os-empty"><i class="fas fa-folder-open"></i><div>No objects found here.</div></div>';
+      document.getElementById('osLoadMore').classList.add('d-none');
+      return;
+    }
+
+    var rows = '';
+    if (!append) {
+      state.prefixes.forEach(function (p) {
+        var label = p.key.replace(state.prefix, '').replace(/\/$/, '');
+        var sizeText = fmtBytes(p.size) + (p.truncated ? '+' : '');
+        var modText = p.last_modified || '&mdash;';
+        rows += '<tr class="folder-row" data-folder="' + p.key + '">' +
+          '<td></td>' +
+          '<td><div class="os-name-cell"><div class="os-icon"><i class="fas fa-folder"></i></div>' +
+          '<span class="os-name">' + label + '/</span></div></td>' +
+          '<td>' + sizeText + '</td>' +
+          '<td>' + modText + '</td>' +
+          '<td></td>' +
+          '<td></td></tr>';
+      });
+    }
+
+    state.objects.forEach(function (o) {
+      var thumb = o.is_image
+        ? '<img class="os-thumb" src="' + o.preview_url + '" loading="lazy">'
+        : '<div class="os-icon"><i class="fas fa-file"></i></div>';
+      var checked = selected.has(o.key) ? 'checked' : '';
+      rows += '<tr>' +
+        '<td><input type="checkbox" class="os-check" data-key="' + o.key.replace(/"/g, '&quot;') + '" ' + checked + '></td>' +
+        '<td><div class="os-name-cell">' + thumb + '<span class="os-name">' + o.key + '</span></div></td>' +
+        '<td>' + fmtBytes(o.size) + '</td>' +
+        '<td>' + (o.last_modified || '&mdash;') + '</td>' +
+        '<td></td>' +
+        '<td><div class="os-row-actions">' +
+        (o.is_image ? '<a class="os-icon-btn" href="' + o.preview_url + '" target="_blank" rel="noopener"><i class="fas fa-eye"></i></a>' : '') +
+        '<button class="os-icon-btn" data-del="' + o.key.replace(/"/g, '&quot;') + '"><i class="fas fa-trash"></i></button>' +
+        '</div></td></tr>';
+    });
+
+    if (append) {
+      wrap.querySelector('tbody').insertAdjacentHTML('beforeend', rows);
+    } else {
+      wrap.innerHTML =
+        '<table class="os-table"><thead><tr>' +
+        '<th style="width:34px"></th><th>Object</th><th style="width:100px">Size</th>' +
+        '<th style="width:160px">Modified</th><th style="width:1px"></th><th style="width:80px"></th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    wireRowEvents();
+    document.getElementById('osLoadMore').classList.toggle('d-none', !state.cursor || state.searching);
+  }
+
+  function wireRowEvents() {
+    document.querySelectorAll('tr.folder-row').forEach(function (tr) {
+      tr.addEventListener('click', function () { navigateTo(tr.getAttribute('data-folder')); });
+    });
+    document.querySelectorAll('.os-check').forEach(function (cb) {
+      cb.addEventListener('click', function (e) { e.stopPropagation(); });
+      cb.addEventListener('change', function () {
+        var key = cb.getAttribute('data-key');
+        if (cb.checked) selected.add(key); else selected.delete(key);
+        updateSelectionUI();
+      });
+    });
+    document.querySelectorAll('[data-del]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openDeleteModal([btn.getAttribute('data-del')]);
+      });
+    });
+  }
+
+  function updateSelectionUI() {
+    document.getElementById('osSelCount').textContent = selected.size;
+    document.getElementById('osBulkDelete').disabled = selected.size === 0;
+  }
+
+  function navigateTo(prefix) {
+    state.prefix = prefix || '';
+    state.cursor = null;
+    selected.clear();
+    updateSelectionUI();
+    document.getElementById('osSearch').value = '';
+    renderBreadcrumb();
+    load(false);
+  }
+
+  function load(append) {
+    var q = document.getElementById('osSearch').value.trim();
+    state.searching = !!q;
+    var url = LIST_URL + '?prefix=' + encodeURIComponent(state.prefix) + '&limit=50';
+    if (q) url += '&q=' + encodeURIComponent(q);
+    if (append && state.cursor) url += '&cursor=' + encodeURIComponent(state.cursor);
+
+    fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.success) { adminToast(d.message || 'Failed to load objects.', 'danger'); return; }
+      if (append) {
+        state.objects = state.objects.concat(d.objects);
+      } else {
+        state.objects = d.objects;
+        state.prefixes = d.prefixes || [];
+      }
+      state.cursor = d.next_cursor;
+      renderTable(append);
+      if (d.truncated) adminToast('Search stopped early after scanning a large number of objects — narrow your search.', 'warning');
+    }).catch(function (err) { adminToast('Network error: ' + err, 'danger'); });
+  }
+
+  function openDeleteModal(keys) {
+    pendingDeleteKeys = keys;
+    document.getElementById('osDeleteCount').textContent = keys.length;
+    delModal.show();
+  }
+
+  function performDelete() {
+    var btn = document.getElementById('osConfirmDelete');
+    btn.disabled = true;
+    fetch(DELETE_URL, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys: pendingDeleteKeys }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      delModal.hide();
+      if (d.success) {
+        adminToast(d.deleted + ' object(s) deleted.', 'success');
+        pendingDeleteKeys.forEach(function (k) { selected.delete(k); });
+        updateSelectionUI();
+        navigateTo(state.prefix);
+      } else {
+        adminToast(d.message || 'Delete failed.', 'danger');
+      }
+    }).catch(function (err) { adminToast('Network error: ' + err, 'danger'); })
+      .finally(function () { btn.disabled = false; });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    delModal = new bootstrap.Modal(document.getElementById('osDeleteModal'));
+    renderBreadcrumb();
+    load(false);
+
+    var searchTimer;
+    document.getElementById('osSearch').addEventListener('input', function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () { load(false); }, 350);
+    });
+    document.getElementById('osRefresh').addEventListener('click', function () { navigateTo(state.prefix); });
+    document.getElementById('osLoadMore').addEventListener('click', function () { load(true); });
+    document.getElementById('osBulkDelete').addEventListener('click', function () {
+      openDeleteModal(Array.from(selected));
+    });
+    document.getElementById('osConfirmDelete').addEventListener('click', performDelete);
+
+    document.getElementById('osCalcUsage').addEventListener('click', function () {
+      var el = document.getElementById('osStats');
+      el.textContent = 'Calculating...';
+      fetch(STATS_URL + '?prefix=' + encodeURIComponent(state.prefix))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.success) { el.textContent = ''; adminToast(d.message || 'Failed to calculate usage.', 'danger'); return; }
+          el.textContent = d.object_count + ' object' + (d.object_count === 1 ? '' : 's') + ' · ' + fmtBytes(d.total_bytes) + (d.truncated ? ' (partial — very large folder)' : '');
+        }).catch(function () { el.textContent = ''; });
+    });
+  });
+})();
+</script>
+{% endblock %}

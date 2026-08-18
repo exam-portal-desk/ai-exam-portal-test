@@ -470,7 +470,7 @@
           <div class="info-box">
             <strong>What happens when you add a subject?</strong>
             <ul>
-              <li>A new folder is created in Google Drive</li>
+              <li>A storage folder is reserved for this subject</li>
               <li>You can upload images for this subject</li>
               <li>Reference images as <code>SubjectName/image.png</code> in questions</li>
             </ul>
@@ -560,7 +560,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 document.getElementById('confirmSubjectDeleteBtn').addEventListener('click', function() {
   if (!_subjectIdToDelete) return;
-  window.location.href = '/admin/subjects/delete/' + _subjectIdToDelete;
+  fetch('/admin/subjects/delete/' + _subjectIdToDelete, { method: 'POST' })
+    .then(() => { window.location.reload(); });
 });
 </script>
 {% endblock %}

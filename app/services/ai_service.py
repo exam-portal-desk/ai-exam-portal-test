@@ -8,7 +8,7 @@ Business logic for the AI study assistant:
 
 from typing import List, Dict, Optional
 
-import config
+import app.config as config
 from app.db.ai import (
     get_chat_history as db_get_history,
     save_chat_message as db_save_message,

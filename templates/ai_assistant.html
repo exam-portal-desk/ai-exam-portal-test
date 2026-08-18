@@ -372,7 +372,7 @@ class AIAssistant{
   _rmSkeleton(){document.getElementById('historySkeleton')?.remove();}
   async loadInit(){
     try{
-      const r=await fetch('/api/assistant-init');const d=await r.json();
+      const r=await fetch('/api/v01/assistant/init');const d=await r.json();
       this._rmSkeleton();if(!d.success)return;
       this.dailyLimit=d.dailyLimit;this.questionsUsed=d.questionsUsed;this.updateUI();
       if(d.history&&d.history.length){
@@ -423,7 +423,7 @@ class AIAssistant{
     if(inp&&!msg){inp.value='';inp.style.height='auto';}
     this._busy(true);this.showTyping();
     try{
-      const r=await fetch('/api/study-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+      const r=await fetch('/api/v01/assistant/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
       const d=await r.json();this.hideTyping();
       if(d.success){this.addMsg(d.response,false);this.questionsUsed++;this.updateUI();}
       else this.addMsg("Sorry, I couldn't process that. Please try again.",false);
@@ -438,7 +438,7 @@ class AIAssistant{
   renderMath(root){const c=root||document.getElementById('chatMessages');if(!c||!window.renderMathInElement)return;try{renderMathInElement(c,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false,ignoredTags:['script','noscript','style','textarea','pre']});}catch(e){}}
   async clearHistory(){
     try{
-      const r=await fetch('/api/clear-chat-history',{method:'POST',headers:{'Content-Type':'application/json'}});
+      const r=await fetch('/api/v01/assistant/messages',{method:'DELETE',headers:{'Content-Type':'application/json'}});
       const d=await r.json();
       if(d.success){document.getElementById('chatMessages').innerHTML='';this.chatHistory=[];this.addMsg('[EXPLANATION]\nChat cleared. Ask me anything!',false);closeConfirmModal();}
       else alert('Failed to clear history.');

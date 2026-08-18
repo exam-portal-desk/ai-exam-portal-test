@@ -157,7 +157,7 @@
 <div class="page-top">
   <div>
     <h1><i class="fas fa-images me-2" style="color:var(--accent)"></i>Upload Question Images</h1>
-    <p>Upload images to a subject folder on Google Drive.</p>
+    <p>Upload images to a subject folder in object storage.</p>
   </div>
 </div>
 
@@ -201,7 +201,7 @@
       <i class="fas fa-folder-open me-1"></i>Choose Files
     </button>
     <input type="file" id="file-input" accept="image/*" multiple hidden>
-    <div class="form-hint mt-3">Supported: JPG, PNG, GIF, SVG &nbsp;•&nbsp; Max 10MB per file</div>
+    <div class="form-hint mt-3">Supported: JPG, PNG, GIF, SVG &nbsp;•&nbsp; Max {{ max_image_size_kb }} KB per file</div>
   </div>
 
   <div id="file-list" class="d-none"></div>
@@ -215,6 +215,7 @@
 
 <script>
 (function() {
+  const MAX_IMAGE_SIZE_BYTES = {{ max_image_size_kb }} * 1024;
   const selectEl   = document.getElementById('subject_folder_id');
   const section    = document.getElementById('uploader-section');
   const dropZone   = document.getElementById('drop-zone');
@@ -257,7 +258,7 @@
   function addFiles(files) {
     for (const f of files) {
       if (!f.type.startsWith('image/')) continue;
-      if (f.size > 10*1024*1024) { adminToast(`${f.name} exceeds 10 MB limit.`, 'warning'); continue; }
+      if (f.size > MAX_IMAGE_SIZE_BYTES) { adminToast(`${f.name} exceeds the {{ max_image_size_kb }} KB limit.`, 'warning'); continue; }
       selectedFiles.push(f);
     }
     render();
@@ -280,7 +281,7 @@
     uploadBtn.disabled = true;
     uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
     try {
-      const resp = await fetch('{{ url_for("admin.upload_images_page") }}', { method: 'POST', body: fd });
+      const resp = await fetch('{{ url_for("admin_api.upload_images_api") }}', { method: 'POST', body: fd });
       const text = await resp.text();
       let result;
       try { result = JSON.parse(text); } catch { adminToast('Unexpected server response. Check console.', 'danger'); return; }
