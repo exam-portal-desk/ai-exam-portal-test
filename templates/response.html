@@ -850,6 +850,7 @@ document.getElementById('downloadPdfBtn').onclick = function() {
 const DISC_IS_ADMIN = {{ ('admin' in (session.role or '')) | tojson }};
 const DISC_UID      = {{ session.user_id | tojson }};
 const DISC_UNAME    = {{ (session.full_name or session.username or 'User') | tojson }};
+const DISC_AVATAR   = {{ (NAV_AVATAR_URL or none) | tojson }};
 const DISC_POLL     = 30000;
 const _discWS       = (typeof io !== 'undefined') ? io() : null;
 const _wsJoined     = new Set();
@@ -912,6 +913,9 @@ function discCard(c, qid, examId, isReply, pUname) {
   const init     = (c.username||'U')[0].toUpperCase();
   const hue      = _avatarHue(c.username);
   const avatarBg = isReply ? `hsl(${hue},52%,40%)` : `hsl(${hue},58%,36%)`;
+  const avatarEl = c.avatar_url
+    ? `<img class="c-avatar" style="object-fit:cover" src="${discEsc(c.avatar_url)}" alt="">`
+    : `<div class="c-avatar" style="background:${avatarBg}">${discEsc(init)}</div>`;
 
   const editedBadge = c.is_edited      ? '<span class="badge-edited">(edited)</span>'    : '';
   const pinBadge    = c.is_pinned      ? '<span class="badge-pin">📌 Pinned</span>'       : '';
@@ -966,7 +970,7 @@ function discCard(c, qid, examId, isReply, pUname) {
   return `
 <div class="c-card ${c.is_pinned?'is-pinned':''} ${c.is_best_answer?'is-best':''} ${isReply?'is-reply':''}" id="ccard-${c.id}">
   <div style="display:flex;gap:.6rem;align-items:flex-start;">
-    <div class="c-avatar" style="background:${avatarBg}">${discEsc(init)}</div>
+    ${avatarEl}
     <div style="flex:1;min-width:0;">
       ${replyChip}
       <div class="c-meta">
@@ -1140,11 +1144,14 @@ async function discPost(qid, examId) {
   const list = document.getElementById(`disc-list-${qid}`);
   const optId = `opt-${Date.now()}`;
   const hue   = _avatarHue(DISC_UNAME);
+  const ownAvatarEl = DISC_AVATAR
+    ? `<img class="c-avatar" style="object-fit:cover" src="${discEsc(DISC_AVATAR)}" alt="">`
+    : `<div class="c-avatar" style="background:hsl(${hue},58%,36%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>`;
   list?.querySelector('.no-comments')?.remove();
   list?.insertAdjacentHTML('beforeend', `
 <div class="c-card" id="${optId}" style="opacity:.55;">
   <div style="display:flex;gap:.6rem;align-items:flex-start;">
-    <div class="c-avatar" style="background:hsl(${hue},58%,36%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>
+    ${ownAvatarEl}
     <div style="flex:1;min-width:0;">
       <div class="c-meta"><span class="c-username">${discEsc(DISC_UNAME)}</span><span class="c-time">just now</span></div>
       <div class="c-text">${discEsc(msg)}</div>
@@ -1189,12 +1196,15 @@ async function discReply(parentId, qid, examId) {
     ? `<div class="reply-to-chip"><i class="fas fa-reply" style="font-size:.65rem;"></i> Replying to <strong>${discEsc(pUname)}</strong></div>`
     : '';
   const optId  = `opt-r-${Date.now()}`;
+  const ownAvatarEl = DISC_AVATAR
+    ? `<img class="c-avatar" style="object-fit:cover" src="${discEsc(DISC_AVATAR)}" alt="">`
+    : `<div class="c-avatar" style="background:hsl(${hue},52%,40%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>`;
 
   // Show optimistic reply inside parent box immediately
   _insertReplyIntoParent(parentId, `
 <div class="c-card is-reply" id="${optId}" style="opacity:.55;">
   <div style="display:flex;gap:.6rem;align-items:flex-start;">
-    <div class="c-avatar" style="background:hsl(${hue},52%,40%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>
+    ${ownAvatarEl}
     <div style="flex:1;min-width:0;">
       ${chip}
       <div class="c-meta"><span class="c-username">${discEsc(DISC_UNAME)}</span><span class="c-time">just now</span></div>

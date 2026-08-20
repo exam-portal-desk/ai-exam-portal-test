@@ -1,0 +1,278 @@
+{% extends "admin_base.html" %}
+{% block title %}Profile & Account{% endblock %}
+
+{% block content %}
+<style>
+  .pf-wrap { max-width:640px; margin:0 auto; }
+  .pf-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:calc(var(--radius) + 4px); box-shadow:var(--shadow-sm);
+    overflow:hidden; margin-bottom:1.25rem;
+  }
+  .pf-hero {
+    padding:2rem 1.75rem 1.5rem; text-align:center;
+    background:linear-gradient(180deg,var(--surface-2),var(--surface));
+    border-bottom:1px solid var(--border);
+  }
+  .pf-av-wrap { position:relative; width:104px; height:104px; margin:0 auto .9rem; }
+  .pf-av {
+    width:104px; height:104px; border-radius:50%; object-fit:cover;
+    background:var(--accent); color:var(--accent-on);
+    display:flex; align-items:center; justify-content:center;
+    font-size:2.2rem; font-weight:700; border:3px solid var(--surface);
+    box-shadow:var(--shadow-md); cursor:default;
+  }
+  .pf-av-wrap.has-photo .pf-av { cursor:pointer; }
+  .pf-av-edit {
+    position:absolute; bottom:2px; right:2px; width:32px; height:32px;
+    border-radius:50%; background:var(--accent); color:var(--accent-on);
+    border:2px solid var(--surface); display:flex; align-items:center;
+    justify-content:center; cursor:pointer; font-size:.8rem; transition:transform .1s;
+  }
+  .pf-av-edit:hover { transform:scale(1.08); }
+  .pf-av-menu {
+    display:none; position:absolute; top:calc(100% + 6px); right:0;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:9px; box-shadow:var(--shadow-lg);
+    padding:.3rem; min-width:180px; z-index:20;
+  }
+  .pf-av-menu.open { display:block; }
+  .pf-av-menu button {
+    display:flex; align-items:center; gap:.55rem; width:100%; text-align:left;
+    padding:.42rem .7rem; border-radius:7px; font-size:.78rem; font-weight:500;
+    color:var(--text-2); border:none; background:none; cursor:pointer; font-family:inherit;
+  }
+  .pf-av-menu button:hover { background:var(--surface-2); color:var(--text-1); }
+  .pf-av-menu button.danger { color:var(--danger-text); }
+  .pf-av-menu button.danger:hover { background:var(--danger-bg); }
+  .pf-av-overlay {
+    position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,.5);
+    display:none; align-items:center; justify-content:center; color:#fff; font-size:1.2rem;
+  }
+  .pf-av-overlay.show { display:flex; }
+  .pf-name { font-size:1.15rem; font-weight:700; color:var(--text-1); }
+  .pf-username { font-size:.8rem; color:var(--text-3); margin-top:.15rem; }
+  .pf-body { padding:.4rem 1.75rem 1.5rem; }
+  .pf-row {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.75rem 0; border-bottom:1px solid var(--border);
+  }
+  .pf-row:last-child { border-bottom:none; }
+  .pf-row-lbl { font-size:.72rem; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:.4rem; }
+  .pf-row-lbl i { width:14px; text-align:center; }
+  .pf-row-val { font-size:.85rem; font-weight:600; color:var(--text-1); text-align:right; }
+  .pf-sec-hdr { padding:1.1rem 1.75rem .3rem; display:flex; align-items:center; gap:.4rem; }
+  .pf-sec-hdr h6 { font-size:.95rem; font-weight:700; color:var(--text-1); margin:0; }
+
+  /* Lightbox */
+  .pf-lightbox { display:none; position:fixed; inset:0; z-index:1070; background:rgba(0,0,0,.75); align-items:center; justify-content:center; padding:1.5rem; }
+  .pf-lightbox.open { display:flex; }
+  .pf-lightbox img { max-width:min(420px,90vw); max-height:70vh; border-radius:calc(var(--radius) + 6px); box-shadow:var(--shadow-lg); }
+  .pf-lightbox-x { position:absolute; top:1.25rem; right:1.5rem; width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,.12); color:#fff; border:none; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; }
+  .pf-lightbox-x:hover { background:rgba(255,255,255,.22); }
+
+  /* Confirm modal — same visual language as #adminLogoutModal in admin_base.html */
+  .pf-modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(0,0,0,.55); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
+  .pf-modal.open { display:flex; }
+  .pf-modal-box { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 6px); max-width:380px; width:90%; box-shadow:var(--shadow-lg); overflow:hidden; }
+  .pf-modal-hdr { display:flex; align-items:center; justify-content:space-between; padding:.9rem 1.2rem; background:var(--surface-2); border-bottom:1px solid var(--border); }
+  .pf-modal-hdr h6 { margin:0; font-size:.88rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:.45rem; }
+  .pf-modal-x { background:none; border:none; color:var(--text-3); cursor:pointer; font-size:.82rem; padding:.2rem .35rem; border-radius:6px; }
+  .pf-modal-bdy { padding:1.1rem 1.2rem; }
+  .pf-modal-ftr { padding:.75rem 1.2rem; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:.5rem; }
+  .pf-btn { display:inline-flex; align-items:center; gap:.3rem; padding:.38rem .85rem; border-radius:var(--radius); font-size:.78rem; font-weight:600; font-family:inherit; cursor:pointer; text-decoration:none; border:1px solid transparent; }
+  .pf-btn-ghost { background:var(--surface-2); color:var(--text-2); border-color:var(--border); }
+  .pf-btn-danger { background:var(--danger); color:#fff; border-color:var(--danger); }
+  .pf-btn-danger:hover { opacity:.9; }
+</style>
+
+<div class="pf-wrap">
+  <div class="pf-card">
+    <div class="pf-hero">
+      <div class="pf-av-wrap {{ 'has-photo' if photo_url else '' }}" id="pfAvWrap">
+        {% if photo_url %}
+        <img class="pf-av" id="pfAvImg" src="{{ photo_url }}" alt="" onclick="pfOpenLightbox()">
+        {% else %}
+        <div class="pf-av" id="pfAvImg">{{ (profile.full_name or profile.username or 'A')[0].upper() }}</div>
+        {% endif %}
+        <div class="pf-av-overlay" id="pfAvOverlay"><i class="fas fa-spinner fa-spin"></i></div>
+        <div class="pf-av-edit" id="pfAvEditBtn" onclick="pfToggleAvMenu(event)"><i class="fas fa-camera"></i></div>
+        <div class="pf-av-menu" id="pfAvMenu">
+          {% if photo_url %}
+          <button onclick="pfCloseAvMenu();pfOpenLightbox()"><i class="fas fa-eye"></i> View Photo</button>
+          {% endif %}
+          <button onclick="pfCloseAvMenu();document.getElementById('pfPhotoInp').click()"><i class="fas fa-upload"></i> {{ 'Change Photo' if photo_url else 'Upload Photo' }}</button>
+          {% if photo_url %}
+          <button class="danger" onclick="pfCloseAvMenu();pfOpenRemoveConfirm()"><i class="fas fa-trash-alt"></i> Remove Photo</button>
+          {% endif %}
+        </div>
+        <input type="file" id="pfPhotoInp" accept=".png,.jpg,.jpeg,.gif,.webp" style="display:none" onchange="pfUploadPhoto(this)">
+      </div>
+      <div class="pf-name">{{ profile.full_name or profile.username }}</div>
+      <div class="pf-username">@{{ profile.username }}</div>
+    </div>
+
+    <div class="pf-body">
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-user"></i> Full Name</span>
+        <span class="pf-row-val">{{ profile.full_name or '—' }}</span>
+      </div>
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-at"></i> Username</span>
+        <span class="pf-row-val">{{ profile.username }}</span>
+      </div>
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-envelope"></i> Email</span>
+        <span class="pf-row-val">{{ profile.email }}</span>
+      </div>
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-shield-alt"></i> Access</span>
+        <span class="pf-row-val">{{ 'Administrator' if 'admin' in (profile.role or '') else 'Student' }}</span>
+      </div>
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-calendar-plus"></i> Account Created</span>
+        <span class="pf-row-val">{{ profile.created_at | display_date if profile.created_at else '—' }}</span>
+      </div>
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-clock"></i> Last Login</span>
+        <span class="pf-row-val">{{ profile.last_login | display_dt if profile.last_login else '—' }}</span>
+      </div>
+      <div class="pf-row">
+        <span class="pf-row-lbl"><i class="fas fa-key"></i> Sign-in Method</span>
+        <span class="pf-row-val">{{ 'Google' if profile.auth_provider == 'google' else 'Email & Password' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card">
+    <div class="pf-sec-hdr"><i class="fas fa-palette" style="color:var(--accent)"></i><h6>Appearance</h6></div>
+    <div class="pf-body" style="padding-top:.3rem">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="accs-opt-row" data-accs-theme="sunset">
+          <input type="radio" name="accsTheme" value="sunset" style="display:none">
+          <div class="accs-opt-radio"></div>
+          <div class="accs-opt-icon" style="background:rgba(193,95,60,0.12);color:#c15f3c"><i class="fas fa-fire"></i></div>
+          <div><div class="accs-opt-name">Sunset</div><div class="accs-opt-desc">Warm cream, terracotta accent</div></div>
+        </label>
+        <label class="accs-opt-row" data-accs-theme="paper">
+          <input type="radio" name="accsTheme" value="paper" style="display:none">
+          <div class="accs-opt-radio"></div>
+          <div class="accs-opt-icon"><i class="fas fa-sun"></i></div>
+          <div><div class="accs-opt-name">Paper <span style="font-size:.68rem;color:var(--text-muted)">(Light)</span></div><div class="accs-opt-desc">Clean white interface</div></div>
+        </label>
+        <label class="accs-opt-row" data-accs-theme="dark">
+          <input type="radio" name="accsTheme" value="dark" style="display:none">
+          <div class="accs-opt-radio"></div>
+          <div class="accs-opt-icon"><i class="fas fa-moon"></i></div>
+          <div><div class="accs-opt-name">Dark</div><div class="accs-opt-desc">Deep charcoal, easy on eyes</div></div>
+        </label>
+        <label class="accs-opt-row" data-accs-theme="midnight">
+          <input type="radio" name="accsTheme" value="midnight" style="display:none">
+          <div class="accs-opt-radio"></div>
+          <div class="accs-opt-icon" style="background:rgba(124,111,255,0.12);color:#7c6fff"><i class="fas fa-star"></i></div>
+          <div><div class="accs-opt-name">Midnight</div><div class="accs-opt-desc">Deep indigo / purple</div></div>
+        </label>
+        <label class="accs-opt-row" data-accs-theme="emerald">
+          <input type="radio" name="accsTheme" value="emerald" style="display:none">
+          <div class="accs-opt-radio"></div>
+          <div class="accs-opt-icon" style="background:rgba(47,158,116,0.12);color:#2f9e74"><i class="fas fa-leaf"></i></div>
+          <div><div class="accs-opt-name">Emerald</div><div class="accs-opt-desc">Deep forest green</div></div>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card">
+    <div class="pf-sec-hdr"><i class="fas fa-sign-out-alt" style="color:var(--text-3)"></i><h6>Session</h6></div>
+    <div class="pf-body" style="padding-top:.3rem;padding-bottom:1.25rem">
+      <button type="button" id="adminLogoutTrigger" class="pf-btn" style="width:100%;justify-content:center;background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-text)">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Photo lightbox (view) ── #}
+<div class="pf-lightbox" id="pfLightbox" onclick="if(event.target===this) pfCloseLightbox()">
+  <button class="pf-lightbox-x" onclick="pfCloseLightbox()"><i class="fas fa-times"></i></button>
+  {% if photo_url %}<img src="{{ photo_url }}" alt="">{% endif %}
+</div>
+
+{# ── Remove-photo confirmation (themed modal, replaces confirm()) ── #}
+<div class="pf-modal" id="pfRemoveModal">
+  <div class="pf-modal-box">
+    <div class="pf-modal-hdr">
+      <h6><i class="fas fa-trash-alt" style="color:var(--danger-text)"></i> Remove Profile Photo</h6>
+      <button class="pf-modal-x" onclick="pfCloseRemoveConfirm()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="pf-modal-bdy">
+      <p style="font-size:.85rem;color:var(--text-2);margin:0;line-height:1.6;">
+        This removes your current profile photo everywhere it's shown across the admin portal. Your profile will revert to the default avatar.
+      </p>
+    </div>
+    <div class="pf-modal-ftr">
+      <button class="pf-btn pf-btn-ghost" onclick="pfCloseRemoveConfirm()"><i class="fas fa-times"></i> Cancel</button>
+      <button class="pf-btn pf-btn-danger" onclick="pfConfirmRemovePhoto()"><i class="fas fa-trash-alt"></i> Remove Photo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function pfToggleAvMenu(e){ if(e) e.stopPropagation(); document.getElementById('pfAvMenu').classList.toggle('open'); }
+function pfCloseAvMenu(){ document.getElementById('pfAvMenu').classList.remove('open'); }
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#pfAvEditBtn') && !e.target.closest('#pfAvMenu')) pfCloseAvMenu();
+});
+
+function pfOpenLightbox(){ var m=document.getElementById('pfLightbox'); if(m) m.classList.add('open'); }
+function pfCloseLightbox(){ var m=document.getElementById('pfLightbox'); if(m) m.classList.remove('open'); }
+
+function pfOpenRemoveConfirm(){ var m=document.getElementById('pfRemoveModal'); if(m) m.classList.add('open'); }
+function pfCloseRemoveConfirm(){ var m=document.getElementById('pfRemoveModal'); if(m) m.classList.remove('open'); }
+
+function pfSetLoading(on){
+  var o=document.getElementById('pfAvOverlay'); if(o) o.classList.toggle('show', on);
+}
+
+function pfUploadPhoto(input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  pfCloseAvMenu();
+
+  if(file.size > {{ max_photo_kb }} * 1024){
+    adminToast('Image is too large', 'danger', 'Maximum size is {{ max_photo_kb }} KB.');
+    input.value = '';
+    return;
+  }
+
+  var fd = new FormData();
+  fd.append('photo', file);
+  pfSetLoading(true);
+  fetch('{{ url_for("profile_api.upload_photo") }}', { method:'POST', credentials:'same-origin', body:fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      pfSetLoading(false);
+      if(d.success){ adminToast('Profile photo updated'); setTimeout(function(){ window.location.reload(); }, 500); }
+      else { adminToast('Upload failed', 'danger', d.message || 'Please try again.'); }
+    })
+    .catch(function(){ pfSetLoading(false); adminToast('Network error', 'danger', 'Please try again.'); });
+}
+
+function pfConfirmRemovePhoto(){
+  pfCloseRemoveConfirm();
+  pfSetLoading(true);
+  fetch('{{ url_for("profile_api.remove_photo") }}', { method:'DELETE', credentials:'same-origin' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      pfSetLoading(false);
+      if(d.success){ adminToast('Profile photo removed'); setTimeout(function(){ window.location.reload(); }, 500); }
+      else { adminToast('Could not remove photo', 'danger', d.message || 'Please try again.'); }
+    })
+    .catch(function(){ pfSetLoading(false); adminToast('Network error', 'danger', 'Please try again.'); });
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape'){ pfCloseLightbox(); pfCloseRemoveConfirm(); }
+});
+</script>
+{% endblock %}

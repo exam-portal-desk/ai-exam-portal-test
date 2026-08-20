@@ -28,3 +28,4 @@ supabase_schema.txt
 /storage/
 .claude/
 database/
+migrations/

@@ -493,6 +493,17 @@ document.getElementById('confirmOkBtn').onclick=async()=>{const cb=confirmCallba
 
 function avatar(name){return (name||'?')[0].toUpperCase();}
 function avatarClass(name){const n=(name||'?').charCodeAt(0)%5;return n===0?'':' av-'+(n+1);}
+// Renders a .conv-avatar div — a real profile photo when photoUrl is set
+// (covers the whole circle, initials hidden behind it), otherwise the
+// existing colored-initials fallback. extraStyle/innerExtra let callers
+// keep their per-site sizing and the online-dot child untouched.
+function avatarHtml(name,photoUrl,extraStyle,innerExtra){
+  extraStyle=extraStyle||'';innerExtra=innerExtra||'';
+  if(photoUrl){
+    return `<div class="conv-avatar" style="${extraStyle}"><img src="${photoUrl}" alt="" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover">${innerExtra}</div>`;
+  }
+  return `<div class="conv-avatar${avatarClass(name)}" style="${extraStyle}">${avatar(name)}${innerExtra}</div>`;
+}
 const DISPLAY_DATETIME_FORMAT='{{ DISPLAY_DATETIME_FORMAT }}';
 const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
 function timeStr(iso){
@@ -535,7 +546,7 @@ function renderConvItem(c,container){
   const last=c.last_message?(c.last_message.message||'').substring(0,32)+((c.last_message.message||'').length>32?'…':''):'No messages yet';
   const lastTime=c.last_message?`<span class="conv-time">${timeStr(c.last_message.created_at)}</span>`:'';
   div.innerHTML=`
-    <div class="conv-avatar${avatarClass(c.name)}">${avatar(c.name)}${!c.is_group&&c.online?'<div class="online-dot"></div>':''}</div>
+    ${avatarHtml(c.name,c.photo_url,'',!c.is_group&&c.online?'<div class="online-dot"></div>':'')}
     <div class="conv-info">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:0.3rem"><span class="conv-name">${c.name}</span>${lastTime}</div>
       <div class="conv-last">${last}</div>
@@ -583,7 +594,7 @@ async function openConversation(convId,name,otherId,isGroup=false,createdBy=null
   }
   document.getElementById('chatHeader').innerHTML=`
     ${backBtn}
-    <div class="conv-avatar${avatarClass(name)}" style="width:36px;height:36px;font-size:0.82rem">${avatar(name)}</div>
+    ${avatarHtml(name,conv&&conv.photo_url,'width:36px;height:36px;font-size:0.82rem')}
     <div style="min-width:0;flex:1">
       <div class="chat-header-name">${name}</div>
       <div class="chat-header-status" id="headerStatus">${membersHtml}</div>
@@ -778,7 +789,7 @@ function searchAddMember(q){
     }
     el.innerHTML=r.users.map(u=>`
       <div class="user-row" onclick="addMemberToGroup(${u.id},'${escJs(u.full_name||u.username)}')">
-        <div class="conv-avatar${avatarClass(u.full_name||u.username)}" style="width:32px;height:32px;font-size:0.8rem">${avatar(u.full_name||u.username)}</div>
+        ${avatarHtml(u.full_name||u.username,u.photo_url,'width:32px;height:32px;font-size:0.8rem')}
         <div>
           <div class="user-row-name">${u.full_name||u.username}</div>
           <div class="user-row-sub">@${u.username}</div>
@@ -842,7 +853,7 @@ async function searchUsers(q){
   data.users.forEach(u=>{
     const div=document.createElement('div');div.className='user-row';
     const connLabel=u.connection_status==='accepted'?'<span style="color:var(--success)"><i class="fas fa-check me-1"></i>Connected</span>':u.connection_status==='pending'?'<span style="color:var(--warning)"><i class="fas fa-clock me-1"></i>Pending</span>':'<span>Send request</span>';
-    div.innerHTML=`<div class="conv-avatar${avatarClass(u.full_name||u.username)}" style="width:32px;height:32px;font-size:.78rem">${avatar(u.full_name||u.username)}</div><div style="flex:1;min-width:0"><div class="user-row-name">${u.full_name||u.username}</div><div class="user-row-sub">${connLabel}</div></div>${u.online?'<div style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0"></div>':''}`;
+    div.innerHTML=`${avatarHtml(u.full_name||u.username,u.photo_url,'width:32px;height:32px;font-size:.78rem')}<div style="flex:1;min-width:0"><div class="user-row-name">${u.full_name||u.username}</div><div class="user-row-sub">${connLabel}</div></div>${u.online?'<div style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0"></div>':''}`;
     div.onclick=()=>handleUserClick(u);box.appendChild(div);
   });
   box.style.display='block';
@@ -876,7 +887,7 @@ async function openInbox(){
   } else {
     data.requests.forEach(r=>{
       const div=document.createElement('div');div.className='request-row';div.id=`req-${r.conn_id}`;
-      div.innerHTML=`<div class="conv-avatar${avatarClass(r.from_name)}" style="width:34px;height:34px;font-size:.8rem">${avatar(r.from_name)}</div><div style="flex:1;min-width:0"><div class="request-name">${r.from_name}</div><div class="request-time">${timeStr(r.created_at)}</div></div><button class="btn-primary-sm" style="padding:.35rem .75rem" onclick="respondRequest(${r.conn_id},'accept',this)"><i class="fas fa-check me-1"></i>Accept</button><button class="btn-ghost-sm" style="padding:.35rem .75rem" onclick="respondRequest(${r.conn_id},'reject',this)">Reject</button>`;
+      div.innerHTML=`${avatarHtml(r.from_name,r.photo_url,'width:34px;height:34px;font-size:.8rem')}<div style="flex:1;min-width:0"><div class="request-name">${r.from_name}</div><div class="request-time">${timeStr(r.created_at)}</div></div><button class="btn-primary-sm" style="padding:.35rem .75rem" onclick="respondRequest(${r.conn_id},'accept',this)"><i class="fas fa-check me-1"></i>Accept</button><button class="btn-ghost-sm" style="padding:.35rem .75rem" onclick="respondRequest(${r.conn_id},'reject',this)">Reject</button>`;
       list.appendChild(div);
     });
   }
@@ -912,7 +923,7 @@ async function searchGroupMembers(){
     (data.users||[]).forEach(u=>{
       if(selectedGroupMembers[u.id])return;
       const div=document.createElement('div');div.className='user-row';
-      div.innerHTML=`<div class="conv-avatar${avatarClass(u.full_name||u.username)}" style="width:28px;height:28px;font-size:.72rem">${avatar(u.full_name||u.username)}</div><span class="user-row-name">${u.full_name||u.username}</span>`;
+      div.innerHTML=`${avatarHtml(u.full_name||u.username,u.photo_url,'width:28px;height:28px;font-size:.72rem')}<span class="user-row-name">${u.full_name||u.username}</span>`;
       div.onclick=()=>addGroupMember(u);box.appendChild(div);
     });
     if(!box.innerHTML)box.innerHTML='<div class="list-empty">No users found</div>';

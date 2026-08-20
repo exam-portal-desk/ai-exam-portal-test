@@ -30,6 +30,7 @@ from flask_socketio import join_room, leave_room
 
 import threading
 import app.services.discussion_service as discussion_service
+from app.services.image_storage_service import profile_photo_url_from_key
 
 discussion_bp = Blueprint('discussion', __name__, url_prefix='/api/v01/discussions')
 discussion_admin_bp = Blueprint('discussion_admin_api', __name__, url_prefix='/api/v01/admin/discussions')
@@ -69,9 +70,10 @@ def post_comment(question_id):
 
     data = request.get_json() or {}
     username = session.get('full_name') or session.get('username', 'User')
+    avatar_url = profile_photo_url_from_key(session.get('profile_photo_key'))
 
     try:
-        err, status, payload = discussion_service.create_comment(question_id, uid, username, data)
+        err, status, payload = discussion_service.create_comment(question_id, uid, username, data, avatar_url)
     except Exception as e:
         print(f"[Disc] insert error: {e}")
         return jsonify({'success': False, 'message': 'Failed to save message'}), 500

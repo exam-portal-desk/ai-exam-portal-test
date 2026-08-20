@@ -42,6 +42,7 @@ from flask_socketio import join_room, leave_room
 import app.db.chat as chat_db
 import app.services.chat_service as chat_service
 from app.utils.datetime_service import now_utc_naive
+from app.services.image_storage_service import profile_photo_url_from_key
 
 chat_api_bp = Blueprint('chat_api', __name__, url_prefix='/api/v01/chat')
 socketio = None
@@ -88,6 +89,7 @@ def search_users():
             other = c['recipient_id'] if c['requester_id'] == _uid() else c['requester_id']
             conn_map[other] = c['status']
         users = [{'id': u['id'], 'username': u['username'], 'full_name': u['full_name'],
+                  'photo_url': profile_photo_url_from_key(u.get('profile_photo_key')),
                   'online': chat_service.is_online(u['id']), 'connection_status': conn_map.get(u['id'])} for u in res]
         return jsonify({'success': True, 'users': users})
     except Exception:
@@ -163,6 +165,7 @@ def inbox():
         user_map = {int(uid_str): u for uid_str, u in users_res.items()}
         requests = [{'conn_id': r['id'], 'from_id': r['requester_id'],
                      'from_name': user_map.get(r['requester_id'], {}).get('full_name') or user_map.get(r['requester_id'], {}).get('username') or 'User',
+                     'photo_url': profile_photo_url_from_key(user_map.get(r['requester_id'], {}).get('profile_photo_key')),
                      'created_at': r['created_at']} for r in res]
         return jsonify({'success': True, 'requests': requests})
     except Exception:

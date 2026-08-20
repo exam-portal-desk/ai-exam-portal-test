@@ -109,3 +109,44 @@ def delete_image(key: str) -> None:
 
 def delete_category_image(key: str) -> None:
     delete_image(key)
+
+
+# ─────────────────────────────────────────────
+# Profile photos (User + Admin portals) — same Category/-style convention,
+# keyed per-account so re-uploads/removals never collide across users.
+# ─────────────────────────────────────────────
+
+def upload_profile_photo(user_id: int, content: bytes, filename: str, content_type: str) -> Tuple[str, str]:
+    """Upload bytes to Profile/<user_id>_<filename>. Returns (key, url) —
+    key is the value to persist in users.profile_photo_key."""
+    storage = get_storage()
+    key = f"Profile/{user_id}_{filename}"
+    storage.upload(key, content, content_type)
+    return key, _url_for_key(storage, key)
+
+
+def resolve_profile_photo_url(profile_photo_key: Optional[str]) -> Optional[str]:
+    """Existence-checked resolution — used where accuracy matters more than
+    per-request cost (the Profile page itself)."""
+    if not profile_photo_key:
+        return None
+    try:
+        storage = get_storage()
+        if storage.exists(profile_photo_key):
+            return _url_for_key(storage, profile_photo_key)
+    except Exception as e:
+        print(f"[image_storage_service] profile photo lookup error for {profile_photo_key}: {e}")
+    return None
+
+
+def profile_photo_url_from_key(profile_photo_key: Optional[str]) -> Optional[str]:
+    """Cheap, non-existence-checked URL construction — used for nav chrome
+    rendered on every page, so no storage round-trip (S3: HEAD request;
+    local: cheap but still avoided) happens on every request."""
+    if not profile_photo_key:
+        return None
+    return _url_for_key(get_storage(), profile_photo_key)
+
+
+def delete_profile_photo(key: str) -> None:
+    delete_image(key)

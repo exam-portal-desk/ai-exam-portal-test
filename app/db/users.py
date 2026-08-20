@@ -8,8 +8,9 @@ from typing import Optional, List, Dict
 from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
 
 
-_AUTH_COLS = "id,username,email,password,full_name,role"
+_AUTH_COLS = "id,username,email,password,full_name,role,profile_photo_key"
 _LIST_COLS = "id,username,email,full_name,role,created_at,updated_at"
+_PROFILE_COLS = "id,username,email,full_name,role,created_at,last_login,auth_provider,profile_photo_key"
 
 
 def get_user_by_username(username: str) -> Optional[Dict]:
@@ -36,6 +37,16 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
         return None
 
 
+def get_user_profile_by_id(user_id: int) -> Optional[Dict]:
+    """Safe, non-sensitive field set for the Profile page — no password,
+    no google_id, no other internal identifiers."""
+    try:
+        return fetch_one(f"SELECT {_PROFILE_COLS} FROM users WHERE id=%s", (user_id,))
+    except Exception as e:
+        print(f"[db.users] get_user_profile_by_id error: {e}")
+        return None
+
+
 def get_all_users() -> List[Dict]:
     """Returns list-safe columns only — avoids fetching passwords in bulk."""
     try:
@@ -48,12 +59,14 @@ def get_all_users() -> List[Dict]:
 def get_users_by_ids(user_ids: List[int]) -> Dict[str, Dict]:
     """
     Batch fetch users by a list of IDs.
-    Returns a dict keyed by str(id) for fast lookup.
+    Returns a dict keyed by str(id) for fast lookup. Includes
+    profile_photo_key so callers (chat, discussions) can resolve avatars
+    without a second round of per-user queries.
     """
     if not user_ids:
         return {}
     try:
-        rows = fetch_all("SELECT id,username,full_name FROM users WHERE id = ANY(%s)", (list(user_ids),))
+        rows = fetch_all("SELECT id,username,full_name,profile_photo_key FROM users WHERE id = ANY(%s)", (list(user_ids),))
         return {str(u["id"]): u for u in rows}
     except Exception as e:
         print(f"[db.users] get_users_by_ids error: {e}")

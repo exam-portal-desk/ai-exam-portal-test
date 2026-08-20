@@ -64,6 +64,26 @@ class StorageProvider(ABC):
         """
         ...
 
+    def delete_prefix(self, prefix: str) -> int:
+        """
+        Delete every object under `prefix` (recursive) and, where the backend
+        has real directories (local), prune the now-empty folder itself.
+        Generic on top of list_objects()/delete() — no backend needs its own
+        copy of this. Returns the number of objects deleted.
+        """
+        deleted = 0
+        cursor = None
+        while True:
+            page = self.list_objects(prefix=prefix, cursor=cursor, limit=1000)
+            keys = [o["key"] for o in page["objects"]]
+            if keys:
+                self.delete(keys)
+                deleted += len(keys)
+            cursor = page.get("next_cursor")
+            if not cursor:
+                break
+        return deleted
+
 
 class ListResult(TypedDict):
     objects: List[ObjectInfo]

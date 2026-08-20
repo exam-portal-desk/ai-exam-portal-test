@@ -118,7 +118,7 @@ Administrators have granular control over result visibility:
 │  Chat          │   │  Google Gemini  ── AI generation│
 │  Discussions   │   │  Groq LLM      ── Study chat    │
 └────────────────┘   │  Object Storage ── Image storage │
-                     │  SMTP / Mailjet── Email service │
+                     │  Generic HTTP  ── Email service │
                      └─────────────────────────────────┘
 ```
 
@@ -140,7 +140,7 @@ Administrators have granular control over result visibility:
 | **Frontend** | HTML5, CSS3, Bootstrap 5.3, JavaScript (ES6+) |
 | **Math Rendering** | MathJax 3, KaTeX, latex2mathml 3.76.0 |
 | **Data Processing** | pandas 2.2.3, numpy 1.26.4 |
-| **Email** | SMTP (Gmail) + Mailjet REST API |
+| **Email** | Generic HTTP email API (provider-independent) |
 | **Deployment** | Render (Gunicorn + gevent-websocket worker) |
 
 ---
@@ -224,7 +224,7 @@ http://localhost:8080/
 - A [Supabase](https://supabase.com) project with the schema applied
 - Google Cloud project with **Gemini API** enabled
 - A [Groq](https://console.groq.com) API key
-- SMTP / Mailjet credentials for transactional email
+- Credentials for a transactional email API (any HTTP-based provider)
 - Local disk (dev) or an S3-compatible object storage bucket (production) — see Object Storage Setup above
 
 ### 1. Clone the repository
@@ -307,10 +307,9 @@ STORAGE_ACCESS_KEY=your-access-key           # s3 backend only
 STORAGE_SECRET_KEY=your-secret-key           # s3 backend only
 
 # ── Email ─────────────────────────────────────────────────────────────────────
-EMAIL_ADDRESS=your-gmail@gmail.com
-FROM_EMAIL=your-gmail@gmail.com
-MAILJET_API_KEY=your-mailjet-api-key
-MAILJET_API_SECRET=your-mailjet-api-secret
+EMAIL_SERVICE_API_KEY=your-email-api-key
+EMAIL_SERVICE_URL=https://your-email-provider.example.com/send
+DEFAULT_FROM_EMAIL=noreply@your-domain.com
 
 # ── AI — Groq (Study Assistant) ───────────────────────────────────────────────
 GROQ_API_KEY=gsk_xxxx
@@ -338,10 +337,9 @@ GEMINI_MODEL_NAME=gemini-2.5-flash
 | `STORAGE_BACKEND` | ✅ | `local` or `s3` — selects the active storage provider |
 | `STORAGE_LOCAL_ROOT` | local only | Filesystem root for locally-stored objects |
 | `STORAGE_BUCKET` / `STORAGE_ENDPOINT_URL` / `STORAGE_REGION` / `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | s3 only | S3-compatible bucket + credentials (any provider — AWS S3, R2, MinIO, Supabase Storage, etc.) |
-| `EMAIL_ADDRESS` | ✅ | Gmail address used for SMTP sending |
-| `FROM_EMAIL` | ✅ | Sender address shown in outgoing emails |
-| `MAILJET_API_KEY` | ✅ | Mailjet API key |
-| `MAILJET_API_SECRET` | ✅ | Mailjet API secret |
+| `EMAIL_SERVICE_API_KEY` | ✅ | API key for the configured email HTTP API |
+| `EMAIL_SERVICE_URL` | ✅ | Endpoint URL of the configured email HTTP API |
+| `DEFAULT_FROM_EMAIL` | ✅ | Sender address shown in outgoing emails |
 | `GROQ_API_KEY` | ✅ | Groq API key for the AI study assistant |
 | `AI_MODEL_NAME` | ✅ | Groq model (default: `llama-3.3-70b-versatile`) |
 | `AI_DAILY_LIMIT_PER_STUDENT` | ⚙️ | Max AI messages per student per day (default: `50`) |
@@ -523,8 +521,7 @@ All dependencies are pinned in `requirements.txt`. Key packages:
 | `numpy` | 1.26.4 | Numerical computing |
 | `orjson` | 3.11.7 | Fast JSON serialization |
 | `python-dotenv` | 1.0.1 | Environment variable loading |
-| `mailjet-rest` | 1.3.4 | Mailjet email API client |
-| `requests` | 2.31.0 | HTTP client |
+| `requests` | 2.31.0 | HTTP client (used for the generic email API + more) |
 | `aiohttp` | 3.10.5 | Async HTTP |
 | `gunicorn` | *(prod only)* | WSGI server — **commented out locally** |
 

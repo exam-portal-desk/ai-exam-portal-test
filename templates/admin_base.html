@@ -549,10 +549,11 @@
         </li>
 
         <li>
-          <button class="nav-link" id="accountSettingsBtn" data-tooltip="Account Settings" aria-label="Account Settings">
-            <span class="nav-icon"><i class="fas fa-cog"></i></span>
-            <span class="nav-label">Account Settings</span>
-          </button>
+          <a class="nav-link {% if request.endpoint == 'admin.profile' %}active{% endif %}"
+             href="{{ url_for('admin.profile') }}" data-tooltip="Profile &amp; Account" aria-label="Profile &amp; Account">
+            <span class="nav-icon"><i class="fas fa-user-circle"></i></span>
+            <span class="nav-label">Profile &amp; Account</span>
+          </a>
         </li>
 
       </ul>
@@ -842,94 +843,6 @@ document.addEventListener('DOMContentLoaded',function(){
 })();
 </script>
 
-<!-- ══ ACCOUNT SETTINGS MODAL ════════════════════════════ -->
-<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" style="max-width:440px">
-    <div class="modal-content">
-      <div class="modal-header" style="padding:1.1rem 1.4rem 0.9rem">
-        <div style="display:flex;align-items:center;gap:0.6rem">
-          <div style="width:30px;height:30px;border-radius:8px;background:var(--accent-subtle);border:1px solid var(--accent-border);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:0.75rem">
-            <i class="fas fa-cog"></i>
-          </div>
-          <div>
-            <h6 class="modal-title mb-0" id="accountSettingsModalLabel" style="font-size:0.92rem;font-weight:700">Account Settings</h6>
-            <div style="font-size:0.68rem;color:var(--text-3);margin-top:1px">Theme &amp; preferences</div>
-          </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="modal-body" style="padding:1.25rem 1.4rem 1.5rem">
-
-        <!-- ── Theme — all 5 options matching index.html ── -->
-        <div style="margin-bottom:1.35rem">
-          <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text-3);margin-bottom:0.65rem">Theme</div>
-          <div style="display:flex;flex-direction:column;gap:6px" id="accs-theme-group">
-
-            <label class="accs-opt-row" data-accs-theme="sunset">
-              <input type="radio" name="accsTheme" value="sunset" style="display:none">
-              <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon" style="background:rgba(193,95,60,0.12);color:#c15f3c"><i class="fas fa-fire"></i></div>
-              <div>
-                <div class="accs-opt-name">Sunset</div>
-                <div class="accs-opt-desc">Warm cream, terracotta accent</div>
-              </div>
-            </label>
-
-            <label class="accs-opt-row" data-accs-theme="paper">
-              <input type="radio" name="accsTheme" value="paper" style="display:none">
-              <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon"><i class="fas fa-sun"></i></div>
-              <div>
-                <div class="accs-opt-name">Paper <span style="font-size:.68rem;color:var(--text-muted)">(Light)</span></div>
-                <div class="accs-opt-desc">Clean white interface</div>
-              </div>
-            </label>
-
-            <label class="accs-opt-row" data-accs-theme="dark">
-              <input type="radio" name="accsTheme" value="dark" style="display:none">
-              <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon"><i class="fas fa-moon"></i></div>
-              <div>
-                <div class="accs-opt-name">Dark</div>
-                <div class="accs-opt-desc">Deep charcoal, easy on eyes</div>
-              </div>
-            </label>
-
-            <label class="accs-opt-row" data-accs-theme="midnight">
-              <input type="radio" name="accsTheme" value="midnight" style="display:none">
-              <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon" style="background:rgba(124,111,255,0.12);color:#7c6fff"><i class="fas fa-star"></i></div>
-              <div>
-                <div class="accs-opt-name">Midnight</div>
-                <div class="accs-opt-desc">Deep indigo / purple</div>
-              </div>
-            </label>
-
-            <label class="accs-opt-row" data-accs-theme="emerald">
-              <input type="radio" name="accsTheme" value="emerald" style="display:none">
-              <div class="accs-opt-radio"></div>
-              <div class="accs-opt-icon" style="background:rgba(47,158,116,0.12);color:#2f9e74"><i class="fas fa-leaf"></i></div>
-              <div>
-                <div class="accs-opt-name">Emerald</div>
-                <div class="accs-opt-desc">Deep forest green</div>
-              </div>
-            </label>
-
-          </div>
-        </div>
-
-        <hr style="border-color:var(--border);margin:0 0 1.1rem">
-
-        <!-- ── Logout ── -->
-        <button type="button" id="adminLogoutTrigger"
-           style="display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.6rem 1rem;border-radius:9px;background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger-text);font-size:0.835rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- ══ LOGOUT CONFIRM MODAL ══════════════════════════════ -->
 <div id="adminLogoutModal" style="display:none;position:fixed;inset:0;z-index:1060;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
@@ -964,9 +877,6 @@ document.addEventListener('DOMContentLoaded',function(){
 function openAdminLogout() {
   var m = document.getElementById('adminLogoutModal');
   if (m) { m.style.display = 'flex'; }
-  // close account settings modal first
-  var accsModal = bootstrap.Modal.getInstance(document.getElementById('accountSettingsModal'));
-  if (accsModal) accsModal.hide();
 }
 function closeAdminLogout() {
   var m = document.getElementById('adminLogoutModal');
@@ -981,22 +891,19 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ══ APPEARANCE (theme) ROWS — reused inline on the Profile & Account
+     page (templates/admin/profile.html); wired here so it works on
+     whichever page happens to render [data-accs-theme] rows. ══ -->
 <script>
 (function(){
   document.addEventListener('DOMContentLoaded', function(){
-    var openBtn  = document.getElementById('accountSettingsBtn');
-    if (!openBtn) return;
-    var modalEl  = document.getElementById('accountSettingsModal');
-    var bsModal  = new bootstrap.Modal(modalEl);
-
-    openBtn.addEventListener('click', function(){ syncSelections(); bsModal.show(); });
-
     function syncSelections(){
       var storedTheme = localStorage.getItem('landingTheme') || 'sunset';
       document.querySelectorAll('[data-accs-theme]').forEach(function(el){
         el.classList.toggle('accs-selected', el.getAttribute('data-accs-theme') === storedTheme);
       });
     }
+    syncSelections();
 
     document.querySelectorAll('[data-accs-theme]').forEach(function(el){
       el.addEventListener('click', function(){
@@ -1005,8 +912,6 @@ document.addEventListener('DOMContentLoaded', function() {
         syncSelections();
       });
     });
-
-    modalEl.addEventListener('show.bs.modal', syncSelections);
   });
 })();
 </script>

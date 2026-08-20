@@ -85,13 +85,29 @@ EXPLANATION_DAILY_LIMIT = int(os.environ.get("EXPLANATION_DAILY_LIMIT", 5))
 EXPLANATION_PER_QUESTION_LIMIT = int(os.environ.get("EXPLANATION_PER_QUESTION_LIMIT", 2))
 
 # ─────────────────────────────────────────────
-# Email (SMTP - Gmail)
+# Email — generic HTTP email API, provider-independent (no vendor SDK).
+# Switching providers requires ONLY changing these env vars, never code:
+#   EMAIL_SERVICE_URL/API_KEY/DEFAULT_FROM_EMAIL — endpoint + credentials.
+#   EMAIL_SERVICE_AUTH_HEADER/AUTH_PREFIX         — how the key is sent,
+#     e.g. Authorization/"Bearer " (default) or api-key/"" for providers
+#     that want the raw key in a custom header.
+#   EMAIL_SERVICE_PAYLOAD_TEMPLATE                — the exact JSON body
+#     shape the provider expects, as a JSON string with placeholders
+#     {from_email} {to_email} {to_name} {subject} {html} {text}. Parsed
+#     once here; app/services/email_service.py substitutes placeholders
+#     into the parsed structure (safe against quotes/newlines in content)
+#     and POSTs it as-is — it has no knowledge of any provider's shape.
 # ─────────────────────────────────────────────
-MAILJET_API_KEY    = os.environ.get("MAILJET_API_KEY", "")
-MAILJET_API_SECRET = os.environ.get("MAILJET_API_SECRET", "")
-FROM_EMAIL         = os.environ.get("FROM_EMAIL", "")
-FROM_NAME          = os.environ.get("SmartAIExamTest", "")
-BASE_URL           = os.environ.get("BASE_URL", "https://your-domain.com")
+EMAIL_SERVICE_API_KEY = os.environ.get("EMAIL_SERVICE_API_KEY", "")
+EMAIL_SERVICE_URL     = os.environ.get("EMAIL_SERVICE_URL", "")
+DEFAULT_FROM_EMAIL    = os.environ.get("DEFAULT_FROM_EMAIL", "")
+EMAIL_SERVICE_AUTH_HEADER = os.environ.get("EMAIL_SERVICE_AUTH_HEADER", "Authorization")
+EMAIL_SERVICE_AUTH_PREFIX = os.environ.get("EMAIL_SERVICE_AUTH_PREFIX", "Bearer ")
+EMAIL_SERVICE_PAYLOAD_TEMPLATE = os.environ.get(
+    "EMAIL_SERVICE_PAYLOAD_TEMPLATE",
+    '{"from": "{from_email}", "to": "{to_email}", "subject": "{subject}", "html": "{html}", "text": "{text}"}',
+)
+BASE_URL              = os.environ.get("BASE_URL", "https://your-domain.com")
 
 # Public, permanent URL of the SmartAIExam logo asset (as uploaded to
 # Supabase Storage), used in transactional emails so the logo doesn't
@@ -107,6 +123,9 @@ LOGO_ASSET_URL     = os.environ.get("LOGO_ASSET_URL", "")
 ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 MAX_IMAGE_SIZE_KB = int(os.environ.get("MAX_IMAGE_SIZE_KB", 500))
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_KB * 1024
+
+# Profile photos use a smaller, distinct cap from the shared image limit above.
+MAX_PROFILE_PHOTO_SIZE_KB = int(os.environ.get("MAX_PROFILE_PHOTO_SIZE_KB", 200))
 
 # ─────────────────────────────────────────────
 # Cache settings

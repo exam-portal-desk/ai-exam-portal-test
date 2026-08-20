@@ -110,8 +110,15 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_globals():
+        from flask import session
+
+        nav_avatar_url = None
+        if session.get("user_id") and session.get("profile_photo_key"):
+            from app.services.image_storage_service import profile_photo_url_from_key
+            nav_avatar_url = profile_photo_url_from_key(session["profile_photo_key"])
         return {"CURRENT_YEAR": now_app_tz().year, "DISPLAY_DATE_FORMAT": config.DISPLAY_DATE_FORMAT,
-                "DISPLAY_DATETIME_FORMAT": config.DISPLAY_DATETIME_FORMAT}
+                "DISPLAY_DATETIME_FORMAT": config.DISPLAY_DATETIME_FORMAT,
+                "NAV_AVATAR_URL": nav_avatar_url}
 
     # ── Error handlers ─────────────────────────────────────────────────────
     _register_error_handlers(app)
@@ -148,6 +155,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.web.notes import notes_bp
     from app.routes.web.chat import chat_bp
     from app.routes.web.admin import admin_bp
+    from app.routes.web.profile import profile_bp
 
     # ── API v01 ──────────────────────────────────────────────────────────────
     from app.routes.api.v01.auth import api_auth_bp
@@ -160,6 +168,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.api.v01.discussions import discussion_bp, discussion_admin_bp
     from app.routes.api.v01.chat import chat_api_bp
     from app.routes.api.v01.admin import admin_api_bp
+    from app.routes.api.v01.profile import profile_api_bp
 
     app.register_blueprint(api_auth_bp)
     app.register_blueprint(access_requests_bp)
@@ -173,6 +182,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(discussion_admin_bp)
     app.register_blueprint(chat_api_bp)
     app.register_blueprint(admin_api_bp)
+    app.register_blueprint(profile_api_bp)
 
     app.register_blueprint(notes_bp)
     app.register_blueprint(auth_bp)
@@ -183,6 +193,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(ai_bp)
     app.register_blueprint(misc_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(profile_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
 

@@ -1,15 +1,18 @@
 """
 app/services/email_service.py
-Sends transactional emails via SMTP (Gmail).
-Credentials: EMAIL_ADDRESS, EMAIL_PASSWORD in .env
+Sends transactional emails through a generic HTTP email API — no provider
+SDK, no vendor-specific payload shape hardcoded here. The auth header and
+the JSON body shape are both driven entirely by config (see the Email
+block in app/config.py) so switching providers is a config change, not a
+code change. This module only knows how to: build headers from
+EMAIL_SERVICE_AUTH_HEADER/AUTH_PREFIX, substitute {placeholders} into the
+parsed EMAIL_SERVICE_PAYLOAD_TEMPLATE, and POST the result.
 """
 
-import smtplib
-import ssl
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from typing import Tuple
+import json
+from typing import Any, Tuple
 
+import requests
 from flask import render_template
 
 import app.config as config
@@ -20,28 +23,56 @@ def _now_display() -> str:
     return now_app_tz().strftime(config.DISPLAY_DATETIME_FORMAT)
 
 
+def _substitute(node: Any, context: dict) -> Any:
+    """Recursively substitute {placeholder} tokens into a parsed JSON
+    template's string leaves. Runs on already-parsed Python values (not
+    raw JSON text), so subject/html/text content is safely JSON-escaped
+    on output regardless of quotes/newlines/braces inside it. A leaf that
+    references a placeholder not present in context (e.g. a provider
+    field with no substitution) is left as-is rather than raising."""
+    if isinstance(node, str):
+        try:
+            return node.format(**context)
+        except (KeyError, IndexError):
+            return node
+    if isinstance(node, dict):
+        return {k: _substitute(v, context) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_substitute(v, context) for v in node]
+    return node
+
+
 def _send(to_email: str, to_name: str, subject: str, html: str, text: str) -> Tuple[bool, str]:
-    api_key    = getattr(config, "MAILJET_API_KEY", None)
-    api_secret = getattr(config, "MAILJET_API_SECRET", None)
-    from_email = getattr(config, "FROM_EMAIL", None)
-    if not api_key or not api_secret or not from_email:
-        return False, "Mailjet credentials not configured"
+    api_key    = getattr(config, "EMAIL_SERVICE_API_KEY", None)
+    api_url    = getattr(config, "EMAIL_SERVICE_URL", None)
+    from_email = getattr(config, "DEFAULT_FROM_EMAIL", None)
+    if not api_key or not api_url or not from_email:
+        return False, "Email service not configured"
     try:
-        from mailjet_rest import Client
-        mj   = Client(auth=(api_key, api_secret), version="v3.1")
-        data = {
-            "Messages": [{
-                "From": {"Email": from_email, "Name": "SmartAIExam"},
-                "To":   [{"Email": to_email,  "Name": to_name}],
-                "Subject":  subject,
-                "TextPart": text,
-                "HTMLPart": html,
-            }]
-        }
-        result = mj.send.create(data=data)
-        if result.status_code == 200:
+        template = json.loads(config.EMAIL_SERVICE_PAYLOAD_TEMPLATE)
+    except (json.JSONDecodeError, TypeError) as e:
+        return False, f"EMAIL_SERVICE_PAYLOAD_TEMPLATE is not valid JSON: {e}"
+
+    context = {
+        "from_email": from_email, "to_email": to_email, "to_name": to_name or to_email,
+        "subject": subject, "html": html, "text": text,
+    }
+    payload = _substitute(template, context)
+
+    header_name = getattr(config, "EMAIL_SERVICE_AUTH_HEADER", "Authorization") or "Authorization"
+    header_prefix = getattr(config, "EMAIL_SERVICE_AUTH_PREFIX", "Bearer ")
+    headers = {"Content-Type": "application/json", header_name: f"{header_prefix}{api_key}"}
+
+    try:
+        # A fresh session with trust_env disabled so host-level proxy env vars
+        # (common on some hosting platforms) can't silently intercept/break
+        # outbound calls to the email API.
+        session = requests.Session()
+        session.trust_env = False
+        resp = session.post(api_url, json=payload, headers=headers, timeout=15)
+        if 200 <= resp.status_code < 300:
             return True, "Email sent successfully"
-        return False, f"Mailjet returned status {result.status_code}"
+        return False, f"Email service returned status {resp.status_code}: {resp.text[:300]}"
     except Exception as e:
         return False, f"Email send failed: {e}"
 

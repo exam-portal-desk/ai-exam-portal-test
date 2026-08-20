@@ -424,6 +424,17 @@
   .ab-both{background:var(--success-bg);color:var(--success-text);border-color:var(--success-border);}
   .ab-pending{background:var(--warning-bg);color:var(--warning-text);border-color:var(--warning-border);}
   .ab-denied{background:var(--danger-bg);color:var(--danger-text);border-color:var(--danger-border);}
+
+  /* ══ GLOBAL APP TOAST — themed replacement for alert() ══ */
+  #appToastContainer { position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; display:flex; flex-direction:column; gap:.4rem; pointer-events:none; }
+  .app-toast { display:flex; align-items:flex-start; gap:.6rem; padding:.65rem 1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); pointer-events:auto; animation:app-tin .2s ease-out; min-width:220px; max-width:340px; }
+  @keyframes app-tin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .app-toast-icon { font-size:.9rem; flex-shrink:0; margin-top:.05rem; }
+  .app-toast.success .app-toast-icon { color:var(--success-text); }
+  .app-toast.danger  .app-toast-icon { color:var(--danger-text); }
+  .app-toast.warning .app-toast-icon { color:var(--warning-text); }
+  .app-toast-msg { font-size:.82rem; font-weight:600; color:var(--text-1); }
+  .app-toast-sub { font-size:.72rem; color:var(--text-3); margin-top:.08rem; }
   </style>
 </head>
 <body>
@@ -463,7 +474,11 @@
   {% elif session.get('user_id') %}
   <div style="position:relative">
     <button class="prof-chip" id="profBtn" onclick="toggleProf()">
+      {% if NAV_AVATAR_URL %}
+      <img class="prof-av" src="{{ NAV_AVATAR_URL }}" alt="" style="object-fit:cover">
+      {% else %}
       <div class="prof-av">{{ session.get('full_name','U')[0].upper() }}</div>
+      {% endif %}
       <span class="prof-name">{{ session.get('full_name','').split()[0] }}</span>
       <i class="fas fa-chevron-down prof-chev"></i>
     </button>
@@ -472,7 +487,7 @@
         <div class="dd-hd-name">{{ session.get('full_name','User') }}</div>
         <div class="dd-hd-role">Student</div>
       </div>
-      <button class="dd-lnk" onclick="closeProfDd();openSettings()"><i class="fas fa-cog"></i> Settings</button>
+      <a class="dd-lnk" href="{{ url_for('profile.my_profile') }}"><i class="fas fa-user-circle"></i> Profile &amp; Account</a>
       <div class="dd-sep"></div>
       <button class="dd-lnk danger" onclick="closeProfDd();openLogoutModal()"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
@@ -561,10 +576,10 @@
   </nav>
 
   <div class="sb-foot">
-    <button class="sb-item" onclick="openSettings()" data-tip="Settings">
-      <span class="sb-ic"><i class="fas fa-cog"></i></span>
-      <span class="sb-lbl">Settings</span>
-    </button>
+    <a class="sb-item {{ 'active' if active_nav == 'profile' else '' }}" href="{{ url_for('profile.my_profile') }}" data-tip="Profile &amp; Account">
+      <span class="sb-ic"><i class="fas fa-user-circle"></i></span>
+      <span class="sb-lbl">Profile &amp; Account</span>
+    </a>
 <button class="sb-item logout" onclick="openLogoutModal()">
       <span class="sb-ic"><i class="fas fa-sign-out-alt"></i></span>
       <span class="sb-lbl">Logout</span>
@@ -619,49 +634,10 @@
 </div>{# /app-shell #}
 
 {# ════════════════════════════════════════════════════════════
-   SETTINGS MODAL (user portal only)
+   DELETE-ACCOUNT MODAL (user portal only) — triggered from the
+   Profile & Account page's Danger Zone (templates/profile.html)
 ════════════════════════════════════════════════════════════ #}
 {% if session.get('user_id') and not session.get('admin_id') %}
-<div class="modal-bd" id="settingsModal">
-  <div class="modal-box">
-    <div class="modal-hdr">
-      <h5><i class="fas fa-cog" style="color:var(--accent)"></i> Settings</h5>
-      <button class="modal-x" onclick="closeSettings()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="modal-bdy">
-      <div class="s-sec">
-        <div class="s-lbl"><i class="fas fa-palette"></i> Theme</div>
-        <div class="theme-pills">
-          <button class="theme-pill" data-lt="sunset"><span class="theme-dot" style="background:#c15f3c"></span>Sunset</button>
-          <button class="theme-pill" data-lt="paper"><span class="theme-dot" style="background:#e8e6e0;border:1px solid #bbb"></span>Paper</button>
-          <button class="theme-pill" data-lt="dark"><span class="theme-dot" style="background:#111116;border:1px solid #444"></span>Dark</button>
-          <button class="theme-pill" data-lt="midnight"><span class="theme-dot" style="background:#7c6fff"></span>Midnight</button>
-          <button class="theme-pill" data-lt="emerald"><span class="theme-dot" style="background:#2f9e74"></span>Emerald</button>
-        </div>
-      </div>
-      <div class="s-sec">
-        <div class="s-lbl"><i class="fas fa-user"></i> Account</div>
-        <div class="info-box">
-          <div><span class="lbl">Name</span><span class="val">{{ session.get('full_name','—') }}</span></div>
-          <div><span class="lbl">Username</span><span class="val">{{ session.get('username','—') }}</span></div>
-        </div>
-      </div>
-      <div class="s-sec" style="margin-bottom:0">
-        <div class="s-lbl" style="color:var(--danger-text)"><i class="fas fa-exclamation-triangle"></i> Danger Zone</div>
-        <div class="dz-row">
-          <div>
-            <div class="dz-title">Delete Account</div>
-            <div class="dz-desc">Permanently remove your account and all data</div>
-          </div>
-          <button class="sbtn sbtn-danger-ol" onclick="closeSettings();openDel()">
-            <i class="fas fa-trash-alt"></i> Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="modal-bd" id="delModal">
   <div class="modal-box">
     <div class="modal-hdr" style="background:var(--danger-bg)">
@@ -684,6 +660,10 @@
         will be shown as posted by a <strong>Deleted User</strong>.
         <a href="{{ url_for('misc.account_deletion_policy') }}" target="_blank" style="color:var(--accent)">Read the full policy</a>.
       </div>
+      <label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.78rem;color:var(--text-2);margin-bottom:.85rem;cursor:pointer;line-height:1.5">
+        <input type="checkbox" id="delPolicyChk" oninput="checkDel()" style="margin-top:.2rem;accent-color:var(--danger)">
+        <span>I have read and understand the <a href="{{ url_for('misc.account_deletion_policy') }}" target="_blank" style="color:var(--accent)">Account Deletion Policy</a>.</span>
+      </label>
       <div style="font-size:.78rem;color:var(--text-2);font-weight:600;margin-bottom:.4rem">
         Type <span style="color:var(--danger-text);font-family:monospace">DELETE</span> to confirm:
       </div>
@@ -820,28 +800,27 @@ function closeMobileSb(){
 var mt=document.getElementById('mobToggle');
 if(mt) mt.addEventListener('click', function(){ var sb=document.getElementById('mainSb'); if(sb&&sb.classList.contains('mobile-open')) closeMobileSb(); else openMobileSb(); });
 
-/* ── SETTINGS ── */
-function openSettings(){ var m=document.getElementById('settingsModal'); if(m) m.classList.add('open'); }
-function closeSettings(){ var m=document.getElementById('settingsModal'); if(m) m.classList.remove('open'); }
-
 /* ── LOGOUT MODAL ── */
 function openLogoutModal(){ var m=document.getElementById('logoutModal'); if(m) m.classList.add('open'); }
 function closeLogoutModal(){ var m=document.getElementById('logoutModal'); if(m) m.classList.remove('open'); }
 var lm=document.getElementById('logoutModal');
 if(lm) lm.addEventListener('click',function(e){ if(e.target===this) closeLogoutModal(); });
-var sm=document.getElementById('settingsModal');
-if(sm) sm.addEventListener('click',function(e){ if(e.target===this) closeSettings(); });
 
 /* ── DELETE ── */
 function openDel(){
-  var i=document.getElementById('delInp'), b=document.getElementById('delBtn');
-  if(i) i.value=''; if(b) b.disabled=true;
+  var i=document.getElementById('delInp'), b=document.getElementById('delBtn'), c=document.getElementById('delPolicyChk');
+  if(i) i.value=''; if(c) c.checked=false; if(b) b.disabled=true;
   var m=document.getElementById('delModal'); if(m) m.classList.add('open');
 }
 function closeDel(){ var m=document.getElementById('delModal'); if(m) m.classList.remove('open'); }
 var dm=document.getElementById('delModal');
 if(dm) dm.addEventListener('click',function(e){ if(e.target===this) closeDel(); });
-function checkDel(){ var v=(document.getElementById('delInp')||{}).value||''; var b=document.getElementById('delBtn'); if(b) b.disabled=v!=='DELETE'; }
+function checkDel(){
+  var v=(document.getElementById('delInp')||{}).value||'';
+  var c=(document.getElementById('delPolicyChk')||{}).checked;
+  var b=document.getElementById('delBtn');
+  if(b) b.disabled=(v!=='DELETE'||!c);
+}
 function doDelete(){
   var b=document.getElementById('delBtn');
   b.disabled=true; b.innerHTML='<i class="fas fa-spinner fa-spin"></i> Deleting…';
@@ -871,7 +850,7 @@ function doDelete(){
 
 /* ── ESC ── */
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){closeProfDd();closeSettings();closeDel();closeLogoutModal();}
+  if(e.key==='Escape'){closeProfDd();closeDel();closeLogoutModal();}
 });
 
 /* ── AUTO-DISMISS FLASH ── */
@@ -912,6 +891,29 @@ document.addEventListener('DOMContentLoaded',function(){
 })();
 </script>
 {% endif %}
+
+{# ══ GLOBAL APP TOAST — themed replacement for alert() ══ #}
+<div id="appToastContainer"></div>
+<script>
+window.appToast = function(msg, type, sub) {
+  type = type || 'success';
+  var icons = { success: 'fa-check-circle', danger: 'fa-times-circle', warning: 'fa-exclamation-circle' };
+  var el = document.createElement('div');
+  el.className = 'app-toast ' + type;
+  el.innerHTML =
+    '<i class="fas ' + (icons[type] || 'fa-info-circle') + ' app-toast-icon"></i>' +
+    '<div><div class="app-toast-msg"></div>' +
+      (sub ? '<div class="app-toast-sub"></div>' : '') +
+    '</div>';
+  el.querySelector('.app-toast-msg').textContent = msg;
+  if (sub) el.querySelector('.app-toast-sub').textContent = sub;
+  var c = document.getElementById('appToastContainer');
+  if (!c) return;
+  c.appendChild(el);
+  setTimeout(function() { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; }, 3200);
+  setTimeout(function() { el.remove(); }, 3500);
+};
+</script>
 
 {% block scripts %}{% endblock %}
 </body>

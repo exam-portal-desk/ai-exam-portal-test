@@ -36,11 +36,29 @@ class LocalStorageProvider(StorageProvider):
         return self._path(key).read_bytes()
 
     def delete(self, keys: List[str]) -> None:
+        dirs_to_prune = set()
         for key in keys:
             try:
-                self._path(key).unlink(missing_ok=True)
+                path = self._path(key)
+                path.unlink(missing_ok=True)
+                dirs_to_prune.add(path.parent)
             except ValueError:
                 pass
+        for d in dirs_to_prune:
+            self._prune_empty_dirs(d)
+
+    def _prune_empty_dirs(self, directory: Path) -> None:
+        """Remove `directory` and any now-empty ancestors, stopping at
+        self.root. Object storage backends have no real directories to
+        clean up — this only matters for local, so a deleted subject/
+        notebook prefix stops showing up as a leftover empty folder."""
+        try:
+            while directory != self.root and directory.is_relative_to(self.root) \
+                    and directory.is_dir() and not any(directory.iterdir()):
+                directory.rmdir()
+                directory = directory.parent
+        except OSError:
+            pass
 
     def copy(self, src_key: str, dst_key: str, content_type: str = None) -> None:
         dst = self._path(dst_key)

@@ -278,6 +278,6 @@ def count_pending_requests(user_id: int) -> int:
 
 def search_users(term: str, exclude_uid: int, limit: int = 10) -> list:
     return fetch_all(
-        'SELECT id,username,full_name FROM users WHERE username ILIKE %s AND id != %s LIMIT %s',
+        'SELECT id,username,full_name,profile_photo_key FROM users WHERE username ILIKE %s AND id != %s LIMIT %s',
         (f'%{term}%', exclude_uid, limit),
     )

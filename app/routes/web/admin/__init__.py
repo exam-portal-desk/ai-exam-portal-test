@@ -26,4 +26,5 @@ from app.routes.web.admin import (  # noqa: E402, F401
     categories,
     latex_editor,
     storage,
+    profile,
 )

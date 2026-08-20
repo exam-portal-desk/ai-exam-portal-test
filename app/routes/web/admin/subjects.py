@@ -81,6 +81,15 @@ def delete_subject_route(subject_id):
         flash("Subject not found.", "warning")
         return redirect(url_for("admin.subjects"))
 
+    try:
+        from app.storage import get_storage
+        deleted = get_storage().delete_prefix(f"{subject['subject_name']}/")
+        if deleted:
+            print(f"[admin.subjects] deleted {deleted} storage object(s) for subject '{subject['subject_name']}'")
+    except Exception as e:
+        print(f"[admin.subjects] storage cleanup error for subject '{subject['subject_name']}': {e}")
+        flash("Subject deleted, but some stored images could not be removed — check Object Storage.", "warning")
+
     delete_subject(subject_id)
     flash("Subject deleted.", "info")
     return redirect(url_for("admin.subjects"))

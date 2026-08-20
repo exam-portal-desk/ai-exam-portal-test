@@ -22,6 +22,8 @@ import uuid
 
 from app.utils.datetime_service import now_utc_naive
 import app.db.discussion as discussion_db
+from app.db.users import get_users_by_ids
+from app.services.image_storage_service import profile_photo_url_from_key
 
 RATE_LIMIT_SECONDS = 10
 MAX_MSG_LEN = 500
@@ -111,6 +113,10 @@ def get_discussion_thread(question_id: int, current_uid) -> dict:
     """Fetch + shape the full comment thread for a question."""
     all_rows = discussion_db.get_thread_rows(question_id)
 
+    live_uids = {r.get('user_id') for r in all_rows
+                 if r.get('user_id') and r.get('user_id') != GHOST_USER_ID}
+    users_by_id = get_users_by_ids(list(live_uids))
+
     display_rows = []
     for r in all_rows:
         uid = r.get('user_id')
@@ -128,9 +134,12 @@ def get_discussion_thread(question_id: int, current_uid) -> dict:
             r['message'] = DELETED_ACCOUNT_MESSAGE
             r['is_deleted_account'] = True
             r['is_own'] = False
+            r['avatar_url'] = None
         else:
             r['is_deleted_account'] = False
             r['is_own'] = (uid == current_uid)
+            photo_key = users_by_id.get(str(uid), {}).get('profile_photo_key')
+            r['avatar_url'] = profile_photo_url_from_key(photo_key)
 
         r.pop('user_id', None)
         r.pop('is_deleted', None)
@@ -142,7 +151,7 @@ def get_discussion_thread(question_id: int, current_uid) -> dict:
     }
 
 
-def create_comment(question_id: int, uid, username: str, data: dict):
+def create_comment(question_id: int, uid, username: str, data: dict, avatar_url: str = None):
     """
     Validate + persist a new comment. Returns (error_message, status_code, None)
     on failure, or (None, None, payload) on success, where payload is the
@@ -182,6 +191,7 @@ def create_comment(question_id: int, uid, username: str, data: dict):
         'id': real_id,
         'question_id': question_id,
         'username': username,
+        'avatar_url': avatar_url,
         'message': msg,
         'parent_id': data.get('parent_id'),
         'created_at': now_iso,

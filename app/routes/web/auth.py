@@ -120,6 +120,7 @@ def _handle_bad_password(identifier, ip, user_exists=True):
 
 def _create_user_session(user, role, admin=False):
     invalidate_session(int(user["id"]))
+    update_user(int(user["id"]), {"last_login": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")})
     token = secrets.token_urlsafe(32)
     create_session({
         "token": token,
@@ -135,6 +136,7 @@ def _create_user_session(user, role, admin=False):
     session["username"]  = user.get("username")
     session["full_name"] = user.get("full_name", user.get("username"))
     session["role"]      = role
+    session["profile_photo_key"] = user.get("profile_photo_key")
     if admin:
         session["admin_id"] = int(user["id"])
         session["is_admin"] = True
