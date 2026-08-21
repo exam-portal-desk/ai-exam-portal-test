@@ -36,3 +36,16 @@ def get_model(category: str, name: str) -> Dict:
 def list_models(category: str) -> list:
     """Safe listing for a future model-selector UI — names only, never keys."""
     return [{"name": e["name"], "provider": e["provider"]} for e in _registry.get(category, [])]
+
+
+def build_headers(model: Dict) -> Dict:
+    """
+    HTTP headers for calling this model's endpoint. Auth scheme is config-driven
+    so swapping providers never requires touching service code: defaults to
+    `Authorization: Bearer <key>` (Groq-style); a registry entry can override
+    the header name via `auth_header` (e.g. Gemini's `x-goog-api-key`).
+    """
+    auth_header = model.get("auth_header")
+    if auth_header:
+        return {auth_header: model["api_key"], "Content-Type": "application/json"}
+    return {"Authorization": f"Bearer {model['api_key']}", "Content-Type": "application/json"}

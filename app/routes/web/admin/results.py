@@ -241,14 +241,15 @@ def users_analytics_view_result(result_id, exam_id):
                  else float(result.get(k,0)) if k in ("score","max_score","percentage","time_taken_minutes")
                  else result.get(k,"")) for k in result}
     norm["attempted_questions"] = int(result.get("total_questions",0)) - int(result.get("unanswered_questions",0))
-    return render_template("admin/view_result_popup.html", result=norm, user=user, exam=exam, responses=resps)
+    return render_template("admin/view_result_popup.html", result=norm, user=user, exam=exam, responses=resps,
+                           standalone=True)
 
 
 @admin_bp.route("/users-analytics/view-responses/<int:result_id>/<int:exam_id>")
 @require_admin_role
 def users_analytics_view_responses(result_id, exam_id):
     import json as _json
-    from app.services.image_storage_service import resolve_question_image_url as _get_img_url
+    from app.services.image_storage_service import resolve_question_image_urls_bulk
 
     result = get_result_by_id(result_id)
     if not result: abort(404)
@@ -277,10 +278,9 @@ def users_analytics_view_responses(result_id, exam_id):
         if ip and str(ip).strip() not in ("", "nan", "None"):
             unique_paths.add(str(ip).strip())
 
-    image_url_map = {}  # image_path -> (has_img, img_url)
-    for path in unique_paths:
-        has_img, img_url = _get_img_url(path)
-        image_url_map[path] = (has_img, img_url)
+    # image_path -> (has_img, img_url) — resolved concurrently, not one at a
+    # time, since this is N storage existence checks (network round trips).
+    image_url_map = resolve_question_image_urls_bulk(unique_paths)
 
     norm = []
     for r in resps:
@@ -325,7 +325,8 @@ def users_analytics_view_responses(result_id, exam_id):
             "marks_obtained": float(r.get("marks_obtained", 0) or 0),
         })
 
-    return render_template("admin/view_responses_popup.html", result=result, user=user, exam=exam, responses=norm)
+    return render_template("admin/view_responses_popup.html", result=result, user=user, exam=exam, responses=norm,
+                           standalone=True)
 
 
 @admin_bp.route("/users-analytics/download-result/<int:result_id>")

@@ -345,12 +345,14 @@ function loadFilteredResults(callback) {
 
 function viewResult(resultId, examId) {
     const url = `/admin/users-analytics/view-result/${resultId}/${examId}`;
-    window.open(url, '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
+    window.openLoadingWindow(url, '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes',
+        {title: 'Loading — SmartAIExam Admin', message: 'Loading result…'});
 }
 
 function viewResponses(resultId, examId) {
     const url = `/admin/users-analytics/view-responses/${resultId}/${examId}`;
-    window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+    window.openLoadingWindow(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes',
+        {title: 'Loading — SmartAIExam Admin', message: 'Loading response analysis…'});
 }
 </script>
 

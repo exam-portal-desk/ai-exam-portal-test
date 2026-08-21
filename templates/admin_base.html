@@ -35,7 +35,57 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+
+  <!-- MathJax bootstrap — single shared instance for every admin page.
+       See templates/base.html for the full rationale (same pattern, kept in
+       sync deliberately): config must be set before the library script
+       loads; window.mathJaxTypeset() is the one safe/serialized way to
+       typeset; startup.typeset:false stops MathJax's own automatic
+       whole-page pass from racing that queue. Previously this page loaded
+       an unconfigured, unpinned MathJax script here AND individual admin
+       templates (e.g. view_responses_popup.html) each loaded their own
+       second, differently-configured MathJax instance in their own
+       extra-head block — two competing instances/configs on the same page,
+       which is why LaTeX rendering was inconsistent/blank on admin pages. -->
+  <script>
+  window._mathJaxReady = false;
+  window._mathJaxReadyPromise = new Promise(function(resolve){ window._mathJaxReadyResolve = resolve; });
+  window.MathJax={
+    loader:{load:['[tex]/mhchem']},
+    tex:{
+      packages:{'[+]':['mhchem']},
+      inlineMath:[['$','$'],['\\(','\\)']],
+      displayMath:[['$$','$$'],['\\[','\\]']],
+      processEscapes:true,
+      processEnvironments:true
+    },
+    chtml:{linebreaks:{automatic:true,width:"container"}},
+    options:{skipHtmlTags:['script','noscript','style','textarea','pre','code']},
+    startup:{
+      typeset:false,
+      ready(){
+        MathJax.startup.defaultReady();
+        window._mathJaxReady = true;
+        window._mathJaxReadyResolve();
+      }
+    }
+  };
+  window._mathJaxQueue = Promise.resolve();
+  window.mathJaxTypeset = function(elements){
+    window._mathJaxQueue = window._mathJaxQueue
+      .then(function(){ return window._mathJaxReady ? null : window._mathJaxReadyPromise; })
+      .then(function(){
+        if (!window.MathJax || typeof MathJax.typesetPromise !== 'function') return;
+        if (elements && typeof MathJax.typesetClear === 'function') {
+          try { MathJax.typesetClear(elements); } catch(e) {}
+        }
+        return MathJax.typesetPromise(elements);
+      })
+      .catch(function(e){ console.warn('[MathJax]', e); });
+    return window._mathJaxQueue;
+  };
+  </script>
+  <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" async></script>
 
   <!-- KaTeX auto-render trigger — runs after all deferred scripts load -->
   <script>
@@ -434,8 +484,10 @@
 </head>
 <body>
 
+{% set standalone = standalone|default(false) %}
 <div class="admin-wrapper">
 
+  {% if not standalone %}
   <!-- ════ SIDEBAR ════════════════════════════════════════ -->
   <aside class="sidebar" id="adminSidebar" role="navigation" aria-label="Admin navigation">
 
@@ -559,6 +611,7 @@
       </ul>
     </div>
   </aside>
+  {% endif %}
 
   <!-- ════ MAIN CONTENT ════════════════════════════════════ -->
   <div class="content-wrap">
@@ -723,6 +776,7 @@
 <script>
 (function(){
   function init(){
+    if (!document.getElementById('adminSidebar')) return;
     if (document.querySelector('.mobile-menu-toggle')) return;
     var btn = document.createElement('button');
     btn.className = 'mobile-menu-toggle';
@@ -866,7 +920,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <button onclick="closeAdminLogout()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.38rem .85rem;border-radius:var(--radius);font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer;background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);transition:border-color .12s,color .12s;">
         <i class="fas fa-times"></i> Cancel
       </button>
-      <a href="{{ url_for('admin.logout') }}" style="display:inline-flex;align-items:center;gap:.3rem;padding:.38rem .85rem;border-radius:var(--radius);font-size:.78rem;font-weight:600;text-decoration:none;background:var(--danger);color:#fff;border:1px solid var(--danger);transition:opacity .12s;">
+      <a id="adminLogoutConfirmBtn" href="{{ url_for('admin.logout') }}" onclick="adminLogoutStart(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.38rem .85rem;border-radius:var(--radius);font-size:.78rem;font-weight:600;text-decoration:none;background:var(--danger);color:#fff;border:1px solid var(--danger);transition:opacity .12s;">
         <i class="fas fa-sign-out-alt"></i> Yes, Logout
       </a>
     </div>
@@ -881,6 +935,11 @@ function openAdminLogout() {
 function closeAdminLogout() {
   var m = document.getElementById('adminLogoutModal');
   if (m) m.style.display = 'none';
+}
+function adminLogoutStart(el) {
+  el.style.pointerEvents = 'none';
+  el.style.opacity = '.7';
+  el.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging out…';
 }
 document.addEventListener('DOMContentLoaded', function() {
   var trigger = document.getElementById('adminLogoutTrigger');
@@ -934,6 +993,50 @@ window.adminToast = function(msg, type, sub) {
   c.appendChild(el);
   setTimeout(function() { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; }, 2700);
   setTimeout(function() { el.remove(); }, 3000);
+};
+</script>
+
+{# ══ NEW-WINDOW LOADING SCREEN ═══════════════════════════
+   Opening a result/response popup navigates straight to a route that can
+   take a while to build (many questions, many images). Without this, the
+   new window sits blank/white — indistinguishable from "stuck" — for that
+   whole time, since nothing paints until the server's response arrives.
+   This opens the window immediately and paints a self-contained loading
+   screen into it synchronously (no network involved, so it's instant),
+   then navigates that same window to the real URL — the loading screen
+   stays visible the whole time the real page is being generated. ══ #}
+<script>
+window.openLoadingWindow = function(url, name, features, opts) {
+  opts = opts || {};
+  var win;
+  try { win = window.open('about:blank', name || '_blank', features); } catch(e) { win = null; }
+  if (!win) { window.location.href = url; return null; }
+  try {
+    win.document.open();
+    win.document.write(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+      '<title>' + (opts.title || 'Loading…') + '</title><style>' +
+      'html,body{margin:0;height:100%;background:#f7f4ee;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}' +
+      '@media (prefers-color-scheme:dark){html,body{background:#1c1917}}' +
+      '.wrap{max-width:760px;margin:0 auto;padding:2.25rem 1.75rem}' +
+      '.hdr{display:flex;align-items:center;gap:.65rem;margin-bottom:1.6rem}' +
+      '.spin{width:20px;height:20px;border-radius:50%;border:2.5px solid rgba(120,100,80,.22);border-top-color:#c1602b;animation:spin .8s linear infinite;flex-shrink:0}' +
+      '@keyframes spin{to{transform:rotate(360deg)}}' +
+      '.htxt{font-size:.95rem;font-weight:600;color:#3a332b}' +
+      '@media (prefers-color-scheme:dark){.htxt{color:#f1ece3}}' +
+      '.sk{border-radius:10px;background:linear-gradient(90deg,rgba(120,100,80,.10) 25%,rgba(120,100,80,.18) 37%,rgba(120,100,80,.10) 63%);background-size:400% 100%;animation:shim 1.4s ease infinite}' +
+      '@keyframes shim{0%{background-position:100% 0}100%{background-position:0 0}}' +
+      '.bar{height:14px;margin-bottom:.6rem}.w60{width:60%}.w40{width:40%}.card{height:88px;margin-bottom:.85rem}' +
+      '</style></head><body><div class="wrap">' +
+      '<div class="hdr"><div class="spin"></div><div class="htxt">' + (opts.message || 'Loading…') + '</div></div>' +
+      '<div class="sk bar w60"></div><div class="sk bar w40" style="margin-bottom:1.4rem"></div>' +
+      '<div class="sk card"></div><div class="sk card"></div><div class="sk card"></div>' +
+      '</div></body></html>'
+    );
+    win.document.close();
+  } catch(e) {}
+  win.location.href = url;
+  return win;
 };
 </script>
 

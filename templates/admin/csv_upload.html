@@ -1,8 +1,31 @@
+{% extends "admin_base.html" %}
+{% block title %}CSV Upload &amp; Editor{% endblock %}
+{% block content %}
+
 <style>
-/* ── CSV Upload Modal ── */
-#csvUploaderModal .modal-content { background:var(--bg) !important; border:none !important; }
-#csvUploaderModal .modal-header  { background:var(--accent) !important; border:none !important; }
-#csvUploaderModal .modal-body    { background:var(--bg) !important; }
+/* ── CSV Upload page ── */
+#csvUploaderModal { background:var(--bg); }
+
+/* Page header */
+.csvpage-header {
+  display:flex; align-items:center; gap:.85rem;
+  margin-bottom:1.5rem;
+}
+.csvpage-back {
+  width:36px; height:36px; flex-shrink:0; border-radius:var(--radius);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--surface-2); border:1px solid var(--border);
+  color:var(--text-2); text-decoration:none; font-size:.85rem;
+  transition:border-color .12s,color .12s;
+}
+.csvpage-back:hover { border-color:var(--accent); color:var(--accent); }
+.csvpage-icon {
+  width:40px; height:40px; flex-shrink:0; border-radius:10px;
+  background:var(--accent-subtle); color:var(--accent);
+  display:flex; align-items:center; justify-content:center; font-size:1.15rem;
+}
+.csvpage-header h1 { font-size:1.15rem; font-weight:700; color:var(--text-1); margin:0 0 .1rem; }
+.csvpage-header p  { font-size:.8rem; color:var(--text-3); margin:0; }
 
 /* Bootstrap Card override */
 #csvUploaderModal .card        { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:calc(var(--radius)+4px) !important; box-shadow:var(--shadow-md); }
@@ -18,6 +41,21 @@
 #csvUploaderModal .form-control-sm { background:var(--bg) !important; border:1px solid var(--border) !important; border-radius:var(--radius) !important; color:var(--text-1) !important; font-family:inherit; }
 #csvUploaderModal .form-control:focus { border-color:var(--accent) !important; box-shadow:0 0 0 3px var(--accent-subtle) !important; }
 #csvUploaderModal .form-control::placeholder { color:var(--text-3) !important; }
+
+/* ── Bootstrap overrides (theme sync) ──────────────────
+   Bootstrap's CSS loads after theme.css (see admin_base.html), so its
+   .btn-primary/.btn-secondary/body-color rules win the cascade unless
+   re-asserted here — same pattern already used in ai_command_centre.html,
+   which this page used to inherit for free back when it was included as a
+   modal fragment on that page. Needed again now that it's standalone. */
+#csvUploaderModal .btn { font-family:inherit; border-radius:var(--radius) !important; }
+#csvUploaderModal .btn-primary   { background:var(--accent)    !important; border-color:var(--accent)    !important; color:var(--accent-on) !important; }
+#csvUploaderModal .btn-primary:hover  { background:var(--accent-hover) !important; border-color:var(--accent-hover) !important; }
+#csvUploaderModal .btn-secondary { background:var(--surface-2) !important; border-color:var(--border)    !important; color:var(--text-2)   !important; }
+#csvUploaderModal .btn-secondary:hover { border-color:var(--accent) !important; color:var(--accent) !important; }
+#csvUploaderModal .dropdown-menu { background:var(--surface) !important; border:1px solid var(--border) !important; box-shadow:var(--shadow-lg) !important; }
+#csvUploaderModal .dropdown-item { color:var(--text-2) !important; }
+#csvUploaderModal .dropdown-item:hover { background:var(--accent-subtle) !important; color:var(--accent) !important; }
 
 /* Question Card */
 .csv-q-card { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); padding:1.25rem; margin-bottom:.85rem; }
@@ -37,10 +75,17 @@
 .csv-raw-code { display:block; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:.45rem .75rem; font-size:.76rem; color:var(--text-1); font-family:'JetBrains Mono',monospace; white-space:pre-wrap; word-break:break-all; }
 
 /* Rendered Option */
-.csv-rend-opt { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.35rem .7rem; font-size:.83rem; margin-bottom:4px; }
+.csv-rend-opt { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.35rem .7rem; font-size:.83rem; margin-bottom:4px; color:var(--text-1); }
+
+/* MathJax/plain-text rendered content — Bootstrap's body{color:#212529}
+   (loaded after theme.css) otherwise wins here since nothing else in this
+   subtree sets a color, which is why rendered question/option text was
+   unreadable in dark theme: near-black text on a near-black surface. */
+.csv-latex { color:var(--text-1); }
 
 /* Rendered preview box */
 #csvUploaderModal [id^="crend-"] {
+  color:var(--text-1);
   background:var(--surface-2);
   border:1px solid var(--border);
   border-radius:var(--radius);
@@ -179,6 +224,42 @@
 /* Delete btn in card */
 .csv-del-btn { background:var(--danger-bg) !important; color:var(--danger-text) !important; border:1px solid var(--danger-border) !important; }
 
+/* ── Stats row ────────────────────────────────────────── */
+.csv-stats-row { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.6rem; }
+.csv-stat {
+  display:flex; align-items:baseline; gap:.35rem;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);
+  padding:.3rem .65rem;
+}
+.csv-stat-val { font-size:.9rem; font-weight:800; color:var(--text-1); }
+.csv-stat-lbl { font-size:.68rem; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; }
+.csv-stat-err .csv-stat-val { color:var(--warning-text); }
+
+/* ── Load more ────────────────────────────────────────── */
+#csvLoadMoreBar {
+  display:none; flex-direction:column; align-items:center; gap:.6rem;
+  padding:1.5rem 0 .5rem;
+}
+#csvShowingLabel { font-size:.8rem; color:var(--text-3); font-weight:600; }
+#csvLoadMoreBtn {
+  padding:.55rem 1.5rem; border-radius:var(--radius); border:1px solid var(--border);
+  background:var(--surface); color:var(--text-1); font-weight:700; font-size:.85rem;
+  font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:.45rem;
+  transition:border-color .12s,background .12s;
+}
+#csvLoadMoreBtn:hover { border-color:var(--accent); background:var(--accent-subtle); color:var(--accent); }
+
+/* ── Processing / loading state ──────────────────────────── */
+#csvProcessing { display:none; padding:3.5rem 1rem; text-align:center; }
+.csv-proc-spin {
+  width:34px; height:34px; margin:0 auto 1.1rem; border-radius:50%;
+  border:3px solid var(--accent-subtle); border-top-color:var(--accent);
+  animation:csvProcSpin .8s linear infinite;
+}
+@keyframes csvProcSpin { to { transform:rotate(360deg); } }
+.csv-proc-title { font-size:.95rem; font-weight:700; color:var(--text-1); margin-bottom:.3rem; }
+.csv-proc-sub   { font-size:.8rem; color:var(--text-3); }
+
 /* Modal boxes */
 @keyframes csvModalIn { from{opacity:0;transform:scale(.92) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);} }
 .csv-modal-box {
@@ -265,8 +346,7 @@
 
 /* ── Mobile Responsive ─────────────────────────────── */
 @media (max-width: 640px) {
-  #csvUploaderModal .modal-header { padding:.75rem 1rem; }
-  #csvUploaderModal .modal-body { padding:1rem !important; }
+  .csvpage-header h1 { font-size:1.05rem; }
 
   /* Stack title row above buttons row */
   #csvStickyBar .csv-top-toolbar {
@@ -304,29 +384,24 @@
 
   /* Prevent any child from busting card width */
   .csv-q-card * { max-width: 100%; }
-  .modal-body { overflow-x: hidden !important; }
 }
 </style>
 
-<!-- ── CSV Uploader Modal ─────────────────────────────────────────────────── -->
-<div class="modal fade" id="csvUploaderModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-fullscreen">
-    <div class="modal-content" style="background:var(--bg);">
+<!-- ── CSV Upload &amp; Editor — standalone page ────────────────────────────── -->
+<div id="csvUploaderModal">
 
-      <div class="modal-header" style="background:var(--accent);border:none;padding:1.1rem 1.5rem;">
-        <div class="d-flex align-items-center gap-3">
-          <div style="width:40px;height:40px;background:rgba(255,255,255,0.18);border-radius:10px;display:flex;align-items:center;justify-content:center;">
-            <i class="fas fa-file-csv" style="color:white;font-size:1.2rem;"></i>
-          </div>
-          <div>
-            <h5 class="modal-title fw-bold text-white mb-0">CSV Upload &amp; Editor</h5>
-            <small style="color:rgba(255,255,255,0.72);">Parse → Preview → Edit → Save to Database</small>
-          </div>
+      <div class="csvpage-header">
+        <a href="{{ url_for('admin.ai_command_centre') }}" class="csvpage-back" title="Back to AI Command Centre" aria-label="Back to AI Command Centre">
+          <i class="fas fa-arrow-left"></i>
+        </a>
+        <div class="csvpage-icon"><i class="fas fa-file-csv"></i></div>
+        <div>
+          <h1>CSV Upload &amp; Editor</h1>
+          <p>Parse &rarr; Preview &rarr; Edit &rarr; Save to Database</p>
         </div>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
 
-      <div class="modal-body p-4" style="background:var(--bg);">
+      <div>
 
         <!-- Step 1: Upload -->
         <div id="csvStep1">
@@ -348,7 +423,7 @@
                     <i class="fas fa-cloud-upload-alt" style="font-size:2.2rem;color:var(--accent);margin-bottom:.6rem;display:block;"></i>
                     <div class="fw-semibold" style="color:var(--text-1);">Drop CSV here or <span style="color:var(--accent);">browse</span></div>
                     <div style="font-size:0.8rem;color:var(--text-3);margin-top:4px;" id="csvFileName">No file selected</div>
-                  </div>
+                  </label>
                   <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="csvFileSelected(this)">
 
                   <div class="d-flex align-items-center gap-2 my-4">
@@ -375,6 +450,13 @@
             </div>
           </div>
         </div><!-- /Step1 -->
+
+        <!-- Processing / loading state -->
+        <div id="csvProcessing">
+          <div class="csv-proc-spin"></div>
+          <div class="csv-proc-title" id="csvProcTitle">Processing CSV&hellip;</div>
+          <div class="csv-proc-sub" id="csvProcSub">Reading file&hellip;</div>
+        </div><!-- /Processing -->
 
         <!-- Step 2: Preview/Edit -->
         <div id="csvStep2" style="display:none;">
@@ -415,9 +497,23 @@
                 </button>
               </div>
             </div>
+            <div class="csv-stats-row">
+              <div class="csv-stat"><span class="csv-stat-val" id="csvStatTotal">0</span><span class="csv-stat-lbl">Total</span></div>
+              <div class="csv-stat"><span class="csv-stat-val" id="csvStatValid">0</span><span class="csv-stat-lbl">Valid</span></div>
+              <div class="csv-stat csv-stat-err"><span class="csv-stat-val" id="csvStatErrors">0</span><span class="csv-stat-lbl">Errors</span></div>
+              <div class="csv-stat"><span class="csv-stat-val" id="csvStatShowing">0</span><span class="csv-stat-lbl">Showing</span></div>
+            </div>
           </div>
 
 <div id="csvCardList"></div>
+
+<!-- Load more -->
+<div id="csvLoadMoreBar">
+  <span id="csvShowingLabel">Showing 0 of 0</span>
+  <button id="csvLoadMoreBtn" onclick="csvLoadMore()">
+    <i class="fas fa-chevron-down"></i>Load More
+  </button>
+</div>
 
 <!-- Floating Scroll Navigation -->
 <div id="csvScrollNav">
@@ -442,9 +538,7 @@
         </div><!-- /Step2 -->
 
       </div>
-    </div>
-  </div>
-</div>
+</div><!-- /csvUploaderModal -->
 
 <!-- Confirm Save Modal -->
 <div id="csvConfirmModal" style="display:none;position:fixed;inset:0;z-index:10060;background:color-mix(in srgb, var(--bg) 55%, transparent);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
@@ -533,10 +627,47 @@
   </div>
 </div>
 
+<!-- Leave Page Confirm Modal — shown instead of the browser's native
+     beforeunload dialog whenever we can intercept the click ourselves
+     (Back to AI Command Centre, sidebar nav links). The native dialog still
+     exists as a fallback for exits we truly can't intercept in JS (browser
+     Back/Forward buttons, closing the tab, typing a new URL) — no site can
+     replace that one, browsers hard-code it deliberately. -->
+<div id="csvLeaveModal" style="display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.6);backdrop-filter:blur(5px);align-items:center;justify-content:center;" onclick="if(event.target===this)csvCancelLeave()">
+  <div class="csv-modal-box">
+    <div class="csv-modal-icon warning"><i class="fas fa-exclamation-triangle"></i></div>
+    <h3 class="csv-modal-title">Leave This Page?</h3>
+    <p class="csv-modal-msg">You have unsaved parsed questions.<br><small>If you leave now without saving, your progress will be lost.</small></p>
+    <div class="csv-modal-footer">
+      <button class="csv-mf-cancel" onclick="csvCancelLeave()"><i class="fas fa-times me-1"></i>Stay on Page</button>
+      <button class="csv-mf-warning" onclick="csvConfirmLeave()"><i class="fas fa-sign-out-alt me-1"></i>Leave Anyway</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   let _csvRows  = [];
   let _csvConfirm = null;
+  let _csvSkipped = 0;     // rows dropped during parse (missing exam_id / question_text)
+  const _PAGE_SIZE = 50;   // cards rendered per "Load More" batch
+  let _renderedCount = 0;  // how many _csvRows are currently in the DOM
+
+  function _setProcessing(title, sub) {
+    const t = document.getElementById('csvProcTitle');
+    const s = document.getElementById('csvProcSub');
+    if (t && title) t.textContent = title;
+    if (s && sub)   s.textContent = sub;
+  }
+  function _showProcessing(title, sub) {
+    document.getElementById('csvStep1').style.display = 'none';
+    document.getElementById('csvStep2').style.display = 'none';
+    document.getElementById('csvProcessing').style.display = 'block';
+    _setProcessing(title, sub);
+  }
+  function _hideProcessing() {
+    document.getElementById('csvProcessing').style.display = 'none';
+  }
 
   function csvToast(title, type, msg) {
     const colors = { success:'var(--success)', danger:'var(--danger)', warning:'var(--warning)', info:'var(--accent)' };
@@ -598,47 +729,135 @@
     const input=document.getElementById('csvFileInput');
     const file=input.files[0];
     if(!file){csvToast('Please select or drop a CSV file first.','warning');return;}
+
+    // Real, staged loading feedback (no fabricated percentages — local text
+    // parsing has no meaningful "% done"). Each label change is yielded via
+    // setTimeout(...,0) so the browser actually paints it before the next
+    // (synchronous, CPU-bound) phase runs — otherwise the whole thing runs
+    // in one blocking tick and the labels would never be visible.
+    _showProcessing('Processing CSV…', 'Reading file…');
+
     const reader=new FileReader();
+    reader.onerror=function(){ _hideProcessing(); document.getElementById('csvStep1').style.display='block'; csvToast('Could not read the file.','danger'); };
     reader.onload=function(e){
-      function _parseCSV(text){
-        const rows=[];let cur=[];let field='';let inQ=false;
-        for(let i=0;i<text.length;i++){
-          const ch=text[i];
-          if(ch==='"'){
-            if(inQ&&text[i+1]==='"'){field+='"';i++;}
-            else inQ=!inQ;
-          } else if(ch===','&&!inQ){cur.push(field.trim());field='';}
-          else if((ch==='\n'||ch==='\r')&&!inQ){
-            if(ch==='\r'&&text[i+1]==='\n')i++;
-            cur.push(field.trim());field='';
-            if(cur.some(f=>f!=''))rows.push(cur);
-            cur=[];
-          } else field+=ch;
-        }
-        if(field||cur.length){cur.push(field.trim());if(cur.some(f=>f!=''))rows.push(cur);}
-        return rows;
-      }
-      const rows=_parseCSV(e.target.result);
-      if(rows.length<2){csvToast('CSV has no data rows.','warning');return;}
-      const headers=rows[0].map(h=>h.trim());
-      const FIELDS=['exam_id','question_text','option_a','option_b','option_c','option_d',
-                    'correct_answer','question_type','image_path','positive_marks','negative_marks','tolerance'];
-      _csvRows=[];
-      for(let i=1;i<rows.length;i++){
-        const vals=rows[i];
-        const q={};
-        headers.forEach((h,idx)=>{if(h) q[h]=idx<vals.length?vals[idx]:''});
-        FIELDS.forEach(f=>{if(q[f]===undefined)q[f]='';});
-        if(!q.exam_id||!q.question_text)continue;
-        _csvRows.push(q);
-      }
-      if(!_csvRows.length){csvToast('No valid rows found.','warning','Check column headers match the required format.');return;}
-      document.getElementById('csvStep1').style.display='none';
-      document.getElementById('csvStep2').style.display='block';
-      _renderCards();
+      setTimeout(function(){
+        _setProcessing(null, 'Parsing rows…');
+        setTimeout(function(){ _doParse(e.target.result); }, 0);
+      }, 0);
     };
     reader.readAsText(file);
   };
+
+  function _parseCSV(text){
+    const rows=[];let cur=[];let field='';let inQ=false;
+    for(let i=0;i<text.length;i++){
+      const ch=text[i];
+      if(ch==='"'){
+        if(inQ&&text[i+1]==='"'){field+='"';i++;}
+        else inQ=!inQ;
+      } else if(ch===','&&!inQ){cur.push(field.trim());field='';}
+      else if((ch==='\n'||ch==='\r')&&!inQ){
+        if(ch==='\r'&&text[i+1]==='\n')i++;
+        cur.push(field.trim());field='';
+        if(cur.some(f=>f!=''))rows.push(cur);
+        cur=[];
+      } else field+=ch;
+    }
+    if(field||cur.length){cur.push(field.trim());if(cur.some(f=>f!=''))rows.push(cur);}
+    return rows;
+  }
+
+  function _doParse(text){
+    const rows=_parseCSV(text);
+    if(rows.length<2){
+      _hideProcessing(); document.getElementById('csvStep1').style.display='block';
+      csvToast('CSV has no data rows.','warning'); return;
+    }
+    const headers=rows[0].map(h=>h.trim());
+    const FIELDS=['exam_id','question_text','option_a','option_b','option_c','option_d',
+                  'correct_answer','question_type','image_path','positive_marks','negative_marks','tolerance'];
+    const parsed=[]; let skipped=0;
+    for(let i=1;i<rows.length;i++){
+      const vals=rows[i];
+      const q={};
+      headers.forEach((h,idx)=>{if(h) q[h]=idx<vals.length?vals[idx]:''});
+      FIELDS.forEach(f=>{if(q[f]===undefined)q[f]='';});
+      if(!q.exam_id||!q.question_text){ skipped++; continue; }
+      parsed.push(q);
+    }
+    if(!parsed.length){
+      _hideProcessing(); document.getElementById('csvStep1').style.display='block';
+      csvToast('No valid rows found.','warning','Check column headers match the required format.'); return;
+    }
+    _loadRowsIntoEditor(parsed, skipped);
+  }
+
+  // Shared tail for every source that lands rows in the editor (manual CSV
+  // parse above, AI-generated below) — one place that puts data into
+  // _csvRows and switches to the paginated preview.
+  function _loadRowsIntoEditor(rows, skipped){
+    _csvRows = rows;
+    _csvSkipped = skipped || 0;
+    _setProcessing(null, 'Preparing preview…');
+    setTimeout(function(){
+      _hideProcessing();
+      document.getElementById('csvStep2').style.display='block';
+      _renderCards();
+    }, 0);
+  }
+
+  // ── AI-generated source ───────────────────────────────────────────────
+  // Normalizes one AI-generated question (see QuestionModel in
+  // app/services/ai_question_generator.py) into the exact same row shape
+  // _csvRows already uses for manually-uploaded CSVs, so every downstream
+  // function (rendering, editing, Load More, Save to DB, Export) works
+  // completely unmodified regardless of source.
+  function _normalizeAiQuestion(q){
+    return {
+      exam_id:        String(q.exam_id ?? ''),
+      question_text:  q.question_text || '',
+      option_a:       q.option_a || '',
+      option_b:       q.option_b || '',
+      option_c:       q.option_c || '',
+      option_d:       q.option_d || '',
+      correct_answer: q.correct_answer || '',
+      question_type:  q.question_type || 'MCQ',
+      image_path:     '',
+      positive_marks: String(q.positive_marks ?? 4),
+      negative_marks: String(q.negative_marks ?? 1),
+      tolerance:      String(q.tolerance ?? 0),
+    };
+  }
+
+  function _loadAiGeneratedQuestions(jobId){
+    _showProcessing('Loading Generated Questions…', 'Fetching from AI engine…');
+    fetch('/api/v01/admin/ai/status/' + encodeURIComponent(jobId))
+      .then(function(r){ return r.json(); })
+      .then(function(job){
+        const rows = (job.questions || []).map(_normalizeAiQuestion);
+        if(!rows.length){
+          _hideProcessing(); document.getElementById('csvStep1').style.display='block';
+          csvToast('No generated questions found for this job.','warning'); return;
+        }
+        if(job.status === 'failed'){
+          csvToast('Partial results', 'warning', `${rows.length} question(s) recovered — some batches failed.`);
+        }
+        _setProcessing(null, 'Normalizing data…');
+        setTimeout(function(){ _loadRowsIntoEditor(rows, 0); }, 0);
+      })
+      .catch(function(){
+        _hideProcessing(); document.getElementById('csvStep1').style.display='block';
+        csvToast('Could not load generated questions.','danger','The generation job may have expired — try generating again.');
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const params = new URLSearchParams(window.location.search);
+    const jobId  = params.get('job_id');
+    if(params.get('source') === 'ai' && jobId){
+      _loadAiGeneratedQuestions(jobId);
+    }
+  });
 
   function _parseRow(row){
     const res=[];let cur='';let inQ=false;
@@ -650,43 +869,52 @@
     res.push(cur.trim());return res;
   }
 
-  function _renderCards(){
-    document.getElementById('csvQCount').textContent = _csvRows.length;
+  // Incremental rendering: only ever put _renderedCount cards in the DOM.
+  // _csvRows always holds the COMPLETE parsed dataset regardless of how much
+  // is rendered — "Load More" is purely a rendering step, never a re-parse
+  // and never a network/database request (Save to DB always sends the full
+  // _csvRows array — see csvSaveToDB below).
+  function _renderCards(preserveCount){
     const container = document.getElementById('csvCardList');
     container.innerHTML = '';
+    _renderedCount = 0;
+    const target = Math.min(_csvRows.length, Math.max(_PAGE_SIZE, preserveCount||0));
+    _appendBatch(target);
+  }
 
-    // Render cards in chunks to avoid blocking the main thread
-    // First 10 cards immediately, rest in batches of 15 via setTimeout
-    const FIRST_BATCH = 10;
-    const CHUNK = 15;
-
-    const renderChunk = (start) => {
-      const end = Math.min(start + CHUNK, _csvRows.length);
-      const frag = document.createDocumentFragment();
-      for(let i = start; i < end; i++){
-        const div = document.createElement('div');
-        div.innerHTML = _cardHTML(_csvRows[i], i);
-        frag.appendChild(div.firstElementChild);
-      }
-      container.appendChild(frag);
-      if(end < _csvRows.length){
-        setTimeout(() => renderChunk(end), 0);
-      }
-    };
-
-    // Render first batch synchronously for immediate feedback
-    const frag = document.createDocumentFragment();
-    const firstEnd = Math.min(FIRST_BATCH, _csvRows.length);
-    for(let i = 0; i < firstEnd; i++){
+  // Appends the next `n` not-yet-rendered rows to the DOM in one batched
+  // document-fragment insertion (a single reflow, not one per card).
+  function _appendBatch(n){
+    const container = document.getElementById('csvCardList');
+    const start = _renderedCount;
+    const end   = Math.min(start + n, _csvRows.length);
+    const frag  = document.createDocumentFragment();
+    for(let i = start; i < end; i++){
       const div = document.createElement('div');
       div.innerHTML = _cardHTML(_csvRows[i], i);
       frag.appendChild(div.firstElementChild);
     }
     container.appendChild(frag);
+    _renderedCount = end;
+    _updateStatsBar();
+  }
 
-    if(_csvRows.length > FIRST_BATCH){
-      setTimeout(() => renderChunk(FIRST_BATCH), 0);
-    }
+  window.csvLoadMore = function(){
+    _appendBatch(_PAGE_SIZE);
+  };
+
+  function _updateStatsBar(){
+    const total = _csvRows.length + _csvSkipped;
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    set('csvQCount', _csvRows.length);
+    set('csvStatTotal', total);
+    set('csvStatValid', _csvRows.length);
+    set('csvStatErrors', _csvSkipped);
+    set('csvStatShowing', _renderedCount);
+    const label = document.getElementById('csvShowingLabel');
+    if (label) label.textContent = `Showing ${_renderedCount} of ${_csvRows.length}`;
+    const bar = document.getElementById('csvLoadMoreBar');
+    if (bar) bar.style.display = _renderedCount < _csvRows.length ? 'flex' : 'none';
   }
 
   function _cardHTML(q,i){
@@ -832,7 +1060,11 @@
       q.option_c=document.getElementById(`ceoc-${i}`).value;
       q.option_d=document.getElementById(`ceod-${i}`).value;
     }
-    _renderCards();
+    // Full rebuild (needed since every card is keyed by array index — a
+    // splice/edit shifts ids for every later card), but keep however many
+    // cards the user had already loaded via "Load More" instead of
+    // collapsing back to just the first page.
+    _renderCards(_renderedCount);
   };
   let _csvDeleteIdx = null;
   window.csvDeleteCard=function(i){
@@ -842,10 +1074,10 @@
   window.csvExecuteDelete=function(){
     document.getElementById('csvDeleteModal').style.display = 'none';
 
-    if(_csvDeleteIdx !== null){ 
-      _csvRows.splice(_csvDeleteIdx,1); 
-      _csvDeleteIdx=null; 
-      _renderCards();
+    if(_csvDeleteIdx !== null){
+      _csvRows.splice(_csvDeleteIdx,1);
+      _csvDeleteIdx=null;
+      _renderCards(_renderedCount);
       csvToast('Question deleted', 'success', 'Removed from preview list');
     }
   };
@@ -854,6 +1086,8 @@
   };
   window.csvExecuteDiscard=function(){
     document.getElementById('csvDiscardModal').style.display = 'none';
+    _renderedCount = 0;
+    _csvSkipped = 0;
     _csvRows=[];
     document.getElementById('csvStep1').style.display='block';
     document.getElementById('csvStep2').style.display='none';
@@ -903,8 +1137,7 @@
         document.getElementById('csvSuccessGotIt').onclick = () => {
           _csvRows = [];
           modal.style.display = 'none';
-          bootstrap.Modal.getInstance(document.getElementById('csvUploaderModal'))?.hide();
-          location.reload();
+          window.location.href = '{{ url_for("admin.ai_command_centre") }}';
         };
         // Cancel/backdrop click — sirf close, no reload
         modal.onclick = (e) => {
@@ -923,6 +1156,45 @@
       e.preventDefault();
       e.returnValue = 'Unsaved progress will be lost. Are you sure?';
     }
+  });
+
+  // ── Themed "Leave Page?" confirm for in-app navigation ──────────────
+  // Intercepts clicks on the header's "Back to AI Command Centre" link and
+  // every sidebar nav link so we can show our own modal instead of letting
+  // the browser start navigating (which would only trigger the native,
+  // unstylable beforeunload dialog above). That native dialog stays in
+  // place as the fallback for exits this can't intercept — browser
+  // Back/Forward, closing the tab, typing a new URL — those are handled
+  // entirely by the browser before any page JS runs.
+  let _pendingLeaveHref = null;
+
+  window.csvCancelLeave = function () {
+    document.getElementById('csvLeaveModal').style.display = 'none';
+    _pendingLeaveHref = null;
+  };
+  window.csvConfirmLeave = function () {
+    document.getElementById('csvLeaveModal').style.display = 'none';
+    const href = _pendingLeaveHref;
+    _pendingLeaveHref = null;
+    if (href) {
+      _csvRows = []; // clear first so beforeunload doesn't also fire its own prompt
+      window.location.href = href;
+    }
+  };
+
+  function _interceptLeaveLink(el) {
+    el.addEventListener('click', function (e) {
+      if (!_csvRows.length) return; // nothing unsaved — let it navigate normally
+      const href = el.getAttribute('href');
+      if (!href) return;
+      e.preventDefault();
+      _pendingLeaveHref = href;
+      document.getElementById('csvLeaveModal').style.display = 'flex';
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.csvpage-back, .sidebar .nav-link[href]').forEach(_interceptLeaveLink);
   });
 
   function _applyLatexSize(text, sizeCmd) {
@@ -1175,116 +1447,52 @@
     return result;
   }
     // ── Sticky Header + Floating Scroll Nav ─────────────────────────────
+  // Standalone page now — the whole document scrolls (there's no modal
+  // scroll container anymore), so this tracks window scroll directly.
   (function () {
 
-    let _scrollEl = null;
-
-    function _findScrollParent(modal) {
-
-      const candidates = [
-        modal.querySelector('.modal-body'),
-        modal.querySelector('.table-responsive'),
-        modal.querySelector('.overflow-auto'),
-        modal.querySelector('[style*="overflow"]'),
-        modal
-      ];
-
-      for (const el of candidates) {
-        if (el && el.scrollHeight > el.clientHeight) {
-          return el;
-        }
-      }
-
-      return modal;
-    }
+    let _attached = false;
 
     function _attach() {
+      if (_attached) return;
+      _attached = true;
 
-      const modal = document.getElementById('csvUploaderModal');
-      if (!modal) return;
-
-      _scrollEl = _findScrollParent(modal);
-
-      if (!_scrollEl) return;
-
-      const nav = document.getElementById('csvScrollNav');
-      const bar = document.getElementById('csvStickyBar');
+      const nav  = document.getElementById('csvScrollNav');
+      const bar  = document.getElementById('csvStickyBar');
       const ring = document.getElementById('csvScrollProgress');
 
       function _update() {
+        const doc = document.documentElement;
+        const st  = window.scrollY || doc.scrollTop || 0;
+        const max = doc.scrollHeight - doc.clientHeight;
 
-        const st = _scrollEl.scrollTop;
-        const max = _scrollEl.scrollHeight - _scrollEl.clientHeight;
+        if (nav) nav.classList.add('csv-nav-visible');
 
-        // Always visible after render
-        if (nav) {
-          nav.classList.add('csv-nav-visible');
-        }
-
-        // Sticky shadow
         if (bar) {
           if (st > 5) bar.classList.add('csv-bar-scrolled');
           else bar.classList.remove('csv-bar-scrolled');
         }
 
-        // Progress ring
         if (ring && max > 0) {
           const pct = st / max;
           ring.style.strokeDashoffset = (113 - (113 * pct));
         }
       }
 
-      _scrollEl.removeEventListener?.('scroll', _scrollEl._csvScrollHandler);
-
-      _scrollEl._csvScrollHandler = _update;
-
-      _scrollEl.addEventListener('scroll', _update, { passive: true });
-
+      window.addEventListener('scroll', _update, { passive: true });
       _update();
     }
 
     // Smooth scroll helpers
     window.csvNavScrollTop = function () {
-      if (!_scrollEl) return;
-      _scrollEl.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     window.csvNavScrollBot = function () {
-      if (!_scrollEl) return;
-      _scrollEl.scrollTo({
-        top: _scrollEl.scrollHeight,
-        behavior: 'smooth'
-      });
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
     };
 
-    // Bootstrap modal open
-    document.addEventListener('shown.bs.modal', function (e) {
-      if (e.target && e.target.id === 'csvUploaderModal') {
-        setTimeout(_attach, 150);
-      }
-    });
-
-    // Reattach after rendering
-    const _origCsvParse = window.csvParse;
-
-    if (_origCsvParse) {
-      window.csvParse = function () {
-
-        const r = _origCsvParse.apply(this, arguments);
-
-        setTimeout(_attach, 400);
-
-        return r;
-      };
-    }
-
-    // Backup attach
-    window.addEventListener('load', () => {
-      setTimeout(_attach, 800);
-    });
+    document.addEventListener('DOMContentLoaded', () => setTimeout(_attach, 100));
 
   })();
 
@@ -1292,3 +1500,4 @@
 
 })();
 </script>
+{% endblock %}

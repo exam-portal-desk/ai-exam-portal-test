@@ -85,9 +85,10 @@ def response_page(exam_id, result_id):
     questions = get_questions_by_exam(exam_id)
     q_map     = {int(q["id"]): q for q in questions}
 
-    from app.services.image_storage_service import resolve_question_image_url as _get_img_url
+    from app.services.image_storage_service import resolve_question_image_urls_bulk
 
-    # ── Bulk-resolve unique image paths first ──
+    # ── Bulk-resolve unique image paths first (concurrently — see
+    #    resolve_question_image_urls_bulk docstring for why) ──
     unique_paths = set()
     for resp in responses:
         qid = int(resp.get("question_id", 0))
@@ -98,10 +99,7 @@ def response_page(exam_id, result_id):
         if ip and str(ip).strip() not in ("", "nan", "None"):
             unique_paths.add(str(ip).strip())
 
-    image_url_map = {}
-    for path in unique_paths:
-        has_img, img_url = _get_img_url(path)
-        image_url_map[path] = (has_img, img_url)
+    image_url_map = resolve_question_image_urls_bulk(unique_paths)
 
     parsed_responses = []
     for resp in responses:
@@ -149,8 +147,10 @@ def response_page(exam_id, result_id):
             "question_type": qtype,
         })
 
+    standalone = request.args.get("popup", "0") == "1"
     return render_template("response.html", exam=exam, result=result_data,
-                           responses=parsed_responses, from_history=from_history)
+                           responses=parsed_responses, from_history=from_history,
+                           standalone=standalone)
 
 
 # ─────────────────────────────────────────────

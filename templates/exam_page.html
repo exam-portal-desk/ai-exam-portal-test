@@ -250,47 +250,143 @@ html, body { overflow:hidden !important; height:100% !important; }
 @keyframes spin{to{transform:rotate(360deg)}}
 .img-fluid { border-radius:var(--radius); }
 
-/* Submit overlay — keeping dark always for focus */
-#submitConfirmationOverlay {
-  position:fixed; inset:0;
-  background:rgba(0,0,0,.97); z-index:20000;
-  display:none; align-items:center; justify-content:center;
-}
-#submitConfirmationOverlay .sco-inner {
-  background:#111118; border:1px solid rgba(255,255,255,.08);
-  border-radius:16px; padding:2.25rem 2rem;
-  max-width:560px; width:92%; color:#fff; text-align:center;
-  box-shadow:0 20px 50px rgba(0,0,0,.7);
-}
-.sco-progress-bar {
-  background:rgba(255,255,255,.04); border-radius:8px;
-  overflow:hidden; height:24px; margin:10px 0;
-  border:1px solid rgba(255,255,255,.06);
-}
-.submit-progress-fill {
-  height:100%; width:0%;
-  background:linear-gradient(90deg,#22c55e,#2dd4bf 40%,#16a34a);
-  border-radius:8px; transition:width .3s ease;
+/* ─── Exam gate (start / resume secure-mode) popups ─────────────────────── */
+.exam-gate-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:20001;
   display:flex; align-items:center; justify-content:center;
-  font-size:.72rem; font-weight:700; color:#fff;
+  backdrop-filter:blur(8px); padding:1.5rem; animation:examGateFade .18s ease;
 }
-.submit-btn-confirm {
-  background:linear-gradient(135deg,#22c55e,#16a34a);
-  border:none; color:#fff; font-weight:800;
-  border-radius:12px; padding:12px 28px; font-size:1rem;
-  box-shadow:0 8px 24px rgba(34,197,94,.25); cursor:pointer;
-  transition:transform .15s, box-shadow .15s; font-family:inherit;
+@keyframes examGateFade { from{opacity:0} to{opacity:1} }
+.exam-gate-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:2.25rem 2.25rem 2rem; max-width:480px; width:100%;
+  color:var(--text-1); text-align:center; box-shadow:0 24px 60px rgba(0,0,0,.45);
 }
-.submit-btn-confirm:hover { transform:translateY(-2px); box-shadow:0 12px 32px rgba(34,197,94,.35); }
-.submit-btn-back {
-  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
-  color:rgba(255,255,255,.7); font-weight:700;
-  border-radius:12px; padding:12px 28px; font-size:1rem;
-  cursor:pointer; transition:background .12s; font-family:inherit;
+.exam-gate-icon {
+  width:56px; height:56px; border-radius:50%;
+  background:var(--accent-subtle); border:1px solid var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto 1.1rem; font-size:1.4rem; color:var(--accent);
 }
-.submit-btn-back:hover { background:rgba(255,255,255,.1); }
-#submitProgressSection { display:none; text-align:left; }
-.submit-progress-section { margin-top:1rem; }
+.exam-gate-icon.warn { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning); }
+.exam-gate-title { font-size:1.15rem; font-weight:700; margin-bottom:.5rem; letter-spacing:-.01em; }
+.exam-gate-desc  { font-size:.86rem; line-height:1.6; color:var(--text-2); margin-bottom:1.4rem; }
+.exam-gate-features {
+  background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+  padding:1.05rem 1.2rem; margin-bottom:1.4rem; text-align:left;
+}
+.exam-gate-features-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:.65rem; }
+.exam-gate-feature { display:flex; align-items:flex-start; gap:.55rem; font-size:.82rem; color:var(--text-2); padding:.28rem 0; }
+.exam-gate-feature i { color:var(--accent); font-size:.72rem; margin-top:.25rem; flex-shrink:0; }
+.exam-gate-meta {
+  font-size:.82rem; color:var(--text-2); margin-bottom:1.4rem; line-height:1.6;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:.7rem .9rem;
+}
+.exam-gate-notice {
+  display:flex; align-items:center; justify-content:center; gap:.4rem;
+  font-size:.78rem; color:var(--warning-text); background:var(--warning-bg);
+  border:1px solid var(--warning-border); border-radius:8px;
+  padding:.55rem .75rem; margin-bottom:1.4rem;
+}
+.exam-gate-btn {
+  background:var(--accent); border:none; color:var(--accent-on); font-weight:700;
+  border-radius:10px; padding:.8rem 1.75rem; font-size:.92rem; cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease; font-family:inherit;
+  box-shadow:0 8px 24px rgba(0,0,0,.15); display:inline-flex; align-items:center; gap:.5rem;
+}
+.exam-gate-btn:hover  { transform:translateY(-2px); box-shadow:0 12px 28px rgba(0,0,0,.22); }
+.exam-gate-btn:active { transform:translateY(0); }
+.exam-gate-btn.warn   { background:var(--warning); color:#fff; }
+.exam-gate-hint { margin-top:1rem; font-size:.75rem; color:var(--text-3); }
+
+/* ─── Submit confirmation / progress overlay — dark always, for focus ───── */
+.sco-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:20000;
+  display:none; align-items:center; justify-content:center;
+  backdrop-filter:blur(6px); padding:1.5rem;
+}
+.sco-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:2rem 2.25rem; max-width:520px; width:100%; color:var(--text-1);
+  box-shadow:0 24px 60px rgba(0,0,0,.45);
+}
+.sco-header { text-align:center; margin-bottom:1.4rem; }
+.sco-icon {
+  width:52px; height:52px; border-radius:50%;
+  background:var(--accent-subtle); border:1px solid var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto .85rem; font-size:1.3rem; color:var(--accent);
+}
+.sco-title { font-size:1.1rem; font-weight:700; margin-bottom:.4rem; letter-spacing:-.01em; }
+.sco-desc  { font-size:.85rem; color:var(--text-2); line-height:1.55; }
+
+/* Stepper: Submit → Confirm → Submitting → Submitted */
+.sco-stepper { display:flex; align-items:center; justify-content:center; gap:.35rem; margin-bottom:1.4rem; }
+.sco-step { display:flex; flex-direction:column; align-items:center; gap:.35rem; }
+.sco-step-dot { width:8px; height:8px; border-radius:50%; background:var(--border); transition:background .25s ease, transform .25s ease; }
+.sco-step-label { font-size:.64rem; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.03em; transition:color .25s ease; white-space:nowrap; }
+.sco-step-line { width:18px; height:1px; background:var(--border); margin-bottom:1.05rem; transition:background .25s ease; }
+.sco-step.active .sco-step-dot { background:var(--accent); transform:scale(1.35); }
+.sco-step.active .sco-step-label { color:var(--accent); }
+.sco-step.done .sco-step-dot { background:var(--success); transform:scale(1); }
+.sco-step-line.done { background:var(--success); }
+
+/* Progress summary */
+.sco-stats {
+  background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+  padding:1rem 1.1rem; margin-bottom:1.1rem;
+}
+.sco-stats-title { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:.7rem; }
+.sco-stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem; margin-bottom:.85rem; }
+.sco-stat { text-align:center; }
+.sco-stat-num { font-weight:700; font-size:1.15rem; line-height:1.2; }
+.sco-stat-label { font-size:.66rem; color:var(--text-3); margin-top:.15rem; }
+.sco-stats-note { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.7rem .85rem; }
+.sco-stats-note ul { margin:0; padding-left:1.1rem; color:var(--text-2); font-size:.78rem; line-height:1.7; }
+
+/* Submitting progress */
+.sco-progress { display:none; text-align:left; margin-bottom:1.1rem; }
+.sco-progress-head { display:flex; align-items:center; gap:.65rem; margin-bottom:.8rem; }
+.sco-progress-spinner {
+  width:22px; height:22px; border-radius:50%; flex-shrink:0;
+  border:2.5px solid var(--border); border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+.sco-progress-done {
+  width:22px; height:22px; border-radius:50%; flex-shrink:0;
+  background:var(--success); color:#fff; font-size:.62rem;
+  display:flex; align-items:center; justify-content:center;
+}
+.sco-progress-text    { font-weight:700; font-size:.86rem; color:var(--text-1); }
+.sco-progress-details { font-size:.75rem; color:var(--text-3); margin-top:.1rem; }
+.sco-progress-meta    { display:flex; justify-content:space-between; font-size:.72rem; color:var(--text-3); margin-bottom:.4rem; }
+.sco-progress-track   { background:var(--surface-2); border:1px solid var(--border); border-radius:99px; height:8px; overflow:hidden; margin-bottom:.5rem; }
+.sco-progress-fill    { height:100%; width:0%; background:var(--accent); border-radius:99px; transition:width .35s ease; }
+.sco-progress-log     { font-size:.72rem; color:var(--text-3); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; max-height:54px; overflow:hidden; line-height:1.6; }
+
+/* Actions */
+.sco-actions { display:flex; gap:.65rem; justify-content:center; flex-wrap:wrap; }
+.sco-btn {
+  border-radius:10px; padding:.75rem 1.6rem; font-size:.88rem; font-weight:700;
+  cursor:pointer; font-family:inherit; border:1px solid transparent;
+  display:inline-flex; align-items:center; gap:.45rem;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.sco-btn-primary   { background:var(--accent); color:var(--accent-on); box-shadow:0 8px 20px rgba(0,0,0,.15); }
+.sco-btn-primary:hover   { transform:translateY(-2px); box-shadow:0 12px 26px rgba(0,0,0,.22); }
+.sco-btn-secondary { background:var(--surface-2); color:var(--text-2); border-color:var(--border); }
+.sco-btn-secondary:hover { background:var(--border); color:var(--text-1); }
+.sco-footnote { text-align:center; margin-top:1rem; font-size:.72rem; color:var(--text-3); }
+
+@media (max-width:480px) {
+  .exam-gate-card, .sco-card { padding:1.5rem 1.25rem; }
+  .sco-stepper { gap:.2rem; }
+  .sco-step-line { width:10px; }
+  .sco-step-label { font-size:.58rem; }
+  .sco-stats-grid { gap:.3rem; }
+  .sco-actions { flex-direction:column-reverse; }
+  .sco-btn { width:100%; justify-content:center; }
+}
 
 /* Image modal */
 .modal-content { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); }
@@ -408,48 +504,60 @@ html, body { overflow:hidden !important; height:100% !important; }
 <div id="examNavBar" style="position:fixed;bottom:0;left:0;right:0;padding:1rem 1.5rem;background:var(--surface-2);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem;z-index:50;box-shadow:0 -2px 8px rgba(0,0,0,.1)"></div>
 
 {# Submit Confirmation Overlay — kept dark always for focus #}
-<div id="submitConfirmationOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:20000;display:none;align-items:center;justify-content:center;">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2.25rem 2rem;max-width:560px;width:92%;color:var(--text-1);text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.7);">
-    <i class="fas fa-paper-plane fa-3x mb-3" style="color:var(--accent)"></i>
-    <h3 style="color:var(--accent);font-weight:800;margin-bottom:12px;font-size:1.3rem"><i class="fas fa-exclamation-triangle me-2"></i> Confirm Exam Submission</h3>
-    <p style="color:var(--text-2);margin-bottom:20px;font-size:.95rem">Are you sure you want to submit? Once submitted, you cannot modify any answers.</p>
+<div id="submitConfirmationOverlay" class="sco-overlay">
+  <div class="sco-card">
 
-    <div style="background:var(--accent-subtle);border:1px solid var(--accent);border-radius:10px;padding:18px;margin-bottom:18px;text-align:left">
-      <h6 style="font-weight:700;margin-bottom:14px;color:var(--text-1);font-size:.9rem"><i class="fas fa-chart-bar me-2"></i> Progress Summary</h6>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);text-align:center;margin-bottom:14px;gap:.5rem">
-        <div><div style="font-weight:800;font-size:1.2rem;color:#22c55e" id="confirmAnsweredCount">0</div><div style="font-size:.75rem;color:var(--text-3)">Answered</div></div>
-        <div><div style="font-weight:800;font-size:1.2rem;color:#f59e0b" id="confirmReviewCount">0</div><div style="font-size:.75rem;color:var(--text-3)">Review</div></div>
-        <div><div style="font-weight:800;font-size:1.2rem;color:#38bdf8" id="confirmVisitedCount">0</div><div style="font-size:.75rem;color:var(--text-3)">Visited</div></div>
-        <div><div style="font-weight:800;font-size:1.2rem;color:var(--text-3)" id="confirmNotVisitedCount">0</div><div style="font-size:.75rem;color:var(--text-3)">Not Visited</div></div>
+    <div class="sco-header">
+      <div class="sco-icon"><i class="fas fa-paper-plane"></i></div>
+      <div class="sco-title">Submit Exam?</div>
+      <div class="sco-desc">Once submitted, you won't be able to change any answers.</div>
+    </div>
+
+    <div class="sco-stepper" id="scoStepper">
+      <div class="sco-step" data-step="1"><span class="sco-step-dot"></span><span class="sco-step-label">Submit</span></div>
+      <span class="sco-step-line" data-line="1"></span>
+      <div class="sco-step" data-step="2"><span class="sco-step-dot"></span><span class="sco-step-label">Confirm</span></div>
+      <span class="sco-step-line" data-line="2"></span>
+      <div class="sco-step" data-step="3"><span class="sco-step-dot"></span><span class="sco-step-label">Submitting</span></div>
+      <span class="sco-step-line" data-line="3"></span>
+      <div class="sco-step" data-step="4"><span class="sco-step-dot"></span><span class="sco-step-label">Submitted</span></div>
+    </div>
+
+    <div class="sco-stats">
+      <div class="sco-stats-title"><i class="fas fa-chart-bar me-1"></i> Progress summary</div>
+      <div class="sco-stats-grid">
+        <div class="sco-stat"><div class="sco-stat-num" style="color:var(--success)" id="confirmAnsweredCount">0</div><div class="sco-stat-label">Answered</div></div>
+        <div class="sco-stat"><div class="sco-stat-num" style="color:var(--warning)" id="confirmReviewCount">0</div><div class="sco-stat-label">Review</div></div>
+        <div class="sco-stat"><div class="sco-stat-num" style="color:var(--info)" id="confirmVisitedCount">0</div><div class="sco-stat-label">Visited</div></div>
+        <div class="sco-stat"><div class="sco-stat-num" style="color:var(--text-3)" id="confirmNotVisitedCount">0</div><div class="sco-stat-label">Not visited</div></div>
       </div>
-      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:14px">
-        <ul style="margin:0;padding-left:18px;color:var(--text-2);font-size:.82rem;line-height:1.8">
-          <li>Your answers have been automatically saved</li>
-          <li>Detailed results available after submission</li>
+      <div class="sco-stats-note">
+        <ul>
+          <li>Your answers are already saved automatically</li>
+          <li>Detailed results will be available after submission</li>
           <li>This action cannot be undone</li>
         </ul>
       </div>
     </div>
 
-    <div id="submitProgressSection" style="display:none;text-align:left;margin-bottom:1rem">
-      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem">
-        <i class="fas fa-cog fa-spin" style="color:#22c55e"></i>
+    <div id="submitProgressSection" class="sco-progress">
+      <div class="sco-progress-head">
+        <div id="submitProgressIcon" class="sco-progress-spinner"></div>
         <div>
-          <div id="submitProgressText" style="font-weight:700;color:var(--success-text, #22c55e);font-size:.9rem">Processing your submission...</div>
-          <div id="submitProgressDetails" style="font-size:.78rem;color:var(--text-3)">Initializing submission process...</div>
+          <div id="submitProgressText" class="sco-progress-text">Processing your submission...</div>
+          <div id="submitProgressDetails" class="sco-progress-details">Initializing submission process...</div>
         </div>
       </div>
-      <div style="background:var(--surface-2);border-radius:8px;overflow:hidden;height:24px;margin:8px 0;border:1px solid var(--border)">
-        <div id="submitProgressFill" class="submit-progress-fill"><span id="submitProgressPercent">0%</span></div>
-      </div>
-      <div id="submitProgressLog" style="font-size:.75rem;color:#22c55e;min-height:18px"></div>
+      <div class="sco-progress-meta"><span>Progress</span><span id="submitProgressPercent">0%</span></div>
+      <div class="sco-progress-track"><div id="submitProgressFill" class="sco-progress-fill"></div></div>
+      <div id="submitProgressLog" class="sco-progress-log"></div>
     </div>
 
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap" id="submitConfirmationButtons">
-      <button class="submit-btn-confirm" onclick="examPortal.confirmSubmission()" style="background:var(--accent);border:none;color:var(--accent-on);font-weight:800;border-radius:12px;padding:12px 28px;font-size:1rem;box-shadow:0 8px 24px rgba(0,0,0,.2);cursor:pointer;transition:all .2s;font-family:inherit"><i class="fas fa-check me-2"></i> Yes, Submit Exam</button>
-      <button class="submit-btn-back" onclick="examPortal.cancelSubmission()" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-weight:700;border-radius:12px;padding:12px 28px;font-size:1rem;cursor:pointer;transition:all .2s;font-family:inherit"><i class="fas fa-arrow-left me-2"></i> Go Back</button>
+    <div class="sco-actions" id="submitConfirmationButtons">
+      <button class="sco-btn sco-btn-primary" onclick="examPortal.confirmSubmission()"><i class="fas fa-check"></i> Yes, Submit Exam</button>
+      <button class="sco-btn sco-btn-secondary" onclick="examPortal.cancelSubmission()"><i class="fas fa-arrow-left"></i> Go Back</button>
     </div>
-    <div style="margin-top:14px"><small style="color:var(--text-3);font-size:.75rem"><i class="fas fa-clock me-1"></i> Take your time — there's no rush.</small></div>
+    <div class="sco-footnote"><i class="fas fa-clock me-1"></i> Take your time — there's no rush.</div>
   </div>
 </div>
 
@@ -564,31 +672,25 @@ async initializeFullscreen() { this.showFullscreenInitModal(); }
 showFullscreenInitModal() {
   const modal = document.createElement('div');
   modal.id = 'fullscreenInitModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:20001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)';
+  modal.className = 'exam-gate-overlay';
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:20px;padding:40px;max-width:600px;width:90%;color:var(--text-1);box-shadow:0 30px 60px rgba(0,0,0,.7);text-align:center;border:2px solid var(--accent-subtle)">
-      <i class="fas fa-expand-arrows-alt fa-4x mb-3" style="color:var(--accent)"></i>
-      <h3 style="color:var(--accent);margin-bottom:20px;font-weight:800">Secure Exam Mode Required</h3>
-      <p style="margin-bottom:25px;font-size:1.05rem;line-height:1.6;color:var(--text-2)">This exam must be taken in fullscreen mode for security and integrity.</p>
-      <div style="background:var(--accent-subtle);border:1px solid var(--accent);border-radius:12px;padding:20px;margin:20px 0;text-align:left">
-        <h6 style="font-weight:700;margin-bottom:14px;color:var(--accent)"><i class="fas fa-shield-check me-2"></i>Security Features:</h6>
-        <ul style="margin:0;padding-left:20px;line-height:1.8;color:var(--text-2)">
-          <li>Prevents tab switching during exam</li>
-          <li>Disables keyboard shortcuts</li>
-          <li>Monitors exam window focus</li>
-          <li>Auto-submit on security violations</li>
-        </ul>
+    <div class="exam-gate-card">
+      <div class="exam-gate-icon"><i class="fas fa-shield-halved"></i></div>
+      <div class="exam-gate-title">Secure Exam Mode Required</div>
+      <div class="exam-gate-desc">This exam must be taken in fullscreen mode to ensure a fair and secure testing environment.</div>
+      <div class="exam-gate-features">
+        <div class="exam-gate-features-title">Security features</div>
+        <div class="exam-gate-feature"><i class="fas fa-check"></i> Prevents tab switching during the exam</div>
+        <div class="exam-gate-feature"><i class="fas fa-check"></i> Disables keyboard shortcuts</div>
+        <div class="exam-gate-feature"><i class="fas fa-check"></i> Monitors exam window focus</div>
+        <div class="exam-gate-feature"><i class="fas fa-check"></i> Auto-submits on security violations</div>
       </div>
-      <p style="margin-bottom:30px;color:var(--warning);font-weight:600"><i class="fas fa-exclamation-triangle me-2"></i>Security monitoring begins after entering fullscreen</p>
-      <button id="enterFullscreenBtn" style="background:var(--accent);border:none;color:var(--accent-on);font-weight:800;border-radius:12px;padding:15px 30px;font-size:1.05rem;box-shadow:0 12px 40px rgba(0,0,0,.2);cursor:pointer;transition:all .2s ease">
-        <i class="fas fa-play me-2"></i> Enter Secure Mode &amp; Start Exam
-      </button>
-      <div style="margin-top:18px"><small style="color:var(--text-3)"><i class="fas fa-info-circle me-1"></i>Click to enable fullscreen and begin your exam</small></div>
+      <div class="exam-gate-notice"><i class="fas fa-info-circle"></i> Security monitoring begins once you enter fullscreen</div>
+      <button id="enterFullscreenBtn" class="exam-gate-btn"><i class="fas fa-expand-arrows-alt"></i> Enter Secure Mode &amp; Start Exam</button>
+      <div class="exam-gate-hint">Click above to enable fullscreen and begin your exam</div>
     </div>`;
   document.body.appendChild(modal);
   const btn = modal.querySelector('#enterFullscreenBtn');
-  btn.addEventListener('mouseenter', () => { btn.style.transform='translateY(-3px)'; btn.style.boxShadow='0 20px 50px rgba(34,197,94,.3)'; });
-  btn.addEventListener('mouseleave', () => { btn.style.transform=''; btn.style.boxShadow='0 12px 40px rgba(34,197,94,.2)'; });
   btn.addEventListener('click', async () => {
     await this.actuallyEnterFullscreen();
     this.removeFullscreenInitModal();
@@ -681,7 +783,7 @@ showFullscreenStatus(isFs) {
     el.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:10000;padding:7px 12px;border-radius:6px;font-size:.82rem;font-weight:600;pointer-events:none;transition:all .3s';
     document.body.appendChild(el);
   }
-  if (isFs) { el.innerHTML='<i class="fas fa-shield-check"></i> Secure Mode Active'; el.style.background='linear-gradient(90deg,#10b981,#059669)'; el.style.color='#fff'; }
+  if (isFs) { el.innerHTML='<i class="fas fa-shield-halved"></i> Secure Mode Active'; el.style.background='linear-gradient(90deg,#10b981,#059669)'; el.style.color='#fff'; }
   else       { el.innerHTML='<i class="fas fa-exclamation-triangle"></i> Security Alert'; el.style.background='linear-gradient(90deg,#ef4444,#dc2626)'; el.style.color='#fff'; }
 }
 
@@ -793,7 +895,14 @@ loadQuestion(index) {
   setTimeout(()=>{this.renderQuestion(q);card.classList.remove('loading');if(this.palette[index]==='not-visited'){this.palette[index]='visited';this.renderPalette();this.updateMetricsCounts();}this.renderMathJax();},50);
 }
 
-renderMathJax() { if(window.MathJax) MathJax.typesetPromise().catch(()=>{}); }
+renderMathJax() {
+  // window.mathJaxTypeset (base.html) is safe to call at any time — it runs
+  // immediately if MathJax has finished initializing, otherwise queues until
+  // it has, instead of racing an arbitrary timeout against an async script load.
+  if (!window.mathJaxTypeset) return;
+  const qc = document.getElementById('questionContent');
+  window.mathJaxTypeset(qc ? [qc] : undefined);
+}
 
 renderQuestion(question) {
   const qc=document.getElementById('questionContent'), qid=String(question.id), sel=this.answers[qid];
@@ -1056,10 +1165,24 @@ showSubmissionConfirmation(){
   document.getElementById('confirmReviewCount').textContent=c.review;
   document.getElementById('confirmVisitedCount').textContent=c.visited;
   document.getElementById('confirmNotVisitedCount').textContent=c['not-visited'];
+  this.setSubmitStep(2);
   document.getElementById('submitConfirmationOverlay').style.display='flex';
 }
 
 cancelSubmission(){ document.getElementById('submitConfirmationOverlay').style.display='none'; }
+
+// Purely visual — advances the Submit -> Confirm -> Submitting -> Submitted
+// indicator in the submit overlay. No effect on submission state/timing.
+setSubmitStep(n){
+  document.querySelectorAll('#scoStepper .sco-step').forEach(el=>{
+    const s=parseInt(el.dataset.step,10);
+    el.classList.toggle('done', s<n);
+    el.classList.toggle('active', s===n);
+  });
+  document.querySelectorAll('#scoStepper .sco-step-line').forEach(el=>{
+    el.classList.toggle('done', parseInt(el.dataset.line,10)<n);
+  });
+}
 
 emergencySyncAnswers(){
   try{const d=JSON.stringify({answers:this.answers,markedForReview:this.markedForReview,currentIndex:this.currentIndex,timeRemaining:this.duration});if(navigator.sendBeacon)navigator.sendBeacon(`/api/emergency-sync-exam/${this.examId}`,d);else{const x=new XMLHttpRequest();x.open('POST',`/api/emergency-sync-exam/${this.examId}`,false);x.setRequestHeader('Content-Type','application/json');x.send(d);}}catch(e){}
@@ -1068,8 +1191,17 @@ emergencySyncAnswers(){
 handlePageVisibilityChange(){ if(!this.isFullscreenEnabled&&!this.isSubmitting) this.showResumeModal(); }
 
 showResumeModal(){
-  const m=document.createElement('div');m.id='resumeExamModal';m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:20001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)';
-  m.innerHTML=`<div style="background:linear-gradient(135deg,#1f2937,#111827);border-radius:20px;padding:40px;max-width:500px;width:90%;color:#fff;text-align:center;border:2px solid rgba(251,191,36,.3)"><i class="fas fa-redo fa-4x mb-3" style="color:#fbbf24"></i><h3 style="color:#fbbf24;margin-bottom:20px;font-weight:800">Resume Secure Exam</h3><p style="margin-bottom:25px;line-height:1.6">Your exam was interrupted but progress was saved. Click below to continue.</p><p style="color:rgba(255,255,255,.6);font-size:.85rem;margin-bottom:25px">Time: ${Math.floor(this.duration/60)}:${String(this.duration%60).padStart(2,'0')} &middot; Q${this.currentIndex+1}/${this.totalQuestions} &middot; ${Object.keys(this.answers).length} answered</p><button id="resumeBtn" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);border:none;color:#111;font-weight:800;border-radius:12px;padding:14px 28px;font-size:1rem;cursor:pointer"><i class="fas fa-expand-arrows-alt me-2"></i>Resume in Fullscreen</button></div>`;
+  const m=document.createElement('div');
+  m.id='resumeExamModal';
+  m.className='exam-gate-overlay';
+  m.innerHTML=`
+    <div class="exam-gate-card">
+      <div class="exam-gate-icon warn"><i class="fas fa-redo"></i></div>
+      <div class="exam-gate-title">Resume Secure Exam</div>
+      <div class="exam-gate-desc">Your exam was interrupted, but your progress was saved. Re-enter fullscreen to continue.</div>
+      <div class="exam-gate-meta"><i class="fas fa-clock me-1"></i> ${Math.floor(this.duration/60)}:${String(this.duration%60).padStart(2,'0')} remaining &nbsp;&middot;&nbsp; Q${this.currentIndex+1}/${this.totalQuestions} &nbsp;&middot;&nbsp; ${Object.keys(this.answers).length} answered</div>
+      <button id="resumeBtn" class="exam-gate-btn warn"><i class="fas fa-expand-arrows-alt"></i> Resume in Fullscreen</button>
+    </div>`;
   document.body.appendChild(m);
   m.querySelector('#resumeBtn').addEventListener('click',async()=>{await this.actuallyEnterFullscreen();m.remove();this.setupFullscreenMonitoring();this.setupVisibilityMonitoring();this.preventTabSwitching();this.startFullscreenMonitoring();});
 }
@@ -1080,6 +1212,9 @@ async confirmSubmission(){
   if(this.fullscreenCheckInterval)clearInterval(this.fullscreenCheckInterval);
   document.getElementById('submitConfirmationButtons').style.display='none';
   document.getElementById('submitProgressSection').style.display='block';
+  const icon0=document.getElementById('submitProgressIcon');
+  if(icon0 && icon0.classList.contains('sco-progress-done')) icon0.outerHTML='<div id="submitProgressIcon" class="sco-progress-spinner"></div>';
+  this.setSubmitStep(3);
   this.updateSubmissionProgress(2,'Starting submission...','Preparing transfer','User confirmed');
   const ds={done:false};
   const sim=this.simulateSubmissionProgress(ds);
@@ -1103,17 +1238,26 @@ updateSubmissionProgress(pct,text,details,log){
   const el={submitProgressPercent:pct+'%',submitProgressText:text,submitProgressDetails:details};
   Object.entries(el).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
   const lg=document.getElementById('submitProgressLog');if(lg&&log)lg.innerHTML=`<div>&bull; ${log}</div>`+lg.innerHTML;
+  if(pct>=100){
+    this.setSubmitStep(4);
+    if(f)f.style.background='var(--success)';
+    const icon=document.getElementById('submitProgressIcon');
+    if(icon && !icon.classList.contains('sco-progress-done')) icon.outerHTML='<div id="submitProgressIcon" class="sco-progress-done"><i class="fas fa-check"></i></div>';
+  }
 }
 
 showSubmissionError(msg){
   this.updateSubmissionProgress(0,'Submission failed!','An error occurred. Please try again.','Error: '+msg);
-  const f=document.getElementById('submitProgressFill');if(f)f.style.background='linear-gradient(90deg,#ef4444,#f97316)';
+  const f=document.getElementById('submitProgressFill');if(f)f.style.background='var(--danger)';
   setTimeout(()=>{
     this.submissionInProgress=false;this.isSubmitting=false;this.isNavigating=false;
     document.getElementById('submitProgressSection').style.display='none';
     document.getElementById('submitConfirmationButtons').style.display='flex';
+    this.setSubmitStep(2);
+    const icon=document.getElementById('submitProgressIcon');
+    if(icon && icon.classList.contains('sco-progress-done')) icon.outerHTML='<div id="submitProgressIcon" class="sco-progress-spinner"></div>';
     const f=document.getElementById('submitProgressFill');
-    if(f){f.style.background='linear-gradient(90deg,#22c55e,#2dd4bf 40%,#16a34a)';f.style.width='0%';}
+    if(f){f.style.background='var(--accent)';f.style.width='0%';}
     ['submitProgressPercent','submitProgressText','submitProgressDetails'].forEach((id,i)=>{const e=document.getElementById(id);if(e)e.textContent=['0%','Processing your submission...','Initializing...'][i];});
     document.getElementById('submitProgressLog').innerHTML='';
   },3000);

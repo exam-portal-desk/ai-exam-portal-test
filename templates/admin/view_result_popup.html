@@ -320,13 +320,13 @@ function openResponse() {
       btn.disabled = false;
       btn.innerHTML = '<i class="fas fa-clipboard-check"></i>';
       var w = screen.availWidth*.9, h = screen.availHeight*.9;
-      var win = window.open(
+      var win = window.openLoadingWindow(
         '{{ url_for("admin.users_analytics_view_responses", exam_id=exam.id, result_id=result.id) }}',
         '_blank',
-        'width='+w+',height='+h+',top='+((screen.availHeight-h)/2)+',left='+((screen.availWidth-w)/2)+',resizable=yes,scrollbars=yes'
+        'width='+w+',height='+h+',top='+((screen.availHeight-h)/2)+',left='+((screen.availWidth-w)/2)+',resizable=yes,scrollbars=yes',
+        {title: 'Loading — SmartAIExam Admin', message: 'Loading response analysis…'}
       );
-      if (!win) window.location.href = '{{ url_for("result.response_page", exam_id=exam.id, result_id=result.id) }}';
-      else win.focus();
+      if (win) win.focus();
     }, 500);
   }
   next();

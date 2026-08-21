@@ -1,6 +1,6 @@
 """
 app/routes/api/v01/admin/ai_centre.py
-AI Command Centre JSON/CSV API (v01): generate, status, save, export.
+AI Command Centre JSON API (v01): generate, status.
 Relocated from app/routes/admin/ai_centre.py.
 Background job model unchanged: POST /generate -> job_id, GET /status/<job_id>
 for live progress, backed by the same in-memory job store (still
@@ -10,22 +10,26 @@ for this routing refactor).
 
   POST /admin/ai-command-centre/generate    -> POST /api/v01/admin/ai/generate
   GET  /admin/ai-command-centre/status/<id> -> GET  /api/v01/admin/ai/status/<id>
-  POST /admin/ai-command-centre/save        -> POST /api/v01/admin/ai/save
-  POST /admin/ai-command-centre/export-csv  -> POST /api/v01/admin/ai/export-csv
+
+job_id also doubles as the safe reference the CSV Editor page uses to pick
+up a completed generation job (GET .../status/<id> again) — see
+templates/admin/csv_upload.html's _loadAiGeneratedQuestions(). Saving and
+CSV export both now go through the same single pipeline manually-uploaded
+CSVs use (POST /api/v01/admin/questions/import-csv, and the CSV Editor's
+own client-side Export CSV) — the JSON-based /ai/save and /ai/export-csv
+endpoints that used to serve the old inline preview on this page have been
+removed since nothing calls them anymore.
 """
 
-import os
-import io
-import csv
 import uuid
+import os
 import tempfile
 import threading
 
-from flask import request, jsonify, Response
+from flask import request, jsonify
 
 from app.routes.api.v01.admin import admin_api_bp
 from app.middleware.session_guard import require_admin_role
-from app.db.questions import create_questions_bulk
 
 # ── In-memory job store ──────────────────────────────────────────────────────
 _jobs: dict = {}
@@ -182,64 +186,3 @@ def ai_generation_status(job_id: str):
     if not job:
         return jsonify({"success": False, "message": "Job not found"}), 404
     return jsonify(job)
-
-
-@admin_api_bp.route("/ai/save", methods=["POST"])
-@require_admin_role
-def ai_save_questions():
-    data      = request.get_json() or {}
-    questions = data.get("questions", [])
-    if not questions:
-        return jsonify({"success": False, "message": "No questions to save"}), 400
-
-    rows = [
-        {
-            "exam_id":        q["exam_id"],
-            "question_text":  q["question_text"],
-            "option_a":       q.get("option_a", ""),
-            "option_b":       q.get("option_b", ""),
-            "option_c":       q.get("option_c", ""),
-            "option_d":       q.get("option_d", ""),
-            "correct_answer": q["correct_answer"],
-            "question_type":  q.get("question_type", "MCQ"),
-            "image_path":     None,
-            "positive_marks": int(q.get("positive_marks", 4)),
-            "negative_marks": float(q.get("negative_marks", 1)),
-            "tolerance":      float(q.get("tolerance", 0)),
-        }
-        for q in questions
-    ]
-
-    if create_questions_bulk(rows):
-        return jsonify({"success": True,
-                        "message": f"Saved {len(rows)} questions.",
-                        "count":   len(rows)})
-    return jsonify({"success": False, "message": "Save failed."}), 500
-
-
-@admin_api_bp.route("/ai/export-csv", methods=["POST"])
-@require_admin_role
-def ai_export_csv():
-    data      = request.get_json() or {}
-    questions = data.get("questions", [])
-    if not questions:
-        return jsonify({"success": False, "message": "No questions to export"}), 400
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["exam_id","question_text","option_a","option_b","option_c","option_d",
-                     "correct_answer","question_type","image_path","positive_marks",
-                     "negative_marks","tolerance"])
-    for q in questions:
-        writer.writerow([q["exam_id"], q["question_text"],
-                         q.get("option_a",""), q.get("option_b",""),
-                         q.get("option_c",""), q.get("option_d",""),
-                         q["correct_answer"], q.get("question_type","MCQ"), "",
-                         q.get("positive_marks",4), q.get("negative_marks",1),
-                         q.get("tolerance",0)])
-
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=ai_generated_questions.csv"},
-    )

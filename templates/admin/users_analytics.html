@@ -482,7 +482,8 @@ function _skeletonTable() {
 function popupOpen(url, w, h) {
   const left = Math.round(window.screenX + (window.innerWidth - w) / 2);
   const top  = Math.round(window.screenY + (window.innerHeight - h) / 2);
-  window.open(url, '_blank', `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+  window.openLoadingWindow(url, '_blank', `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`,
+    {title: 'Loading — SmartAIExam Admin', message: 'Loading response analysis…'});
 }
 
 /* ═══════════════════════════════════════════

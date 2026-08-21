@@ -240,8 +240,6 @@ const API_CONFIG = {
       <a class="sl" href="#admin-analytics-data"><span class="mdot mdot-get"></span>GET /admin/analytics/data</a>
       <a class="sl" href="#admin-ai-gen"><span class="mdot mdot-post"></span>POST /admin/ai/generate</a>
       <a class="sl" href="#admin-ai-status"><span class="mdot mdot-get"></span>GET /admin/ai/status/:id</a>
-      <a class="sl" href="#admin-ai-save"><span class="mdot mdot-post"></span>POST /admin/ai/save</a>
-      <a class="sl" href="#admin-ai-export"><span class="mdot mdot-post"></span>POST /admin/ai/export-csv</a>
       <a class="sl" href="#admin-categories-list"><span class="mdot mdot-get"></span>GET /admin/categories</a>
       <a class="sl" href="#admin-categories-create"><span class="mdot mdot-post"></span>POST /admin/categories</a>
       <a class="sl" href="#admin-categories-update"><span class="mdot mdot-patch"></span>PATCH /admin/categories/:id</a>
@@ -1831,54 +1829,7 @@ topic:                 <span class="s">"Newton's Laws"</span>  <span class="c">/
     </div>
   </div>
 
-  <div class="ep" id="admin-ai-save">
-    <div class="ep-header" onclick="toggleEp(this)">
-      <span class="mb mb-POST">POST</span>
-      <span class="ep-path">/api/v01/admin/ai/save</span>
-      <span class="ep-summary">Persist AI-generated questions to the database</span>
-      <span class="badge-admin">Admin</span>
-      <span class="ep-expand">▾</span>
-    </div>
-    <div class="ep-body">
-      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Body is the <code>questions</code> array as returned by the status endpoint (each item needs at least <code>exam_id</code>, <code>question_text</code>, <code>correct_answer</code>).</span></div>
-      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
-      <pre>{
-  <span class="n">"questions"</span>: [
-    {
-      <span class="n">"exam_id"</span>:        <span class="v">42</span>,
-      <span class="n">"question_text"</span>:  <span class="s">"A block of mass m slides..."</span>,
-      <span class="n">"option_a"</span>:       <span class="s">"..."</span>,
-      <span class="n">"correct_answer"</span>: <span class="s">"A"</span>,
-      <span class="n">"question_type"</span>:  <span class="s">"MCQ"</span>,
-      <span class="n">"positive_marks"</span>: <span class="v">4</span>,
-      <span class="n">"negative_marks"</span>: <span class="v">1</span>
-    }
-  ]
-}</pre></div>
-      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
-      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: <span class="s">"Saved 1 questions."</span>, <span class="n">"count"</span>: <span class="v">1</span> }</pre></div>
-      <div class="rpills">
-        <span class="rp rp-4">400 — {"success": false, "message": "No questions to save"}</span>
-        <span class="rp rp-5">500 — {"success": false, "message": "Save failed."}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="ep" id="admin-ai-export">
-    <div class="ep-header" onclick="toggleEp(this)">
-      <span class="mb mb-POST">POST</span>
-      <span class="ep-path">/api/v01/admin/ai/export-csv</span>
-      <span class="ep-summary">Export AI-generated questions as a CSV download, without saving them</span>
-      <span class="badge-admin">Admin</span>
-      <span class="ep-expand">▾</span>
-    </div>
-    <div class="ep-body">
-      <div class="cb"><div class="cb-header"><span class="cb-lang">json — request</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
-      <pre>{ <span class="n">"questions"</span>: [ { <span class="n">"exam_id"</span>: <span class="v">42</span>, <span class="n">"question_text"</span>: <span class="s">"..."</span>, <span class="n">"correct_answer"</span>: <span class="s">"A"</span> } ] }</pre></div>
-      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Response is a raw CSV file (<code>Content-Type: text/csv</code>, <code>Content-Disposition: attachment; filename=ai_generated_questions.csv</code>), not JSON.</span></div>
-      <div class="rpills"><span class="rp rp-4">400 — {"success": false, "message": "No questions to export"}</span></div>
-    </div>
-  </div>
+  <div class="note note-info"><span class="note-icon">ℹ️</span><span>Once a generation job's status is <code>done</code>, the admin UI navigates to <code>/admin/ai-command-centre/csv-upload?source=ai&amp;job_id={id}</code> — the CSV Editor re-fetches this same status endpoint to load the generated questions, then reuses the exact same preview/edit/Load More/save pipeline as a manually uploaded CSV (<code>POST /api/v01/admin/questions/import-csv</code>, documented under Questions). There is no separate save or export endpoint for AI-generated questions anymore.</span></div>
 
   <!-- CATEGORIES -->
   <h3 style="margin:1.5rem 0 .5rem;color:var(--text-1);font-size:1.05rem;">Categories</h3>

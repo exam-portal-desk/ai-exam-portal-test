@@ -3,19 +3,10 @@
 {% block title %}Response Analysis - SmartAIExam{% endblock %}
 
 {% block extra_head %}
-<script>
-window.MathJax = {
-  tex: {
-    inlineMath: [['$','$'], ['\\(','\\)']],
-    displayMath: [['$$','$$'], ['\\[','\\]']],
-    processEscapes: true
-  },
-  options: {
-    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
-  }
-};
-</script>
-<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+{# MathJax config/script/window.mathJaxTypeset now live once in admin_base.html
+   (this page extends it) — a second, independently-configured MathJax
+   instance used to load here on top of that one, and the two competed over
+   window.MathJax, which is why rendering was inconsistent/blank. #}
 {% endblock %}
 
 {% block content %}
@@ -194,7 +185,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .disc-chevron.open { transform:rotate(180deg); }
 .disc-body { display:none; padding:.85rem .9rem; }
 .disc-body.open { display:block; }
-.disc-input-wrap { display:flex; gap:.5rem; align-items:flex-end; margin-bottom:.4rem; }
+.disc-input-wrap { display:flex; gap:.5rem; align-items:flex-end; margin-bottom:.4rem; position:relative; }
 .disc-textarea {
   flex:1; background:var(--bg); border:1px solid var(--border);
   border-radius:var(--radius); color:var(--text-1);
@@ -266,7 +257,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .reply-box { display:none; margin-top:.5rem; }
 .reply-box.open { display:block; }
 
-.disc-edit-wrap { margin-bottom:.4rem; white-space:normal; }
+.disc-edit-wrap { margin-bottom:.4rem; white-space:normal; position:relative; }
 .disc-edit-textarea {
   width:100%; background:var(--bg); border:1px solid var(--border);
   border-radius:var(--radius); color:var(--text-1);
@@ -283,6 +274,33 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .disc-edit-cancel { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border); }
 
 .replies-wrap { margin-top:.35rem; padding-left:.5rem; }
+
+/* Progressive loading: view/load-more replies, load-more comments */
+.replies-area { margin-top:.4rem; }
+.disc-view-replies, .disc-loadmore-btn {
+  display:inline-flex; align-items:center; gap:.3rem;
+  background:none; border:none; color:var(--accent);
+  font-size:.72rem; font-weight:700; font-family:inherit;
+  cursor:pointer; padding:.2rem 0;
+}
+.disc-view-replies:hover, .disc-loadmore-btn:hover { text-decoration:underline; }
+.disc-view-replies:disabled { opacity:.6; cursor:default; text-decoration:none; }
+.disc-loadmore-btn { width:100%; justify-content:center; padding:.5rem 0; margin-top:.15rem; }
+.disc-replies-loading { font-size:.72rem; color:var(--text-3); display:inline-flex; align-items:center; gap:.35rem; }
+
+/* @mentions */
+.disc-mention { color:var(--accent); font-weight:700; }
+.disc-mention-pop {
+  display:none; position:absolute; z-index:40; margin-top:2px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--shadow-md);
+  max-width:260px; max-height:180px; overflow-y:auto;
+}
+.disc-mention-pop.open { display:block; }
+.disc-mention-item { display:flex; flex-direction:column; padding:.35rem .6rem; cursor:pointer; }
+.disc-mention-item:hover { background:var(--surface-2); }
+.disc-mention-item-name { font-size:.75rem; font-weight:600; color:var(--text-1); }
+.disc-mention-item-uname { font-size:.65rem; color:var(--text-3); }
 
 .emoji-picker-pop {
   position:fixed;
@@ -596,8 +614,9 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
                     <textarea class="disc-textarea" id="disc-ta-{{ response.question.id }}" rows="2"
                       placeholder="Write a comment… (Shift+Enter for new line, Enter to send)"
                       maxlength="500"
-                      oninput="discCharCount({{ response.question.id }})"
+                      oninput="discCharCount({{ response.question.id }});discMentionInput(event,'disc-ta-{{ response.question.id }}','dmpop-{{ response.question.id }}')"
                       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discPost({{ response.question.id }},{{ exam.id }});}"></textarea>
+                    <div class="disc-mention-pop" id="dmpop-{{ response.question.id }}"></div>
                     <div class="disc-actions-row">
                       <div style="position:relative;">
                         <button class="disc-emoji-trigger" type="button"
@@ -695,23 +714,37 @@ document.getElementById('downloadPdfBtn').onclick = function() {
 };
 
 // ─── DISCUSSION SYSTEM ────────────────────────────────────────────────────────
-const DISC_IS_ADMIN = {{ ('admin' in (session.role or '')) | tojson }};
-const DISC_UID      = {{ session.user_id | tojson }};
-const DISC_UNAME    = {{ (session.full_name or session.username or 'User') | tojson }};
-const DISC_AVATAR   = {{ (NAV_AVATAR_URL or none) | tojson }};
-const DISC_POLL     = 30000;
+// ─── DISCUSSION SYSTEM ────────────────────────────────────────────────────────
+// Paginated, YouTube/Reddit-style: only the first page of top-level comments
+// loads on open; replies are fetched only when "View replies" is clicked;
+// both paginate further via keyset cursors instead of ever loading a whole
+// thread at once. See app/services/discussion_service.py for the matching
+// server-side design notes.
+const DISC_IS_ADMIN    = {{ ('admin' in (session.role or '')) | tojson }};
+const DISC_UID         = {{ session.user_id | tojson }};
+const DISC_UNAME       = {{ (session.full_name or session.username or 'User') | tojson }};
+const DISC_AVATAR      = {{ (NAV_AVATAR_URL or none) | tojson }};
+const DISC_PAGE_LIMIT  = 20;
+const DISC_REPLY_LIMIT = 10;
 const _discWS       = (typeof io !== 'undefined') ? io() : null;
 const _wsJoined     = new Set();
-const _discPolls    = {};
 const _discOpen     = new Set();
 const _pendingDisc  = new Set(); // temp_ids of our own in-flight posts
-const _discLastHash = {};
+const _discCursor   = {};        // qid -> next_cursor for the top-level page list (null = exhausted)
+const _discReplyState = {};      // commentId -> {expanded, cursor, count}
 const DISC_EMOJIS   = ['😊','😂','🤔','👍','👎','❤️','🔥','🎉','😮','😢','👏','💡','✅','❌','⭐','🙏','😅','🤣','😍','🥳','🤯','💪','🎯','📚','✏️','🧠','⚡','🌟','💯','🤝','😎','😆','😜','🥲','🫡','🙌','💬','📝','🔑','⚠️','🚀','💎'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function discEsc(t) {
   return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Safe to embed inside a single-quoted JS string literal that itself sits
+// inside a double-quoted HTML attribute (onclick="...('...')") — escapes
+// both layers, mirroring chat.html's escJs() for the JS side.
+function discAttr(s) {
+  return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function discTime(ts) {
@@ -731,52 +764,31 @@ function _avatarHue(name) {
   return h % 360;
 }
 
-// Get username text from a rendered parent card
-function _parentUname(parentId) {
-  const card = document.getElementById('ccard-' + parentId);
-  if (!card) return null;
-  const el = card.querySelector('.c-username');
-  return el ? el.textContent.trim() : null;
+function discAvatarHtml(username, avatarUrl, sizeStyle) {
+  sizeStyle = sizeStyle || '';
+  if (avatarUrl) return `<img class="c-avatar" style="object-fit:cover;${sizeStyle}" src="${discEsc(avatarUrl)}" alt="">`;
+  const hue = _avatarHue(username);
+  return `<div class="c-avatar" style="background:hsl(${hue},58%,36%);${sizeStyle}">${discEsc((username||'U')[0].toUpperCase())}</div>`;
 }
 
-// Insert a reply HTML string into the parent card's replies-wrap div.
-// Creates replies-wrap if it doesn't exist yet.
-// Returns true on success, false if parent card not found.
-function _insertReplyIntoParent(parentId, html) {
-  const parentCard = document.getElementById('ccard-' + parentId);
-  if (!parentCard) return false;
-  let wrap = parentCard.querySelector(':scope > .replies-wrap');
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.className = 'replies-wrap';
-    parentCard.appendChild(wrap);
-  }
-  wrap.insertAdjacentHTML('beforeend', html);
-  return true;
+// Renders message text with @mentions styled — no server round trip, same
+// place discEsc() already runs. Matches any @word (2-32 chars); doesn't
+// validate the username is real, which is fine for display purposes.
+function discRenderMessage(text) {
+  return discEsc(text).replace(/(^|[\s(])@([A-Za-z0-9_]{2,32})/g, (m, pre, uname) => `${pre}<span class="disc-mention">@${uname}</span>`);
 }
 
-// ── Card renderer ─────────────────────────────────────────────────────────────
+function discCommentsListEl(qid) { return document.getElementById(`disc-list-${qid}`); }
 
-function discCard(c, qid, examId, isReply, pUname) {
-  const init     = (c.username||'U')[0].toUpperCase();
-  const hue      = _avatarHue(c.username);
-  const avatarBg = isReply ? `hsl(${hue},52%,40%)` : `hsl(${hue},58%,36%)`;
-  const avatarEl = c.avatar_url
-    ? `<img class="c-avatar" style="object-fit:cover" src="${discEsc(c.avatar_url)}" alt="">`
-    : `<div class="c-avatar" style="background:${avatarBg}">${discEsc(init)}</div>`;
+// ── Card renderers ────────────────────────────────────────────────────────────
 
+function discCommentCardHtml(c, qid, examId) {
+  const avatarEl = discAvatarHtml(c.username, c.avatar_url);
   const editedBadge = c.is_edited      ? '<span class="badge-edited">(edited)</span>'    : '';
   const pinBadge    = c.is_pinned      ? '<span class="badge-pin">📌 Pinned</span>'       : '';
   const bestBadge   = c.is_best_answer ? '<span class="badge-best">✅ Best Answer</span>' : '';
 
-  // "Replying to X" chip shown inside reply cards
-  const replyChip = (isReply && pUname)
-    ? `<div class="reply-to-chip"><i class="fas fa-reply" style="font-size:.65rem;"></i> Replying to <strong>${discEsc(pUname)}</strong></div>`
-    : '';
-
-  const replyBtn  = !isReply
-    ? `<button class="ca-btn" onclick="discReplyToggle(${c.id},${qid},${examId})"><i class="fas fa-reply"></i> Reply</button>`
-    : '';
+  const replyBtn  = `<button class="ca-btn" onclick="discReplyToggle(${c.id},${qid},${examId})"><i class="fas fa-reply"></i> Reply</button>`;
   const editBtn   = c.is_own
     ? `<button class="ca-btn" onclick="discEditStart(${c.id},${qid},${examId})"><i class="fas fa-pen"></i> Edit</button>`
     : '';
@@ -790,64 +802,191 @@ function discCard(c, qid, examId, isReply, pUname) {
     ? `<button class="ca-btn" onclick="discAdminBest(${c.id},${qid},${examId})"><i class="fas fa-star"></i> ${c.is_best_answer?'Unmark':'Best'}</button>`
     : '';
 
-  // Render nested replies inside this card
-  const repliesHtml = (c.replies||[]).map(r => discCard(r, qid, examId, true, c.username)).join('');
-
-  // Reply input box (only on top-level cards)
-  const replyBox = !isReply ? `
-      <div class="reply-box" id="rbox-${c.id}">
-        <div class="disc-input-wrap" style="margin-bottom:0;">
-          <textarea class="disc-textarea" id="rta-${c.id}" rows="2"
-            placeholder="Write a reply…" maxlength="500"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discReply(${c.id},${qid},${examId});}"></textarea>
-          <div class="disc-actions-row">
-            <div style="position:relative;">
-              <button class="disc-emoji-trigger" type="button"
-                onclick="discEmojiToggle(event,'reply',${qid},${c.id})">😊</button>
-              <div class="emoji-picker-pop" id="epop-reply-${c.id}">
-                <div class="emoji-grid" id="egrid-reply-${c.id}"></div>
-              </div>
-            </div>
-            <button class="disc-send" type="button" onclick="discReply(${c.id},${qid},${examId})">
-              <i class="fas fa-paper-plane" style="font-size:.68rem;"></i>
-            </button>
-          </div>
-        </div>
-      </div>` : '';
-
   return `
-<div class="c-card ${c.is_pinned?'is-pinned':''} ${c.is_best_answer?'is-best':''} ${isReply?'is-reply':''}" id="ccard-${c.id}">
+<div class="c-card ${c.is_pinned?'is-pinned':''} ${c.is_best_answer?'is-best':''}" id="ccard-${c.id}">
   <div style="display:flex;gap:.6rem;align-items:flex-start;">
     ${avatarEl}
     <div style="flex:1;min-width:0;">
-      ${replyChip}
       <div class="c-meta">
         <span class="c-username">${discEsc(c.username)}</span>
         <span class="c-time">${discTime(c.created_at)}</span>
         ${editedBadge}${pinBadge}${bestBadge}
       </div>
-      <div class="c-text" id="ctext-${c.id}">${discEsc(c.message)}</div>
+      <div class="c-text" id="ctext-${c.id}">${discRenderMessage(c.message)}</div>
       <div class="c-actions">${replyBtn}${editBtn}${deleteBtn}${pinBtn}${bestBtn}</div>
-      ${replyBox}
     </div>
   </div>
-  ${repliesHtml ? `<div class="replies-wrap">${repliesHtml}</div>` : ''}
+  <div class="replies-area" id="rarea-${c.id}"></div>
+  <div class="replies-wrap" id="rwrap-${c.id}"></div>
+  <div class="reply-box" id="rbox-${c.id}">
+    <div class="disc-input-wrap" style="margin-bottom:0;">
+      <textarea class="disc-textarea" id="rta-${c.id}" rows="2"
+        placeholder="Write a reply…" maxlength="500"
+        oninput="discMentionInput(event,'rta-${c.id}','rmpop-${c.id}')"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discReply(${c.id},${qid},${examId});}"></textarea>
+      <div class="disc-mention-pop" id="rmpop-${c.id}"></div>
+      <div class="disc-actions-row">
+        <div style="position:relative;">
+          <button class="disc-emoji-trigger" type="button"
+            onclick="discEmojiToggle(event,'reply',${qid},${c.id})">😊</button>
+          <div class="emoji-picker-pop" id="epop-reply-${c.id}">
+            <div class="emoji-grid" id="egrid-reply-${c.id}"></div>
+          </div>
+        </div>
+        <button class="disc-send" type="button" onclick="discReply(${c.id},${qid},${examId})">
+          <i class="fas fa-paper-plane" style="font-size:.68rem;"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>`;
 }
 
-// ── Render full thread ────────────────────────────────────────────────────────
+// A reply row stays visually flat under its top-level comment (rootId) no
+// matter who it's actually addressing — "who's being replied to" is shown
+// via an @mention prefilled into the shared reply box instead of another
+// level of indentation (see discReplyToggle).
+function discReplyRowHtml(r, qid, examId, rootId) {
+  const avatarEl = discAvatarHtml(r.username, r.avatar_url, 'width:26px;height:26px;font-size:.68rem;');
+  const editedBadge = r.is_edited ? '<span class="badge-edited">(edited)</span>' : '';
+  const replyBtn  = `<button class="ca-btn" onclick="discReplyToggle(${rootId},${qid},${examId},'${discAttr(r.username)}')"><i class="fas fa-reply"></i> Reply</button>`;
+  const editBtn   = r.is_own
+    ? `<button class="ca-btn" onclick="discEditStart(${r.id},${qid},${examId})"><i class="fas fa-pen"></i> Edit</button>`
+    : '';
+  const deleteBtn = (r.is_own || DISC_IS_ADMIN)
+    ? `<button class="ca-btn red" onclick="discDelete(${r.id},${qid},${examId})"><i class="fas fa-trash"></i></button>`
+    : '';
+  const pinBtn    = DISC_IS_ADMIN
+    ? `<button class="ca-btn" onclick="discAdminPin(${r.id},${qid},${examId})"><i class="fas fa-thumbtack"></i> ${r.is_pinned?'Unpin':'Pin'}</button>`
+    : '';
+  const bestBtn   = DISC_IS_ADMIN
+    ? `<button class="ca-btn" onclick="discAdminBest(${r.id},${qid},${examId})"><i class="fas fa-star"></i> ${r.is_best_answer?'Unmark':'Best'}</button>`
+    : '';
 
-function discRender(qid, examId, comments) {
-  const list = document.getElementById(`disc-list-${qid}`);
-  if (!list) return;
-  if (!comments.length) {
-    list.innerHTML = '<div class="no-comments">No comments yet. Start the discussion!</div>';
-    return;
-  }
-  const pinned = comments.filter(c => c.is_pinned);
-  const rest   = comments.filter(c => !c.is_pinned);
-  list.innerHTML = [...pinned, ...rest].map(c => discCard(c, qid, examId, false)).join('');
+  return `
+<div class="c-card is-reply ${r.is_pinned?'is-pinned':''} ${r.is_best_answer?'is-best':''}" id="ccard-${r.id}">
+  <div style="display:flex;gap:.6rem;align-items:flex-start;">
+    ${avatarEl}
+    <div style="flex:1;min-width:0;">
+      <div class="c-meta">
+        <span class="c-username">${discEsc(r.username)}</span>
+        <span class="c-time">${discTime(r.created_at)}</span>
+        ${editedBadge}
+      </div>
+      <div class="c-text" id="ctext-${r.id}">${discRenderMessage(r.message)}</div>
+      <div class="c-actions">${replyBtn}${editBtn}${deleteBtn}${pinBtn}${bestBtn}</div>
+    </div>
+  </div>
+</div>`;
 }
+
+// ── Progressive replies: view / load more / hide ─────────────────────────────
+
+function discRepliesState(commentId) {
+  return _discReplyState[commentId] || (_discReplyState[commentId] = {expanded:false, cursor:null, count:0});
+}
+
+function discSetReplyCount(commentId, qid, examId, count) {
+  discRepliesState(commentId).count = count;
+  discRenderRepliesArea(commentId, qid, examId);
+}
+
+function discRenderRepliesArea(commentId, qid, examId) {
+  const area = document.getElementById(`rarea-${commentId}`);
+  if (!area) return;
+  const state = discRepliesState(commentId);
+  if (state.expanded) {
+    area.innerHTML = state.cursor
+      ? `<button class="disc-view-replies" onclick="discLoadMoreReplies(${commentId},${qid},${examId})"><i class="fas fa-angle-down"></i> Load more replies</button>`
+      : (state.count > 0 ? `<button class="disc-view-replies" onclick="discHideReplies(${commentId},${qid},${examId})"><i class="fas fa-angle-up"></i> Hide replies</button>` : '');
+  } else {
+    area.innerHTML = state.count > 0
+      ? `<button class="disc-view-replies" onclick="discShowReplies(${commentId},${qid},${examId})"><i class="fas fa-comment-dots"></i> View ${state.count} ${state.count===1?'reply':'replies'}</button>`
+      : '';
+  }
+}
+
+async function discShowReplies(commentId, qid, examId) {
+  const state = discRepliesState(commentId);
+  const area = document.getElementById(`rarea-${commentId}`);
+  if (area) area.innerHTML = '<span class="disc-replies-loading"><i class="fas fa-spinner fa-spin"></i> Loading replies…</span>';
+  try {
+    const r = await fetch(`/api/v01/discussions/${qid}/comments/${commentId}/replies?limit=${DISC_REPLY_LIMIT}`);
+    const d = await r.json();
+    if (!d.success) { discRenderRepliesArea(commentId, qid, examId); return; }
+    state.expanded = true;
+    state.cursor = d.next_cursor;
+    const wrap = document.getElementById(`rwrap-${commentId}`);
+    if (wrap) wrap.innerHTML = d.replies.map(rr => discReplyRowHtml(rr, qid, examId, commentId)).join('');
+    discRenderRepliesArea(commentId, qid, examId);
+  } catch(e) { discRenderRepliesArea(commentId, qid, examId); }
+}
+
+async function discLoadMoreReplies(commentId, qid, examId) {
+  const state = discRepliesState(commentId);
+  if (!state.cursor) return;
+  const area = document.getElementById(`rarea-${commentId}`);
+  if (area) area.innerHTML = '<span class="disc-replies-loading"><i class="fas fa-spinner fa-spin"></i> Loading…</span>';
+  try {
+    const r = await fetch(`/api/v01/discussions/${qid}/comments/${commentId}/replies?limit=${DISC_REPLY_LIMIT}&cursor=${encodeURIComponent(state.cursor)}`);
+    const d = await r.json();
+    if (!d.success) { discRenderRepliesArea(commentId, qid, examId); return; }
+    state.cursor = d.next_cursor;
+    document.getElementById(`rwrap-${commentId}`)?.insertAdjacentHTML('beforeend', d.replies.map(rr => discReplyRowHtml(rr, qid, examId, commentId)).join(''));
+    discRenderRepliesArea(commentId, qid, examId);
+  } catch(e) { discRenderRepliesArea(commentId, qid, examId); }
+}
+
+function discHideReplies(commentId, qid, examId) {
+  discRepliesState(commentId).expanded = false;
+  const wrap = document.getElementById(`rwrap-${commentId}`);
+  if (wrap) wrap.innerHTML = '';
+  discRenderRepliesArea(commentId, qid, examId);
+}
+
+// ── @mention autocomplete (reuses chat's user-search endpoint) ───────────────
+
+let _discMentionTimer = null;
+
+function discMentionInput(event, taId, popId) {
+  clearTimeout(_discMentionTimer);
+  const ta = document.getElementById(taId);
+  const pop = document.getElementById(popId);
+  if (!ta || !pop) return;
+  const caret = ta.selectionStart;
+  const m = ta.value.slice(0, caret).match(/(?:^|\s)@([A-Za-z0-9_]{1,32})$/);
+  if (!m) { pop.innerHTML = ''; pop.classList.remove('open'); return; }
+  const query = m[1];
+  const matchStart = caret - query.length - 1;
+  _discMentionTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`/api/v01/chat/users/search?q=${encodeURIComponent(query)}`);
+      const d = await r.json();
+      if (!d.success || !d.users || !d.users.length) { pop.innerHTML = ''; pop.classList.remove('open'); return; }
+      pop.innerHTML = d.users.slice(0, 6).map(u => `
+        <div class="disc-mention-item" onmousedown="event.preventDefault();discMentionPick('${taId}',${matchStart},${caret},'${discAttr(u.username)}')">
+          <span class="disc-mention-item-name">${discEsc(u.full_name||u.username)}</span>
+          <span class="disc-mention-item-uname">@${discEsc(u.username)}</span>
+        </div>`).join('');
+      pop.classList.add('open');
+    } catch(e) { pop.innerHTML = ''; pop.classList.remove('open'); }
+  }, 200);
+}
+
+function discMentionPick(taId, start, end, username) {
+  const ta = document.getElementById(taId);
+  if (!ta) return;
+  const before = ta.value.slice(0, start), after = ta.value.slice(end);
+  ta.value = `${before}@${username} ${after}`;
+  const pos = before.length + username.length + 2;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+  document.querySelectorAll('.disc-mention-pop.open').forEach(p => { p.innerHTML = ''; p.classList.remove('open'); });
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.disc-mention-pop')) document.querySelectorAll('.disc-mention-pop.open').forEach(p => p.classList.remove('open'));
+});
 
 // ── Socket events ─────────────────────────────────────────────────────────────
 
@@ -857,18 +996,21 @@ if (_discWS) {
     if (!_discOpen.has(qid)) return;
     // Skip our own — discPost/discReply already rendered it locally
     if (msg.sender_uid === DISC_UID || _pendingDisc.has(msg.temp_id)) return;
-    const list = document.getElementById(`disc-list-${qid}`);
+    const list = discCommentsListEl(qid);
     if (!list) return;
-    if (list.querySelector('.disc-spinner')) { discLoad(qid, null); return; }
-    msg.replies = msg.replies || [];
-    list.querySelector('.no-comments')?.remove();
+
     if (msg.parent_id) {
-      const pUname = _parentUname(msg.parent_id);
-      if (!_insertReplyIntoParent(msg.parent_id, discCard(msg, qid, null, true, pUname))) {
-        discLoad(qid, null); // parent not in DOM yet, fallback to full reload
+      const state = discRepliesState(msg.parent_id);
+      if (state.expanded && !state.cursor) {
+        document.getElementById(`rwrap-${msg.parent_id}`)?.insertAdjacentHTML('beforeend', discReplyRowHtml(msg, qid, null, msg.parent_id));
       }
-    } else {
-      list.insertAdjacentHTML('beforeend', discCard(msg, qid, null, false));
+      discSetReplyCount(msg.parent_id, qid, null, state.count + 1);
+    } else if (!document.getElementById(`ccard-${msg.id}`)) {
+      list.querySelector('.no-comments')?.remove();
+      const loadMoreBtn = document.getElementById(`disc-loadmore-${qid}`);
+      const html = discCommentCardHtml(msg, qid, null);
+      if (loadMoreBtn) loadMoreBtn.insertAdjacentHTML('beforebegin', html); else list.insertAdjacentHTML('beforeend', html);
+      discSetReplyCount(msg.id, qid, null, msg.reply_count || 0);
     }
     document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = msg.count);
   });
@@ -877,7 +1019,7 @@ if (_discWS) {
 
   _discWS.on('edit_message', function(d) {
     const el = document.getElementById(`ctext-${d.comment_id}`);
-    if (el && !el.querySelector('textarea')) el.textContent = d.message;
+    if (el && !el.querySelector('textarea')) el.innerHTML = discRenderMessage(d.message);
   });
 
   _discWS.on('pin_message', function(d) {
@@ -893,6 +1035,16 @@ if (_discWS) {
     document.querySelectorAll('.is-best').forEach(c => c.classList.remove('is-best'));
     if (d.is_best_answer) document.getElementById(`ccard-${d.comment_id}`)?.classList.add('is-best');
   });
+
+  // WebSocket already pushes every change in real time — this only resyncs
+  // whatever discussions are open after a reconnect (dropped connection),
+  // replacing the old unconditional 30s full-thread poll.
+  _discWS.on('connect', () => {
+    _discOpen.forEach(qid => {
+      discLoadComments(qid, null);
+      if (!_wsJoined.has(qid)) { _discWS.emit('join_discussion', {question_id: qid}); _wsJoined.add(qid); }
+    });
+  });
 }
 
 // ── Toggle open/close ─────────────────────────────────────────────────────────
@@ -904,71 +1056,65 @@ function discToggle(qid, examId) {
     body.classList.remove('open');
     chev.classList.remove('open');
     _discOpen.delete(qid);
-    clearInterval(_discPolls[qid]);
-    delete _discPolls[qid];
     if (_discWS && _wsJoined.has(qid)) { _discWS.emit('leave_discussion', {question_id: qid}); _wsJoined.delete(qid); }
   } else {
     if (_discOpen.size >= 3) { discToast('Close other discussions first', 'warn'); return; }
     body.classList.add('open');
     chev.classList.add('open');
     _discOpen.add(qid);
-    discLoad(qid, examId);
+    discLoadComments(qid, examId);
     if (_discWS && !_wsJoined.has(qid)) { _discWS.emit('join_discussion', {question_id: qid}); _wsJoined.add(qid); }
-    _discPolls[qid] = setInterval(() => discLoad(qid, examId), DISC_POLL);
   }
 }
 
-// ── Load comments from server ─────────────────────────────────────────────────
+// ── Load top-level comments (paginated) ───────────────────────────────────────
 
-async function discLoad(qid, examId) {
+function discRenderComments(qid, examId, comments, append) {
+  const list = discCommentsListEl(qid);
+  if (!list) return;
+  document.getElementById(`disc-loadmore-${qid}`)?.remove();
+  if (!append) {
+    list.innerHTML = '';
+    if (!comments.length) { list.innerHTML = '<div class="no-comments">No comments yet. Start the discussion!</div>'; return; }
+  } else {
+    list.querySelector('.no-comments')?.remove();
+  }
+  comments.forEach(c => {
+    list.insertAdjacentHTML('beforeend', discCommentCardHtml(c, qid, examId));
+    discSetReplyCount(c.id, qid, examId, c.reply_count || 0);
+  });
+}
+
+function discAppendLoadMoreBtn(qid, examId) {
+  document.getElementById(`disc-loadmore-${qid}`)?.remove();
+  if (!_discCursor[qid]) return;
+  discCommentsListEl(qid)?.insertAdjacentHTML('beforeend',
+    `<button class="disc-loadmore-btn" id="disc-loadmore-${qid}" onclick="discLoadMoreComments(${qid},${examId})"><i class="fas fa-angle-down"></i> Load more comments</button>`);
+}
+
+async function discLoadComments(qid, examId) {
   try {
-    const r = await fetch(`/api/v01/discussions/${qid}`);
+    const r = await fetch(`/api/v01/discussions/${qid}/comments?limit=${DISC_PAGE_LIMIT}`);
     const d = await r.json();
     if (!d.success) return;
     document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = d.count);
+    _discCursor[qid] = d.next_cursor;
+    discRenderComments(qid, examId, d.comments, false);
+    discAppendLoadMoreBtn(qid, examId);
+  } catch(e) {}
+}
 
-    // Hash check — skip re-render if nothing changed
-    const newHash = JSON.stringify(d.comments.map(c => ({
-      id: c.id, msg: c.message, edited: c.is_edited,
-      pinned: c.is_pinned, best: c.is_best_answer,
-      replies: (c.replies||[]).map(r => ({id: r.id, msg: r.message}))
-    })));
-    if (_discLastHash[qid] === newHash) return;
-    _discLastHash[qid] = newHash;
-
-    // Preserve open reply boxes and their text
-    const openReplies = {};
-    document.querySelectorAll('[id^="rbox-"]').forEach(el => {
-      if (el.classList.contains('open')) {
-        const pid = el.id.replace('rbox-', '');
-        const ta  = document.getElementById(`rta-${pid}`);
-        openReplies[pid] = ta ? ta.value : '';
-      }
-    });
-
-    // Preserve active input focus
-    const activeId  = document.activeElement?.id || null;
-    const activeVal = document.activeElement?.value || '';
-    const activeSS  = document.activeElement?.selectionStart ?? 0;
-    const activeSE  = document.activeElement?.selectionEnd   ?? 0;
-
-    discRender(qid, examId, d.comments);
-
-    // Restore open reply boxes
-    Object.entries(openReplies).forEach(([pid, val]) => {
-      const box = document.getElementById(`rbox-${pid}`);
-      if (box) { box.classList.add('open'); const ta = document.getElementById(`rta-${pid}`); if (ta && val) ta.value = val; }
-    });
-
-    // Restore focus
-    if (activeId) {
-      const el = document.getElementById(activeId);
-      if (el && el !== document.activeElement) {
-        el.focus();
-        if (el.setSelectionRange) try { el.setSelectionRange(activeSS, activeSE); } catch(e) {}
-        if (activeVal && el.value !== activeVal) el.value = activeVal;
-      }
-    }
+async function discLoadMoreComments(qid, examId) {
+  if (!_discCursor[qid]) return;
+  const btn = document.getElementById(`disc-loadmore-${qid}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…'; }
+  try {
+    const r = await fetch(`/api/v01/discussions/${qid}/comments?limit=${DISC_PAGE_LIMIT}&cursor=${encodeURIComponent(_discCursor[qid])}`);
+    const d = await r.json();
+    if (!d.success) return;
+    _discCursor[qid] = d.next_cursor;
+    discRenderComments(qid, examId, d.comments, true);
+    discAppendLoadMoreBtn(qid, examId);
   } catch(e) {}
 }
 
@@ -989,23 +1135,21 @@ async function discPost(qid, examId) {
   if (!msg) return;
   ta.disabled = true;
 
-  const list = document.getElementById(`disc-list-${qid}`);
+  const list = discCommentsListEl(qid);
   const optId = `opt-${Date.now()}`;
-  const hue   = _avatarHue(DISC_UNAME);
-  const ownAvatarEl = DISC_AVATAR
-    ? `<img class="c-avatar" style="object-fit:cover" src="${discEsc(DISC_AVATAR)}" alt="">`
-    : `<div class="c-avatar" style="background:hsl(${hue},58%,36%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>`;
   list?.querySelector('.no-comments')?.remove();
-  list?.insertAdjacentHTML('beforeend', `
+  const optHtml = `
 <div class="c-card" id="${optId}" style="opacity:.55;">
   <div style="display:flex;gap:.6rem;align-items:flex-start;">
-    ${ownAvatarEl}
+    ${discAvatarHtml(DISC_UNAME, DISC_AVATAR)}
     <div style="flex:1;min-width:0;">
       <div class="c-meta"><span class="c-username">${discEsc(DISC_UNAME)}</span><span class="c-time">just now</span></div>
       <div class="c-text">${discEsc(msg)}</div>
     </div>
   </div>
-</div>`);
+</div>`;
+  const loadMoreBtn0 = document.getElementById(`disc-loadmore-${qid}`);
+  if (loadMoreBtn0) loadMoreBtn0.insertAdjacentHTML('beforebegin', optHtml); else list?.insertAdjacentHTML('beforeend', optHtml);
 
   try {
     const r = await fetch(`/api/v01/discussions/${qid}`, {
@@ -1021,46 +1165,26 @@ async function discPost(qid, examId) {
       if (m) {
         if (m.temp_id) { _pendingDisc.add(m.temp_id); setTimeout(() => _pendingDisc.delete(m.temp_id), 300); }
         m.is_own = true;
-        list?.insertAdjacentHTML('beforeend', discCard(m, qid, examId, false));
+        const html = discCommentCardHtml(m, qid, examId);
+        const loadMoreBtn = document.getElementById(`disc-loadmore-${qid}`);
+        if (loadMoreBtn) loadMoreBtn.insertAdjacentHTML('beforebegin', html); else list?.insertAdjacentHTML('beforeend', html);
+        discSetReplyCount(m.id, qid, examId, 0);
         document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = m.count);
-        _discLastHash[qid] = ''; // invalidate so next discLoad re-renders
-      } else if (!_discWS || !_wsJoined.has(qid)) discLoad(qid, examId);
+      } else if (!_discWS || !_wsJoined.has(qid)) discLoadComments(qid, examId);
     } else discToast(d.message || 'Error posting', 'err');
   } catch(e) { document.getElementById(optId)?.remove(); discToast('Network error','err'); }
   ta.disabled = false;
 }
 
-// ── Post reply ────────────────────────────────────────────────────────────────
+// ── Post reply (to a top-level comment, or to another reply — server keeps
+//    the tree flat either way, see discussion_service.create_comment) ───────
 
 async function discReply(parentId, qid, examId) {
   const ta = document.getElementById(`rta-${parentId}`);
   const msg = ta?.value.trim();
   if (!msg) return;
   ta.disabled = true;
-
-  const pUname = _parentUname(parentId);
-  const hue    = _avatarHue(DISC_UNAME);
-  const chip   = pUname
-    ? `<div class="reply-to-chip"><i class="fas fa-reply" style="font-size:.65rem;"></i> Replying to <strong>${discEsc(pUname)}</strong></div>`
-    : '';
-  const optId  = `opt-r-${Date.now()}`;
-  const ownAvatarEl = DISC_AVATAR
-    ? `<img class="c-avatar" style="object-fit:cover" src="${discEsc(DISC_AVATAR)}" alt="">`
-    : `<div class="c-avatar" style="background:hsl(${hue},52%,40%)">${discEsc((DISC_UNAME||'U')[0].toUpperCase())}</div>`;
-
-  // Show optimistic reply inside parent box immediately
-  _insertReplyIntoParent(parentId, `
-<div class="c-card is-reply" id="${optId}" style="opacity:.55;">
-  <div style="display:flex;gap:.6rem;align-items:flex-start;">
-    ${ownAvatarEl}
-    <div style="flex:1;min-width:0;">
-      ${chip}
-      <div class="c-meta"><span class="c-username">${discEsc(DISC_UNAME)}</span><span class="c-time">just now</span></div>
-      <div class="c-text">${discEsc(msg)}</div>
-    </div>
-  </div>
-</div>`);
-
+  const original = ta.value;
   ta.value = '';
   document.getElementById(`rbox-${parentId}`)?.classList.remove('open');
 
@@ -1070,28 +1194,41 @@ async function discReply(parentId, qid, examId) {
       body: JSON.stringify({message: msg, exam_id: examId, parent_id: parentId})
     });
     const d = await r.json();
-    document.getElementById(optId)?.remove();
     if (d.success) {
       const m = d.message;
       if (m) {
         if (m.temp_id) { _pendingDisc.add(m.temp_id); setTimeout(() => _pendingDisc.delete(m.temp_id), 300); }
         m.is_own = true;
-        _insertReplyIntoParent(parentId, discCard(m, qid, examId, true, pUname));
+        const state = discRepliesState(parentId);
+        if (state.expanded && !state.cursor) {
+          document.getElementById(`rwrap-${parentId}`)?.insertAdjacentHTML('beforeend', discReplyRowHtml(m, qid, examId, parentId));
+          discSetReplyCount(parentId, qid, examId, state.count + 1);
+        } else {
+          // Thread wasn't (fully) expanded yet — load it fresh so the user
+          // sees full context (their new reply included) instead of just
+          // one reply floating with no surrounding conversation.
+          await discShowReplies(parentId, qid, examId);
+        }
         document.getElementById(`disc-cnt-${qid}`) && (document.getElementById(`disc-cnt-${qid}`).textContent = m.count);
-        _discLastHash[qid] = ''; // invalidate hash
-      } else if (!_discWS || !_wsJoined.has(qid)) discLoad(qid, examId);
-    } else discToast(d.message || 'Error posting', 'err');
-  } catch(e) { document.getElementById(optId)?.remove(); discToast('Network error','err'); }
+      } else if (!_discWS || !_wsJoined.has(qid)) discShowReplies(parentId, qid, examId);
+    } else { ta.value = original; discToast(d.message || 'Error posting', 'err'); }
+  } catch(e) { ta.value = original; discToast('Network error','err'); }
   ta.disabled = false;
 }
 
-// ── Reply box toggle ──────────────────────────────────────────────────────────
+// ── Reply box toggle (with optional @mention prefill for reply-to-reply) ────
 
-function discReplyToggle(parentId, qid, examId) {
-  const box = document.getElementById(`rbox-${parentId}`);
+function discReplyToggle(rootId, qid, examId, mentionUsername) {
+  const box = document.getElementById(`rbox-${rootId}`);
   if (!box) return;
-  box.classList.toggle('open');
-  if (box.classList.contains('open')) document.getElementById(`rta-${parentId}`)?.focus();
+  const ta = document.getElementById(`rta-${rootId}`);
+  if (mentionUsername) {
+    box.classList.add('open');
+    if (ta && !ta.value.startsWith(`@${mentionUsername} `)) ta.value = `@${mentionUsername} ${ta.value}`;
+  } else {
+    box.classList.toggle('open');
+  }
+  if (box.classList.contains('open') && ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
@@ -1106,7 +1243,9 @@ function discEditStart(commentId, qid, examId) {
   textEl.innerHTML = `
     <div class="disc-edit-wrap">
       <textarea class="disc-edit-textarea" id="eta-${commentId}" rows="2" maxlength="500"
+        oninput="discMentionInput(event,'eta-${commentId}','empop-${commentId}')"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();discEditSubmit(${commentId},${qid},${examId});}">${_discEditOriginal[commentId]}</textarea>
+      <div class="disc-mention-pop" id="empop-${commentId}"></div>
       <div class="disc-edit-actions">
         <button class="disc-edit-save"   onclick="discEditSubmit(${commentId},${qid},${examId})">Save</button>
         <button class="disc-edit-cancel" onclick="discEditCancel(${commentId})">Cancel</button>
@@ -1138,12 +1277,11 @@ async function discEditSubmit(commentId, qid, examId) {
       delete _discEditOriginal[commentId];
       // Update in-place without full reload
       const textEl = document.getElementById(`ctext-${commentId}`);
-      if (textEl) textEl.innerHTML = discEsc(msg);
+      if (textEl) textEl.innerHTML = discRenderMessage(msg);
       const card = document.getElementById(`ccard-${commentId}`);
       if (card && !card.querySelector('.badge-edited')) {
         card.querySelector('.c-meta')?.insertAdjacentHTML('beforeend','<span class="badge-edited">(edited)</span>');
       }
-      _discLastHash[qid] = '';
     } else { ta.disabled = false; discToast(d.message || 'Edit failed','err'); }
   } catch(e) { ta.disabled = false; discToast('Network error','err'); }
 }
@@ -1170,30 +1308,22 @@ function discDelete(commentId, qid, examId) {
     try {
       const r = await fetch(`/api/v01/discussions/comments/${commentId}`, {method:'DELETE'});
       const d = await r.json();
-      if (d.success) {
-        document.getElementById(`ccard-${commentId}`)?.remove();
-        _discLastHash[qid] = '';
-      } else discToast('Delete failed','err');
+      if (d.success) document.getElementById(`ccard-${commentId}`)?.remove();
+      else discToast('Delete failed','err');
     } catch(e) { discToast('Network error','err'); }
   };
 }
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
+// ── Admin — pin/best changes broadcast to every viewer (including the
+//    acting admin) over the pin_message/best_message socket events above,
+//    which already patch the DOM in place, so no reload is needed here. ───
 
 async function discAdminPin(commentId, qid, examId) {
-  try {
-    const r = await fetch(`/api/v01/admin/discussions/comments/${commentId}/pin`, {method:'PUT'});
-    const d = await r.json();
-    if (d.success) discLoad(qid, examId);
-  } catch(e) {}
+  try { await fetch(`/api/v01/admin/discussions/comments/${commentId}/pin`, {method:'PUT'}); } catch(e) {}
 }
 
 async function discAdminBest(commentId, qid, examId) {
-  try {
-    const r = await fetch(`/api/v01/admin/discussions/comments/${commentId}/best`, {method:'PUT'});
-    const d = await r.json();
-    if (d.success) discLoad(qid, examId);
-  } catch(e) {}
+  try { await fetch(`/api/v01/admin/discussions/comments/${commentId}/best`, {method:'PUT'}); } catch(e) {}
 }
 
 // ── Emoji picker ──────────────────────────────────────────────────────────────
@@ -1319,11 +1449,7 @@ function _renderAllDataRaw() {
 function _typesetMath() {
   const els = [...document.querySelectorAll('.math-wrap')];
   if (!els.length) return;
-  if (window.MathJax && MathJax.typesetPromise) {
-    // Clear MathJax's processed cache on each element so re-typeset works
-    els.forEach(el => { if (MathJax.typesetClear) MathJax.typesetClear([el]); });
-    MathJax.typesetPromise(els).catch(e => console.warn('MathJax:', e));
-  }
+  window.mathJaxTypeset(els);
 }
 
 function discWrapMath() {
@@ -1331,17 +1457,7 @@ function discWrapMath() {
   _typesetMath();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  _renderAllDataRaw();
-  if (window.MathJax) {
-    MathJax.startup.promise.then(() => _typesetMath());
-  } else {
-    // MathJax not yet defined — wait for it
-    window.addEventListener('load', () => {
-      if (window.MathJax) MathJax.startup.promise.then(() => _typesetMath());
-    });
-  }
-});
+document.addEventListener('DOMContentLoaded', discWrapMath);
 
 // ── Bulk count init ───────────────────────────────────────────────────────────
 

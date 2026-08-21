@@ -77,6 +77,7 @@ ASSISTANT_TEXT_MODEL = os.environ.get("ASSISTANT_TEXT_MODEL", "assistant-default
 EXPLANATION_TEXT_MODEL = os.environ.get("EXPLANATION_TEXT_MODEL", "explanation-default")
 EXPLANATION_VISION_MODEL_NAME = os.environ.get("EXPLANATION_VISION_MODEL_NAME", "explanation-vision-default")
 QUESTION_GENERATOR_TEXT_MODEL = os.environ.get("QUESTION_GENERATOR_TEXT_MODEL", "question-generator-default")
+QUESTION_GENERATOR_VISION_MODEL = os.environ.get("QUESTION_GENERATOR_VISION_MODEL", "question-generator-vision-default")
 
 AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT_PER_STUDENT", 50))
 AI_MAX_MESSAGE_LENGTH = int(os.environ.get("AI_MAX_MESSAGE_LENGTH", 500))

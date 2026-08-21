@@ -426,10 +426,7 @@ answer is not acceptable at any length."""
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _headers(model: dict) -> dict:
-    return {
-        "Authorization": f"Bearer {model['api_key']}",
-        "Content-Type":  "application/json",
-    }
+    return ai_provider.build_headers(model)
 
 
 # Generous headroom for a full multi-step LaTeX/mhchem solution — the old

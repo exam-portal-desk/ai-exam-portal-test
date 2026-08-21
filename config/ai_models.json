@@ -18,7 +18,9 @@
       "name": "question-generator-default",
       "provider": "gemini",
       "model": "gemini-2.5-flash",
-      "api_key_env": "TEXT_MODEL_QUESTIONGEN_API_KEY"
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "api_key_env": "TEXT_MODEL_QUESTIONGEN_API_KEY",
+      "auth_header": "x-goog-api-key"
     }
   ],
   "vision_models": [
@@ -28,6 +30,15 @@
       "model": "llama-4-scout-17b-16e-instruct",
       "endpoint": "https://api.groq.com/openai/v1/chat/completions",
       "api_key_env": "VISION_MODEL_EXPLANATION_API_KEY"
+    },
+    {
+      "name": "question-generator-vision-default",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "upload_endpoint": "https://generativelanguage.googleapis.com/upload/v1beta/files",
+      "api_key_env": "VISION_MODEL_QUESTIONGEN_API_KEY",
+      "auth_header": "x-goog-api-key"
     }
   ]
 }

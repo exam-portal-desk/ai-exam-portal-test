@@ -187,10 +187,7 @@ def _post_groq_chat(model: Dict, payload: Dict) -> Optional[str]:
 
     resp = requests.post(
         model["endpoint"],
-        headers={
-            "Authorization": f"Bearer {model['api_key']}",
-            "Content-Type": "application/json",
-        },
+        headers=ai_provider.build_headers(model),
         json=payload,
         timeout=config.AI_REQUEST_TIMEOUT,
     )

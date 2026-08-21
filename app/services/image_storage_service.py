@@ -11,7 +11,8 @@ Existing DB references keep their current shape and meaning:
     this service.
 """
 
-from typing import Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import app.config as config
@@ -61,6 +62,29 @@ def resolve_question_image_url(image_path: str) -> Tuple[bool, Optional[str]]:
         print(f"[image_storage_service] storage lookup error for {key}: {e}")
 
     return False, None
+
+
+def resolve_question_image_urls_bulk(image_paths) -> Dict[str, Tuple[bool, Optional[str]]]:
+    """
+    Same result as calling resolve_question_image_url() once per path, but
+    runs the storage existence checks concurrently instead of sequentially.
+
+    A response/result page can reference dozens of unique question images —
+    each resolution is one storage.exists() round trip (an S3 HEAD request
+    on the S3-compatible backend), and doing those one at a time in a loop
+    is what made large response pages block for a long time before any HTML
+    was sent. This makes the exact same calls, just in parallel, so total
+    wait time is roughly (N / worker count) round trips instead of N.
+    """
+    unique = [p for p in dict.fromkeys(image_paths) if p]
+    if not unique:
+        return {}
+    if len(unique) == 1:
+        return {unique[0]: resolve_question_image_url(unique[0])}
+
+    with ThreadPoolExecutor(max_workers=min(8, len(unique))) as pool:
+        resolved = list(pool.map(resolve_question_image_url, unique))
+    return dict(zip(unique, resolved))
 
 
 def resolve_category_image_url(category: dict) -> Optional[str]:

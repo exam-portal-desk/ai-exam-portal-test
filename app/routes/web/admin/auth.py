@@ -79,6 +79,7 @@ def admin_login():
     session["username"] = user.get("username")
     session["full_name"]= user.get("full_name", user.get("username"))
     session["is_admin"] = True
+    session["profile_photo_key"] = user.get("profile_photo_key")
     session.modified    = True
 
     flash("Admin login successful!", "success")

@@ -15,6 +15,8 @@ original — still per-process, not shared across multiple worker
 processes, same as before this refactor.
 """
 
+import base64
+import json
 import threading
 import time
 import re
@@ -27,6 +29,11 @@ from app.services.image_storage_service import profile_photo_url_from_key
 
 RATE_LIMIT_SECONDS = 10
 MAX_MSG_LEN = 500
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 50
+DEFAULT_REPLY_LIMIT = 10
+MAX_REPLY_LIMIT = 30
 
 # Ghost user ID — same as user_deletion_service.py
 GHOST_USER_ID = -1
@@ -55,31 +62,105 @@ def rate_ok(user_id) -> bool:
         return True
 
 
-def _build_thread(rows: list) -> list:
-    """
-    Build threaded comment tree.
+def _encode_cursor(row: dict) -> str:
+    raw = json.dumps([row['created_at'], row['id']]).encode()
+    return base64.urlsafe_b64encode(raw).decode()
 
-    PROFESSIONAL APPROACH (Reddit/Slack style):
-      - Deleted account messages (user_id = GHOST_USER_ID) are NOT hidden.
-        They show as "[deleted account] • This user has deleted their account."
-        This keeps the thread structure intact — replies stay nested correctly.
-      - Only truly deleted messages (is_deleted=True AND not ghost) are hidden,
-        BUT their slot is preserved if they have replies, showing:
-        "[message deleted] • replies still visible below"
-      - Orphan replies whose parent is completely gone → dropped silently.
-    """
-    by_id = {r['id']: {**r, 'replies': []} for r in rows}
-    roots = []
 
+def _decode_cursor(cursor):
+    if not cursor:
+        return None, None
+    try:
+        created_at, cid = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+        return created_at, cid
+    except Exception:
+        return None, None
+
+
+def _shape_rows(rows: list, current_uid, reply_counts: dict = None) -> list:
+    """Resolve avatars + ghost-account/soft-delete placeholders + is_own for
+    a page of rows, batched (one get_users_by_ids call for the whole page,
+    no N+1). reply_counts is only passed for top-level pages.
+
+    PROFESSIONAL APPROACH (Reddit/Slack style), same rule as before:
+      - Deleted-account rows (user_id = GHOST_USER_ID) show as
+        "[Deleted Account] — This user has deleted their account."
+      - Soft-deleted-but-has-replies rows (only reachable here because
+        app/db/discussion.py's top-level queries keep them for exactly
+        this reason) show as "[message deleted]" so the reply thread
+        underneath stays reachable instead of being orphaned.
+    """
+    live_uids = {r.get('user_id') for r in rows
+                 if r.get('user_id') and r.get('user_id') != GHOST_USER_ID}
+    users_by_id = get_users_by_ids(list(live_uids))
+
+    shaped = []
     for r in rows:
-        pid = r.get('parent_id')
-        if not pid:
-            roots.append(by_id[r['id']])
-        elif pid in by_id:
-            by_id[pid]['replies'].append(by_id[r['id']])
-        # else: true orphan (parent completely purged) — drop silently
+        uid = r.get('user_id')
+        deleted = r.get('is_deleted', False)
+        is_ghost = (uid == GHOST_USER_ID)
 
-    return roots
+        if is_ghost:
+            r['username'] = DELETED_ACCOUNT_DISPLAY
+            r['message'] = DELETED_ACCOUNT_MESSAGE
+            r['is_deleted_account'] = True
+            r['is_own'] = False
+            r['avatar_url'] = None
+        elif deleted:
+            r['message'] = '[message deleted]'
+            r['is_deleted_account'] = False
+            r['is_own'] = False
+            r['avatar_url'] = None
+        else:
+            r['is_deleted_account'] = False
+            r['is_own'] = (uid == current_uid)
+            photo_key = users_by_id.get(str(uid), {}).get('profile_photo_key')
+            r['avatar_url'] = profile_photo_url_from_key(photo_key)
+
+        if reply_counts is not None:
+            r['reply_count'] = reply_counts.get(r['id'], 0)
+
+        r.pop('user_id', None)
+        r.pop('is_deleted', None)
+        shaped.append(r)
+    return shaped
+
+
+def get_comments_page(question_id: int, current_uid, cursor: str = None, limit: int = DEFAULT_PAGE_LIMIT) -> dict:
+    """Paginated top-level comments (keyset, oldest first). Pinned comments
+    are always included in full on the first page only (cursor is None) —
+    they're inherently few, so re-sending them on every later page would
+    just be wasted payload."""
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+    after_created_at, after_id = _decode_cursor(cursor)
+
+    pinned_rows = discussion_db.get_pinned_top_level(question_id) if not cursor else []
+    page_rows = discussion_db.get_top_level_page(question_id, after_created_at, after_id, limit + 1)
+
+    has_more = len(page_rows) > limit
+    page_rows = page_rows[:limit]
+    next_cursor = _encode_cursor(page_rows[-1]) if has_more and page_rows else None
+
+    all_rows = pinned_rows + page_rows
+    counts = discussion_db.get_reply_counts([r['id'] for r in all_rows])
+    comments = _shape_rows(all_rows, current_uid, reply_counts=counts)
+
+    return {'comments': comments, 'next_cursor': next_cursor, 'count': get_count(question_id)}
+
+
+def get_replies_page(question_id: int, parent_id: int, current_uid, cursor: str = None, limit: int = DEFAULT_REPLY_LIMIT) -> dict:
+    """Paginated replies for one top-level comment (keyset, oldest first —
+    natural conversation order, important since replies may @mention
+    earlier replies)."""
+    limit = max(1, min(limit, MAX_REPLY_LIMIT))
+    after_created_at, after_id = _decode_cursor(cursor)
+
+    rows = discussion_db.get_replies_page(question_id, parent_id, after_created_at, after_id, limit + 1)
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = _encode_cursor(rows[-1]) if has_more and rows else None
+
+    return {'replies': _shape_rows(rows, current_uid), 'next_cursor': next_cursor}
 
 
 def get_count(question_id: int) -> int:
@@ -109,53 +190,20 @@ def sync_count(question_id: int, delta: int) -> None:
         print(f"[Disc] count sync error: {e}")
 
 
-def get_discussion_thread(question_id: int, current_uid) -> dict:
-    """Fetch + shape the full comment thread for a question."""
-    all_rows = discussion_db.get_thread_rows(question_id)
-
-    live_uids = {r.get('user_id') for r in all_rows
-                 if r.get('user_id') and r.get('user_id') != GHOST_USER_ID}
-    users_by_id = get_users_by_ids(list(live_uids))
-
-    display_rows = []
-    for r in all_rows:
-        uid = r.get('user_id')
-        deleted = r.get('is_deleted', False)
-        is_ghost = (uid == GHOST_USER_ID)
-
-        # Skip truly deleted messages (not ghost, not having replies)
-        # We will re-add them if they have children below
-        if deleted and not is_ghost:
-            continue
-
-        # Ghost user row → show as "deleted account" placeholder
-        if is_ghost:
-            r['username'] = DELETED_ACCOUNT_DISPLAY
-            r['message'] = DELETED_ACCOUNT_MESSAGE
-            r['is_deleted_account'] = True
-            r['is_own'] = False
-            r['avatar_url'] = None
-        else:
-            r['is_deleted_account'] = False
-            r['is_own'] = (uid == current_uid)
-            photo_key = users_by_id.get(str(uid), {}).get('profile_photo_key')
-            r['avatar_url'] = profile_photo_url_from_key(photo_key)
-
-        r.pop('user_id', None)
-        r.pop('is_deleted', None)
-        display_rows.append(r)
-
-    return {
-        'comments': _build_thread(display_rows),
-        'count': get_count(question_id),
-    }
-
-
 def create_comment(question_id: int, uid, username: str, data: dict, avatar_url: str = None):
     """
     Validate + persist a new comment. Returns (error_message, status_code, None)
     on failure, or (None, None, payload) on success, where payload is the
     comment shape used for both the HTTP response and the socket broadcast.
+
+    A reply's parent_id is always rewritten to its thread ROOT server-side
+    (even if the client sent a reply's own id as parent_id, i.e. "reply to
+    a reply") — this keeps the flat 2-tier structure (top-level comments +
+    one flat replies bucket each) an actual invariant, not just a UI
+    convention, so pagination/reply-count queries never have to recurse.
+    "Who this reply is actually addressing" is preserved instead as the
+    leading @username the client prefills into the message text — no new
+    column needed, and it survives reloads since it's part of `message`.
     """
     msg = (data.get('message') or '').strip()
     if not msg:
@@ -163,6 +211,12 @@ def create_comment(question_id: int, uid, username: str, data: dict, avatar_url:
     if len(msg) > MAX_MSG_LEN:
         return f'Max {MAX_MSG_LEN} characters allowed', 400, None
     msg = _sanitize(msg)
+
+    parent_id = data.get('parent_id')
+    if parent_id:
+        parent = discussion_db.get_comment_parent_info(parent_id)
+        if parent and parent.get('parent_id'):
+            parent_id = parent['parent_id']
 
     now_iso = now_utc_naive().isoformat()
     temp_id = str(uuid.uuid4())
@@ -172,7 +226,7 @@ def create_comment(question_id: int, uid, username: str, data: dict, avatar_url:
         'user_id': uid,
         'username': username,
         'message': msg,
-        'parent_id': data.get('parent_id'),
+        'parent_id': parent_id,
         'is_pinned': False,
         'is_best_answer': False,
         'is_deleted': False,
@@ -193,13 +247,13 @@ def create_comment(question_id: int, uid, username: str, data: dict, avatar_url:
         'username': username,
         'avatar_url': avatar_url,
         'message': msg,
-        'parent_id': data.get('parent_id'),
+        'parent_id': parent_id,
         'created_at': now_iso,
         'is_pinned': False,
         'is_best_answer': False,
         'is_edited': False,
         'is_deleted_account': False,
-        'replies': [],
+        'reply_count': 0,
         'count': get_count(question_id),
     }
     return None, None, payload

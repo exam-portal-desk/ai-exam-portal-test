@@ -24,7 +24,7 @@ from flask import (
 from app.db.users import (
     get_user_by_username, get_user_by_email,
     get_user_by_google_id, get_all_users, create_user,
-    update_user,
+    update_user, get_user_by_id,
 )
 from app.db.sessions import create_session, invalidate_session, set_exam_active
 from app.db.auth import (
@@ -164,7 +164,13 @@ def select_portal():
             flash("Session expired. Please login again.", "error")
             return redirect(url_for("auth.login"))
 
-        user = {"id": user_id, "username": username, "full_name": full_name, "role": role}
+        # Re-fetch the full row instead of trusting the partial pending_*
+        # session fields (id/username/full_name/role only) — those silently
+        # dropped every other column, including profile_photo_key, so the
+        # new session always started with no avatar regardless of what was
+        # actually saved in the DB.
+        user = get_user_by_id(user_id) or \
+            {"id": user_id, "username": username, "full_name": full_name, "role": role}
         is_admin = portal == "admin"
         _create_user_session(user, role, admin=is_admin)
 

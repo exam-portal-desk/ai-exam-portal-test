@@ -23,7 +23,34 @@
   <!-- mhchem must load after katex.min.js but before auto-render.min.js (per KaTeX docs) -->
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" defer></script>
-  <script>window.MathJax={
+  <script>
+  // _mathJaxReady / _mathJaxReadyPromise: MathJax-script below loads `async`,
+  // so `window.MathJax` exists immediately as this plain config object, but
+  // `MathJax.typesetPromise` isn't attached until the library itself finishes
+  // downloading and initializing — calling it before then throws synchronously
+  // (not a promise rejection, so .catch() never sees it), which is what caused
+  // LaTeX to sometimes render as raw source on first load. startup.ready()
+  // fires only once MathJax is fully usable. window.mathJaxTypeset() (defined
+  // below) is the one safe way any page/script should ever call MathJax from
+  // now on: it waits for readiness instead of guessing with a timeout, AND
+  // serializes every call through one shared queue, since calling
+  // MathJax.typesetPromise() again while a previous call is still in flight
+  // is unsafe (observed in production as "Cannot read properties of null
+  // (reading 'replaceChild')" when multiple pieces of content typeset
+  // concurrently) — every caller across the app now shares this one queue.
+  //
+  // startup.typeset:false — MathJax's default (true) makes it automatically
+  // typeset the whole document itself once ready, via its own internal,
+  // unserialized call. That call raced window.mathJaxTypeset()'s own queued
+  // typesetPromise() call on the very same elements (confirmed empirically:
+  // MathJax's auto pass mutated the question/option nodes microseconds
+  // before our own call started), which is exactly the kind of concurrent
+  // typesetting this queue exists to prevent — root cause of LaTeX
+  // sometimes rendering, sometimes showing as raw source. Disabling it means
+  // the only typesetting that ever happens goes through our single queue.
+  window._mathJaxReady = false;
+  window._mathJaxReadyPromise = new Promise(function(resolve){ window._mathJaxReadyResolve = resolve; });
+  window.MathJax={
     loader:{load:['[tex]/mhchem']},
     tex:{
       packages:{'[+]':['mhchem']},
@@ -33,8 +60,37 @@
       processEnvironments:true
     },
     chtml:{linebreaks:{automatic:true,width:"container"}},
-    options:{skipHtmlTags:['script','noscript','style','textarea','pre','code']}
-  };</script>
+    options:{skipHtmlTags:['script','noscript','style','textarea','pre','code']},
+    startup:{
+      typeset:false,
+      ready(){
+        MathJax.startup.defaultReady();
+        window._mathJaxReady = true;
+        window._mathJaxReadyResolve();
+      }
+    }
+  };
+  // Safe MathJax typeset helper — call any time (before or after MathJax has
+  // finished loading, any number of times concurrently). `elements` optionally
+  // scopes typesetting to specific DOM nodes (faster than a full-document
+  // typeset, and lets typesetClear() re-typeset already-rendered nodes
+  // cleanly); omit for the whole page. Returns a Promise resolved once this
+  // call's typesetting actually completes.
+  window._mathJaxQueue = Promise.resolve();
+  window.mathJaxTypeset = function(elements){
+    window._mathJaxQueue = window._mathJaxQueue
+      .then(function(){ return window._mathJaxReady ? null : window._mathJaxReadyPromise; })
+      .then(function(){
+        if (!window.MathJax || typeof MathJax.typesetPromise !== 'function') return;
+        if (elements && typeof MathJax.typesetClear === 'function') {
+          try { MathJax.typesetClear(elements); } catch(e) {}
+        }
+        return MathJax.typesetPromise(elements);
+      })
+      .catch(function(e){ console.warn('[MathJax]', e); });
+    return window._mathJaxQueue;
+  };
+  </script>
   <!-- mhchem: required for \ce{...} chemistry notation used by AI explanations.
        Version pinned (not the floating "@3" alias) so a new MathJax release
        can never silently change behavior on this page. -->
@@ -447,8 +503,9 @@
   or request.path.startswith('/exam/')
   or request.path.startswith('/submit-exam')
 ) %}
+{% set standalone = standalone|default(false) %}
 
-{% if session.get('user_id') and not is_exam_page %}
+{% if session.get('user_id') and not is_exam_page and not standalone %}
 <nav class="t-nav">
   {# Mobile sidebar toggle #}
   {% if session.get('user_id') and not session.get('admin_id') %}
@@ -503,7 +560,7 @@
 ════════════════════════════════════════════════════════════ #}
 <div class="app-shell">
 
-{% if session.get('user_id') and not session.get('admin_id') and not is_exam_page %}
+{% if session.get('user_id') and not session.get('admin_id') and not is_exam_page and not standalone %}
 {# ── USER SIDEBAR ─────────────────────────────────────────── #}
 <aside class="sb" id="mainSb">
 
@@ -703,7 +760,7 @@
       <button class="sbtn sbtn-ghost" onclick="closeLogoutModal()">
         <i class="fas fa-times"></i> Cancel
       </button>
-      <a class="sbtn sbtn-danger" href="{{ url_for('auth.logout') }}" style="text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;">
+      <a class="sbtn sbtn-danger" href="{{ url_for('auth.logout') }}" onclick="userLogoutStart(this)" style="text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;">
         <i class="fas fa-sign-out-alt"></i> Yes, Logout
       </a>
     </div>
@@ -803,6 +860,11 @@ if(mt) mt.addEventListener('click', function(){ var sb=document.getElementById('
 /* ── LOGOUT MODAL ── */
 function openLogoutModal(){ var m=document.getElementById('logoutModal'); if(m) m.classList.add('open'); }
 function closeLogoutModal(){ var m=document.getElementById('logoutModal'); if(m) m.classList.remove('open'); }
+function userLogoutStart(el){
+  el.style.pointerEvents='none';
+  el.style.opacity='.7';
+  el.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging out…';
+}
 var lm=document.getElementById('logoutModal');
 if(lm) lm.addEventListener('click',function(e){ if(e.target===this) closeLogoutModal(); });
 
@@ -912,6 +974,46 @@ window.appToast = function(msg, type, sub) {
   c.appendChild(el);
   setTimeout(function() { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; }, 3200);
   setTimeout(function() { el.remove(); }, 3500);
+};
+</script>
+
+{# ══ NEW-WINDOW LOADING SCREEN ═══════════════════════════
+   See templates/admin_base.html for the full rationale (same pattern,
+   kept in sync deliberately) — opens the window immediately and paints a
+   self-contained loading screen into it before navigating to the real
+   (potentially slow) URL, so the window is never blank/white. ══ #}
+<script>
+window.openLoadingWindow = function(url, name, features, opts) {
+  opts = opts || {};
+  var win;
+  try { win = window.open('about:blank', name || '_blank', features); } catch(e) { win = null; }
+  if (!win) { window.location.href = url; return null; }
+  try {
+    win.document.open();
+    win.document.write(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+      '<title>' + (opts.title || 'Loading…') + '</title><style>' +
+      'html,body{margin:0;height:100%;background:#f7f4ee;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}' +
+      '@media (prefers-color-scheme:dark){html,body{background:#1c1917}}' +
+      '.wrap{max-width:760px;margin:0 auto;padding:2.25rem 1.75rem}' +
+      '.hdr{display:flex;align-items:center;gap:.65rem;margin-bottom:1.6rem}' +
+      '.spin{width:20px;height:20px;border-radius:50%;border:2.5px solid rgba(120,100,80,.22);border-top-color:#c1602b;animation:spin .8s linear infinite;flex-shrink:0}' +
+      '@keyframes spin{to{transform:rotate(360deg)}}' +
+      '.htxt{font-size:.95rem;font-weight:600;color:#3a332b}' +
+      '@media (prefers-color-scheme:dark){.htxt{color:#f1ece3}}' +
+      '.sk{border-radius:10px;background:linear-gradient(90deg,rgba(120,100,80,.10) 25%,rgba(120,100,80,.18) 37%,rgba(120,100,80,.10) 63%);background-size:400% 100%;animation:shim 1.4s ease infinite}' +
+      '@keyframes shim{0%{background-position:100% 0}100%{background-position:0 0}}' +
+      '.bar{height:14px;margin-bottom:.6rem}.w60{width:60%}.w40{width:40%}.card{height:88px;margin-bottom:.85rem}' +
+      '</style></head><body><div class="wrap">' +
+      '<div class="hdr"><div class="spin"></div><div class="htxt">' + (opts.message || 'Loading…') + '</div></div>' +
+      '<div class="sk bar w60"></div><div class="sk bar w40" style="margin-bottom:1.4rem"></div>' +
+      '<div class="sk card"></div><div class="sk card"></div><div class="sk card"></div>' +
+      '</div></body></html>'
+    );
+    win.document.close();
+  } catch(e) {}
+  win.location.href = url;
+  return win;
 };
 </script>
 
