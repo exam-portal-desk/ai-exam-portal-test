@@ -71,23 +71,54 @@ def init_jwt_middleware(app):
 
 
 def _bootstrap_web_session(user_id: int, role: str) -> None:
-    """See the OPT-IN WEB SESSION BOOTSTRAP note above."""
+    """
+    See the OPT-IN WEB SESSION BOOTSTRAP note above.
+
+    Also accepts an optional X-Selected-Portal: user|admin header — for a
+    dual-role account, the caller (e.g. a native picker on a mobile client)
+    can specify which portal to bind this session to, same as choosing on
+    the web's own /select-portal page. Without it, defaults to deriving
+    admin-vs-user purely from the role string, same as before.
+    """
     import secrets
     from app.db.sessions import create_session, get_session_by_token, invalidate_session
+    from app.db.users import get_user_by_id
+
+    selected_portal = request.headers.get("X-Selected-Portal", "").strip().lower()
+    if selected_portal not in ("user", "admin"):
+        selected_portal = None
+    effective_role = selected_portal or role
+    is_admin_portal = (
+        selected_portal == "admin" if selected_portal
+        else ("admin" in role and "user" not in role)
+    )
 
     existing_token = session.get("token")
-    if existing_token and get_session_by_token(existing_token):
-        return  # Already have a live DB-backed session — nothing to do.
+    if not (existing_token and get_session_by_token(existing_token)):
+        invalidate_session(user_id)
+        new_token = secrets.token_urlsafe(32)
+        create_session({
+            "token":         new_token,
+            "user_id":       user_id,
+            "device_info":   request.headers.get("User-Agent", "unknown"),
+            "is_exam_active": False,
+            "admin_session": is_admin_portal,
+            "active":        True,
+        })
+        session.permanent = True
+        session["token"] = new_token
 
-    invalidate_session(user_id)
-    new_token = secrets.token_urlsafe(32)
-    create_session({
-        "token":         new_token,
-        "user_id":       user_id,
-        "device_info":   request.headers.get("User-Agent", "unknown"),
-        "is_exam_active": False,
-        "admin_session": "admin" in role and "user" not in role,
-        "active":        True,
-    })
-    session.permanent = True
-    session["token"] = new_token
+    # Mirrors the rest of _create_user_session()'s session keys — without
+    # these, session_guard's DB-token check now passes, but the navbar
+    # (which trusts bare session values, no DB check — see
+    # templates/base.html) still had nothing but a bare user_id/role to
+    # show, hence a generic name/no avatar even after a working login.
+    user = get_user_by_id(user_id)
+    if user:
+        session["username"]          = user.get("username")
+        session["full_name"]         = user.get("full_name", user.get("username"))
+        session["role"]              = effective_role
+        session["profile_photo_key"] = user.get("profile_photo_key")
+        if is_admin_portal:
+            session["admin_id"]  = user_id
+            session["is_admin"] = True
