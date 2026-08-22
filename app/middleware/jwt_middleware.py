@@ -14,6 +14,25 @@ Web UI (cookie session) bilkul untouched rehta hai.
 Register in app/__init__.py:
     from app.middleware.jwt_middleware import init_jwt_middleware
     init_jwt_middleware(app)
+
+OPT-IN WEB SESSION BOOTSTRAP
+=============================
+session_guard.require_user_role()'s JWT branch only accepts requests that
+themselves carry the Authorization header — it never touches the
+`sessions` DB table, so a page load without that header (i.e. any normal
+browser/WebView navigation) still falls through to the cookie branch,
+which requires session['token'] to match an active `sessions` row. A
+Bearer-only client that never re-sends that header on every request would
+therefore authenticate once and then appear logged out on the very next
+page. When the caller explicitly asks for it (via X-Bootstrap-Web-Session,
+below), this also creates that DB session row and sets session['token'],
+mirroring app/routes/web/auth.py's _create_user_session() — so a client
+that performs one Bearer-authenticated request can then browse normally
+via the resulting cookie, same as any other web login. Gated behind that
+header so ordinary stateless Bearer-only API usage (whoever calls
+/api/v01/* with a token on every request and never keeps cookies) is
+completely unaffected — without the gate, a client like that would create
+a new `sessions` row on every single request.
 """
 
 from flask import request, session, g
@@ -46,3 +65,29 @@ def init_jwt_middleware(app):
         session["role"]     = str(payload.get("role", "user"))
         # username/full_name optional — session_guard ko sirf user_id chahiye
         # Agar koi route full_name use karta hai toh DB se fetch hoga automatically
+
+        if request.headers.get("X-Bootstrap-Web-Session") == "1":
+            _bootstrap_web_session(session["user_id"], session["role"])
+
+
+def _bootstrap_web_session(user_id: int, role: str) -> None:
+    """See the OPT-IN WEB SESSION BOOTSTRAP note above."""
+    import secrets
+    from app.db.sessions import create_session, get_session_by_token, invalidate_session
+
+    existing_token = session.get("token")
+    if existing_token and get_session_by_token(existing_token):
+        return  # Already have a live DB-backed session — nothing to do.
+
+    invalidate_session(user_id)
+    new_token = secrets.token_urlsafe(32)
+    create_session({
+        "token":         new_token,
+        "user_id":       user_id,
+        "device_info":   request.headers.get("User-Agent", "unknown"),
+        "is_exam_active": False,
+        "admin_session": "admin" in role and "user" not in role,
+        "active":        True,
+    })
+    session.permanent = True
+    session["token"] = new_token
