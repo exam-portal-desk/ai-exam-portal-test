@@ -1,0 +1,32 @@
+{# templates/_portal_cards.html
+   Shared macros for one category/subcategory card in the User Portal —
+   used by the initial server render (templates/categories.html,
+   templates/subcategories.html) and the "Load more" AJAX endpoints
+   (app/routes/api/v01/portal.py), so both stay in sync. #}
+
+{% macro render_category_card(cat) %}
+<a class="cat-card" href="{{ url_for('categories.set_category', id=cat.id) }}">
+  <div class="cat-img">
+    {% if cat.image_url %}
+    <img src="{{ cat.image_url }}" alt="{{ cat.name }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <i class="fas fa-graduation-cap" style="display:none"></i>
+    {% else %}
+    <i class="fas fa-graduation-cap"></i>
+    {% endif %}
+  </div>
+  <div class="cat-info">
+    <div class="cat-name">{{ cat.name }}</div>
+    <span class="cat-link">View Exams <i class="fas fa-arrow-right" style="font-size:.6rem"></i></span>
+  </div>
+</a>
+{% endmacro %}
+
+{% macro render_subcategory_card(sub) %}
+<a class="cat-card" href="{{ url_for('categories.set_subcategory', id=sub.id) }}">
+  <div class="cat-img"><i class="fas fa-folder-open"></i></div>
+  <div class="cat-info">
+    <div class="cat-name">{{ sub.name }}</div>
+    <span class="cat-link">View Exams <i class="fas fa-arrow-right" style="font-size:.6rem"></i></span>
+  </div>
+</a>
+{% endmacro %}

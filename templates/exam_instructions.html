@@ -130,7 +130,7 @@
     <div class="ei-card-body">
 
       <div class="exam-meta-row">
-        <span class="exam-meta-tag"><i class="fas fa-calendar"></i>{{ exam.date }}</span>
+        <span class="exam-meta-tag"><i class="fas fa-calendar"></i>{{ exam.date | calendar_date }}</span>
         <span class="exam-meta-tag"><i class="fas fa-clock"></i>{{ exam.start_time }}</span>
         <span class="exam-meta-tag"><i class="fas fa-stopwatch"></i>{{ exam.duration }} mins</span>
         <span class="exam-meta-tag"><i class="fas fa-question-circle"></i>{{ exam.total_questions }} questions</span>

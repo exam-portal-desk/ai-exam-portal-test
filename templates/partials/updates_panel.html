@@ -1,0 +1,143 @@
+{#
+  templates/partials/updates_panel.html
+  The GLOBAL "Your Updates" notification panel content — aggregated across
+  every category/portal the user can see, not scoped to whichever one is
+  currently selected. Rendered by GET /api/v01/student/updates and injected
+  into the #updatesModalBody shell in base.html. Takes `dash`
+  (app.services.dashboard_service context). One compact row per item,
+  notification-center style — not a grid of cards. This is the ONLY place
+  this markup lives — do not duplicate it elsewhere.
+#}
+{% if dash.today_exams %}
+<div class="ntf-section-label">Today's Exams</div>
+{% for entry in dash.today_exams %}
+{% set live_now = entry.status == 'ongoing' or entry.is_startable %}
+{% set pending_countdown = entry.status == 'upcoming' and not entry.is_startable and not entry.is_window_ended and entry.start_iso %}
+<div class="ntf-row" {% if pending_countdown %}data-exam-row data-target="{{ entry.start_iso }}" data-start-href="{{ url_for('exam.exam_instructions', exam_id=entry.exam.id) }}" data-can-start="{{ 'true' if entry.can_start else 'false' }}" data-active-attempt="{{ 'true' if entry.active_attempt else 'false' }}"{% endif %}>
+  <div class="ntf-icon {{ 'ntf-icon-success' if live_now else ('ntf-icon-muted' if entry.is_window_ended else 'ntf-icon-warning') }}">
+    <i class="fas {{ 'fa-play' if live_now else ('fa-clock' if entry.is_window_ended else 'fa-calendar-day') }}"></i>
+  </div>
+  <div class="ntf-body">
+    <div class="ntf-title">
+      {{ entry.exam.name }}
+      {% if entry.category_name %}<span class="ntf-tag">{{ entry.category_name }}</span>{% endif %}
+      {% if live_now %}<span class="ntf-live"><span class="ntf-live-dot"></span>Live</span>{% endif %}
+    </div>
+    <div class="ntf-meta">
+      {{ entry.start_time_ampm or entry.exam.start_time }} &ndash; {{ entry.end_time_ampm }}
+      {% if pending_countdown %}
+      &middot; Starts in <span class="countdown">&ndash;&ndash;</span>
+      {% elif entry.is_window_ended %}
+      &middot; Window closed
+      {% endif %}
+    </div>
+  </div>
+  <div class="ntf-action">
+    {% if live_now and entry.active_attempt %}
+    <a href="{{ url_for('exam.exam_instructions', exam_id=entry.exam.id) }}" class="ntf-btn success">Resume</a>
+    {% elif live_now and entry.can_start %}
+    <a href="{{ url_for('exam.exam_instructions', exam_id=entry.exam.id) }}" class="ntf-btn success">Start</a>
+    {% elif live_now %}
+    <span class="ntf-btn ghost">Exhausted</span>
+    {% elif entry.is_window_ended %}
+    <span class="ntf-btn ghost">Ended</span>
+    {% elif entry.status == 'upcoming' %}
+    <span class="ntf-btn ghost">Upcoming</span>
+    {% else %}
+    <a href="{{ url_for('result.result', exam_id=entry.exam.id) }}" class="ntf-btn primary">View</a>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if dash.results_available %}
+<div class="ntf-section-label">Results Available</div>
+{% for item in dash.results_available %}
+<a href="{{ url_for('result.result', exam_id=item.exam.id, result_id=item.result.id) }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon ntf-icon-success"><i class="fas fa-chart-bar"></i></div>
+  <div class="ntf-body">
+    <div class="ntf-title">
+      {{ item.exam.name }}
+      {% if item.category_name %}<span class="ntf-tag">{{ item.category_name }}</span>{% endif %}
+    </div>
+    <div class="ntf-meta">{{ item.result.score }}/{{ item.result.max_score }} &middot; {{ '%.1f'|format(item.result.percentage|float) }}% &middot; Grade {{ item.result.grade }}</div>
+  </div>
+  <div class="ntf-action"><i class="fas fa-chevron-right ntf-chevron"></i></div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if dash.pending_update %}
+<div class="ntf-section-label">Access Request</div>
+{% set st = dash.pending_update.request_status %}
+<a href="{{ url_for('profile.my_profile') }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon {{ 'ntf-icon-warning' if st == 'pending' else ('ntf-icon-danger' if st == 'denied' else 'ntf-icon-success') }}">
+    <i class="fas {{ 'fa-hourglass-half' if st == 'pending' else ('fa-circle-xmark' if st == 'denied' else 'fa-circle-check') }}"></i>
+  </div>
+  <div class="ntf-body">
+    <div class="ntf-title">
+      {% if st == 'pending' %}Access request pending
+      {% elif st == 'denied' %}Access request not approved
+      {% else %}Access request approved{% endif %}
+    </div>
+    <div class="ntf-meta">
+      {% if st == 'pending' %}Still under review{% elif st == 'denied' %}Your recent request was not approved{% else %}Your admin access request has been approved{% endif %}
+    </div>
+  </div>
+  <div class="ntf-action"><i class="fas fa-chevron-right ntf-chevron"></i></div>
+</a>
+{% endif %}
+
+{% if dash.new_messages %}
+<div class="ntf-section-label">New Messages</div>
+{% for c in dash.new_messages %}
+<a href="{{ url_for('chat.chat_page') }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon ntf-avatar">{% if c.photo_url %}<img src="{{ c.photo_url }}" alt="">{% else %}{{ (c.name or '?')[0]|upper }}{% endif %}</div>
+  <div class="ntf-body">
+    <div class="ntf-title">{{ c.name }}</div>
+    {% if c.last_message %}<div class="ntf-meta">{{ c.last_message.message[:70] }}</div>{% endif %}
+  </div>
+  <div class="ntf-action"><span class="ntf-count">{{ c.unread }}</span></div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if dash.shared_notebooks %}
+<div class="ntf-section-label">Shared With You</div>
+{% for nb in dash.shared_notebooks %}
+<a href="{{ url_for('notes.notebook_editor', notebook_id=nb.notebook_id) }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon ntf-icon-shared"><i class="fas fa-share-nodes"></i></div>
+  <div class="ntf-body">
+    <div class="ntf-title">{{ nb.title }} <span class="ntf-tag">{{ nb.permission|capitalize }}</span></div>
+    <div class="ntf-meta">Shared by {{ nb.owner_full_name or nb.owner_username }}</div>
+  </div>
+  <div class="ntf-action"><i class="fas fa-chevron-right ntf-chevron"></i></div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if dash.new_exams %}
+<div class="ntf-section-label">New Exams</div>
+{% for e in dash.new_exams %}
+<a href="{{ url_for('exam.exam_instructions', exam_id=e.id) }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon ntf-icon-info"><i class="fas fa-graduation-cap"></i></div>
+  <div class="ntf-body">
+    <div class="ntf-title">
+      {{ e.name }}
+      {% if e.category_name %}<span class="ntf-tag">{{ e.category_name }}</span>{% endif %}
+    </div>
+    <div class="ntf-meta">{{ e.date | calendar_date }} &middot; {{ e.start_time_ampm or e.start_time }}</div>
+  </div>
+  <div class="ntf-action"><i class="fas fa-chevron-right ntf-chevron"></i></div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if not dash.has_any %}
+<div class="dash-empty">
+  <div class="dash-empty-icon"><i class="fas fa-check-circle"></i></div>
+  <h3>You're all caught up</h3>
+  <p>Nothing new right now &mdash; check back after your next exam or update.</p>
+</div>
+{% endif %}

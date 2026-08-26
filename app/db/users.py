@@ -5,7 +5,8 @@ Uses selective column fetching instead of SELECT *.
 """
 
 from typing import Optional, List, Dict
-from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
+from app.db import fetch_one, fetch_all, execute, execute_returning, set_clause, insert_returning
+from app.utils.datetime_service import now_utc_naive
 
 
 _AUTH_COLS = "id,username,email,password,full_name,role,profile_photo_key"
@@ -91,6 +92,27 @@ def update_user(user_id: int, updates: Dict) -> bool:
         return False
 
 
+def update_last_login(user_id: int) -> Optional[str]:
+    """Atomically overwrite last_login with now(), returning the value it
+    held immediately before the overwrite (None on a user's first login).
+    Used to display "Last Login" as the PREVIOUS login, not the one that
+    just happened — a plain UPDATE would lose the old value before any
+    caller could read it."""
+    try:
+        rows = execute_returning(
+            """
+            WITH old AS (SELECT last_login FROM users WHERE id=%s)
+            UPDATE users SET last_login=%s WHERE id=%s
+            RETURNING (SELECT last_login FROM old) AS previous_last_login
+            """,
+            (user_id, now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"), user_id),
+        )
+        return rows[0]["previous_last_login"] if rows else None
+    except Exception as e:
+        print(f"[db.users] update_last_login error: {e}")
+        return None
+
+
 def delete_user(user_id: int) -> bool:
     try:
         execute("DELETE FROM users WHERE id=%s", (user_id,))
@@ -106,6 +128,39 @@ def get_user_by_google_id(google_id: str) -> Optional[Dict]:
     except Exception as e:
         print(f"[db.users] get_user_by_google_id error: {e}")
         return None
+
+
+def get_notes_view_mode(user_id: int) -> str:
+    """Persisted My Notebooks grid/list view preference. Thin wrapper over
+    get_view_prefs() — the 'notes' section used to live in its own
+    dedicated notes_view_mode column (mirroring the chat_background_*
+    convention); consolidated into the generic view_prefs jsonb column by
+    migrations/20260826_consolidate_notes_view_mode.sql."""
+    return get_view_prefs(user_id).get("notes", "grid")
+
+
+def get_view_prefs(user_id: int) -> Dict[str, str]:
+    """Generic per-section grid/list view preferences (users.view_prefs
+    jsonb) — flat {section: mode} shape, one shared column for every
+    toggle usage instead of a dedicated column per section."""
+    try:
+        row = fetch_one("SELECT view_prefs FROM users WHERE id=%s", (user_id,))
+        return (row or {}).get("view_prefs") or {}
+    except Exception as e:
+        print(f"[db.users] get_view_prefs error: {e}")
+        return {}
+
+
+def set_view_pref(user_id: int, section: str, view_mode: str) -> bool:
+    try:
+        execute(
+            "UPDATE users SET view_prefs = jsonb_set(coalesce(view_prefs, '{}'::jsonb), %s, to_jsonb(%s::text)) WHERE id=%s",
+            ([section], view_mode, user_id),
+        )
+        return True
+    except Exception as e:
+        print(f"[db.users] set_view_pref error: {e}")
+        return False
 
 
 def get_users_count() -> int:

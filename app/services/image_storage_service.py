@@ -174,3 +174,30 @@ def profile_photo_url_from_key(profile_photo_key: Optional[str]) -> Optional[str
 
 def delete_profile_photo(key: str) -> None:
     delete_image(key)
+
+
+# ─────────────────────────────────────────────
+# Chat backgrounds — same Profile/-style convention, keyed per-account.
+# Only used when users.chat_background holds a real storage key (not a
+# "preset:<id>" sentinel, which needs no storage at all).
+# ─────────────────────────────────────────────
+
+def upload_chat_background(user_id: int, content: bytes, filename: str, content_type: str) -> Tuple[str, str]:
+    """Upload bytes to ChatBackground/<user_id>_<filename>. Returns (key, url)
+    — key is the value to persist in users.chat_background."""
+    storage = get_storage()
+    key = f"ChatBackground/{user_id}_{filename}"
+    storage.upload(key, content, content_type)
+    return key, _url_for_key(storage, key)
+
+
+def chat_background_url_from_key(key: Optional[str]) -> Optional[str]:
+    """Cheap, non-existence-checked URL construction — used to render the
+    background on every chat page load, no storage round-trip."""
+    if not key:
+        return None
+    return _url_for_key(get_storage(), key)
+
+
+def delete_chat_background(key: str) -> None:
+    delete_image(key)

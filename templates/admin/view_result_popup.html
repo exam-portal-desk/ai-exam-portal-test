@@ -269,7 +269,7 @@
 
   {# Exam metadata #}
   <div class="res-meta">
-    <div class="res-meta-item"><div class="res-meta-lbl">Exam Date</div><div class="res-meta-val">{{ exam.date | display_date if exam.date else exam.date }}</div></div>
+    <div class="res-meta-item"><div class="res-meta-lbl">Exam Date</div><div class="res-meta-val">{{ exam.date | calendar_date if exam.date else exam.date }}</div></div>
     <div class="res-meta-item"><div class="res-meta-lbl">Submitted</div><div class="res-meta-val">{{ result.completed_at | display_dt if result.completed_at else '—' }}</div></div>
     <div class="res-meta-item"><div class="res-meta-lbl">Duration</div><div class="res-meta-val">{{ exam.duration }} min</div></div>
     <div class="res-meta-item"><div class="res-meta-lbl">Time Taken</div><div class="res-meta-val">{{ result.time_taken_minutes }} min</div></div>

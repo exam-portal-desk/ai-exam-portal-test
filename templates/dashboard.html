@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% set active_nav = 'dashboard' %}
 {% block title %}Dashboard - SmartAIExam{% endblock %}
+{% from "_dashboard_exam_cards.html" import render_live_card, render_upcoming_card, render_completed_card %}
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/view-toggle.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
 <style>
 /* Dashboard layout — no sidebar CSS here, sidebar is in base.html */
 .ud-main { flex:1; min-width:0; padding:1.5rem 1.75rem; }
@@ -10,16 +13,49 @@
 .ud-greeting h1 { font-size:1.2rem; font-weight:700; color:var(--text-1); letter-spacing:-.02em; margin-bottom:.2rem; }
 .ud-greeting p  { font-size:.8rem; color:var(--text-3); }
 
-.cat-pill {
-  display:inline-flex; align-items:center; gap:.5rem;
-  padding:.35rem .85rem; border-radius:20px;
+/* ── Compact category/subcategory breadcrumb switcher — replaces the two
+   separate, widely-spaced pills with one hierarchy control. ── */
+.portal-crumb {
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.3rem .4rem; border-radius:20px;
   background:var(--accent-subtle); border:1px solid var(--border);
-  font-size:.78rem; font-weight:600; color:var(--accent);
-  text-decoration:none; transition:border-color .15s;
 }
-.cat-pill:hover { border-color:var(--accent); }
+.pc-seg {
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.3rem .65rem; border-radius:16px; border:none; background:transparent;
+  font-family:inherit; font-size:.78rem; font-weight:600; color:var(--accent);
+  cursor:pointer; transition:background .12s;
+  max-width:160px;
+}
+.pc-seg span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pc-seg:hover { background:rgba(0,0,0,.06); }
+.pc-seg i.pc-caret { font-size:.6rem; opacity:.6; margin-left:.1rem; }
+.pc-sep { color:var(--accent); opacity:.5; font-size:.62rem; }
 
-.ud-tabs { display:flex; gap:.15rem; border-bottom:1px solid var(--border); margin-bottom:1.25rem; }
+.pc-pop {
+  position:fixed; z-index:2000; min-width:220px; max-width:280px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:calc(var(--radius) + 4px); box-shadow:var(--shadow-lg);
+  display:none; overflow:hidden;
+}
+.pc-pop.open { display:block; }
+.pc-pop-search {
+  width:100%; border:none; border-bottom:1px solid var(--border); background:var(--surface);
+  padding:.6rem .8rem; font-family:inherit; font-size:.8rem; color:var(--text-1); outline:none;
+}
+.pc-pop-list { max-height:260px; overflow-y:auto; padding:.35rem; }
+.pc-pop-item {
+  display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+  padding:.5rem .65rem; border-radius:8px; font-size:.82rem; color:var(--text-2);
+  text-decoration:none; cursor:pointer;
+}
+.pc-pop-item:hover { background:var(--surface-2); }
+.pc-pop-item.current { color:var(--accent); font-weight:700; background:var(--accent-subtle); }
+.pc-pop-more { display:block; padding:.5rem .8rem; font-size:.76rem; color:var(--accent); font-weight:600; text-decoration:none; border-top:1px solid var(--border); }
+.pc-pop-empty { padding:1rem .8rem; font-size:.78rem; color:var(--text-3); text-align:center; }
+
+.ud-tabs-row { display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.ud-tabs { display:flex; gap:.15rem; border-bottom:1px solid var(--border); flex:1; }
 .ud-tab {
   display:flex; align-items:center; gap:.4rem;
   padding:.5rem .9rem; background:none; border:none;
@@ -87,6 +123,16 @@
 .eb-pending  { background:var(--danger-bg);  color:var(--danger-text);  border-color:var(--danger-border); }
 @keyframes livepulse{0%,100%{box-shadow:0 0 0 0 var(--success-bg)}50%{box-shadow:0 0 0 4px transparent}}
 
+/* ── List view ── */
+#dashViewWrapper.list-view .ud-grid { grid-template-columns:1fr; gap:.5rem; }
+#dashViewWrapper.list-view .ec { flex-direction:row; align-items:center; flex-wrap:wrap; padding:.65rem .9rem; gap:.6rem; }
+#dashViewWrapper.list-view .ec:hover { transform:none; }
+#dashViewWrapper.list-view .ec-head { border-bottom:none; padding:0; flex:1 1 220px; min-width:0; }
+#dashViewWrapper.list-view .ec-body { padding:0; flex:2 1 260px; }
+#dashViewWrapper.list-view .ec-desc { display:none; }
+#dashViewWrapper.list-view .ec-foot { border-top:none; padding:0; flex:0 0 auto; width:auto; }
+#dashViewWrapper.list-view .ec-btn { width:auto; padding:.45rem .9rem; white-space:nowrap; }
+
 .ud-empty { text-align:center; padding:3.5rem 2rem; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); }
 .ud-empty-icon { width:48px; height:48px; border-radius:12px; background:var(--surface-2); color:var(--text-3); display:flex; align-items:center; justify-content:center; font-size:1.2rem; margin:0 auto .85rem; }
 .ud-empty h3 { font-size:.9rem; font-weight:700; color:var(--text-2); margin-bottom:.3rem; }
@@ -105,130 +151,99 @@
 
   <div class="ud-topbar">
     <div class="ud-greeting">
-      <h1>Welcome back, {{ session.get('full_name','').split()[0] }}</h1>
-      <p>
-        {% if selected_category %}Category: <strong style="color:var(--text-1)">{{ selected_category.name }}</strong> &nbsp;&middot;&nbsp;{% endif %}
-        {{ ongoing_exams|length }} live &middot; {{ upcoming_exams|length }} upcoming &middot; {{ completed_exams|length }} completed
-      </p>
+      <h1>{{ greeting }}, {{ session.get('full_name','').split()[0] }}</h1>
     </div>
-    <a href="{{ url_for('categories.select_category') }}" class="cat-pill">
-      <i class="fas fa-layer-group"></i>
-      {{ selected_category.name if selected_category else 'Select Category' }}
-      <i class="fas fa-exchange-alt" style="font-size:.62rem;opacity:.55"></i>
-    </a>
+    <div class="portal-crumb" id="portalCrumb">
+      <button type="button" class="pc-seg" data-kind="category" title="Switch category">
+        <i class="fas fa-layer-group"></i><span>{{ selected_category.name if selected_category else 'Select Category' }}</span><i class="fas fa-chevron-down pc-caret"></i>
+      </button>
+      {% if selected_subcategory %}
+      <i class="fas fa-chevron-right pc-sep"></i>
+      <button type="button" class="pc-seg" data-kind="subcategory" title="Switch subcategory">
+        <i class="fas fa-sitemap"></i><span>{{ selected_subcategory.name }}</span><i class="fas fa-chevron-down pc-caret"></i>
+      </button>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="ud-tabs">
-    <button class="ud-tab active" data-tab="live">
-      <i class="fas fa-circle" style="font-size:.42rem;color:var(--success-text)"></i> Live
-      <span class="tc">{{ ongoing_exams|length }}</span>
-    </button>
-    <button class="ud-tab" data-tab="upcoming">
-      <i class="fas fa-calendar-alt"></i> Upcoming
-      <span class="tc">{{ upcoming_exams|length }}</span>
-    </button>
-    <button class="ud-tab" data-tab="completed">
-      <i class="fas fa-check-circle"></i> Completed
-      <span class="tc">{{ completed_exams|length }}</span>
-    </button>
+  <div class="ud-tabs-row">
+    <div class="ud-tabs">
+      <button class="ud-tab active" data-tab="live">
+        <i class="fas fa-circle" style="font-size:.42rem;color:var(--success-text)"></i> Live
+        <span class="tc">{{ ongoing_total }}</span>
+      </button>
+      <button class="ud-tab" data-tab="upcoming">
+        <i class="fas fa-calendar-alt"></i> Upcoming
+        <span class="tc">{{ upcoming_total }}</span>
+      </button>
+      <button class="ud-tab" data-tab="completed">
+        <i class="fas fa-check-circle"></i> Completed
+        <span class="tc">{{ completed_total }}</span>
+      </button>
+    </div>
+    <div class="view-toggle" id="dashViewToggle" role="group" aria-label="Exam view">
+      <button type="button" data-view="grid" class="{{ 'active' if view_mode != 'list' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode != 'list' else 'false' }}"><i class="fas fa-th-large"></i></button>
+      <button type="button" data-view="list" class="{{ 'active' if view_mode == 'list' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode == 'list' else 'false' }}"><i class="fas fa-list"></i></button>
+    </div>
   </div>
 
-  {# LIVE #}
-  <div class="ud-pane active" id="pane-live">
-    {% if ongoing_exams %}
-    <div class="ud-toolbar">
-      <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" placeholder="Search…" oninput="filterCards(this,'pane-live')"></div>
-      <span class="ud-count" id="cnt-live">{{ ongoing_exams|length }} exams</span>
-    </div>
-    <div class="ud-grid">
-      {% for e in ongoing_exams %}
-      <div class="ec live" data-n="{{ e.name|lower }}">
-        <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-live"><i class="fas fa-circle" style="font-size:.4rem"></i>Live</span></div>
-        <div class="ec-body">
-          <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
-          <div class="ec-meta">
-            <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date }}</span>
-            <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
-            <span class="ec-tag"><i class="fas fa-stopwatch"></i>{{ e.duration }}m</span>
-            <span class="ec-tag"><i class="fas fa-question-circle"></i>{{ e.total_questions }}Q</span>
-          </div>
-        </div>
-        <div class="ec-foot"><a href="{{ url_for('exam.exam_instructions', exam_id=e.id) }}" class="ec-btn start"><i class="fas fa-play"></i> Start Exam</a></div>
+  <div id="dashViewWrapper" class="{{ 'list-view' if view_mode == 'list' else '' }}">
+    {# LIVE #}
+    <div class="ud-pane active" id="pane-live">
+      {% if ongoing_exams %}
+      <div class="ud-toolbar">
+        <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" id="search-live" placeholder="Search…"></div>
+        <span class="ud-count" id="cnt-live">{{ ongoing_total }} exams</span>
       </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-play-circle"></i></div><h3>No live exams right now</h3><p>Active exams will appear here when they start.</p></div>
-    {% endif %}
-  </div>
-
-  {# UPCOMING #}
-  <div class="ud-pane" id="pane-upcoming">
-    {% if upcoming_exams %}
-    <div class="ud-toolbar">
-      <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" placeholder="Search…" oninput="filterCards(this,'pane-upcoming')"></div>
-      <span class="ud-count" id="cnt-upcoming">{{ upcoming_exams|length }} exams</span>
-    </div>
-    <div class="ud-grid">
-      {% for e in upcoming_exams %}
-      <div class="ec" data-n="{{ e.name|lower }}">
-        <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-upcoming">Upcoming</span></div>
-        <div class="ec-body">
-          <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
-          <div class="ec-meta">
-            <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date }}</span>
-            <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
-            <span class="ec-tag"><i class="fas fa-stopwatch"></i>{{ e.duration }}m</span>
-            <span class="ec-tag"><i class="fas fa-question-circle"></i>{{ e.total_questions }}Q</span>
-          </div>
-        </div>
-        <div class="ec-foot"><button class="ec-btn off" disabled><i class="fas fa-clock"></i> Not started yet</button></div>
+      <div class="ud-grid" id="grid-live">
+        {% for e in ongoing_exams %}{{ render_live_card(e) }}{% endfor %}
       </div>
-      {% endfor %}
+      <div class="admin-pg-bar" id="pg-live"></div>
+      {% else %}
+      <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-play-circle"></i></div><h3>No live exams right now</h3><p>Active exams will appear here when they start.</p></div>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-calendar-alt"></i></div><h3>No upcoming exams</h3><p>Scheduled exams will appear here.</p></div>
-    {% endif %}
-  </div>
 
-  {# COMPLETED #}
-  <div class="ud-pane" id="pane-completed">
-    {% if completed_exams %}
-    <div class="ud-toolbar">
-      <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" placeholder="Search…" oninput="filterCards(this,'pane-completed')"></div>
-      <span class="ud-count" id="cnt-completed">{{ completed_exams|length }} exams</span>
-    </div>
-    <div class="ud-grid">
-      {% for e in completed_exams %}
-      <div class="ec" data-n="{{ e.name|lower }}">
-        <div class="ec-head">
-          <div class="ec-title">{{ e.name }}</div>
-          {% if e.result %}<span class="ebadge eb-done">Done</span>{% else %}<span class="ebadge eb-pending">Pending</span>{% endif %}
-        </div>
-        <div class="ec-body">
-          <div class="ec-meta">
-            <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date }}</span>
-            {% if e.result %}<span class="ec-tag"><i class="fas fa-chart-bar"></i>{{ e.result }}</span>{% endif %}
-          </div>
-        </div>
-        <div class="ec-foot">
-          {% if e.result %}
-          <a href="{{ url_for('result.result', exam_id=e.id) }}" class="ec-btn result"><i class="fas fa-eye"></i> View Result</a>
-          {% else %}
-          <button class="ec-btn off" disabled><i class="fas fa-hourglass-half"></i> Result Pending</button>
-          {% endif %}
-        </div>
+    {# UPCOMING #}
+    <div class="ud-pane" id="pane-upcoming">
+      {% if upcoming_exams %}
+      <div class="ud-toolbar">
+        <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" id="search-upcoming" placeholder="Search…"></div>
+        <span class="ud-count" id="cnt-upcoming">{{ upcoming_total }} exams</span>
       </div>
-      {% endfor %}
+      <div class="ud-grid" id="grid-upcoming">
+        {% for e in upcoming_exams %}{{ render_upcoming_card(e) }}{% endfor %}
+      </div>
+      <div class="admin-pg-bar" id="pg-upcoming"></div>
+      {% else %}
+      <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-calendar-alt"></i></div><h3>No upcoming exams</h3><p>Scheduled exams will appear here.</p></div>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-clipboard-check"></i></div><h3>No completed exams</h3><p>Finished exams will appear here.</p></div>
-    {% endif %}
+
+    {# COMPLETED #}
+    <div class="ud-pane" id="pane-completed">
+      {% if completed_exams %}
+      <div class="ud-toolbar">
+        <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" id="search-completed" placeholder="Search…"></div>
+        <span class="ud-count" id="cnt-completed">{{ completed_total }} exams</span>
+      </div>
+      <div class="ud-grid" id="grid-completed">
+        {% for e in completed_exams %}{{ render_completed_card(e) }}{% endfor %}
+      </div>
+      <div class="admin-pg-bar" id="pg-completed"></div>
+      {% else %}
+      <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-clipboard-check"></i></div><h3>No completed exams</h3><p>Finished exams will appear here.</p></div>
+      {% endif %}
+    </div>
   </div>
 
 </main>
 
+<script src="{{ url_for('static', filename='shared/view-toggle.js') }}"></script>
+<script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
 <script>
+window.__autoShowUpdates = {{ auto_show_updates|tojson }};
+
 document.querySelectorAll('.ud-tab').forEach(function(b){
   b.addEventListener('click',function(){
     document.querySelectorAll('.ud-tab').forEach(function(x){x.classList.remove('active');});
@@ -238,13 +253,119 @@ document.querySelectorAll('.ud-tab').forEach(function(b){
     if(p) p.classList.add('active');
   });
 });
-if({{ ongoing_exams|length }}===0){ var b=document.querySelector('[data-tab="upcoming"]'); if(b) b.click(); }
-function filterCards(inp,pid){
-  var t=inp.value.toLowerCase().trim(), p=document.getElementById(pid); if(!p) return;
-  var v=0;
-  p.querySelectorAll('.ec').forEach(function(c){ var s=!t||(c.getAttribute('data-n')||'').includes(t); c.style.display=s?'':'none'; if(s)v++; });
-  var k=pid.replace('pane-',''), el=document.getElementById('cnt-'+k);
-  if(el) el.textContent=v+' exam'+(v!==1?'s':'');
-}
+if({{ ongoing_total }}===0){ var b=document.querySelector('[data-tab="upcoming"]'); if(b) b.click(); }
+
+createViewToggle({
+  toggleEl: document.getElementById('dashViewToggle'),
+  targetEl: document.getElementById('dashViewWrapper'),
+  syncUrl: '/api/v01/portal/view-mode',
+  section: 'dashboard',
+  initial: {{ (view_mode or 'grid') | tojson }},
+});
+
+/* One paginated "load more" list per tab — server-side search, never the
+   whole subcategory's exam list at once. */
+['live', 'upcoming', 'completed'].forEach(function (tab) {
+  var status = tab === 'live' ? 'ongoing' : tab;
+  var ctl = createAdminList({
+    endpoint: '/api/v01/portal/exams',
+    paginatorEl: document.getElementById('pg-' + tab),
+    paginatorMode: 'loadmore',
+    searchInputEl: document.getElementById('search-' + tab),
+    perPage: {{ dashboard_per_page | default(12) }},
+    extraParams: function () { return { status: status }; },
+    onData: function (data) {
+      var grid = document.getElementById('grid-' + tab);
+      if (!grid) return;
+      if (data.page === 1) grid.innerHTML = data.cards_html || '';
+      else grid.insertAdjacentHTML('beforeend', data.cards_html || '');
+      var cnt = document.getElementById('cnt-' + tab);
+      if (cnt) cnt.textContent = data.total + ' exam' + (data.total !== 1 ? 's' : '');
+    },
+  });
+  var totals = { live: {{ ongoing_total }}, upcoming: {{ upcoming_total }}, completed: {{ completed_total }} };
+  var totalPages = { live: {{ ongoing_total_pages }}, upcoming: {{ upcoming_total_pages }}, completed: {{ completed_total_pages }} };
+  ctl.hydrate({ page: 1, total_pages: totalPages[tab], total: totals[tab], per_page: {{ dashboard_per_page | default(12) }} });
+});
+
+/* ── Compact Category/Subcategory breadcrumb switcher ── */
+(function () {
+  var crumb = document.getElementById('portalCrumb');
+  if (!crumb) return;
+  var pop = null;
+
+  function buildPop() {
+    pop = document.createElement('div');
+    pop.className = 'pc-pop';
+    pop.innerHTML =
+      '<input type="text" class="pc-pop-search" placeholder="Search…">' +
+      '<div class="pc-pop-list"></div>';
+    document.body.appendChild(pop);
+    return pop;
+  }
+
+  function positionPop(anchor) {
+    var r = anchor.getBoundingClientRect();
+    var top = r.bottom + 6, left = r.left;
+    var w = pop.offsetWidth || 260;
+    if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+  }
+
+  function closePop() {
+    if (pop) pop.classList.remove('open');
+    document.removeEventListener('mousedown', outsideHandler);
+  }
+
+  function outsideHandler(e) {
+    if (pop && (pop.contains(e.target) || crumb.contains(e.target))) return;
+    closePop();
+  }
+
+  function renderList(items, kind, filter) {
+    var listEl = pop.querySelector('.pc-pop-list');
+    var currentName = kind === 'category'
+      ? {{ (selected_category.name if selected_category else '') | tojson }}
+      : {{ (selected_subcategory.name if selected_subcategory else '') | tojson }};
+    var filtered = filter ? items.filter(function (i) { return i.name.toLowerCase().includes(filter); }) : items;
+    if (!filtered.length) {
+      listEl.innerHTML = '<div class="pc-pop-empty">No matches</div>';
+      return;
+    }
+    var setUrl = kind === 'category' ? '/set-category' : '/set-subcategory';
+    listEl.innerHTML = filtered.map(function (i) {
+      var cur = i.name === currentName ? ' current' : '';
+      return '<a class="pc-pop-item' + cur + '" href="' + setUrl + '?id=' + i.id + '"><span>' + i.name + '</span>' + (cur ? '<i class="fas fa-check"></i>' : '') + '</a>';
+    }).join('');
+  }
+
+  function openFor(kind, anchor) {
+    if (!pop) buildPop();
+    closePop();
+    fetch('/api/v01/portal/breadcrumb-options').then(function (r) { return r.json(); }).then(function (data) {
+      var items = kind === 'category' ? data.categories : data.subcategories;
+      var truncated = kind === 'category' ? data.categories_truncated : data.subcategories_truncated;
+      var searchEl = pop.querySelector('.pc-pop-search');
+      searchEl.value = '';
+      searchEl.oninput = function () { renderList(items, kind, this.value.trim().toLowerCase()); };
+      renderList(items, kind, '');
+      var existingMore = pop.querySelector('.pc-pop-more');
+      if (existingMore) existingMore.remove();
+      var listEl = pop.querySelector('.pc-pop-list');
+      if (truncated) {
+        var browseUrl = kind === 'category' ? '/select-category' : '/select-subcategory';
+        listEl.insertAdjacentHTML('afterend', '<a class="pc-pop-more" href="' + browseUrl + '">Browse all →</a>');
+      }
+      positionPop(anchor);
+      pop.classList.add('open');
+      document.addEventListener('mousedown', outsideHandler);
+    });
+  }
+
+  crumb.querySelectorAll('.pc-seg').forEach(function (seg) {
+    seg.addEventListener('click', function () { openFor(seg.dataset.kind, seg); });
+  });
+})();
 </script>
 {% endblock %}

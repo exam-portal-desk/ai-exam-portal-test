@@ -1,0 +1,1 @@
+{% from "notes/_notebook_card.html" import notebook_card %}{% for notebook in notebooks %}{{ notebook_card(notebook, shared_with_me=(section == 'shared_with_me')) }}{% endfor %}

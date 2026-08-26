@@ -3,6 +3,7 @@
 {% block title %}Exam Result - SmartAIExam{% endblock %}
 
 {% block content %}
+{% from "partials/_leaderboard_row_macro.html" import leaderboard_row %}
 <style>
 .res-page { background:var(--bg); padding:2rem 1rem; min-height:100%; }
 .res-wrap { max-width:880px; margin:0 auto; }
@@ -174,6 +175,132 @@
   .perf-grid, .perf-grid-sub { grid-template-columns:1fr 1fr; }
   .perf-grid .perf-item:nth-child(3), .perf-grid-sub .perf-item:nth-child(3) { grid-column:span 2; }
 }
+
+/* ── Exam Performance & Ranking ──────────────────────────────────── */
+.rk-section {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden; margin-bottom:.85rem;
+}
+.rk-header {
+  background:var(--surface-2); padding:.65rem 1.1rem;
+  border-bottom:1px solid var(--border);
+  font-size:.76rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--text-3);
+  display:flex; align-items:center; gap:.4rem;
+}
+.rk-header i { color:var(--accent); }
+
+.rk-note {
+  display:flex; align-items:flex-start; gap:.5rem;
+  margin:.9rem 1.1rem 0; padding:.6rem .8rem;
+  background:var(--info-bg); border:1px solid var(--info-border); color:var(--info-text);
+  border-radius:var(--radius); font-size:.76rem; font-weight:500;
+}
+
+.rk-hero { text-align:center; padding:1.1rem 1.1rem .3rem; }
+.rk-hero-rank { font-size:1.3rem; font-weight:800; color:var(--text-1); }
+.rk-hero-of { font-size:.85rem; font-weight:600; color:var(--text-3); }
+.rk-hero-top {
+  display:inline-block; margin-top:.35rem; padding:.22rem .7rem; border-radius:20px;
+  background:var(--accent-subtle); color:var(--accent); font-size:.78rem; font-weight:700;
+}
+.rk-hero-sub { margin-top:.4rem; font-size:.78rem; color:var(--text-3); }
+
+.rk-stat-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem; padding:.9rem 1.1rem; }
+.rk-stat { text-align:center; }
+.rk-stat-val { font-size:1.1rem; font-weight:800; color:var(--text-1); line-height:1; margin-bottom:.25rem; }
+.rk-stat-lbl { font-size:.66rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+
+.rk-passing {
+  display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+  margin:0 1.1rem .9rem; padding:.6rem .8rem; border-radius:var(--radius);
+  border:1px solid; font-size:.8rem; font-weight:700;
+}
+.rk-passing.pass { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.rk-passing.fail { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+.rk-passing-counts { font-weight:500; font-size:.74rem; color:inherit; opacity:.85; }
+
+.rk-block { padding:.9rem 1.1rem; border-top:1px solid var(--border); }
+.rk-block-title {
+  font-size:.78rem; font-weight:700; color:var(--text-1); margin-bottom:.7rem;
+  display:flex; align-items:center; gap:.4rem;
+}
+.rk-block-title i { color:var(--accent); }
+
+/* Score distribution — plain CSS bars, no chart library */
+.rk-dist { display:flex; align-items:flex-end; gap:.5rem; height:110px; }
+.rk-dist-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.rk-dist-bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; justify-content:center; }
+.rk-dist-bar { width:60%; min-height:2px; background:var(--surface-2); border-radius:3px 3px 0 0; transition:height .3s; }
+.rk-dist-bar.rk-dist-bar-you { background:var(--accent); }
+.rk-dist-count { font-size:.7rem; font-weight:700; color:var(--text-2); margin-top:.3rem; }
+.rk-dist-label { font-size:.62rem; color:var(--text-3); margin-top:.1rem; white-space:nowrap; }
+.rk-dist-hint { margin-top:.6rem; font-size:.72rem; color:var(--text-3); text-align:center; }
+
+/* Comparison table */
+.rk-compare { display:flex; flex-direction:column; gap:.1rem; }
+.rk-compare-row { display:grid; grid-template-columns:1fr .8fr .8fr; gap:.4rem; padding:.4rem 0; font-size:.8rem; border-bottom:1px solid var(--border); }
+.rk-compare-row:last-child { border-bottom:none; }
+.rk-compare-row span:first-child { color:var(--text-3); font-weight:600; }
+.rk-compare-row span:nth-child(2) { color:var(--accent); font-weight:700; }
+.rk-compare-row span:nth-child(3) { color:var(--text-2); font-weight:600; }
+.rk-compare-hd { font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); }
+.rk-compare-hd span { color:var(--text-3) !important; font-weight:700 !important; }
+.rk-minmax { display:flex; gap:1rem; flex-wrap:wrap; margin-top:.7rem; font-size:.74rem; color:var(--text-3); }
+.rk-minmax strong { color:var(--text-1); }
+
+/* Leaderboard rows — shared by initial render + AJAX load-more */
+.lb-list { display:flex; flex-direction:column; gap:.4rem; }
+.lb-row {
+  display:flex; align-items:center; gap:.65rem;
+  padding:.5rem .6rem; border-radius:var(--radius); border:1px solid var(--border);
+  background:var(--bg);
+}
+.lb-row-medal { background:var(--accent-subtle); }
+.lb-row-you { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+.lb-rank { flex-shrink:0; width:26px; text-align:center; font-size:.85rem; font-weight:800; color:var(--text-2); }
+.lb-avatar {
+  flex-shrink:0; width:32px; height:32px; border-radius:50%; position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent)); color:var(--accent-on);
+  font-size:.75rem; font-weight:700;
+}
+.lb-avatar.av-2 { background:linear-gradient(135deg,var(--success),var(--success)); }
+.lb-avatar.av-3 { background:linear-gradient(135deg,var(--info),var(--info)); }
+.lb-avatar.av-4 { background:linear-gradient(135deg,var(--warning),var(--warning)); }
+.lb-avatar.av-5 { background:linear-gradient(135deg,var(--danger),var(--danger)); }
+.lb-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.lb-name-wrap { flex:1; min-width:0; }
+.lb-name { font-size:.82rem; font-weight:700; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:.35rem; }
+.lb-you-tag { flex-shrink:0; font-size:.6rem; font-weight:700; padding:.1rem .4rem; border-radius:10px; background:var(--accent); color:var(--accent-on); }
+.lb-time { font-size:.68rem; color:var(--text-3); }
+.lb-stats { flex-shrink:0; display:flex; align-items:center; gap:.5rem; font-size:.76rem; }
+.lb-score { color:var(--text-2); font-weight:600; }
+.lb-pct { color:var(--accent); font-weight:800; }
+.lb-acc { color:var(--text-3); }
+
+.rk-loadmore-btn {
+  display:block; margin:.8rem auto 0; padding:.45rem 1.1rem;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);
+  color:var(--text-2); font-family:inherit; font-size:.78rem; font-weight:700; cursor:pointer;
+  transition:background .12s,color .12s;
+}
+.rk-loadmore-btn:hover:not(:disabled) { background:var(--accent-subtle); color:var(--accent); }
+.rk-loadmore-btn:disabled { opacity:.6; cursor:default; }
+
+.rk-empty {
+  display:flex; align-items:center; gap:.6rem;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:.9rem 1.1rem; margin-bottom:.85rem; font-size:.82rem; color:var(--text-3);
+}
+.rk-empty i { color:var(--accent); }
+
+@media(max-width:600px){
+  .rk-stat-strip { grid-template-columns:repeat(2,1fr); }
+  .rk-compare-row { grid-template-columns:1fr .7fr .7fr; font-size:.74rem; }
+  .lb-acc { display:none; }
+  .lb-stats { gap:.35rem; font-size:.7rem; }
+}
 </style>
 
 {% set correct = result.correct_answers if result.correct_answers is defined else 0 %}
@@ -279,9 +406,92 @@
     </div>
   </div>
 
+  {# Exam Performance & Ranking #}
+  {% if perf.available %}
+  <div class="rk-section">
+    <div class="rk-header"><i class="fas fa-trophy"></i> Exam Performance &amp; Ranking</div>
+
+    {% if perf.best_attempt_note %}
+    <div class="rk-note"><i class="fas fa-info-circle"></i> {{ perf.best_attempt_note }}</div>
+    {% endif %}
+
+    <div class="rk-hero">
+      <div class="rk-hero-rank">🏆 Rank #{{ perf.summary.rank }} <span class="rk-hero-of">of {{ perf.summary.total_participants }}</span></div>
+      <div class="rk-hero-top">Top {{ perf.summary.top_percent }}%</div>
+      <div class="rk-hero-sub">You performed better than {{ perf.summary.percentile }}% of participants</div>
+    </div>
+
+    <div class="rk-stat-strip">
+      <div class="rk-stat"><div class="rk-stat-val">{{ perf.summary.score }}/{{ perf.summary.max_score }}</div><div class="rk-stat-lbl">Score</div></div>
+      <div class="rk-stat"><div class="rk-stat-val">{% if perf.summary.accuracy is not none %}{{ perf.summary.accuracy }}%{% else %}N/A{% endif %}</div><div class="rk-stat-lbl">Accuracy</div></div>
+      <div class="rk-stat"><div class="rk-stat-val">{{ perf.summary.percentile }}%</div><div class="rk-stat-lbl">Percentile</div></div>
+      <div class="rk-stat"><div class="rk-stat-val">{{ perf.summary.time_taken_minutes }}m</div><div class="rk-stat-lbl">Time Taken</div></div>
+    </div>
+
+    {% if perf.summary.passing %}
+    <div class="rk-passing {{ 'pass' if perf.summary.passing.passed else 'fail' }}">
+      <i class="fas fa-{{ 'check-circle' if perf.summary.passing.passed else 'times-circle' }}"></i>
+      {{ 'Passed' if perf.summary.passing.passed else 'Not Passed' }} &mdash; cutoff {{ perf.summary.passing.cutoff }}%
+      {% if perf.summary.passing.passed_count is not none %}
+      <span class="rk-passing-counts">({{ perf.summary.passing.passed_count }} passed / {{ perf.summary.passing.failed_count }} failed)</span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="rk-block">
+      <div class="rk-block-title">Score Distribution</div>
+      <div class="rk-dist">
+        {% for b in perf.distribution %}
+        <div class="rk-dist-col">
+          <div class="rk-dist-bar-wrap"><div class="rk-dist-bar{{ ' rk-dist-bar-you' if b.is_viewer_bucket else '' }}" style="height:{{ b.height_pct }}%"></div></div>
+          <div class="rk-dist-count">{{ b.count }}</div>
+          <div class="rk-dist-label">{{ b.label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="rk-dist-hint">Your score ({{ perf.summary.percentage }}%) is highlighted above.</div>
+    </div>
+
+    <div class="rk-block">
+      <div class="rk-block-title">Your Performance vs Average</div>
+      <div class="rk-compare">
+        <div class="rk-compare-row rk-compare-hd"><span></span><span>You</span><span>Average</span></div>
+        <div class="rk-compare-row"><span>Score</span><span>{{ perf.comparison.you.score }}</span><span>{{ perf.comparison.average.score if perf.comparison.average.score is not none else '—' }}</span></div>
+        <div class="rk-compare-row"><span>Percentage</span><span>{{ perf.comparison.you.percentage }}%</span><span>{% if perf.comparison.average.percentage is not none %}{{ perf.comparison.average.percentage }}%{% else %}—{% endif %}</span></div>
+        <div class="rk-compare-row"><span>Accuracy</span><span>{% if perf.comparison.you.accuracy is not none %}{{ perf.comparison.you.accuracy }}%{% else %}N/A{% endif %}</span><span>{% if perf.comparison.average.accuracy is not none %}{{ perf.comparison.average.accuracy }}%{% else %}—{% endif %}</span></div>
+        <div class="rk-compare-row"><span>Time</span><span>{{ perf.comparison.you.time_taken_minutes }}m</span><span>{% if perf.comparison.average.time_taken_minutes is not none %}{{ perf.comparison.average.time_taken_minutes }}m{% else %}—{% endif %}</span></div>
+      </div>
+      <div class="rk-minmax">
+        <span>Highest: <strong>{{ perf.comparison.highest }}%</strong></span>
+        <span>Median: <strong>{{ perf.comparison.median }}%</strong></span>
+        <span>Lowest: <strong>{{ perf.comparison.lowest }}%</strong></span>
+      </div>
+    </div>
+
+    <div class="rk-block">
+      <div class="rk-block-title"><i class="fas fa-trophy"></i> Top Performers</div>
+      <div class="lb-list" id="lbList">
+        {% for row in perf.top10 %}{{ leaderboard_row(row) }}{% endfor %}
+      </div>
+      {% if perf.has_more %}
+      <button type="button" class="rk-loadmore-btn" id="lbLoadMoreBtn" onclick="loadMoreLeaderboard()">View full leaderboard</button>
+      {% endif %}
+    </div>
+
+    {% if perf.user_position %}
+    <div class="rk-block">
+      <div class="rk-block-title">Your Position</div>
+      <div class="lb-list">{{ leaderboard_row(perf.user_position) }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% elif perf.reason %}
+  <div class="rk-empty"><i class="fas fa-chart-line"></i> {{ perf.reason }}</div>
+  {% endif %}
+
   {# Exam metadata #}
   <div class="res-meta">
-    <div class="res-meta-item"><div class="res-meta-lbl">Exam Date</div><div class="res-meta-val">{{ exam.date | display_date if exam.date else exam.date }}</div></div>
+    <div class="res-meta-item"><div class="res-meta-lbl">Exam Date</div><div class="res-meta-val">{{ exam.date | calendar_date if exam.date else exam.date }}</div></div>
     <div class="res-meta-item"><div class="res-meta-lbl">Submitted</div><div class="res-meta-val">{{ result.completed_at | display_dt if result.completed_at else '—' }}</div></div>
     <div class="res-meta-item"><div class="res-meta-lbl">Duration</div><div class="res-meta-val">{{ exam.duration }} min</div></div>
     <div class="res-meta-item"><div class="res-meta-lbl">Time Taken</div><div class="res-meta-val">{{ result.time_taken_minutes }} min</div></div>
@@ -343,5 +553,42 @@ function openResponse() {
   }
   next();
 }
+
+{% if perf.available and perf.has_more %}
+(function(){
+  var afterRank = {{ perf.top10 | length }};
+  var limit = {{ perf.load_more_limit }};
+  var btn = document.getElementById('lbLoadMoreBtn');
+  var list = document.getElementById('lbList');
+
+  window.loadMoreLeaderboard = function() {
+    if (!btn) return;
+    btn.disabled = true;
+    var orig = btn.textContent;
+    btn.textContent = 'Loading…';
+
+    fetch('{{ url_for("result.leaderboard_more", exam_id=exam.id) }}?after_rank=' + afterRank + '&limit=' + limit)
+      .then(function(r){ return r.text(); })
+      .then(function(html){
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        var marker = tmp.querySelector('.lb-more-marker');
+        var count = marker ? parseInt(marker.getAttribute('data-count') || '0', 10) : 0;
+        var lastRank = marker ? parseInt(marker.getAttribute('data-last-rank') || afterRank, 10) : afterRank;
+
+        tmp.querySelectorAll('.lb-row').forEach(function(el){ list.appendChild(el); });
+
+        afterRank = lastRank;
+        btn.disabled = false;
+        btn.textContent = orig;
+        if (count < limit) { btn.style.display = 'none'; }
+      })
+      .catch(function(){
+        btn.disabled = false;
+        btn.textContent = orig;
+      });
+  };
+})();
+{% endif %}
 </script>
 {% endblock %}

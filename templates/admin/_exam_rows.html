@@ -1,0 +1,228 @@
+{# templates/admin/_exam_rows.html
+   Shared macros for rendering one exam as a table row, a grid card, and
+   its edit modal — used both by the initial server-render (admin/exams.html)
+   and the AJAX pagination partial (api_exams_list ?partial=1), so the two
+   never drift out of sync and there is exactly one place that knows what
+   an exam row/card/modal looks like. #}
+
+{% macro render_exam_row(exam) %}
+<tr>
+  <td><span class="exam-id-badge">{{ exam.id }}</span></td>
+  <td><div class="exam-name-text">{{ exam.name }}</div></td>
+  <td>
+    {% if exam.category_name %}
+      <span class="cat-pill">{{ exam.category_name }}</span>{% if exam.subcategory_name %} <span class="cat-pill" style="opacity:.72">{{ exam.subcategory_name }}</span>{% endif %}
+    {% else %}
+      <span style="color:var(--text-3);font-size:.78rem">—</span>
+    {% endif %}
+  </td>
+  <td>
+    <div class="meta-pill">{{ exam.date | calendar_date if exam.date else exam.date }}</div>
+    <div style="font-size:.75rem;color:var(--text-3);margin-top:3px">{{ exam.start_time }}</div>
+  </td>
+  <td><span class="meta-pill">{{ exam.duration }} min</span></td>
+  <td>
+    <span class="meta-pill">{{ exam.total_questions }}Q</span>
+    <div style="font-size:.72rem;color:var(--text-3);margin-top:3px">
+      Max: <strong style="color:var(--text-2)">{{ exam.max_attempts if exam.max_attempts else '∞' }}</strong>
+    </div>
+  </td>
+  <td><span class="status-badge status-{{ exam.status }}">{{ exam.status }}</span></td>
+  <td>
+    <div class="instructions-text" title="{{ exam.instructions }}">
+      {{ exam.instructions or '—' }}
+    </div>
+  </td>
+  <td>
+    <span class="marks-pos">+{{ exam.positive_marks }}</span>
+    <span style="color:var(--text-3);margin:0 2px">/</span>
+    <span class="marks-neg">−{{ exam.negative_marks }}</span>
+  </td>
+  <td>
+    {% set rmode = exam.result_mode or 'instant' %}
+    <span class="result-mode-badge mode-{{ rmode }}">{{ rmode }}</span>
+    {% if rmode == 'manual' and not exam.results_released %}
+      <br>
+      <button class="release-btn mt-1"
+        onclick="releaseResults({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', false)">
+        <i class="fas fa-unlock-alt"></i> Release
+      </button>
+    {% elif rmode == 'manual' and exam.results_released %}
+      <br>
+      <button class="release-btn unrelease mt-1"
+        onclick="releaseResults({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', true)">
+        <i class="fas fa-lock"></i> Unrelease
+      </button>
+    {% elif rmode == 'delayed' %}
+      <div style="font-size:.68rem;color:var(--text-3);margin-top:2px;">
+        {{ exam.result_delay or 0 }} min delay
+      </div>
+    {% endif %}
+  </td>
+  <td>
+    <div class="action-btns">
+      <button class="icon-btn" title="Edit"
+              data-bs-toggle="modal"
+              data-bs-target="#editExamModal{{ exam.id }}">
+        <i class="fas fa-pencil-alt"></i>
+      </button>
+      <button class="icon-btn danger" title="Delete"
+              onclick="showDeleteConfirm({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  </td>
+</tr>
+{% endmacro %}
+
+{% macro render_exam_card(exam) %}
+<div class="exam-grid-item">
+  <div class="egi-top">
+    <span class="exam-id-badge">{{ exam.id }}</span>
+    <span class="status-badge status-{{ exam.status }}">{{ exam.status }}</span>
+  </div>
+  <div class="egi-name">{{ exam.name }}</div>
+  <div class="egi-meta">
+    {% if exam.category_name %}<span class="cat-pill">{{ exam.category_name }}</span>{% endif %}
+    {% if exam.subcategory_name %}<span class="cat-pill" style="opacity:.72">{{ exam.subcategory_name }}</span>{% endif %}
+  </div>
+  <div class="egi-row"><i class="fas fa-calendar-days"></i> {{ exam.date | calendar_date if exam.date else exam.date }} &nbsp;·&nbsp; {{ exam.start_time }}</div>
+  <div class="egi-row"><i class="fas fa-hourglass-half"></i> {{ exam.duration }} min &nbsp;·&nbsp; <i class="fas fa-list-ol"></i> {{ exam.total_questions }}Q</div>
+  <div class="egi-actions">
+    <button class="icon-btn" title="Edit" data-bs-toggle="modal" data-bs-target="#editExamModal{{ exam.id }}">
+      <i class="fas fa-pencil-alt"></i>
+    </button>
+    <button class="icon-btn danger" title="Delete" onclick="showDeleteConfirm({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}')">
+      <i class="fas fa-trash"></i>
+    </button>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro render_exam_edit_modal(exam, categories) %}
+<div class="modal fade" id="editExamModal{{ exam.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content" style="max-height:90vh;">
+      <form method="POST" action="{{ url_for('admin.edit_exam', exam_id=exam.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-pencil-alt me-2"></i>Edit: {{ exam.name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Exam Name</label>
+              <input type="text" class="form-control" name="name" value="{{ exam.name }}" required>
+            </div>
+            <div class="col-md-3 col-sm-6 col-12">
+              <label class="form-label">Date</label>
+              <div class="dt-field">
+                <input type="text" class="form-control dt-date-input" name="date" value="{{ exam.date | calendar_date }}" data-iso="{{ exam.date }}" placeholder="Select date" readonly autocomplete="off" required>
+                <i class="fas fa-calendar-days dt-field-icon"></i>
+              </div>
+            </div>
+            <div class="col-md-3 col-sm-6 col-12">
+              <label class="form-label">Start Time</label>
+              <div class="dt-field">
+                <input type="text" class="form-control dt-time-input" name="start_time" value="{{ exam.start_time }}" placeholder="Select time" readonly autocomplete="off" required>
+                <i class="fas fa-clock dt-field-icon"></i>
+              </div>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Duration (min)</label>
+              <input type="number" class="form-control" name="duration" value="{{ exam.duration }}" required>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Total Questions</label>
+              <input type="number" class="form-control" name="total_questions" value="{{ exam.total_questions }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select class="form-select" name="status">
+                <option value="upcoming"  {% if exam.status == "upcoming"  %}selected{% endif %}>Upcoming</option>
+                <option value="ongoing"   {% if exam.status == "ongoing"   %}selected{% endif %}>Ongoing</option>
+                <option value="completed" {% if exam.status == "completed" %}selected{% endif %}>Completed</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Category</label>
+              <select name="category_id" class="form-select" data-cat-select onchange="loadSubcategoriesFor(this)">
+                <option value="">Select Category</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if exam.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Subcategory</label>
+              <select name="subcategory_id" class="form-select" data-subcat-select>
+                {% if exam.subcategory_id and exam.subcategory_name %}
+                  <option value="{{ exam.subcategory_id }}" selected>{{ exam.subcategory_name }}</option>
+                {% else %}
+                  <option value="">Select Category first</option>
+                {% endif %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Instructions</label>
+              <textarea class="form-control" name="instructions" rows="3">{{ exam.instructions }}</textarea>
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Positive Marks</label>
+              <input type="text" class="form-control" name="positive_marks" value="{{ exam.positive_marks }}">
+            </div>
+            <div class="col-md-4 col-sm-6 col-12">
+              <label class="form-label">Negative Marks</label>
+              <input type="text" class="form-control" name="negative_marks" value="{{ exam.negative_marks }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">
+                Max Attempts
+                <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = unlimited)</span>
+              </label>
+              <input type="number" class="form-control" name="max_attempts"
+                     min="0" step="1" value="{{ exam.max_attempts or '' }}" placeholder="e.g. 3">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">
+                Passing Percentage
+                <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = no cutoff)</span>
+              </label>
+              <input type="number" class="form-control" name="passing_percentage"
+                     min="0" max="100" step="0.01" value="{{ exam.passing_percentage if exam.passing_percentage is not none else '' }}" placeholder="e.g. 40">
+            </div>
+            <div class="col-12">
+              <hr style="border-color:var(--border);margin:.25rem 0;">
+              <span class="result-section-label">Result Visibility</span>
+              <div class="result-visibility-row">
+                <div style="flex:1;min-width:150px;">
+                  <label class="form-label" style="font-size:.82rem;">Result Mode</label>
+                  <select class="form-select" name="result_mode"
+                    onchange="toggleDelayField(this, 'edit-delay-field-{{ exam.id }}')">
+                    <option value="instant" {% if (exam.result_mode or 'instant') == 'instant' %}selected{% endif %}>Instant (show immediately)</option>
+                    <option value="delayed" {% if exam.result_mode == 'delayed' %}selected{% endif %}>Delayed (show after X mins)</option>
+                    <option value="manual"  {% if exam.result_mode == 'manual'  %}selected{% endif %}>Manual (admin releases)</option>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:150px;{% if exam.result_mode != 'delayed' %}display:none;{% endif %}"
+                     id="edit-delay-field-{{ exam.id }}">
+                  <label class="form-label" style="font-size:.82rem;">Delay (minutes)</label>
+                  <input type="number" class="form-control" name="result_delay"
+                         min="1" value="{{ exam.result_delay or 30 }}" placeholder="e.g. 30">
+                  <small class="text-muted">Time after submission before result is visible</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-save me-1"></i>Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endmacro %}

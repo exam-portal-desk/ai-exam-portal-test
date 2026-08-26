@@ -36,13 +36,28 @@ Endpoints:
   GET    /api/v01/chat/online-status
 """
 
+import os
+import uuid
+import mimetypes
+
 from flask import Blueprint, request, jsonify, session
 from flask_socketio import join_room, leave_room
+from werkzeug.utils import secure_filename
 
 import app.db.chat as chat_db
 import app.services.chat_service as chat_service
+import app.config as config
 from app.utils.datetime_service import now_utc_naive
+from app.db.users import get_user_by_id, update_user
+from app.services import image_storage_service
 from app.services.image_storage_service import profile_photo_url_from_key
+
+CHAT_BG_PRESETS = {
+    "sunrise", "midnight", "forest", "paper-dots",
+    "aurora", "graphite", "cloud", "lines",
+    "none",
+}
+CHAT_BG_ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 chat_api_bp = Blueprint('chat_api', __name__, url_prefix='/api/v01/chat')
 socketio = None
@@ -490,6 +505,180 @@ def online_status():
         return jsonify({'success': True, 'status': result})
     except Exception:
         return jsonify({'success': False}), 400
+
+
+def _clamp(value, lo, hi, default):
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    if v != v:  # NaN
+        return default
+    return max(lo, min(hi, v))
+
+
+def _position_fields(source):
+    """Parses/clamps zoom (>=1, whole-image baseline) and pos_x/pos_y/overlay
+    (0..1) from a form/JSON payload, defaulting to the safe show-full-image
+    state when absent or invalid."""
+    return {
+        'chat_background_zoom': _clamp(source.get('zoom'), 1, 8, 1.0),
+        'chat_background_pos_x': _clamp(source.get('pos_x'), 0, 1, 0.5),
+        'chat_background_pos_y': _clamp(source.get('pos_y'), 0, 1, 0.5),
+        'chat_background_overlay': _clamp(source.get('overlay'), 0, 1, 0.45),
+    }
+
+
+def _position_response(user_or_updates):
+    return {
+        'zoom': user_or_updates.get('chat_background_zoom', 1.0),
+        'pos_x': user_or_updates.get('chat_background_pos_x', 0.5),
+        'pos_y': user_or_updates.get('chat_background_pos_y', 0.5),
+        'overlay': user_or_updates.get('chat_background_overlay', 0.45),
+    }
+
+
+@chat_api_bp.route('/background/preset', methods=['POST'])
+def set_background_preset():
+    """Switch the ACTIVE background to a preset (or 'none' to reset to the
+    default look). Deliberately does not touch chat_background_key/_fit —
+    those persist independently so a previously uploaded custom image is
+    still there if the user switches back to it later."""
+    if not _uid():
+        return jsonify({'success': False}), 401
+    data = request.get_json() or {}
+    preset_id = str(data.get('preset_id', '')).strip()
+    if preset_id not in CHAT_BG_PRESETS:
+        return jsonify({'success': False, 'message': 'Unknown preset.'}), 400
+    if preset_id == 'none':
+        updates = {'chat_background_type': None, 'chat_background_value': None}
+    else:
+        updates = {'chat_background_type': 'preset', 'chat_background_value': preset_id}
+    if not update_user(_uid(), updates):
+        return jsonify({'success': False, 'message': 'Could not save your background. Please try again.'}), 500
+    return jsonify({'success': True, **updates})
+
+
+@chat_api_bp.route('/background/upload', methods=['POST'])
+def upload_background():
+    """Upload a NEW custom background image and make it active. Replaces
+    (deletes) whatever custom image was previously stored, if any — that's
+    normal storage hygiene for a fresh upload, distinct from switching
+    away from an existing custom image (which must NOT delete it)."""
+    if not _uid():
+        return jsonify({'success': False}), 401
+    file_storage = request.files.get('file')
+    if not file_storage or not file_storage.filename:
+        return jsonify({'success': False, 'message': 'No file provided.'}), 400
+
+    ext = os.path.splitext(secure_filename(file_storage.filename))[1].lower()
+    if ext not in CHAT_BG_ALLOWED_EXTS:
+        return jsonify({'success': False, 'message': f"Unsupported image type ({ext or 'unknown'})."}), 400
+
+    file_storage.seek(0, os.SEEK_END)
+    size_kb = file_storage.tell() / 1024
+    if size_kb > config.MAX_CHAT_BACKGROUND_SIZE_KB:
+        return jsonify({'success': False, 'message': f'Image exceeds the {config.MAX_CHAT_BACKGROUND_SIZE_KB} KB size limit.'}), 400
+    file_storage.seek(0)
+
+    position = _position_fields(request.form)
+    filename = f"{uuid.uuid4().hex[:12]}{ext}"
+    mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+    try:
+        content = file_storage.read()
+        key, url = image_storage_service.upload_chat_background(_uid(), content, filename, mime)
+    except Exception as e:
+        print(f'[Chat] background upload error: {e}')
+        return jsonify({'success': False, 'message': 'Upload failed. Please try again.'}), 500
+
+    user = get_user_by_id(_uid())
+    old_key = (user or {}).get('chat_background_key')
+
+    updates = {
+        'chat_background_type': 'custom',
+        'chat_background_value': None,
+        'chat_background_key': key,
+        **position,
+    }
+    if not update_user(_uid(), updates):
+        image_storage_service.delete_chat_background(key)
+        return jsonify({'success': False, 'message': 'Could not save your background. Please try again.'}), 500
+
+    if old_key and old_key != key:
+        image_storage_service.delete_chat_background(old_key)
+
+    return jsonify({'success': True, 'chat_background_key': key, 'url': url, **_position_response(updates)})
+
+
+@chat_api_bp.route('/background/custom/activate', methods=['POST'])
+def activate_custom_background():
+    """Re-activate the already-saved custom image (no re-upload) — e.g.
+    after the user switched to a preset and now wants their photo back."""
+    if not _uid():
+        return jsonify({'success': False}), 401
+    user = get_user_by_id(_uid())
+    key = (user or {}).get('chat_background_key')
+    if not key:
+        return jsonify({'success': False, 'message': 'No saved custom image to activate.'}), 404
+    if not update_user(_uid(), {'chat_background_type': 'custom', 'chat_background_value': None}):
+        return jsonify({'success': False, 'message': 'Could not activate your background. Please try again.'}), 500
+    url = image_storage_service.chat_background_url_from_key(key)
+    return jsonify({'success': True, 'chat_background_key': key, 'url': url, **_position_response(user)})
+
+
+@chat_api_bp.route('/background/position', methods=['PUT'])
+def update_background_position():
+    """Change zoom/pan/overlay of the already-saved custom image without
+    re-uploading it (used both for quick-preset buttons and the drag/zoom
+    editor's Apply, when the user already has a saved image active)."""
+    if not _uid():
+        return jsonify({'success': False}), 401
+    user = get_user_by_id(_uid())
+    key = (user or {}).get('chat_background_key')
+    if not key:
+        return jsonify({'success': False, 'message': 'No saved custom image.'}), 404
+    data = request.get_json() or {}
+    position = _position_fields(data)
+    if not update_user(_uid(), position):
+        return jsonify({'success': False, 'message': 'Could not update your background. Please try again.'}), 500
+    return jsonify({'success': True, **_position_response(position)})
+
+
+@chat_api_bp.route('/background', methods=['DELETE'])
+def remove_background():
+    """Reset to the DEFAULT look — clears only the active type/value.
+    Deliberately does not touch chat_background_key/_fit, so a saved
+    custom image is still available afterwards."""
+    if not _uid():
+        return jsonify({'success': False}), 401
+    update_user(_uid(), {'chat_background_type': None, 'chat_background_value': None})
+    return jsonify({'success': True})
+
+
+@chat_api_bp.route('/background/custom', methods=['DELETE'])
+def delete_custom_background():
+    """Permanently remove the saved custom image: deletes the storage
+    object and clears chat_background_key/_fit. If it was the active
+    background, also falls back to the default look."""
+    if not _uid():
+        return jsonify({'success': False}), 401
+    user = get_user_by_id(_uid())
+    key = (user or {}).get('chat_background_key')
+    if not key:
+        return jsonify({'success': True})
+
+    updates = {
+        'chat_background_key': None,
+        'chat_background_zoom': 1.0, 'chat_background_pos_x': 0.5,
+        'chat_background_pos_y': 0.5, 'chat_background_overlay': 0.45,
+    }
+    if user.get('chat_background_type') == 'custom':
+        updates['chat_background_type'] = None
+        updates['chat_background_value'] = None
+    update_user(_uid(), updates)
+    image_storage_service.delete_chat_background(key)
+    return jsonify({'success': True})
 
 
 def register_chat_socketio_events(sio):

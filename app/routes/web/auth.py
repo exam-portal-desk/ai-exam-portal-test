@@ -24,15 +24,17 @@ from flask import (
 from app.db.users import (
     get_user_by_username, get_user_by_email,
     get_user_by_google_id, get_all_users, create_user,
-    update_user, get_user_by_id,
+    update_user, get_user_by_id, update_last_login,
 )
+from app.db.password_history import get_recent_password_hashes, record_password_history
 from app.db.sessions import create_session, invalidate_session, set_exam_active
 from app.db.auth import (
-    check_login_attempts, record_failed_login, clear_login_attempts,
+    check_login_attempts, record_failed_login, clear_login_attempts, mark_token_used,
 )
 from app.services.auth_service import (
     is_password_hashed, verify_password, hash_password,
-    validate_password_strength, create_password_token, validate_and_use_token,
+    validate_password_strength, create_password_token,
+    is_password_reused,
 )
 from app.services.email_service import send_password_setup_email, send_password_reset_email
 from app.utils.helpers import generate_username, is_valid_email
@@ -120,7 +122,7 @@ def _handle_bad_password(identifier, ip, user_exists=True):
 
 def _create_user_session(user, role, admin=False):
     invalidate_session(int(user["id"]))
-    update_user(int(user["id"]), {"last_login": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")})
+    previous_login = update_last_login(int(user["id"]))
     token = secrets.token_urlsafe(32)
     create_session({
         "token": token,
@@ -137,6 +139,7 @@ def _create_user_session(user, role, admin=False):
     session["full_name"] = user.get("full_name", user.get("username"))
     session["role"]      = role
     session["profile_photo_key"] = user.get("profile_photo_key")
+    session["last_login_display"] = previous_login
     if admin:
         session["admin_id"] = int(user["id"])
         session["is_admin"] = True
@@ -293,13 +296,12 @@ def setup_password(token):
             flash(msg, "error")
             return render_template("password_setup_form.html", token=token)
 
-        valid, vmsg, token_data = validate_and_use_token(token)
-        if not valid:
-            flash(vmsg, "error")
-            return redirect(url_for("auth.login"))
-
-        if token_data.get("type") != "setup":
-            flash("Invalid setup token.", "error")
+        # Validate the token WITHOUT consuming it — a rejected password
+        # (mismatch/weak/reused) must not burn the token, so the same link
+        # stays usable for a corrected resubmission. Only mark it used once
+        # the password has actually been changed, below.
+        token_data = _validate_token_for_display(token, "setup")
+        if token_data is None:
             return redirect(url_for("auth.login"))
 
         user = get_user_by_email(token_data["email"])
@@ -307,10 +309,20 @@ def setup_password(token):
             flash("User not found.", "error")
             return redirect(url_for("auth.login"))
 
+        old_hash = str(user.get("password", "")).strip()
+        history_hashes = get_recent_password_hashes(user["id"])
+        if is_password_reused(new_pw, old_hash, history_hashes):
+            flash("You can't reuse any of your last 3 passwords. Please choose a different one.", "error")
+            return render_template("password_setup_form.html", token=token)
+
+        if old_hash:
+            record_password_history(user["id"], old_hash)
+
         if update_user(user["id"], {
             "password": hash_password(new_pw),
             "updated_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
         }):
+            mark_token_used(token)
             flash(f"Password set succesfully!", "success")
         else:
             flash("Failed to set password. Please try again.", "error")
@@ -369,23 +381,34 @@ def reset_password_with_token(token):
             flash(msg, "error")
             return render_template("password_reset_form.html", token=token)
 
-        valid, vmsg, token_data = validate_and_use_token(token)
-        if not valid:
-            flash(vmsg, "error")
-            return redirect(url_for("auth.login"))
-
-        if token_data.get("type") != "reset":
-            flash("Invalid reset token.", "error")
+        # Validate the token WITHOUT consuming it — see the matching comment
+        # in setup_password() above for why.
+        token_data = _validate_token_for_display(token, "reset")
+        if token_data is None:
             return redirect(url_for("auth.login"))
 
         user = get_user_by_email(token_data["email"])
-        if not user or not update_user(user["id"], {
+        if not user:
+            flash("Failed to update password. Please try again.", "error")
+            return render_template("password_reset_form.html", token=token)
+
+        old_hash = str(user.get("password", "")).strip()
+        history_hashes = get_recent_password_hashes(user["id"])
+        if is_password_reused(new_pw, old_hash, history_hashes):
+            flash("You can't reuse any of your last 3 passwords. Please choose a different one.", "error")
+            return render_template("password_reset_form.html", token=token)
+
+        if old_hash:
+            record_password_history(user["id"], old_hash)
+
+        if not update_user(user["id"], {
             "password": hash_password(new_pw),
             "updated_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
         }):
             flash("Failed to update password. Please try again.", "error")
             return render_template("password_reset_form.html", token=token)
 
+        mark_token_used(token)
         flash("Password updated! You can now login.", "success")
         return redirect(url_for("auth.login"))
 
@@ -394,14 +417,6 @@ def reset_password_with_token(token):
         return redirect(url_for("auth.login"))
     return render_template("password_reset_form.html", token=token, email=td.get("email",""))
 
-
-# ─────────────────────────────────────────────
-# Access request (public — no login needed)
-# ─────────────────────────────────────────────
-
-@auth_bp.route("/request-admin-access")
-def request_admin_access_page():
-    return render_template("request_admin_access.html")
 
 
 # ─────────────────────────────────────────────

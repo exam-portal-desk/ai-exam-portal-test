@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% set active_nav = 'categories' %}
+{% block title %}{{ category.name }} - SmartAIExam{% endblock %}
+{% from "_portal_cards.html" import render_subcategory_card %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/view-toggle.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
+<style>
+.cat-main { flex:1; min-width:0; padding:1.5rem 1.75rem; }
+.cat-head { margin-bottom:1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.cat-head h1 { font-size:1.2rem; font-weight:700; color:var(--text-1); letter-spacing:-.02em; margin-bottom:.2rem; }
+.cat-head p  { font-size:.8rem; color:var(--text-3); }
+.cat-head-top { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.cat-back { display:inline-flex; align-items:center; gap:.35rem; font-size:.78rem; font-weight:600; color:var(--text-3); text-decoration:none; }
+.cat-back:hover { color:var(--accent); }
+
+.cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:1rem; }
+
+.cat-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:calc(var(--radius)+2px);
+  display:flex; flex-direction:column; text-decoration:none;
+  transition:border-color .15s,box-shadow .15s,transform .15s; overflow:hidden;
+}
+.cat-card:hover { border-color:var(--accent); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+
+.cat-img {
+  height:80px; background:var(--surface-2);
+  display:flex; align-items:center; justify-content:center;
+  border-bottom:1px solid var(--border);
+}
+.cat-img i { font-size:1.8rem; color:var(--accent); opacity:.3; }
+
+.cat-info { padding:.8rem .9rem; }
+.cat-name { font-size:.85rem; font-weight:700; color:var(--text-1); margin-bottom:.35rem; line-height:1.3; }
+.cat-link {
+  display:inline-flex; align-items:center; gap:.3rem;
+  font-size:.72rem; font-weight:600; color:var(--accent);
+}
+
+/* ── List view ── */
+#subViewWrapper.list-view .cat-grid { grid-template-columns:1fr; gap:.5rem; }
+#subViewWrapper.list-view .cat-card { flex-direction:row; align-items:center; }
+#subViewWrapper.list-view .cat-card:hover { transform:none; }
+#subViewWrapper.list-view .cat-img { height:44px; width:44px; flex-shrink:0; border-bottom:none; border-right:1px solid var(--border); }
+#subViewWrapper.list-view .cat-img i { font-size:1.05rem; }
+#subViewWrapper.list-view .cat-info { flex:1; display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.6rem .9rem; }
+#subViewWrapper.list-view .cat-name { margin-bottom:0; }
+
+.cat-empty { text-align:center; padding:4rem 2rem; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); }
+.cat-empty i { font-size:1.8rem; color:var(--text-3); opacity:.3; display:block; margin-bottom:.75rem; }
+.cat-empty h4 { font-size:.9rem; font-weight:700; color:var(--text-2); margin-bottom:.3rem; }
+.cat-empty p  { font-size:.78rem; color:var(--text-3); }
+
+@media(max-width:768px){ .cat-main{padding:1rem;} .cat-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;} }
+</style>
+
+<main class="cat-main">
+  <div class="cat-head">
+    <div class="cat-head-top" style="width:100%">
+      <div>
+        <h1><i class="fas fa-sitemap" style="color:var(--accent);margin-right:.45rem"></i>{{ category.name }}</h1>
+        <p>Select a subcategory to view and attempt available exams</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <a class="cat-back" href="{{ url_for('categories.select_category') }}"><i class="fas fa-arrow-left"></i> All Categories</a>
+        {% if subcategories %}
+        <div class="view-toggle" id="subViewToggle" role="group" aria-label="Subcategory view">
+          <button type="button" data-view="grid" class="{{ 'active' if view_mode != 'list' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode != 'list' else 'false' }}"><i class="fas fa-th-large"></i></button>
+          <button type="button" data-view="list" class="{{ 'active' if view_mode == 'list' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode == 'list' else 'false' }}"><i class="fas fa-list"></i></button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if subcategories %}
+  <div class="admin-list-toolbar">
+    <input type="text" class="admin-list-search" id="subSearch" placeholder="Search subcategories…">
+  </div>
+  <div id="subViewWrapper" class="{{ 'list-view' if view_mode == 'list' else '' }}">
+    <div class="cat-grid" id="subGrid">
+      {% for sub in subcategories %}{{ render_subcategory_card(sub) }}{% endfor %}
+    </div>
+  </div>
+  <div class="admin-pg-bar" id="subPaginator"></div>
+  {% else %}
+  <div class="cat-empty">
+    <i class="fas fa-folder-open"></i>
+    <h4>No Subcategories Yet</h4>
+    <p>An admin needs to add subcategories to {{ category.name }} first.</p>
+  </div>
+  {% endif %}
+</main>
+<script src="{{ url_for('static', filename='shared/view-toggle.js') }}"></script>
+<script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
+<script>
+window.__autoShowUpdates = {{ auto_show_updates|tojson }};
+
+createViewToggle({
+  toggleEl: document.getElementById('subViewToggle'),
+  targetEl: document.getElementById('subViewWrapper'),
+  syncUrl: '/api/v01/portal/view-mode',
+  section: 'subcategories',
+  initial: {{ (view_mode or 'grid') | tojson }},
+});
+
+var subList = createAdminList({
+  endpoint: '/api/v01/portal/subcategories',
+  paginatorEl: document.getElementById('subPaginator'),
+  paginatorMode: 'loadmore',
+  searchInputEl: document.getElementById('subSearch'),
+  perPage: {{ subcategories_per_page | default(24) }},
+  onData: function (data) {
+    var grid = document.getElementById('subGrid');
+    if (data.page === 1) grid.innerHTML = data.cards_html || '';
+    else grid.insertAdjacentHTML('beforeend', data.cards_html || '');
+  },
+});
+subList.hydrate({ page: 1, total_pages: {{ subcategories_total_pages | default(1) }}, total: {{ subcategories_total | default(0) }}, per_page: {{ subcategories_per_page | default(24) }} });
+</script>
+{% endblock %}

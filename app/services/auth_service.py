@@ -9,7 +9,7 @@ Business logic for authentication:
 import re
 import secrets
 from datetime import datetime, timedelta
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
 
 import bcrypt
 
@@ -44,6 +44,14 @@ def verify_password(plain: str, hashed: str) -> bool:
 def is_password_hashed(password: str) -> bool:
     """Return True if the stored password is already a bcrypt hash."""
     return bool(password and password.startswith(("$2a$", "$2b$", "$2y$")) and len(password) == 60)
+
+
+def is_password_reused(new_plain: str, current_hash: str, history_hashes: List[str]) -> bool:
+    """True if new_plain matches the current password or any of the
+    supplied prior-password hashes — used to block reuse of the last 3
+    passwords. Only ever compares via bcrypt; nothing plaintext is stored."""
+    candidates = [h for h in ([current_hash] + list(history_hashes)) if h and is_password_hashed(h)]
+    return any(verify_password(new_plain, h) for h in candidates)
 
 
 # ─────────────────────────────────────────────

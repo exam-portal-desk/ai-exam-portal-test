@@ -5,6 +5,7 @@ PostgreSQL queries for subjects and requests_raised tables.
 
 from typing import Optional, List, Dict
 from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
+from app.utils.pagination import paginate_params, pagination_meta
 
 
 # ─────────────────────────────────────────────
@@ -20,6 +21,25 @@ def get_all_subjects() -> List[Dict]:
     except Exception as e:
         print(f"[db.misc] get_all_subjects error: {e}")
         return []
+
+
+def get_subjects_page(search: str = "", page=1, per_page=20) -> Dict:
+    page, per_page, offset = paginate_params(page, per_page)
+    try:
+        where_sql, params = "", []
+        if search:
+            where_sql = "WHERE subject_name ILIKE %s"
+            params.append(f"%{search}%")
+        total = fetch_one(f"SELECT COUNT(*) AS count FROM subjects {where_sql}", params)["count"]
+        rows = fetch_all(
+            f"SELECT id,subject_name,subject_folder_id,subject_folder_created_at FROM subjects "
+            f"{where_sql} ORDER BY subject_name LIMIT %s OFFSET %s",
+            params + [per_page, offset],
+        )
+        return {"subjects": rows, **pagination_meta(total, page, per_page)}
+    except Exception as e:
+        print(f"[db.misc] get_subjects_page error: {e}")
+        return {"subjects": [], **pagination_meta(0, page, per_page)}
 
 
 def get_subject_by_name(name: str) -> Optional[Dict]:

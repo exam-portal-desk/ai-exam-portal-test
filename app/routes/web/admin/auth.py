@@ -8,7 +8,7 @@ from flask import render_template, request, redirect, url_for, session, flash
 
 from app.routes.web.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
-from app.db.users import get_user_by_username, get_user_by_email
+from app.db.users import get_user_by_username, get_user_by_email, update_last_login
 from app.db.sessions import create_session, invalidate_session
 from app.db.auth import check_login_attempts, record_failed_login, clear_login_attempts
 from app.services.auth_service import is_password_hashed, verify_password
@@ -63,6 +63,7 @@ def admin_login():
 
     # Admin-only session
     invalidate_session(int(user["id"]))
+    previous_login = update_last_login(int(user["id"]))
     token = secrets.token_urlsafe(32)
     create_session({
         "token":        token,
@@ -80,6 +81,7 @@ def admin_login():
     session["full_name"]= user.get("full_name", user.get("username"))
     session["is_admin"] = True
     session["profile_photo_key"] = user.get("profile_photo_key")
+    session["last_login_display"] = previous_login
     session.modified    = True
 
     flash("Admin login successful!", "success")

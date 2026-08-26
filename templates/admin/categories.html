@@ -1,7 +1,9 @@
 {% extends "admin_base.html" %}
 {% block title %}Manage Categories{% endblock %}
+{% from "admin/_category_rows.html" import render_category_row %}
 {% block content %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
 <style>
 /* ── Manage Categories — layout + structure only, all colors via tokens ── */
 
@@ -258,13 +260,18 @@
   </button>
 </div>
 
+<!-- ── Search toolbar ── -->
+<div class="admin-list-toolbar">
+  <input type="text" class="admin-list-search" id="catSearch" placeholder="Search categories by name…">
+</div>
+
 <!-- ── Table Card ── -->
 <div class="cat-card">
   <div class="cat-card-hdr">
     <h5>
       <i class="fas fa-layer-group" style="color:var(--accent)"></i>
       All Categories
-      <span class="cat-count-pill">{{ categories|length }}</span>
+      <span class="cat-count-pill" id="catCountPill">{{ categories_total | default(categories|length) }}</span>
     </h5>
   </div>
   <div style="overflow-x:auto">
@@ -274,40 +281,12 @@
           <th style="width:68px">Image</th>
           <th>Name</th>
           <th>Created</th>
-          <th style="width:100px">Actions</th>
+          <th style="width:130px">Actions</th>
         </tr>
       </thead>
       <tbody id="catTbody">
-        {% for cat in categories %}
-        <tr id="row-{{ cat.id }}">
-          <td>
-            {% if cat.image_url %}
-            <img src="{{ cat.image_url }}" class="cat-thumb"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-            <div class="cat-thumb-ph" style="display:none">
-              <i class="fas fa-graduation-cap"></i>
-            </div>
-            {% else %}
-            <div class="cat-thumb-ph">
-              <i class="fas fa-graduation-cap"></i>
-            </div>
-            {% endif %}
-          </td>
-          <td><span class="cat-name-cell">{{ cat.name }}</span></td>
-          <td><span class="cat-date-cell">{{ cat.created_at | display_date if cat.created_at else '—' }}</span></td>
-          <td>
-            <div style="display:flex;gap:.3rem">
-              <button class="icon-btn" title="Edit"
-                      onclick="openEdit({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}', '{{ cat.image_url or "" }}')">
-                <i class="fas fa-pencil-alt"></i>
-              </button>
-              <button class="icon-btn danger" title="Delete"
-                      onclick="openDelete({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}')">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
+        {% if categories %}
+          {% for cat in categories %}{{ render_category_row(cat) }}{% endfor %}
         {% else %}
         <tr>
           <td colspan="4">
@@ -317,10 +296,11 @@
             </div>
           </td>
         </tr>
-        {% endfor %}
+        {% endif %}
       </tbody>
     </table>
   </div>
+  <div class="admin-pg-bar" id="catPaginator" style="padding:0 1.1rem 1rem"></div>
 </div>
 
 <!-- ══ ADD MODAL ══════════════════════════════════════════════════ -->
@@ -446,16 +426,83 @@
   </div>
 </div>
 
+<!-- ══ SUBCATEGORIES MODAL ════════════════════════════════════════ -->
+<div class="modal fade" id="subcatModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-size:.92rem;font-weight:700;display:flex;align-items:center;gap:.5rem">
+          <span style="width:28px;height:28px;border-radius:8px;background:var(--accent-subtle);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">
+            <i class="fas fa-sitemap"></i>
+          </span>
+          Subcategories — <span id="subcatCatName"></span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="subcatCatId">
+        <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+          <input type="text" id="subcatNewName" class="m-input" placeholder="New subcategory name (e.g. Civil, SOM)">
+          <button class="btn-flat primary" id="subcatAddBtn" onclick="submitAddSubcat()" style="flex-shrink:0">
+            <i class="fas fa-plus"></i> Add
+          </button>
+        </div>
+        <div id="subcatList" style="display:flex;flex-direction:column;gap:.4rem">
+          <div style="text-align:center;color:var(--text-3);font-size:.82rem;padding:1rem">Loading…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-flat secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DELETE SUBCATEGORY MODAL ═══════════════════════════════════ -->
+<div class="modal fade" id="deleteSubcatModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:440px">
+    <div class="modal-content">
+      <div class="modal-header"
+           style="background:var(--danger-bg);border-bottom:1px solid var(--danger-border)!important">
+        <h5 class="modal-title"
+            style="font-size:.92rem;font-weight:700;color:var(--danger-text);display:flex;align-items:center;gap:.45rem">
+          <i class="fas fa-trash"></i> Delete Subcategory
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                style="filter:invert(0.4) sepia(1) saturate(3) hue-rotate(315deg) brightness(.8)"></button>
+      </div>
+      <div class="modal-body">
+        <div class="del-warn">
+          <div class="del-warn-t">
+            <i class="fas fa-exclamation-triangle"></i> Are you sure?
+          </div>
+          <ul>
+            <li>Delete this subcategory? This cannot be undone.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-flat danger" id="deleteSubcatBtn" onclick="confirmDeleteSubcat()">
+          <i class="fas fa-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
 
   /* ── Bootstrap modal refs ── */
-  var _addM, _editM, _delM;
+  var _addM, _editM, _delM, _subcatM, _delSubcatM;
   document.addEventListener('DOMContentLoaded', function () {
     _addM  = new bootstrap.Modal(document.getElementById('addModal'));
     _editM = new bootstrap.Modal(document.getElementById('editModal'));
     _delM  = new bootstrap.Modal(document.getElementById('deleteModal'));
+    _subcatM = new bootstrap.Modal(document.getElementById('subcatModal'));
+    _delSubcatM = new bootstrap.Modal(document.getElementById('deleteSubcatModal'));
   });
 
   /* ── Image preview ── */
@@ -583,7 +630,141 @@
       });
   };
 
+  /* ══ SUBCATEGORIES ══════════════════════════════════════════════
+     Loaded on demand (only when the admin opens a category's
+     subcategories), never eagerly joined into the categories list. */
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderSubcatRow(s) {
+    return '<div class="subcat-row" style="display:flex;align-items:center;gap:.4rem;padding:.5rem .65rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius)" data-subcat-id="' + s.id + '">' +
+      '<input type="text" class="m-input subcat-name-input" value="' + escHtml(s.name) + '" style="padding:.4rem .6rem;font-size:.82rem">' +
+      '<button class="icon-btn" title="Save" onclick="submitRenameSubcat(' + s.id + ', this)"><i class="fas fa-save"></i></button>' +
+      '<button class="icon-btn danger" title="Delete" onclick="submitDeleteSubcat(' + s.id + ', this)"><i class="fas fa-trash"></i></button>' +
+      '</div>';
+  }
+
+  window.openSubcats = function (catId, catName) {
+    document.getElementById('subcatCatId').value = catId;
+    document.getElementById('subcatCatName').textContent = catName;
+    document.getElementById('subcatNewName').value = '';
+    var list = document.getElementById('subcatList');
+    list.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:.82rem;padding:1rem">Loading…</div>';
+    (_subcatM || new bootstrap.Modal(document.getElementById('subcatModal'))).show();
+    reloadSubcats();
+  };
+
+  function reloadSubcats() {
+    var catId = document.getElementById('subcatCatId').value;
+    var list = document.getElementById('subcatList');
+    fetch('/api/v01/admin/categories/' + catId + '/subcategories')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var subs = d.subcategories || [];
+        list.innerHTML = subs.length
+          ? subs.map(renderSubcatRow).join('')
+          : '<div style="text-align:center;color:var(--text-3);font-size:.82rem;padding:1rem">No subcategories yet — add one above.</div>';
+      })
+      .catch(function () {
+        list.innerHTML = '<div style="text-align:center;color:var(--danger-text);font-size:.82rem;padding:1rem">Failed to load subcategories.</div>';
+      });
+  }
+
+  window.submitAddSubcat = function () {
+    var catId = document.getElementById('subcatCatId').value;
+    var input = document.getElementById('subcatNewName');
+    var name = input.value.trim();
+    if (!name) { adminToast('Subcategory name is required.', 'warning'); return; }
+    var btn = document.getElementById('subcatAddBtn');
+    btn.disabled = true;
+    fetch('/api/v01/admin/categories/' + catId + '/subcategories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false;
+        if (d.success) { input.value = ''; reloadSubcats(); adminToast('Subcategory added.', 'success'); }
+        else { adminToast(d.message || 'Failed to add subcategory.', 'danger'); }
+      })
+      .catch(function () { btn.disabled = false; adminToast('Network error. Please try again.', 'danger'); });
+  };
+
+  window.submitRenameSubcat = function (subcatId, btn) {
+    var row = btn.closest('.subcat-row');
+    var name = row.querySelector('.subcat-name-input').value.trim();
+    if (!name) { adminToast('Name cannot be empty.', 'warning'); return; }
+    fetch('/api/v01/admin/subcategories/' + subcatId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.success) adminToast('Subcategory renamed.', 'success');
+        else adminToast(d.message || 'Failed to rename.', 'danger');
+      })
+      .catch(function () { adminToast('Network error. Please try again.', 'danger'); });
+  };
+
+  var _subcatIdToDelete = null;
+  var _subcatRowToDelete = null;
+
+  window.submitDeleteSubcat = function (subcatId, btn) {
+    _subcatIdToDelete = subcatId;
+    _subcatRowToDelete = btn.closest('.subcat-row');
+    (_delSubcatM || new bootstrap.Modal(document.getElementById('deleteSubcatModal'))).show();
+  };
+
+  window.confirmDeleteSubcat = function () {
+    if (!_subcatIdToDelete) return;
+    var btn = document.getElementById('deleteSubcatBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting…';
+    fetch('/api/v01/admin/subcategories/' + _subcatIdToDelete, { method: 'DELETE' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+        (_delSubcatM || bootstrap.Modal.getInstance(document.getElementById('deleteSubcatModal')))?.hide();
+        if (d.success) {
+          if (_subcatRowToDelete) _subcatRowToDelete.remove();
+          adminToast('Subcategory deleted.', 'success');
+        } else {
+          adminToast(d.message || 'Cannot delete this subcategory.', 'danger');
+        }
+        _subcatIdToDelete = null;
+        _subcatRowToDelete = null;
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+        adminToast('Network error. Please try again.', 'danger');
+      });
+  };
+
 })();
+</script>
+
+<script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
+<script>
+/* ── Search + pagination (reusable component) — bounded initial load
+   (server-rendered page 1), everything after that via AJAX. ── */
+var catList = createAdminList({
+  endpoint: '/api/v01/admin/categories',
+  paginatorEl: document.getElementById('catPaginator'),
+  searchInputEl: document.getElementById('catSearch'),
+  searchParam: 'q',
+  perPage: {{ categories_per_page | default(20) }},
+  extraParams: function () { return { partial: 1 }; },
+  onData: function (data) {
+    document.getElementById('catTbody').innerHTML = data.rows_html || '';
+    document.getElementById('catCountPill').textContent = data.total;
+  },
+});
+catList.hydrate({ page: 1, total_pages: {{ categories_total_pages | default(1) }}, total: {{ categories_total | default(0) }}, per_page: {{ categories_per_page | default(20) }} });
 </script>
 
 {% endblock %}

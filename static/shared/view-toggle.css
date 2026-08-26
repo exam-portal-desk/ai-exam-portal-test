@@ -1,0 +1,7 @@
+/* Shared grid/list view toggle — same visual language as the toggle already
+   used in My Notes (static/notes/notes.css .view-toggle), factored out so
+   any page using static/shared/view-toggle.js can pull in just this. */
+.view-toggle{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius,10px);padding:2px;background:var(--surface);flex-shrink:0}
+.view-toggle button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;background:transparent;color:var(--text-3);border-radius:calc(var(--radius, 10px) - 2px);cursor:pointer;font-size:.78rem;transition:background .15s,color .15s}
+.view-toggle button:hover{color:var(--text-1)}
+.view-toggle button.active{background:var(--accent-subtle);color:var(--accent)}

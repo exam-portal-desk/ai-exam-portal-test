@@ -295,7 +295,7 @@ def _delete_ai_data(cur, uid: int) -> None:
     """AI chat/assistant conversations and explanation history are private
     to the user — never shown to anyone else — so they are fully removed."""
     try:
-        for table in ("ai_chat_history", "ai_explanation_history", "ai_explanation_usage", "ai_usage_tracking"):
+        for table in ("ai_conversations", "ai_chat_history", "ai_explanation_history", "ai_explanation_usage", "ai_usage_tracking"):
             cur.execute(f"DELETE FROM {table} WHERE user_id=%s", (uid,))
         logger.info("[user_deletion] Deleted AI chat/explanation/usage data uid=%s", uid)
     except Exception as e:

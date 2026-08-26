@@ -124,6 +124,11 @@
 .chat-header-name { font-size:.9rem; font-weight:700; color:var(--text-1); }
 .chat-header-status { font-size:.71rem; color:var(--text-3); margin-top:.1rem; }
 .header-actions { margin-left:auto; display:flex; gap:.3rem; }
+/* The Options 3-dot button reuses .icon-btn (sized for the sidebar's
+   bell/New-Group icons); scope it down here so only this button shrinks —
+   .dropdown-menu is anchored top/right, independent of the button's box
+   size, so this causes no layout shift. */
+.header-actions .icon-btn { width:26px; height:26px; font-size:.7rem; }
 
 /* Messages */
 .messages-area {
@@ -135,6 +140,147 @@
 }
 .messages-area::-webkit-scrollbar { width:4px; }
 .messages-area::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+/* Chat backgrounds — presets are pure CSS gradients (zero image bytes);
+   custom uploads use the existing image_storage_service URL resolution.
+   Applied to .chat-main (not .messages-area) so it paints behind the
+   *entire* chat column — .messages-area and .typing-indicator have no
+   background of their own and let it show through, while .chat-header and
+   .chat-input-area stay legible because they already paint an opaque
+   var(--surface) on top. This is also what fixes the flat gap that used
+   to show below the messages (.typing-indicator sat on plain .chat-main
+   background, visibly cut off from the picture above it). */
+.chat-main[data-bg-type] .messages-area { background-image:none; }
+.chat-main[data-bg-type="preset"][data-bg-value="sunrise"] {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--warning) 22%, var(--bg)), color-mix(in srgb, var(--danger) 16%, var(--bg)) 60%, var(--bg));
+  background-size: cover; background-position:center; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="midnight"] {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--info) 22%, var(--bg)), color-mix(in srgb, var(--accent) 18%, var(--bg)) 65%, var(--bg));
+  background-size: cover; background-position:center; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="forest"] {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--success) 22%, var(--bg)), color-mix(in srgb, var(--accent) 16%, var(--bg)) 65%, var(--bg));
+  background-size: cover; background-position:center; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="paper-dots"] {
+  background-image: radial-gradient(color-mix(in srgb, var(--accent) 35%, var(--border)) 1.5px, transparent 1.5px);
+  background-color: var(--bg); background-size:26px 26px; background-position:-13px -13px; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="aurora"] {
+  background-image:
+    radial-gradient(at 15% 15%, color-mix(in srgb, var(--info) 32%, transparent), transparent 55%),
+    radial-gradient(at 85% 25%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 55%),
+    radial-gradient(at 50% 90%, color-mix(in srgb, var(--success) 26%, transparent), transparent 55%);
+  background-color: var(--bg); background-size:cover; background-position:center; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="graphite"] {
+  background-image: linear-gradient(160deg, #1f2430, #12141b 65%);
+  background-size:cover; background-position:center; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="cloud"] {
+  background-image: linear-gradient(135deg, #eef2ff, #fdf2f8 50%, #f0fdfa);
+  background-size:cover; background-position:center; background-attachment:local;
+}
+.chat-main[data-bg-type="preset"][data-bg-value="lines"] {
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--border) 75%, transparent) 0 1px, transparent 1px 26px);
+  background-color: var(--bg); background-attachment:local;
+}
+/* Custom image — a real positionable/scalable <img>, not a CSS
+   background-image. CSS background-size/position can only express a fixed
+   keyword (cover/contain/center-ish); it cannot represent a user-chosen
+   continuous zoom level + arbitrary pan offset, which is what an actual
+   drag/zoom editor needs. #chatBgImageLayer is an absolutely-positioned
+   layer (first child of .chat-main, needs .chat-main's own
+   position:relative below) holding the <img> — its width/height/left/top
+   are computed in JS by the SAME function used for the editor preview
+   (see computeBgLayout in the script block), so the real chat is always a
+   1:1 match for whatever the user saw in preview. .chat-header/.empty-
+   state/#activeChat sit above it via z-index. */
+.chat-main { position:relative; }
+.chat-bg-image-layer { position:absolute; inset:0; overflow:hidden; z-index:0; background:var(--surface); }
+.chat-bg-image-layer img { position:absolute; display:block; }
+.chat-bg-image-layer .chat-bg-overlay { position:absolute; inset:0; background:var(--surface); pointer-events:none; }
+.empty-state, #activeChat { position:relative; z-index:1; }
+
+/* Drag/zoom editor — the SAME .bg-editor-pane + computeBgLayout() combo
+   used here is reused verbatim for the real chat, just at a different
+   container size (read live from the real #chatMain when the editor
+   opens), so preview and reality can't drift apart. */
+.bg-editor-pane {
+  position:relative; width:100%; border-radius:calc(var(--radius) + 4px);
+  border:1px solid var(--border); overflow:hidden; background:var(--surface);
+  touch-action:none; cursor:grab; user-select:none;
+}
+.bg-editor-pane:active { cursor:grabbing; }
+.bg-editor-pane img { position:absolute; display:block; -webkit-user-drag:none; pointer-events:none; }
+.bg-editor-overlay { position:absolute; inset:0; background:var(--surface); pointer-events:none; }
+.bg-editor-bubbles { position:absolute; inset:0; padding:.6rem; display:flex; flex-direction:column; gap:.4rem; pointer-events:none; }
+.bg-editor-bubbles .msg-bubble { max-width:65%; font-size:.7rem; padding:.4rem .6rem; box-shadow:var(--shadow-sm); }
+.bg-editor-bubbles .msg-row.own { align-self:flex-end; }
+.bg-preview-hint { font-size:.74rem; color:var(--text-3); margin:.5rem 0 0; }
+
+.bg-control-row { display:flex; align-items:center; gap:.55rem; margin:.7rem 0 0; }
+.bg-control-label { font-size:.72rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; width:52px; flex-shrink:0; }
+.bg-zoom-btn {
+  width:24px; height:24px; flex-shrink:0; border-radius:7px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text-2); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:.68rem; transition:all .12s;
+}
+.bg-zoom-btn:hover { border-color:var(--accent); color:var(--accent); }
+.bg-range { flex:1; accent-color:var(--accent); cursor:pointer; }
+
+.bg-quick-preset-row { display:flex; flex-wrap:wrap; gap:.4rem; margin:.85rem 0 0; }
+.fit-mode-btn {
+  padding:.4rem .75rem; border-radius:20px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text-2); font-size:.76rem; font-weight:600;
+  cursor:pointer; font-family:inherit; transition:all .12s;
+}
+.fit-mode-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Background picker popover */
+.bg-picker-menu { min-width:230px; padding:.55rem; }
+.bg-swatch-row { display:grid; grid-template-columns:repeat(4,1fr); gap:.45rem; margin-bottom:.5rem; }
+.bg-swatch {
+  width:100%; aspect-ratio:1; border-radius:9px; border:1px solid var(--border);
+  cursor:pointer; padding:0; transition:transform .12s, border-color .12s;
+}
+.bg-swatch:hover { transform:scale(1.06); border-color:var(--accent); }
+.bg-swatch-sunrise { background:linear-gradient(135deg, color-mix(in srgb, var(--warning) 55%, var(--bg)), color-mix(in srgb, var(--danger) 45%, var(--bg))); }
+.bg-swatch-midnight { background:linear-gradient(135deg, color-mix(in srgb, var(--info) 55%, var(--bg)), color-mix(in srgb, var(--accent) 45%, var(--bg))); }
+.bg-swatch-forest { background:linear-gradient(135deg, color-mix(in srgb, var(--success) 55%, var(--bg)), color-mix(in srgb, var(--accent) 45%, var(--bg))); }
+.bg-swatch-paper-dots { background-image:radial-gradient(var(--accent) 1.5px, transparent 1.5px); background-size:8px 8px; background-color:var(--surface-2); }
+.bg-swatch-aurora { background-image: radial-gradient(at 20% 20%, color-mix(in srgb, var(--info) 55%, var(--bg)), transparent 60%), radial-gradient(at 80% 30%, color-mix(in srgb, var(--accent) 50%, var(--bg)), transparent 60%), radial-gradient(at 50% 90%, color-mix(in srgb, var(--success) 50%, var(--bg)), transparent 60%); background-color:var(--bg); }
+.bg-swatch-graphite { background:linear-gradient(160deg, #1f2430, #12141b 65%); }
+.bg-swatch-cloud { background:linear-gradient(135deg, #eef2ff, #fdf2f8 50%, #f0fdfa); }
+.bg-swatch-lines { background-image:repeating-linear-gradient(135deg, var(--border) 0 1px, transparent 1px 8px); background-color:var(--surface-2); }
+.bg-upload-btn {
+  display:flex; align-items:center; gap:.5rem; padding:.42rem .65rem; border-radius:6px;
+  font-size:.79rem; font-weight:500; color:var(--text-2); cursor:pointer; transition:background .1s;
+}
+.bg-upload-btn:hover { background:var(--surface-2); color:var(--text-1); }
+.bg-reset-btn {
+  display:flex; align-items:center; gap:.5rem; width:100%; padding:.42rem .65rem; border-radius:6px;
+  font-size:.79rem; font-weight:500; color:var(--text-2); cursor:pointer; background:none; border:none;
+  font-family:inherit; transition:background .1s;
+}
+.bg-reset-btn:hover { background:var(--surface-2); color:var(--text-1); }
+.bg-reset-btn:disabled, .bg-upload-btn.disabled { opacity:.45; cursor:not-allowed; pointer-events:none; }
+.bg-picker-divider { height:1px; background:var(--border); margin:.4rem 0; }
+.bg-custom-row { display:flex; align-items:center; gap:.5rem; margin-bottom:.35rem; }
+.bg-custom-thumb {
+  width:100%; flex:1; aspect-ratio:1; border-radius:9px; border:2px solid var(--accent);
+  cursor:pointer; padding:0; background-size:cover; background-position:center; background-repeat:no-repeat;
+  transition:transform .12s;
+}
+.bg-custom-thumb:hover { transform:scale(1.06); }
+.bg-custom-label { flex:2; font-size:.76rem; font-weight:600; color:var(--text-2); }
+.bg-adjust-btn {
+  width:28px; height:28px; flex-shrink:0; border-radius:7px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text-3); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:.7rem; transition:all .12s;
+}
+.bg-adjust-btn:hover { border-color:var(--accent); color:var(--accent); }
 .load-more-btn {
   text-align:center; padding:.55rem; font-size:.75rem; font-weight:700;
   color:var(--accent); cursor:pointer; background:var(--surface);
@@ -274,7 +420,15 @@
 .btn-ghost-sm:hover { border-color:var(--accent); color:var(--accent); }
 
 /* Dropdown */
-.dropdown { position:relative; }
+/* Named dd-wrap, not "dropdown" — static/theme.css already defines a
+   global .dropdown rule (its own menu-panel convention: position:absolute,
+   min-width:200px, background/border/shadow) that collides with this
+   file's wrapper-vs-panel convention. Reusing "dropdown" here lets those
+   theme.css properties leak through on every property this rule doesn't
+   redeclare (min-width, padding, background, shadow, z-index) even though
+   this rule wins on position — exactly the oversized invisible box the
+   3-dot buttons need fixed, not just icon-btn's own size. */
+.dd-wrap { position:relative; }
 .dropdown-menu {
   position:absolute; top:calc(100% + 4px); right:0;
   background:var(--surface); border:1px solid var(--border);
@@ -332,6 +486,12 @@
   .chat-wrap .sidebar.hidden-mobile { transform:translateX(-100%); }
   .chat-main.show-mobile { display:flex; }
 }
+
+/* Without this, an element that both has [hidden] and a class-based
+   `display:` rule (e.g. .bg-custom-row{display:flex}) stays visible —
+   same specificity as the browser's built-in [hidden]{display:none},
+   and the class rule comes later in the cascade so it wins. */
+[hidden] { display:none !important; }
 </style>
 
 <div id="toastContainer"></div>
@@ -403,6 +563,49 @@
   </div>
 </div>
 
+<!-- Chat background drag/zoom editor -->
+<div class="modal-overlay" id="bgPreviewModal">
+  <div class="modal-box" style="max-width:440px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+      <p class="modal-title" style="margin:0"><i class="fas fa-image me-2" style="color:var(--accent)"></i>Position your background</p>
+      <button class="btn-ghost-sm" style="padding:0.3rem 0.6rem" onclick="closeBgPreviewModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="bg-editor-pane" id="bgEditorPane">
+      <img id="bgEditorImg" alt="">
+      <div class="bg-editor-overlay" id="bgEditorOverlay"></div>
+      <div class="bg-editor-bubbles">
+        <div class="msg-row"><div class="msg-bubble">Hey! 👋</div></div>
+        <div class="msg-row own"><div class="msg-bubble">This is your new background</div></div>
+        <div class="msg-row"><div class="msg-bubble">Looks great</div></div>
+      </div>
+    </div>
+    <p class="bg-preview-hint">Drag the image to reposition it. This is exactly how it will look in chat.</p>
+
+    <div class="bg-control-row">
+      <span class="bg-control-label">Zoom</span>
+      <button type="button" class="bg-zoom-btn" id="bgZoomOutBtn"><i class="fas fa-minus"></i></button>
+      <input type="range" class="bg-range" id="bgZoomRange" min="0" max="100" value="0">
+      <button type="button" class="bg-zoom-btn" id="bgZoomInBtn"><i class="fas fa-plus"></i></button>
+    </div>
+    <div class="bg-control-row">
+      <span class="bg-control-label">Overlay</span>
+      <input type="range" class="bg-range" id="bgOverlayRange" min="0" max="100" value="45" style="margin-left:calc(24px + .55rem)">
+    </div>
+
+    <div class="bg-quick-preset-row">
+      <button type="button" class="fit-mode-btn" id="bgPresetFitBtn">Show Full Image</button>
+      <button type="button" class="fit-mode-btn" id="bgPresetFillBtn">Fill Chat Area</button>
+      <button type="button" class="fit-mode-btn" id="bgPresetResetBtn"><i class="fas fa-rotate-left"></i> Reset</button>
+    </div>
+    <p class="bg-preview-hint">Wide images tend to work best for chat backgrounds — but any size works.</p>
+
+    <div class="modal-actions">
+      <button class="btn-primary-sm" id="bgPreviewApplyBtn"><i class="fas fa-check"></i> Apply</button>
+      <button class="btn-ghost-sm" onclick="closeBgPreviewModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="chat-wrap" id="chatWrap">
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -411,6 +614,31 @@
         <div class="icon-btn" id="inboxBtn" onclick="openInbox()" title="Chat Requests">
           <i class="fas fa-bell"></i>
           <span class="badge-dot" id="inboxBadge" style="display:none">0</span>
+        </div>
+        <div class="dd-wrap">
+          <div class="icon-btn" onclick="toggleDropdown('bgPickerMenu')" title="Chat background"><i class="fas fa-palette"></i></div>
+          <div class="dropdown-menu bg-picker-menu" id="bgPickerMenu">
+            <div class="bg-swatch-row">
+              <button type="button" class="bg-swatch bg-swatch-sunrise" data-preset="sunrise" title="Sunrise"></button>
+              <button type="button" class="bg-swatch bg-swatch-midnight" data-preset="midnight" title="Midnight"></button>
+              <button type="button" class="bg-swatch bg-swatch-forest" data-preset="forest" title="Sage"></button>
+              <button type="button" class="bg-swatch bg-swatch-paper-dots" data-preset="paper-dots" title="Classic"></button>
+              <button type="button" class="bg-swatch bg-swatch-aurora" data-preset="aurora" title="Aurora"></button>
+              <button type="button" class="bg-swatch bg-swatch-graphite" data-preset="graphite" title="Graphite"></button>
+              <button type="button" class="bg-swatch bg-swatch-cloud" data-preset="cloud" title="Cloud"></button>
+              <button type="button" class="bg-swatch bg-swatch-lines" data-preset="lines" title="Blueprint"></button>
+            </div>
+            <div class="bg-picker-divider"></div>
+            <div class="bg-custom-row" id="bgCustomRow" {% if not chat_bg_has_custom %}hidden{% endif %}>
+              <button type="button" class="bg-custom-thumb" id="bgCustomThumb" title="Use your saved image" style="{{ 'background-image:url(\'' ~ chat_bg_custom_url ~ '\')' if chat_bg_custom_url else '' }}"></button>
+              <span class="bg-custom-label">Your image</span>
+              <button type="button" class="bg-adjust-btn" id="bgAdjustBtn" title="Adjust position"><i class="fas fa-sliders-h"></i></button>
+            </div>
+            <label class="bg-upload-btn"><i class="fas fa-image"></i> Upload image<input type="file" id="bgUploadInput" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label>
+            <button type="button" class="bg-reset-btn" id="bgRemoveCustomBtn" {% if not chat_bg_has_custom %}disabled{% endif %}><i class="fas fa-trash-alt"></i> Remove custom image</button>
+            <div class="bg-picker-divider"></div>
+            <button type="button" class="bg-reset-btn" id="bgResetBtn"><i class="fas fa-rotate-left"></i> Reset to default</button>
+          </div>
         </div>
         <div class="icon-btn" onclick="openGroupModal()" title="New Group"><i class="fas fa-users"></i></div>
       </div>
@@ -428,6 +656,10 @@
   </div>
 
   <div class="chat-main" id="chatMain">
+    <div class="chat-bg-image-layer" id="chatBgImageLayer" style="display:none">
+      <img id="chatBgImg" alt="">
+      <div class="chat-bg-overlay" id="chatBgOverlay"></div>
+    </div>
     <div class="empty-state" id="emptyState">
       <div class="empty-state-icon"><i class="fas fa-comment-dots"></i></div>
       <div>
@@ -523,7 +755,320 @@ function timeStr(iso){
 function escJs(str){return(str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');}
 
 function toggleDropdown(id){document.getElementById(id).classList.toggle('show');}
-document.addEventListener('click',e=>{if(!e.target.closest('.dropdown'))document.querySelectorAll('.dropdown-menu.show').forEach(m=>m.classList.remove('show'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.dd-wrap'))document.querySelectorAll('.dropdown-menu.show').forEach(m=>m.classList.remove('show'));});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Chat background — drag/zoom image positioning.
+
+   ONE shared pair of functions computes layout for BOTH the real chat
+   background and the editor preview — computeBgFit/computeBgLayout take
+   only a container size + natural image size + (zoom, posX, posY), all
+   resolution-independent, so the exact same stored values render
+   correctly (and identically to what the editor showed) at any viewport
+   size. zoom=1 means "whole image visible" (the contain scale) — cropping
+   only starts once the user zooms past that, never as a silent default.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function computeBgFit(containerW,containerH,imgW,imgH,zoom){
+  const containScale=Math.min(containerW/imgW,containerH/imgH);
+  const scale=containScale*zoom;
+  const renderedW=imgW*scale, renderedH=imgH*scale;
+  return {
+    renderedW,renderedH,
+    maxOffX:Math.max(0,(renderedW-containerW)/2),
+    maxOffY:Math.max(0,(renderedH-containerH)/2),
+  };
+}
+function computeBgLayout(containerW,containerH,imgW,imgH,zoom,posX,posY){
+  const f=computeBgFit(containerW,containerH,imgW,imgH,zoom);
+  return {
+    width:f.renderedW, height:f.renderedH,
+    left:(containerW-f.renderedW)/2-(posX-0.5)*2*f.maxOffX,
+    top:(containerH-f.renderedH)/2-(posY-0.5)*2*f.maxOffY,
+    maxOffX:f.maxOffX, maxOffY:f.maxOffY,
+  };
+}
+function bgApplyLayout(imgEl,containerEl,naturalW,naturalH,zoom,posX,posY){
+  const rect=containerEl.getBoundingClientRect();
+  if(!rect.width||!rect.height||!naturalW||!naturalH)return null;
+  const layout=computeBgLayout(rect.width,rect.height,naturalW,naturalH,zoom,posX,posY);
+  imgEl.style.width=layout.width+'px'; imgEl.style.height=layout.height+'px';
+  imgEl.style.left=layout.left+'px'; imgEl.style.top=layout.top+'px';
+  return layout;
+}
+function bgClamp01(v){return Math.min(1,Math.max(0,v));}
+
+/* ── Real chat background ─────────────────────────────────────────────── */
+
+let bgRealState={active:false,naturalW:0,naturalH:0,zoom:1,posX:0.5,posY:0.5};
+
+function bgRenderRealImage(){
+  if(!bgRealState.active||!bgRealState.naturalW)return;
+  bgApplyLayout(document.getElementById('chatBgImg'),document.getElementById('chatMain'),
+    bgRealState.naturalW,bgRealState.naturalH,bgRealState.zoom,bgRealState.posX,bgRealState.posY);
+}
+function bgLoadRealCustomImage(url,zoom,posX,posY,overlay){
+  const layer=document.getElementById('chatBgImageLayer'), img=document.getElementById('chatBgImg');
+  document.getElementById('chatBgOverlay').style.opacity=overlay;
+  layer.style.display='block';
+  bgRealState.active=true; bgRealState.zoom=zoom; bgRealState.posX=posX; bgRealState.posY=posY;
+  if(img.src===url&&bgRealState.naturalW){bgRenderRealImage();return;}
+  bgRealState.naturalW=0; bgRealState.naturalH=0;
+  img.onload=()=>{bgRealState.naturalW=img.naturalWidth;bgRealState.naturalH=img.naturalHeight;bgRenderRealImage();};
+  img.src=url;
+}
+
+/* type: 'preset'|'custom'|null. customData (only for 'custom'): {url,zoom,pos_x,pos_y,overlay}. */
+function applyChatBackground(type,value,customData){
+  const area=document.getElementById('chatMain');
+  area.removeAttribute('data-bg-type'); area.removeAttribute('data-bg-value');
+  document.getElementById('chatBgImageLayer').style.display='none';
+  bgRealState.active=false;
+  if(!type)return;
+  area.setAttribute('data-bg-type',type);
+  if(type==='preset'){
+    area.setAttribute('data-bg-value',value);
+  }else if(type==='custom'&&customData&&customData.url){
+    bgLoadRealCustomImage(customData.url,customData.zoom,customData.pos_x,customData.pos_y,customData.overlay);
+  }
+}
+applyChatBackground(
+  {{ chat_bg_type|tojson }},
+  {{ chat_bg_value|tojson }},
+  {{ chat_bg_type|tojson }}==='custom' ? {
+    url:{{ chat_bg_custom_url|tojson }}, zoom:{{ chat_bg_zoom|tojson }},
+    pos_x:{{ chat_bg_pos_x|tojson }}, pos_y:{{ chat_bg_pos_y|tojson }}, overlay:{{ chat_bg_overlay|tojson }}
+  } : null
+);
+
+/* Re-lay-out on any real size change (sidebar toggle, window resize,
+   mobile rotation) — this + being anchored on #chatMain itself (not a
+   fixed height) is what keeps the background correctly covering the full
+   message/composer area at any viewport size, no black-strip gaps. */
+if(window.ResizeObserver){
+  new ResizeObserver(()=>bgRenderRealImage()).observe(document.getElementById('chatMain'));
+}
+
+/* Saved-custom-image state — independent of what's currently ACTIVE, so
+   switching to a preset never loses the uploaded image (server enforces
+   this too; this is just the client-side mirror for the picker UI). */
+let bgSavedCustom={
+  hasCustom:{{ 'true' if chat_bg_has_custom else 'false' }},
+  url:{{ chat_bg_custom_url|tojson }}, zoom:{{ chat_bg_zoom|tojson }},
+  posX:{{ chat_bg_pos_x|tojson }}, posY:{{ chat_bg_pos_y|tojson }}, overlay:{{ chat_bg_overlay|tojson }},
+};
+function bgSetSavedCustom(has,data){
+  bgSavedCustom.hasCustom=has;
+  if(data){bgSavedCustom.url=data.url;bgSavedCustom.zoom=data.zoom;bgSavedCustom.posX=data.pos_x;bgSavedCustom.posY=data.pos_y;bgSavedCustom.overlay=data.overlay;}
+  else if(!has){bgSavedCustom.url=null;}
+  const row=document.getElementById('bgCustomRow'), thumb=document.getElementById('bgCustomThumb'), removeBtn=document.getElementById('bgRemoveCustomBtn');
+  if(row) row.hidden=!has;
+  if(thumb) thumb.style.backgroundImage=has&&bgSavedCustom.url?`url("${bgSavedCustom.url}")`:'';
+  if(removeBtn) removeBtn.disabled=!has;
+}
+
+document.querySelectorAll('.bg-swatch').forEach(btn=>btn.addEventListener('click',async()=>{
+  const preset=btn.dataset.preset;
+  try{
+    const r=await fetch('/api/v01/chat/background/preset',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset_id:preset})});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||'Unable to set background.');
+    applyChatBackground('preset',preset,null);
+    toggleDropdown('bgPickerMenu');
+    showToast('Background updated.','success');
+  }catch(e){showToast(e.message,'error');}
+}));
+
+document.getElementById('bgCustomThumb')?.addEventListener('click',async()=>{
+  if(!bgSavedCustom.hasCustom)return;
+  try{
+    const r=await fetch('/api/v01/chat/background/custom/activate',{method:'POST',credentials:'same-origin'});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||'Unable to activate your image.');
+    applyChatBackground('custom',null,d);
+    bgSetSavedCustom(true,d);
+    toggleDropdown('bgPickerMenu');
+    showToast('Background updated.','success');
+  }catch(e){showToast(e.message,'error');}
+});
+
+document.getElementById('bgRemoveCustomBtn')?.addEventListener('click',async()=>{
+  try{
+    const r=await fetch('/api/v01/chat/background/custom',{method:'DELETE',credentials:'same-origin'});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||'Unable to remove your image.');
+    const wasActive=document.getElementById('chatMain')?.getAttribute('data-bg-type')==='custom';
+    bgSetSavedCustom(false,null);
+    if(wasActive)applyChatBackground(null,null,null);
+    toggleDropdown('bgPickerMenu');
+    showToast('Custom image removed.','success');
+  }catch(e){showToast(e.message,'error');}
+});
+
+document.getElementById('bgResetBtn')?.addEventListener('click',async()=>{
+  try{
+    const r=await fetch('/api/v01/chat/background',{method:'DELETE',credentials:'same-origin'});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||'Unable to reset background.');
+    applyChatBackground(null,null,null);
+    toggleDropdown('bgPickerMenu');
+    showToast('Background reset.','success');
+  }catch(e){showToast(e.message,'error');}
+});
+
+/* ── Drag/zoom editor modal — nothing is sent to the server until Apply.
+   Reused (skipping file selection) for "adjust position" on an
+   already-saved custom image. */
+let bgEditorState=null; // {mode:'upload'|'adjust', file, url, naturalW, naturalH, zoom, posX, posY, overlay}
+
+function bgZoomToSlider(zoom){return Math.round(((zoom-1)/7)*100);}
+function bgSliderToZoom(val){return 1+(val/100)*7;}
+
+function bgRenderEditor(){
+  if(!bgEditorState||!bgEditorState.naturalW)return;
+  bgApplyLayout(document.getElementById('bgEditorImg'),document.getElementById('bgEditorPane'),
+    bgEditorState.naturalW,bgEditorState.naturalH,bgEditorState.zoom,bgEditorState.posX,bgEditorState.posY);
+  document.getElementById('bgEditorOverlay').style.opacity=bgEditorState.overlay;
+  document.getElementById('bgZoomRange').value=bgZoomToSlider(bgEditorState.zoom);
+  document.getElementById('bgOverlayRange').value=Math.round(bgEditorState.overlay*100);
+}
+
+function openBgPreviewModal(mode,url,initial,file){
+  // Match the editor's aspect ratio to the REAL chat area, measured live
+  // right now — not guessed — so preview and reality use the same frame.
+  const realRect=document.getElementById('chatMain').getBoundingClientRect();
+  const ratio=(realRect.width>0&&realRect.height>0)?(realRect.width/realRect.height):1.6;
+  document.getElementById('bgEditorPane').style.aspectRatio=ratio;
+
+  bgEditorState={
+    mode,url,file,naturalW:0,naturalH:0,
+    zoom:(initial&&initial.zoom)||1,
+    posX:(initial&&initial.pos_x!=null)?initial.pos_x:0.5,
+    posY:(initial&&initial.pos_y!=null)?initial.pos_y:0.5,
+    overlay:(initial&&initial.overlay!=null)?initial.overlay:0.45,
+  };
+  const img=document.getElementById('bgEditorImg');
+  img.onload=()=>{bgEditorState.naturalW=img.naturalWidth;bgEditorState.naturalH=img.naturalHeight;bgRenderEditor();};
+  img.src=url;
+  document.getElementById('bgPreviewModal').classList.add('show');
+}
+
+function closeBgPreviewModal(){
+  document.getElementById('bgPreviewModal').classList.remove('show');
+  if(bgEditorState&&bgEditorState.mode==='upload'&&bgEditorState.url&&bgEditorState.url.startsWith('blob:')){
+    URL.revokeObjectURL(bgEditorState.url);
+  }
+  bgEditorState=null;
+  const input=document.getElementById('bgUploadInput'); if(input) input.value='';
+}
+
+/* Pointer Events cover mouse (desktop) AND single-finger touch (mobile)
+   with one code path — touch-action:none on the pane (set in CSS) stops
+   the browser's own scroll/zoom gestures from fighting the drag. */
+let bgDrag=null;
+const bgEditorPane=document.getElementById('bgEditorPane');
+bgEditorPane.addEventListener('pointerdown',e=>{
+  if(!bgEditorState||!bgEditorState.naturalW)return;
+  const rect=bgEditorPane.getBoundingClientRect();
+  const layout=computeBgLayout(rect.width,rect.height,bgEditorState.naturalW,bgEditorState.naturalH,bgEditorState.zoom,bgEditorState.posX,bgEditorState.posY);
+  bgDrag={startX:e.clientX,startY:e.clientY,startPosX:bgEditorState.posX,startPosY:bgEditorState.posY,maxOffX:layout.maxOffX,maxOffY:layout.maxOffY};
+  bgEditorPane.setPointerCapture(e.pointerId);
+});
+bgEditorPane.addEventListener('pointermove',e=>{
+  if(!bgDrag)return;
+  const dx=e.clientX-bgDrag.startX, dy=e.clientY-bgDrag.startY;
+  if(bgDrag.maxOffX>0)bgEditorState.posX=bgClamp01(bgDrag.startPosX-dx/(2*bgDrag.maxOffX));
+  if(bgDrag.maxOffY>0)bgEditorState.posY=bgClamp01(bgDrag.startPosY-dy/(2*bgDrag.maxOffY));
+  bgRenderEditor();
+});
+bgEditorPane.addEventListener('pointerup',()=>{bgDrag=null;});
+bgEditorPane.addEventListener('pointercancel',()=>{bgDrag=null;});
+
+document.getElementById('bgZoomRange')?.addEventListener('input',e=>{
+  if(!bgEditorState)return;
+  bgEditorState.zoom=bgSliderToZoom(Number(e.target.value));
+  bgRenderEditor();
+});
+document.getElementById('bgZoomOutBtn')?.addEventListener('click',()=>{
+  if(!bgEditorState)return;
+  bgEditorState.zoom=Math.max(1,bgEditorState.zoom-0.25);
+  bgRenderEditor();
+});
+document.getElementById('bgZoomInBtn')?.addEventListener('click',()=>{
+  if(!bgEditorState)return;
+  bgEditorState.zoom=Math.min(8,bgEditorState.zoom+0.25);
+  bgRenderEditor();
+});
+document.getElementById('bgOverlayRange')?.addEventListener('input',e=>{
+  if(!bgEditorState)return;
+  bgEditorState.overlay=Number(e.target.value)/100;
+  document.getElementById('bgEditorOverlay').style.opacity=bgEditorState.overlay;
+});
+
+document.getElementById('bgPresetFitBtn')?.addEventListener('click',()=>{
+  if(!bgEditorState)return;
+  bgEditorState.zoom=1; bgEditorState.posX=0.5; bgEditorState.posY=0.5;
+  bgRenderEditor();
+});
+document.getElementById('bgPresetFillBtn')?.addEventListener('click',()=>{
+  if(!bgEditorState||!bgEditorState.naturalW)return;
+  const rect=bgEditorPane.getBoundingClientRect();
+  const containScale=Math.min(rect.width/bgEditorState.naturalW,rect.height/bgEditorState.naturalH);
+  const coverScale=Math.max(rect.width/bgEditorState.naturalW,rect.height/bgEditorState.naturalH);
+  bgEditorState.zoom=Math.min(8,coverScale/containScale);
+  bgEditorState.posX=0.5; bgEditorState.posY=0.5;
+  bgRenderEditor();
+});
+document.getElementById('bgPresetResetBtn')?.addEventListener('click',()=>{
+  if(!bgEditorState)return;
+  bgEditorState.zoom=1; bgEditorState.posX=0.5; bgEditorState.posY=0.5; bgEditorState.overlay=0.45;
+  bgRenderEditor();
+});
+
+document.getElementById('bgUploadInput')?.addEventListener('change',(e)=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const objectUrl=URL.createObjectURL(file);
+  document.getElementById('bgPickerMenu')?.classList.remove('show');
+  openBgPreviewModal('upload',objectUrl,null,file);
+});
+
+document.getElementById('bgAdjustBtn')?.addEventListener('click',()=>{
+  if(!bgSavedCustom.hasCustom)return;
+  document.getElementById('bgPickerMenu')?.classList.remove('show');
+  openBgPreviewModal('adjust',bgSavedCustom.url,{zoom:bgSavedCustom.zoom,pos_x:bgSavedCustom.posX,pos_y:bgSavedCustom.posY,overlay:bgSavedCustom.overlay},null);
+});
+
+document.getElementById('bgPreviewApplyBtn')?.addEventListener('click',async()=>{
+  if(!bgEditorState)return;
+  const btn=document.getElementById('bgPreviewApplyBtn');
+  const original=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Applying...';
+  try{
+    if(bgEditorState.mode==='upload'){
+      if(!bgEditorState.file)throw new Error('No image selected.');
+      const fd=new FormData();
+      fd.append('file',bgEditorState.file);
+      fd.append('zoom',bgEditorState.zoom); fd.append('pos_x',bgEditorState.posX);
+      fd.append('pos_y',bgEditorState.posY); fd.append('overlay',bgEditorState.overlay);
+      const r=await fetch('/api/v01/chat/background/upload',{method:'POST',credentials:'same-origin',body:fd});
+      const d=await r.json();
+      if(!r.ok||!d.success)throw new Error(d.message||'Upload failed.');
+      applyChatBackground('custom',null,d);
+      bgSetSavedCustom(true,d);
+    }else if(bgEditorState.mode==='adjust'){
+      const r=await fetch('/api/v01/chat/background/position',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({zoom:bgEditorState.zoom,pos_x:bgEditorState.posX,pos_y:bgEditorState.posY,overlay:bgEditorState.overlay})});
+      const d=await r.json();
+      if(!r.ok||!d.success)throw new Error(d.message||'Unable to update your background.');
+      const merged={url:bgSavedCustom.url,...d};
+      applyChatBackground('custom',null,merged);
+      bgSetSavedCustom(true,merged);
+    }
+    closeBgPreviewModal();
+    showToast('Background updated.','success');
+  }catch(e){showToast(e.message,'error');}
+  finally{btn.disabled=false; btn.innerHTML=original;}
+});
 
 async function loadConversations(){
   const res=await fetch('/api/v01/chat/conversations');
@@ -600,7 +1145,7 @@ async function openConversation(convId,name,otherId,isGroup=false,createdBy=null
       <div class="chat-header-status" id="headerStatus">${membersHtml}</div>
     </div>
     <div class="header-actions">
-      <div class="dropdown">
+      <div class="dd-wrap">
         <div class="icon-btn" onclick="toggleDropdown('headerMenu')" title="Options"><i class="fas fa-ellipsis-v"></i></div>
         <div class="dropdown-menu" id="headerMenu">${menuItems}</div>
       </div>

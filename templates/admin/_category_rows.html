@@ -1,0 +1,40 @@
+{# templates/admin/_category_rows.html
+   Shared macro for one category table row — used by the initial
+   server-render (admin/categories.html) and the AJAX pagination partial,
+   so both stay in sync. #}
+
+{% macro render_category_row(cat) %}
+<tr id="row-{{ cat.id }}">
+  <td>
+    {% if cat.image_url %}
+    <img src="{{ cat.image_url }}" class="cat-thumb"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="cat-thumb-ph" style="display:none">
+      <i class="fas fa-graduation-cap"></i>
+    </div>
+    {% else %}
+    <div class="cat-thumb-ph">
+      <i class="fas fa-graduation-cap"></i>
+    </div>
+    {% endif %}
+  </td>
+  <td><span class="cat-name-cell">{{ cat.name }}</span></td>
+  <td><span class="cat-date-cell">{{ cat.created_at | display_date if cat.created_at else '—' }}</span></td>
+  <td>
+    <div style="display:flex;gap:.3rem">
+      <button class="icon-btn" title="Manage Subcategories"
+              onclick="openSubcats({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}')">
+        <i class="fas fa-sitemap"></i>
+      </button>
+      <button class="icon-btn" title="Edit"
+              onclick="openEdit({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}', '{{ cat.image_url or "" }}')">
+        <i class="fas fa-pencil-alt"></i>
+      </button>
+      <button class="icon-btn danger" title="Delete"
+              onclick="openDelete({{ cat.id }}, '{{ cat.name | replace("'", "\\'") }}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  </td>
+</tr>
+{% endmacro %}

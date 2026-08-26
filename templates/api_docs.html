@@ -5,14 +5,14 @@
 
 <script>
 const API_CONFIG = {
-  baseUrl: "https://smartaiexam-test.onrender.com",
+  baseUrl: {{ BASE_URL | tojson }},
   version: "v01",
   year:    new Date().getFullYear()
 };
 </script>
 <style>
 /* ── MOB SIDEBAR BUTTON (hidden on desktop) ── */
-.apidoc-mob-sb-btn{display:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border2,rgba(255,255,255,.1));background:rgba(128,128,128,.1);color:var(--text1,#f1f3f9);cursor:pointer;flex-shrink:0;order:-1}
+.apidoc-mob-sb-btn{display:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-1);cursor:pointer;flex-shrink:0;order:-1}
 /* ── MOB OVERLAY ── */
 .apidoc-mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:299;backdrop-filter:blur(2px)}
 .apidoc-mob-overlay.active{display:block}
@@ -48,8 +48,8 @@ const API_CONFIG = {
     z-index:300;
     overflow-y:auto !important;
     padding:52px 0 1rem !important;
-    box-shadow:6px 0 28px rgba(0,0,0,.55);
-    background:var(--bg2,#111116)
+    box-shadow:var(--shadow-lg);
+    background:var(--surface)
   }
   /* Force sidebar content visible regardless of sb-collapsed state */
   .apidoc-sidebar .sidebar-search-wrap,
@@ -184,8 +184,11 @@ const API_CONFIG = {
     <div class="sg-header" onclick="toggleGroup('sg-ai')"><span class="sg-label">AI Assistant</span><span class="sg-arrow">▾</span></div>
     <div class="sg-items">
       <a class="sl" href="#ep-ai-init"><span class="mdot mdot-get"></span>GET /api/v01/assistant/init</a>
+      <a class="sl" href="#ep-ai-list"><span class="mdot mdot-get"></span>GET /api/v01/assistant/conversations</a>
+      <a class="sl" href="#ep-ai-messages-list"><span class="mdot mdot-get"></span>GET .../conversations/{id}/messages</a>
       <a class="sl" href="#ep-ai-chat"><span class="mdot mdot-post"></span>POST /api/v01/assistant/messages</a>
-      <a class="sl" href="#ep-ai-clear"><span class="mdot mdot-delete"></span>DELETE /api/v01/assistant/messages</a>
+      <a class="sl" href="#ep-ai-rename"><span class="mdot mdot-post"></span>PATCH .../conversations/{id}</a>
+      <a class="sl" href="#ep-ai-delete"><span class="mdot mdot-delete"></span>DELETE .../conversations/{id}</a>
     </div>
   </div>
 
@@ -388,7 +391,8 @@ print(convs.json())</pre>
       <tr><td><code>/login</code>, <code>/admin/login</code></td><td style="color:var(--red)">3 attempts</td><td>Per IP + identifier</td><td style="color:var(--text2)">15-min lockout</td></tr>
       <tr><td><code>POST /api/v01/chat/conversations/:id/messages</code></td><td style="color:var(--amber)">1 msg / 2s</td><td>Per user</td><td style="color:var(--text2)">429</td></tr>
       <tr><td><code>POST /api/v01/discussions/:id</code></td><td style="color:var(--amber)">1 msg / 10s</td><td>Per user</td><td style="color:var(--text2)">429</td></tr>
-      <tr><td><code>POST /api/v01/assistant/messages</code></td><td style="color:var(--green)">50 / day</td><td>Per user, resets midnight</td><td style="color:var(--text2)">429 with limit_reached:true</td></tr>
+      <tr><td><code>POST /api/v01/assistant/messages</code></td><td style="color:var(--green)">50 / day</td><td>Per user, resets midnight (independent of conversation count)</td><td style="color:var(--text2)">429 with limit_reached:true</td></tr>
+      <tr><td><code>POST /api/v01/assistant/messages</code></td><td style="color:var(--green)">100 / conversation</td><td>Per conversation (~50 exchanges), start a new chat to continue</td><td style="color:var(--text2)">400 with limit_reached:"conversation"</td></tr>
       <tr><td>All other endpoints</td><td style="color:var(--green)">Unlimited</td><td>—</td><td style="color:var(--text2)">—</td></tr>
     </tbody>
   </table>
@@ -858,14 +862,14 @@ print(convs.json())</pre>
   <div class="section-header">
     <span class="section-tag">AI Assistant</span>
     <h2 class="section-title">AI Study Assistant</h2>
-    <p class="section-desc">AI-powered study chat. Responses include LaTeX for math/science. Daily limit: <code>50 messages/user/day</code>.</p>
+    <p class="section-desc">Multi-conversation AI study chat. Each user can have many independent conversations. Responses include LaTeX for math/science. Daily limit: <code>50 messages/user/day</code> (shared across all conversations); per-conversation limit: <code>100 messages/conversation</code>.</p>
   </div>
 
   <div class="ep open" id="ep-ai-init">
     <div class="ep-header" onclick="toggleEp(this)">
       <span class="mb mb-GET">GET</span>
       <span class="ep-path">/api/v01/assistant/init</span>
-      <span class="ep-summary">Get daily limits + full chat history in one call</span>
+      <span class="ep-summary">Get daily limits + first page of conversations (sidebar's first paint)</span>
       <span class="badge-auth">Auth</span>
       <span class="ep-expand">▾</span>
     </div>
@@ -875,11 +879,41 @@ print(convs.json())</pre>
   <span class="n">"success"</span>:       <span class="v">true</span>,
   <span class="n">"dailyLimit"</span>:    <span class="v">50</span>,
   <span class="n">"questionsUsed"</span>: <span class="v">12</span>,
-  <span class="n">"history"</span>: [
-    { <span class="n">"text"</span>: <span class="s">"What is Newton's second law?"</span>, <span class="n">"isUser"</span>: <span class="v">true</span>,  <span class="n">"timestamp"</span>: <span class="s">"2025-01-15T10:30:00"</span> },
-    { <span class="n">"text"</span>: <span class="s">"Newton's second law states $F = ma$..."</span>, <span class="n">"isUser"</span>: <span class="v">false</span>, <span class="n">"timestamp"</span>: <span class="s">"2025-01-15T10:30:05"</span> }
-  ]
+  <span class="n">"conversations"</span>: [
+    { <span class="n">"id"</span>: <span class="v">4</span>, <span class="n">"title"</span>: <span class="s">"Bernoulli's Theorem"</span>, <span class="n">"messageCount"</span>: <span class="v">6</span>, <span class="n">"createdAt"</span>: <span class="s">"..."</span>, <span class="n">"updatedAt"</span>: <span class="s">"..."</span> }
+  ],
+  <span class="n">"hasMoreConversations"</span>: <span class="v">false</span>
 }</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-ai-list">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/v01/assistant/conversations?limit=<span class="param">{20}</span>&amp;offset=<span class="param">{0}</span>&amp;search=<span class="param">{query}</span></span>
+      <span class="ep-summary">Paginated, optionally-searched conversation list (server-side)</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span><code>search</code> matches conversation title or message text (case-insensitive). Max <code>limit</code> is 50.</span></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"conversations"</span>: [ <span class="s">"..."</span> ], <span class="n">"hasMore"</span>: <span class="v">true</span> }</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-ai-messages-list">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-GET">GET</span>
+      <span class="ep-path">/api/v01/assistant/conversations/<span class="param">{id}</span>/messages?limit=<span class="param">{30}</span>&amp;offset=<span class="param">{0}</span></span>
+      <span class="ep-summary">Paginated messages for one conversation (newest 30 first, then older on demand)</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Ownership-checked — returns 404 if the conversation doesn't belong to the caller (never a 403, to avoid leaking existence).</span></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"messages"</span>: [ { <span class="n">"text"</span>: <span class="s">"..."</span>, <span class="n">"isUser"</span>: <span class="v">true</span>, <span class="n">"timestamp"</span>: <span class="s">"..."</span> } ], <span class="n">"hasMore"</span>: <span class="v">true</span>, <span class="n">"conversation"</span>: { <span class="s">"..."</span> } }</pre></div>
     </div>
   </div>
 
@@ -887,7 +921,7 @@ print(convs.json())</pre>
     <div class="ep-header" onclick="toggleEp(this)">
       <span class="mb mb-POST">POST</span>
       <span class="ep-path">/api/v01/assistant/messages</span>
-      <span class="ep-summary">Send message to AI study assistant</span>
+      <span class="ep-summary">Send a message — creates the conversation on first send if conversation_id is omitted</span>
       <span class="badge-auth">Auth</span>
       <span class="ep-expand">▾</span>
     </div>
@@ -899,39 +933,60 @@ print(convs.json())</pre>
       </div>
       <div class="tab-content active" id="t-ai-req">
         <div class="cb"><div class="cb-header"><span class="cb-lang">json</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
-        <pre>{ <span class="n">"message"</span>: <span class="s">"Explain conservation of momentum with an example"</span> }</pre></div>
+        <pre>{ <span class="n">"message"</span>: <span class="s">"Explain conservation of momentum with an example"</span>, <span class="n">"conversation_id"</span>: <span class="v">null</span> }</pre></div>
+        <div class="note note-info"><span class="note-icon">ℹ️</span><span>Omit or pass <code>null</code> for <code>conversation_id</code> to start a new conversation — no empty conversation is created unless a message is actually sent.</span></div>
       </div>
       <div class="tab-content" id="t-ai-res">
         <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span><button class="copy-btn" onclick="copyCode(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>
         <pre>{
   <span class="n">"success"</span>:              <span class="v">true</span>,
   <span class="n">"response"</span>:             <span class="s">"[FINAL ANSWER]\nConservation of momentum states that..."</span>,
+  <span class="n">"conversation_id"</span>:      <span class="v">4</span>,
+  <span class="n">"title"</span>:                <span class="s">"Conservation Of Momentum"</span>,
   <span class="n">"questions_remaining"</span>:  <span class="v">37</span>
 }</pre></div>
       </div>
       <div class="tab-content" id="t-ai-err">
         <div class="rpills">
           <span class="rp rp-4">400 — Message too short or too long</span>
-          <span class="rp rp-4">429 — Daily limit reached</span>
+          <span class="rp rp-4">400 — Conversation message limit reached (limit_reached:"conversation")</span>
+          <span class="rp rp-4">404 — Conversation not found / not owned by caller</span>
+          <span class="rp rp-4">429 — Daily limit reached, or a previous send is still in flight</span>
         </div>
         <div class="cb"><div class="cb-header"><span class="cb-lang">json — 429</span></div>
-        <pre>{ <span class="n">"success"</span>: <span class="v">false</span>, <span class="n">"message"</span>: <span class="s">"Daily limit reached."</span>, <span class="n">"limit_reached"</span>: <span class="v">true</span> }</pre></div>
+        <pre>{ <span class="n">"success"</span>: <span class="v">false</span>, <span class="n">"message"</span>: <span class="s">"Daily limit reached. Resets at midnight."</span>, <span class="n">"limit_reached"</span>: <span class="v">true</span> }</pre></div>
       </div>
     </div>
   </div>
 
-  <div class="ep" id="ep-ai-clear">
+  <div class="ep" id="ep-ai-rename">
     <div class="ep-header" onclick="toggleEp(this)">
-      <span class="mb mb-DELETE" style="background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);">DELETE</span>
-      <span class="ep-path">/api/v01/assistant/messages</span>
-      <span class="ep-summary">Delete all AI chat history for current user</span>
+      <span class="mb mb-POST" style="background:var(--info-bg,rgba(56,189,248,.12));color:var(--info-text,#38bdf8);border:1px solid var(--info-border,rgba(56,189,248,.3));">PATCH</span>
+      <span class="ep-path">/api/v01/assistant/conversations/<span class="param">{id}</span></span>
+      <span class="ep-summary">Rename a conversation (max 70 characters)</span>
       <span class="badge-auth">Auth</span>
       <span class="ep-expand">▾</span>
     </div>
     <div class="ep-body">
-      <div class="note note-info"><span class="note-icon">ℹ️</span><span>No request body. Deletes all rows from <code>ai_chat_history</code>. Daily usage counter is NOT reset.</span></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json</span></div>
+      <pre>{ <span class="n">"title"</span>: <span class="s">"Bernoulli's Theorem"</span> }</pre></div>
       <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
-      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: <span class="s">"Chat history cleared."</span> }</pre></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"conversation"</span>: { <span class="s">"..."</span> } }</pre></div>
+    </div>
+  </div>
+
+  <div class="ep" id="ep-ai-delete">
+    <div class="ep-header" onclick="toggleEp(this)">
+      <span class="mb mb-DELETE" style="background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);">DELETE</span>
+      <span class="ep-path">/api/v01/assistant/conversations/<span class="param">{id}</span></span>
+      <span class="ep-summary">Permanently delete one conversation and its messages</span>
+      <span class="badge-auth">Auth</span>
+      <span class="ep-expand">▾</span>
+    </div>
+    <div class="ep-body">
+      <div class="note note-info"><span class="note-icon">ℹ️</span><span>Ownership-checked — 404 if not owned. Cascades to the conversation's <code>ai_chat_history</code> rows. Does not affect the daily usage counter.</span></div>
+      <div class="cb"><div class="cb-header"><span class="cb-lang">json — 200</span></div>
+      <pre>{ <span class="n">"success"</span>: <span class="v">true</span>, <span class="n">"message"</span>: <span class="s">"Conversation deleted."</span> }</pre></div>
     </div>
   </div>
 </section>
@@ -2200,7 +2255,7 @@ images:            <span class="s">&lt;file&gt;, &lt;file&gt;, ...</span>  <span
   <div class="admin-grid">
     <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/, /about, /contact, /support, /privacy-policy, /terms-of-service, /account-deletion-policy</div><div class="ag-desc">Public static pages</div></div></div>
     <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/login, /create_account, /select-portal, /logout</div><div class="ag-desc">Auth pages</div></div></div>
-    <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/reset-password[/{token}], /setup-password/{token}, /request-admin-access</div><div class="ag-desc">Password reset / account setup / access-request pages</div></div></div>
+    <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/reset-password[/{token}], /setup-password/{token}</div><div class="ag-desc">Password reset / account setup pages</div></div></div>
     <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/auth/google, /auth/google/callback</div><div class="ag-desc">Google OAuth redirect flow — never rename, registered with Google's console</div></div></div>
     <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/dashboard, /results_history, /analytics</div><div class="ag-desc">Student dashboard, exam history, personal analytics</div></div></div>
     <div class="ag-row"><span class="ag-method mb-GET">GET</span><div><div class="ag-path">/select-category, /set-category</div><div class="ag-desc">Category selection</div></div></div>
@@ -2229,7 +2284,7 @@ images:            <span class="s">&lt;file&gt;, &lt;file&gt;, ...</span>  <span
 <footer class="apidoc-footer">
   <div class="footer-left">
     <span>© <span id="footer-year">2025</span> SmartAIExam</span>
-    <span style="color:var(--border2)">·</span>
+    <span style="color:var(--text-3)">·</span>
     <span>API Reference <span id="footer-version">v01</span></span>
   </div>
       <a class="footer-logo">

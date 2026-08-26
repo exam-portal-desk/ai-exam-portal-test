@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Profile & Account — SmartAIExam{% endblock %}
+{% block title %}Profile & Account - SmartAIExam{% endblock %}
 {% set active_nav = 'profile' %}
 
 {% block content %}
@@ -57,6 +57,23 @@
   .pf-row-val { font-size:.85rem; font-weight:600; color:var(--text-1); text-align:right; }
   .pf-sec-hdr { padding:1.1rem 1.75rem .3rem; display:flex; align-items:center; gap:.4rem; }
   .pf-sec-hdr h6 { font-size:.95rem; font-weight:700; color:var(--text-1); margin:0; }
+
+  /* Admin Access request section — status-badge/status-* mirrors the same
+     pattern already used on the admin's own requests review page
+     (templates/admin/requests.html), kept local here rather than reusing
+     base.html's .abadge/.ab-* (those mix "access level" and "status"
+     badges into one set and have a status-string mismatch bug). */
+  .status-badge { display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .6rem; border-radius:999px; font-size:.72rem; font-weight:700; border:1px solid var(--border); }
+  .status-badge.status-pending { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+  .status-badge.status-completed { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+  .status-badge.status-denied { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+  .aar-status-row { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; }
+  .aar-date { font-size:.72rem; color:var(--text-3); }
+  .aar-note { font-size:.8rem; line-height:1.55; color:var(--text-2); margin:.6rem 0 0; }
+  .aar-form { margin-top:.9rem; display:grid; gap:.6rem; }
+  .aar-form[hidden] { display:none; }
+  .aar-form label { display:grid; gap:.35rem; font-size:.75rem; font-weight:600; color:var(--text-2); }
+  .aar-form-actions { display:flex; justify-content:flex-end; gap:.5rem; }
 
   /* Lightbox */
   .pf-lightbox { display:none; position:fixed; inset:0; z-index:900; background:rgba(0,0,0,.75); align-items:center; justify-content:center; padding:1.5rem; }
@@ -118,12 +135,60 @@
       </div>
       <div class="pf-row">
         <span class="pf-row-lbl"><i class="fas fa-clock"></i> Last Login</span>
-        <span class="pf-row-val">{{ profile.last_login | display_dt if profile.last_login else '—' }}</span>
+        <span class="pf-row-val">{{ last_login_display | display_dt if last_login_display else '—' }}</span>
       </div>
       <div class="pf-row">
         <span class="pf-row-lbl"><i class="fas fa-key"></i> Sign-in Method</span>
         <span class="pf-row-val">{{ 'Google' if profile.auth_provider == 'google' else 'Email & Password' }}</span>
       </div>
+    </div>
+  </div>
+
+  <div class="pf-card">
+    <div class="pf-sec-hdr"><i class="fas fa-user-shield" style="color:var(--accent)"></i><h6>Admin Access</h6></div>
+    <div class="pf-body" style="padding-top:.3rem">
+      {% set req = latest_access_request %}
+      {% set req_status = req.request_status if req else None %}
+
+      {% if req_status == 'pending' %}
+        <div class="aar-status-row">
+          <span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending Review</span>
+          <span class="aar-date">Submitted {{ req.request_date | display_dt if req.request_date else '' }}</span>
+        </div>
+        <p class="aar-note">Your request for admin access is awaiting review by an administrator. You'll be able to submit a new request if this one isn't approved.</p>
+      {% elif req_status == 'completed' %}
+        <div class="aar-status-row">
+          <span class="status-badge status-completed"><i class="fas fa-check-circle"></i> Approved</span>
+          <span class="aar-date">{{ req.processed_date | display_dt if req.processed_date else '' }}</span>
+        </div>
+        <p class="aar-note">Your request for admin access was approved.</p>
+      {% elif req_status == 'denied' %}
+        <div class="aar-status-row">
+          <span class="status-badge status-denied"><i class="fas fa-times-circle"></i> Not Approved</span>
+          <span class="aar-date">{{ req.processed_date | display_dt if req.processed_date else '' }}</span>
+        </div>
+        {% if req.reason %}<p class="aar-note">{{ req.reason }}</p>{% endif %}
+      {% endif %}
+
+      {% if can_request_access %}
+        {% if not req_status %}
+        <p class="aar-note">Request elevated permissions to manage exams, questions, and student data.</p>
+        {% endif %}
+        <button class="sbtn {{ 'sbtn-ghost' if req_status == 'denied' else 'sbtn-primary' }}" type="button" style="margin-top:.7rem" onclick="pfToggleAccessForm(true)">
+          <i class="fas {{ 'fa-redo' if req_status == 'denied' else 'fa-user-shield' }}"></i> {{ 'Request Again' if req_status == 'denied' else 'Request Admin Access' }}
+        </button>
+        <div class="aar-form" id="aarForm" hidden>
+          <label>Reason for request
+            <textarea class="auth-textarea" id="aarReason" maxlength="500" placeholder="Briefly explain why you need admin access"></textarea>
+          </label>
+          <div class="aar-form-actions">
+            <button class="sbtn sbtn-ghost" type="button" onclick="pfToggleAccessForm(false)">Cancel</button>
+            <button class="sbtn sbtn-primary" type="button" id="aarSubmitBtn" onclick="pfSubmitAccessRequest()"><i class="fas fa-paper-plane"></i> Submit Request</button>
+          </div>
+        </div>
+      {% elif not req_status %}
+        <p class="aar-note">You already have admin access.</p>
+      {% endif %}
     </div>
   </div>
 
@@ -256,5 +321,38 @@ function pfConfirmRemovePhoto(){
 document.addEventListener('keydown', function(e){
   if(e.key==='Escape'){ pfCloseLightbox(); pfCloseRemoveConfirm(); }
 });
+
+function pfToggleAccessForm(show){
+  var f = document.getElementById('aarForm');
+  if(!f) return;
+  f.hidden = !show;
+  if(show) document.getElementById('aarReason')?.focus();
+}
+
+var aarSubmitting = false;
+function pfSubmitAccessRequest(){
+  if(aarSubmitting) return;
+  var textarea = document.getElementById('aarReason');
+  var reason = (textarea.value || '').trim();
+  if(!reason){ appToast('Please provide a reason', 'danger'); textarea.focus(); return; }
+
+  var btn = document.getElementById('aarSubmitBtn');
+  aarSubmitting = true;
+  btn.disabled = true;
+  var originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+
+  fetch('{{ url_for("profile_api.submit_admin_access_request") }}', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason }),
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.success){ appToast('Request submitted'); setTimeout(function(){ window.location.reload(); }, 500); }
+      else { appToast('Could not submit request', 'danger', d.message || 'Please try again.'); aarSubmitting = false; btn.disabled = false; btn.innerHTML = originalHtml; }
+    })
+    .catch(function(){ appToast('Network error', 'danger', 'Please try again.'); aarSubmitting = false; btn.disabled = false; btn.innerHTML = originalHtml; });
+}
 </script>
 {% endblock %}

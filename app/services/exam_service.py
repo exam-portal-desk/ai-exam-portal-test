@@ -219,6 +219,100 @@ def preload_exam_data(exam_id: int) -> Tuple[bool, str]:
     return True, f"Successfully loaded {len(processed)} questions"
 
 
+# ─────────────────────────────────────────────
+# Exam action-state / time-window (shared by exam_instructions() and the
+# Student Dashboard's "Today's Exams" cards — single source of truth so both
+# apply the exact same Start/Resume/attempts-exhausted rules)
+# ─────────────────────────────────────────────
+
+def compute_exam_action_state(user_id: int, exam: Dict) -> Dict:
+    """Start/Resume/attempts-exhausted decision, extracted from the logic
+    that used to be inlined in app/routes/web/exams.py:exam_instructions()."""
+    from app.db.attempts import get_active_attempt, get_completed_attempts_count
+
+    exam_id = int(exam["id"])
+    active_attempt = get_active_attempt(user_id, exam_id)
+    completed_count = get_completed_attempts_count(user_id, exam_id)
+    max_attempts = safe_int(exam.get("max_attempts"), 0)
+
+    if max_attempts > 0:
+        attempts_left = max(max_attempts - completed_count, 0)
+        attempts_exhausted = (attempts_left == 0)
+        can_start = not attempts_exhausted
+    else:
+        attempts_left = None
+        attempts_exhausted = False
+        can_start = True
+
+    if active_attempt:
+        can_start = False
+
+    return {
+        "active_attempt": active_attempt,
+        "attempts_left": attempts_left,
+        "max_attempts": max_attempts,
+        "attempts_exhausted": attempts_exhausted,
+        "can_start": can_start,
+    }
+
+
+def _ampm(dt) -> str:
+    """'22:00' -> '10:00 PM' (no leading zero on the hour)."""
+    s = dt.strftime("%I:%M %p")
+    return s[1:] if s.startswith("0") else s
+
+
+def get_exam_time_window(exam: Dict) -> Dict:
+    """Derives the exam's real start/end instants from date+start_time+
+    duration — the only fields an exam actually stores (no dedicated
+    end_time column). date/start_time are confirmed HTML5 date/time inputs
+    stored verbatim as YYYY-MM-DD / HH:MM wall-clock strings in
+    config.APP_TIMEZONE, safe to parse and attach that zone to directly.
+
+    Returns absolute, timezone-aware instants (start_iso/end_iso) rather
+    than a relative "seconds remaining" snapshot — the client computes and
+    continuously re-derives the countdown from these against its own clock,
+    so it stays correct across refreshes, popup reopens, or any caching,
+    with nothing time-sensitive ever persisted or reused stale.
+
+    has_started/has_ended reflect the exam's REAL scheduled window — not the
+    admin-set `status` column (which this app never flips automatically) —
+    so a student can correctly start an exam the instant its real start time
+    arrives even if an admin hasn't manually relabelled it "ongoing" yet.
+    """
+    from datetime import datetime as _dt, timedelta
+    from app.utils.datetime_service import now_app_tz, app_timezone
+
+    try:
+        naive_start = _dt.strptime(f"{exam.get('date')} {exam.get('start_time')}", "%Y-%m-%d %H:%M")
+    except Exception:
+        return {
+            "start_dt": None, "start_iso": None, "end_iso": None,
+            "start_time_ampm": "", "end_time_ampm": "",
+            "has_started": False, "has_ended": False,
+        }
+
+    start_dt = naive_start.replace(tzinfo=app_timezone())
+    duration_min = safe_int(exam.get("duration"), 60) or 60
+    end_dt = start_dt + timedelta(minutes=duration_min)
+
+    end_time_ampm = _ampm(end_dt)
+    if end_dt.date() != start_dt.date():
+        end_time_ampm += " (+1d)"
+
+    now = now_app_tz()
+
+    return {
+        "start_dt": start_dt,
+        "start_iso": start_dt.isoformat(),
+        "end_iso": end_dt.isoformat(),
+        "start_time_ampm": _ampm(start_dt),
+        "end_time_ampm": end_time_ampm,
+        "has_started": now >= start_dt,
+        "has_ended": now >= end_dt,
+    }
+
+
 def _process_image(image_path: str) -> Tuple[bool, Optional[str]]:
     try:
         from app.services.image_storage_service import resolve_question_image_url

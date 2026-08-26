@@ -19,6 +19,8 @@ from app.db.results import (
     get_result_by_id, get_latest_result_by_user_exam, get_responses_by_result,
 )
 from app.services.result_service import can_user_see_result
+from app.services.ranking_service import build_exam_performance, get_more_leaderboard_rows
+from app.db.dashboard_events import mark_event_seen
 
 result_bp = Blueprint("result", __name__)
 
@@ -48,9 +50,44 @@ def result(exam_id, result_id):
                                reason=reason, result_id=result_data["id"],
                                from_history=False)
 
+    mark_event_seen(user_id, "result", result_data["id"])
 
-    return render_template("result.html", result=result_data, exam=exam,
+    perf = build_exam_performance(exam, result_data, user_id)
+
+    return render_template("result.html", result=result_data, exam=exam, perf=perf,
                            from_history=request.args.get("from_history","0") == "1")
+
+
+# ─────────────────────────────────────────────
+# Leaderboard "View full leaderboard" (AJAX load-more)
+# ─────────────────────────────────────────────
+
+@result_bp.route("/result/<int:exam_id>/leaderboard")
+@require_user_role
+def leaderboard_more(exam_id):
+    user_id = session["user_id"]
+
+    # Same ownership/visibility gate as the result page itself — only a
+    # user who has a visible completed result for this exam can browse its
+    # leaderboard.
+    result_data = _resolve_result(user_id, exam_id, None)
+    if not result_data:
+        abort(404)
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        abort(404)
+    visible, _ = can_user_see_result(exam, result_data)
+    if not visible:
+        abort(404)
+
+    try:
+        after_rank = int(request.args.get("after_rank", 10))
+        limit = int(request.args.get("limit", 20))
+    except (TypeError, ValueError):
+        abort(400)
+
+    rows = get_more_leaderboard_rows(exam_id, user_id, after_rank, limit)
+    return render_template("partials/leaderboard_rows.html", rows=rows, last_rank=after_rank)
 
 
 # ─────────────────────────────────────────────

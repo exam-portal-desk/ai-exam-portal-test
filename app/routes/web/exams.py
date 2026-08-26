@@ -40,10 +40,10 @@ from app.db.sessions import set_exam_active
 from app.services.exam_service import (
     get_cached_exam_data, preload_exam_data,
     check_answer, calculate_question_score,
-    purge_exam_session_cache,
+    purge_exam_session_cache, compute_exam_action_state,
 )
 from app.services.result_service import can_user_see_result
-from app.utils.helpers import safe_int
+from app.db.dashboard_events import mark_event_seen
 
 log = logging.getLogger(__name__)
 exam_bp = Blueprint("exam", __name__)
@@ -98,32 +98,19 @@ def exam_instructions(exam_id):
     exam.setdefault("positive_marks", 1)
     exam.setdefault("negative_marks", 0)
 
-    user_id         = session["user_id"]
-    active_attempt  = get_active_attempt(user_id, exam_id)
-    from app.db.attempts import get_completed_attempts_count
-    completed_count = get_completed_attempts_count(user_id, exam_id)
-    max_attempts    = safe_int(exam.get("max_attempts"), 0)
+    user_id = session["user_id"]
+    mark_event_seen(user_id, "new_exam", exam_id)
 
-    if max_attempts > 0:
-        attempts_left      = max(max_attempts - completed_count, 0)
-        attempts_exhausted = (attempts_left == 0)
-        can_start          = not attempts_exhausted
-    else:
-        attempts_left      = None
-        attempts_exhausted = False
-        can_start          = True
-
-    if active_attempt:
-        can_start = False
+    state = compute_exam_action_state(user_id, exam)
 
     return render_template(
         "exam_instructions.html",
         exam=exam,
-        active_attempt=active_attempt,
-        attempts_left=attempts_left,
-        max_attempts=max_attempts,
-        attempts_exhausted=attempts_exhausted,
-        can_start=can_start,
+        active_attempt=state["active_attempt"],
+        attempts_left=state["attempts_left"],
+        max_attempts=state["max_attempts"],
+        attempts_exhausted=state["attempts_exhausted"],
+        can_start=state["can_start"],
     )
 
 

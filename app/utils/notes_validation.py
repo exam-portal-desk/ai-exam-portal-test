@@ -10,6 +10,10 @@ VISIBILITIES = {"private", "public", "unlisted"}
 MAX_TITLE_LENGTH = 160
 MAX_DESCRIPTION_LENGTH = 2_000
 
+# Notebook sharing permission levels — Viewer (read-only) or Editor (can
+# modify content, not ownership/sharing/visibility). See notes_service.py.
+SHARE_PERMISSIONS = {"viewer", "editor"}
+
 # Single source of truth for canvas object types the app understands.
 # Shared by notes_service.save_page_objects() (editor autosave) and the
 # notebook importer below, so the two can never silently drift apart.
@@ -31,11 +35,24 @@ class NotesValidationError(ValueError):
     """Raised when Notes input is invalid."""
 
 
+class NotesPermissionError(NotesValidationError):
+    """Raised when the acting user lacks sufficient permission for the
+    requested action — kept distinct from NotesValidationError so routes can
+    map it to 403 (forbidden) instead of 400 (bad request)."""
+
+
 def validate_notebook_id(value: str) -> str:
     try:
         return str(UUID(str(value)))
     except (TypeError, ValueError, AttributeError) as exc:
         raise NotesValidationError("Invalid notebook identifier.") from exc
+
+
+def validate_share_permission(value: Any) -> str:
+    permission = str(value or "").lower().strip()
+    if permission not in SHARE_PERMISSIONS:
+        raise NotesValidationError("Permission must be 'viewer' or 'editor'.")
+    return permission
 
 
 def normalize_notebook_payload(payload: Dict[str, Any], *, partial: bool = False) -> Dict[str, Any]:

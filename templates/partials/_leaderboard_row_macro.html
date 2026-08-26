@@ -1,0 +1,20 @@
+{# Single leaderboard row — imported by result.html (initial Top 10) AND
+   partials/leaderboard_rows.html (AJAX "load more"), so the markup can
+   never drift between the two render paths. #}
+{% macro leaderboard_row(row) %}
+<div class="lb-row{{ ' lb-row-you' if row.is_current_user else '' }}{{ ' lb-row-medal' if row.rank <= 3 else '' }}" data-rank="{{ row.rank }}">
+  <div class="lb-rank">{% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% else %}{{ row.rank }}{% endif %}</div>
+  <div class="lb-avatar{{ row.avatar_class }}">
+    {% if row.avatar_url %}<img src="{{ row.avatar_url }}" alt="">{% else %}{{ row.initials }}{% endif %}
+  </div>
+  <div class="lb-name-wrap">
+    <div class="lb-name">{{ row.name }}{% if row.is_current_user %}<span class="lb-you-tag">You</span>{% endif %}</div>
+    {% if row.time_taken_minutes is not none %}<div class="lb-time">{{ row.time_taken_minutes }} min</div>{% endif %}
+  </div>
+  <div class="lb-stats">
+    <span class="lb-score">{{ row.score }}/{{ row.max_score }}</span>
+    <span class="lb-pct">{{ row.percentage }}%</span>
+    {% if row.accuracy is not none %}<span class="lb-acc">{{ row.accuracy }}% acc</span>{% endif %}
+  </div>
+</div>
+{% endmacro %}

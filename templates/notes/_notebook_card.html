@@ -1,0 +1,22 @@
+{% macro notebook_card(notebook, shared_with_me=false) %}
+<article class="notebook-card" data-notebook-id="{{ notebook.id }}" data-description="{{ notebook.description or '' }}" data-shared="{{ 'true' if shared_with_me else 'false' }}">
+  <div class="notebook-card-top">
+    <span class="notebook-icon"><i class="fas fa-book"></i></span>
+    <button class="notebook-menu" aria-label="Notebook actions" aria-haspopup="true" aria-expanded="false" data-menu-toggle><i class="fas fa-ellipsis-h"></i></button>
+  </div>
+  <h2>{{ notebook.title }}</h2>
+  <p>{{ notebook.description or 'No description yet.' }}</p>
+  <div class="notebook-meta">
+    {% if notebook.subject %}<span><i class="fas fa-tag"></i>{{ notebook.subject }}</span>{% endif %}
+    {% if notebook.is_imported %}<span class="imported-badge"><i class="fas fa-file-import"></i>Imported</span>{% endif %}
+    {% if shared_with_me %}
+    <span class="shared-badge"><i class="fas fa-{{ 'pen' if notebook.permission == 'editor' else 'eye' }}"></i>{{ notebook.permission|title }}</span>
+    <span><i class="fas fa-user"></i>{{ notebook.owner_full_name or notebook.owner_username }}</span>
+    {% else %}
+    <span class="visibility-pill visibility-{{ notebook.visibility }}"><i class="fas fa-{{ 'lock' if notebook.visibility == 'private' else 'globe' if notebook.visibility == 'public' else 'link' }}"></i>{{ notebook.visibility|title }}</span>
+    {% if notebook.share_count %}<span class="shared-badge"><i class="fas fa-share-alt"></i>Shared{{ ' (%d)'|format(notebook.share_count) }}</span>{% endif %}
+    {% endif %}
+  </div>
+  <div class="notebook-card-footer"><span>Updated {{ notebook.updated_at | display_date if notebook.updated_at else 'recently' }}</span><a href="{{ url_for('notes.notebook_editor', notebook_id=notebook.id) }}" class="soon-label">Open notebook <i class="fas fa-arrow-right"></i></a></div>
+</article>
+{% endmacro %}

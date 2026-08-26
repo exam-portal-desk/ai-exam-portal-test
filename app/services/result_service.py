@@ -81,6 +81,45 @@ def can_user_see_result(exam: dict, result: dict) -> Tuple[bool, str]:
 
 
 # ─────────────────────────────────────────────
+# Student dashboard exam cards — shared between the initial server render
+# (app/routes/web/dashboard.py) and the paginated "load more" AJAX endpoint
+# (app/routes/api/v01/portal.py), so both build cards identically.
+# ─────────────────────────────────────────────
+
+def build_result_map(user_results: List[Dict]) -> Dict[int, Dict]:
+    """exam_id -> most recent result, for attaching a score/grade to
+    completed-exam cards."""
+    result_map: Dict[int, Dict] = {}
+    for r in user_results:
+        eid = int(r.get("exam_id", 0))
+        if eid not in result_map or r.get("completed_at", "") > result_map[eid].get("completed_at", ""):
+            result_map[eid] = r
+    return result_map
+
+
+def build_exam_card(exam: Dict, result_map: Optional[Dict[int, Dict]] = None) -> Dict:
+    """Trim an exams-table row down to what the dashboard exam card needs,
+    and (for completed exams) attach the student's own result summary."""
+    status = str(exam.get("status", "draft")).lower().strip()
+    ed = {
+        "id":              int(exam.get("id", 0)),
+        "name":            exam.get("name", "Unnamed Exam"),
+        "date":            exam.get("date", ""),
+        "start_time":      exam.get("start_time", ""),
+        "duration":        exam.get("duration", 60),
+        "total_questions": exam.get("total_questions", 0),
+        "status":          status,
+        "instructions":    exam.get("instructions", ""),
+        "positive_marks":  exam.get("positive_marks", "1"),
+        "negative_marks":  exam.get("negative_marks", "0"),
+    }
+    if status == "completed" and result_map is not None:
+        r = result_map.get(int(ed["id"]))
+        ed["result"] = f"{r.get('score')}/{r.get('max_score')} ({r.get('grade', 'N/A')})" if r else "Pending"
+    return ed
+
+
+# ─────────────────────────────────────────────
 # Student analytics
 # ─────────────────────────────────────────────
 

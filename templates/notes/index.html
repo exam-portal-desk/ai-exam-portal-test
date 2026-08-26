@@ -4,12 +4,13 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='notes/notes.css') }}">
+{% from "notes/_notebook_card.html" import notebook_card %}
 <main class="notes-page" id="notesApp">
   <div class="notes-header">
     <div>
       <div class="notes-kicker"><i class="fas fa-book-open"></i> Workspace</div>
       <h1>My Notes</h1>
-      <p>Create private notebooks for your study material. Publishing and the editor arrive next.</p>
+      <p>Create private notebooks for your study material — write, draw, organize into pages, and share them with classmates.</p>
     </div>
     <div class="notes-header-actions">
       <a href="{{ url_for('notes.notes_trash') }}" class="sbtn sbtn-ghost"><i class="fas fa-trash-alt"></i> Trash</a>
@@ -18,44 +19,95 @@
     </div>
   </div>
 
-  <div class="notes-toolbar" {% if not notebooks %}hidden{% endif %}>
-    <div class="notes-search"><i class="fas fa-search"></i><input id="notebookSearch" type="search" placeholder="Search your notebooks" autocomplete="off"></div>
-    <span id="notebookCount" class="notes-count">{{ notebooks|length }} notebook{{ '' if notebooks|length == 1 else 's' }}</span>
+  {% set section_icons = {'created': 'book', 'imported': 'file-import', 'public': 'globe', 'shared_with_me': 'inbox', 'shared_by_me': 'share-alt'} %}
+  {% set empty_copy = {
+    'created': ('No notebooks yet', 'Create your first notebook to start organizing notes, pages, drawings, and study material.'),
+    'imported': ('Nothing imported yet', 'Notebooks you import from a Notebook file will show up here.'),
+    'public': ('No public notebooks yet', 'Notebooks you set to Public will show up here.'),
+    'shared_with_me': ('Nothing shared with you yet', 'Notebooks other people share with you will show up here.'),
+    'shared_by_me': ('You haven\'t shared any notebooks', 'Share a notebook with specific people from its "Share" menu action — it will show up here.'),
+  } %}
+
+  <nav class="notebook-tabs" id="notebookTabs" role="tablist" aria-label="Notebook library sections">
+    {% for section in sections %}
+    <button type="button" class="notebook-tab{{ ' active' if section == active_section else '' }}" data-section="{{ section }}" role="tab" aria-selected="{{ 'true' if section == active_section else 'false' }}">
+      <i class="fas fa-{{ section_icons[section] }}"></i> {{ section_labels[section] }}
+    </button>
+    {% endfor %}
+  </nav>
+
+  <div class="notes-toolbar">
+    <div class="notes-search"><i class="fas fa-search"></i><input id="notebookSearch" type="search" placeholder="Search notebooks" autocomplete="off"></div>
+    <div class="view-toggle" id="viewToggle" role="group" aria-label="Notebook view">
+      <button type="button" data-view="grid" class="{{ 'active' if view_mode != 'list' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode != 'list' else 'false' }}"><i class="fas fa-th-large"></i></button>
+      <button type="button" data-view="list" class="{{ 'active' if view_mode == 'list' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode == 'list' else 'false' }}"><i class="fas fa-list"></i></button>
+    </div>
   </div>
 
-  <section class="notebook-grid" id="notebookGrid">
-    {% for notebook in notebooks %}
-    <article class="notebook-card" data-notebook-id="{{ notebook.id }}" data-description="{{ notebook.description or '' }}" data-search="{{ (notebook.title ~ ' ' ~ (notebook.subject or '') ~ ' ' ~ (notebook.course or '') ~ ' ' ~ (notebook.tags or [])|join(' '))|lower }}">
-      <div class="notebook-card-top">
-        <span class="notebook-icon"><i class="fas fa-book"></i></span>
-        <div class="notebook-menu-wrap">
-          <button class="notebook-menu" aria-label="Notebook actions" data-menu-toggle><i class="fas fa-ellipsis-h"></i></button>
-          <div class="notebook-menu" data-menu>
-            <button data-action="export"><i class="fas fa-download"></i> Export JSON</button>
-            <button data-action="edit"><i class="fas fa-pen"></i> Edit</button>
-            <button data-action="visibility"><i class="fas fa-lock"></i> Visibility</button>
-            <button class="danger" data-action="delete"><i class="fas fa-trash-alt"></i> Move to Trash</button>
-          </div>
-        </div>
-      </div>
-      <h2>{{ notebook.title }}</h2>
-      <p>{{ notebook.description or 'No description yet.' }}</p>
-      <div class="notebook-meta">
-        {% if notebook.subject %}<span><i class="fas fa-tag"></i>{{ notebook.subject }}</span>{% endif %}
-        <span class="visibility-pill visibility-{{ notebook.visibility }}"><i class="fas fa-{{ 'lock' if notebook.visibility == 'private' else 'globe' if notebook.visibility == 'public' else 'link' }}"></i>{{ notebook.visibility|title }}</span>
-      </div>
-      <div class="notebook-card-footer"><span>Updated {{ notebook.updated_at | display_date if notebook.updated_at else 'recently' }}</span><a href="{{ url_for('notes.notebook_editor', notebook_id=notebook.id) }}" class="soon-label">Open notebook <i class="fas fa-arrow-right"></i></a></div>
-    </article>
-    {% endfor %}
-  </section>
+  <div class="notebook-section-loading" id="notebookLoading" hidden><i class="fas fa-spinner fa-spin"></i> Loading…</div>
 
-  <section class="notes-empty" id="notesEmpty" {% if notebooks %}hidden{% endif %}>
-    <div class="notes-empty-icon"><i class="fas fa-book-open"></i></div>
-    <h2>Your workspace is ready</h2>
-    <p>Create your first notebook to start organizing notes, pages, drawings, and study material.</p>
-    <button class="sbtn sbtn-primary" type="button" data-open-modal="createNotebookModal"><i class="fas fa-plus"></i> Create first notebook</button>
-  </section>
+  <div class="notebook-grid {{ 'list-view' if view_mode == 'list' else '' }}" id="notebookGrid" data-section="{{ active_section }}" data-offset="{{ notebooks|length }}" data-has-more="{{ 'true' if has_more else 'false' }}" {% if not notebooks %}hidden{% endif %}>
+    {% for notebook in notebooks %}{{ notebook_card(notebook, shared_with_me=(active_section == 'shared_with_me')) }}{% endfor %}
+  </div>
+
+  <div class="notes-load-more-wrap" id="notebookLoadMoreWrap" {% if not has_more %}hidden{% endif %}>
+    <button class="sbtn sbtn-ghost" type="button" id="notebookLoadMore"><i class="fas fa-chevron-down"></i> Load more</button>
+  </div>
+
+  <div class="notes-empty" id="notebookSectionEmpty" {% if notebooks %}hidden{% endif %}>
+    <div class="notes-empty-icon"><i class="fas fa-{{ section_icons[active_section] }}" id="notebookSectionEmptyIcon"></i></div>
+    <h2 id="notebookSectionEmptyTitle">{{ empty_copy[active_section][0] }}</h2>
+    <p id="notebookSectionEmptyText">{{ empty_copy[active_section][1] }}</p>
+    <button class="sbtn sbtn-primary" type="button" id="notebookSectionEmptyAction" data-open-modal="createNotebookModal" {% if active_section != 'created' %}hidden{% endif %}><i class="fas fa-plus"></i> Create first notebook</button>
+  </div>
 </main>
+
+<!-- Single shared action menu reused by every card (Grid or List, any
+     section) — positioned via JS at the clicked kebab button's location
+     (see notebooks.js). Living outside any card avoids the stacking-order
+     clipping bug where a later sibling card would paint over an earlier
+     card's dropdown. -->
+<div class="notebook-menu-panel" id="notebookActionMenu" role="menu" hidden>
+  <button data-action="export-json" role="menuitem"><i class="fas fa-file-code"></i> Export JSON</button>
+  <button data-action="export-pdf" role="menuitem"><i class="fas fa-file-pdf"></i> Export PDF</button>
+  <button data-action="edit" role="menuitem" data-owner-only><i class="fas fa-pen"></i> Edit</button>
+  <button data-action="visibility" role="menuitem" data-owner-only><i class="fas fa-lock"></i> Visibility</button>
+  <button data-action="share" role="menuitem" data-owner-only><i class="fas fa-user-plus"></i> Share</button>
+  <button class="danger" data-action="delete" role="menuitem" data-owner-only><i class="fas fa-trash-alt"></i> Move to Trash</button>
+  <button class="danger" data-action="leave" role="menuitem" data-shared-only hidden><i class="fas fa-sign-out-alt"></i> Remove from My Notebooks</button>
+</div>
+
+<!-- Sharing dialog: search + add users with a per-person Viewer/Editor permission, plus a live
+     "currently has access" list the owner can edit/remove from directly (see notebooks.js). -->
+<div class="modal-bd" id="shareNotebookModal" aria-hidden="true">
+  <div class="modal-box notes-modal share-modal">
+    <div class="modal-hdr">
+      <div class="share-modal-heading">
+        <h5><i class="fas fa-user-plus" style="color:var(--accent)"></i> Share notebook</h5>
+        <p class="share-modal-subtitle" id="shareNotebookTitle"></p>
+      </div>
+      <button class="modal-x" data-close-modal="shareNotebookModal"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-bdy notes-form">
+      <label>Search users
+        <div class="share-search-wrap">
+          <input class="input" id="shareUserSearch" type="search" placeholder="Search by username" autocomplete="off">
+          <div class="share-search-results" id="shareSearchResults" hidden></div>
+        </div>
+      </label>
+      <div id="sharePendingSection" hidden>
+        <div class="share-list-label">Adding</div>
+        <div class="share-list" id="sharePendingList"></div>
+      </div>
+      <div id="shareCurrentSection" hidden>
+        <div class="share-list-label">Currently has access</div>
+        <div class="share-list" id="shareCurrentList"></div>
+      </div>
+      <p class="notes-form-message" id="shareNotebookMessage" role="status"></p>
+    </div>
+    <div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="shareNotebookModal">Close</button><button class="sbtn sbtn-primary" type="button" id="shareSubmitBtn"><i class="fas fa-user-plus"></i> Share</button></div>
+  </div>
+</div>
 
 <div class="modal-bd" id="createNotebookModal" aria-hidden="true">
   <div class="modal-box notes-modal">
@@ -74,7 +126,19 @@
 
 <div class="modal-bd" id="editNotebookModal" aria-hidden="true"><div class="modal-box notes-modal"><div class="modal-hdr"><h5><i class="fas fa-pen" style="color:var(--accent)"></i> Edit notebook</h5><button class="modal-x" data-close-modal="editNotebookModal"><i class="fas fa-times"></i></button></div><form id="editNotebookForm"><div class="modal-bdy notes-form"><label>Notebook title<input class="input" id="editNotebookTitle" name="title" maxlength="160" required></label><label>Description <textarea class="input notes-textarea" id="editNotebookDescription" name="description" maxlength="2000" placeholder="What will you keep in this notebook?"></textarea></label><p class="notes-form-message" id="editNotebookMessage" role="status"></p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="editNotebookModal">Cancel</button><button class="sbtn sbtn-primary" type="submit">Save changes</button></div></form></div></div>
 
-<div class="modal-bd" id="importNotebookModal" aria-hidden="true"><div class="modal-box notes-modal"><div class="modal-hdr"><h5><i class="fas fa-file-import" style="color:var(--accent)"></i> Import notebook</h5><button class="modal-x" data-close-modal="importNotebookModal"><i class="fas fa-times"></i></button></div><form id="importNotebookForm"><div class="modal-bdy notes-form"><label>Notebook JSON file<input class="input" type="file" id="importNotebookFile" accept="application/json,.json" required></label><p class="notes-help">Select a Notebook file exported from Smart AI Exam Portal (Export JSON, or exported from a Public Notebook). It will be created as a new private notebook in your workspace.</p><p class="notes-form-message" id="importNotebookMessage" role="status"></p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="importNotebookModal">Cancel</button><button class="sbtn sbtn-primary" type="submit"><i class="fas fa-file-import"></i> Import</button></div></form></div></div>
+<div class="modal-bd" id="importNotebookModal" aria-hidden="true"><div class="modal-box notes-modal"><div class="modal-hdr"><h5><i class="fas fa-file-import" style="color:var(--accent)"></i> Import notebook</h5><button class="modal-x" data-close-modal="importNotebookModal"><i class="fas fa-times"></i></button></div><form id="importNotebookForm"><div class="modal-bdy notes-form"><label>Notebook JSON file<input class="input" type="file" id="importNotebookFile" accept="application/json,.json" required></label><p class="notes-help">Select a Notebook file exported from Smart AI Exam Portal (Export JSON, or exported from a Public Notebook). It will be created as a new private notebook in your workspace.</p><p class="notes-form-message" id="importNotebookMessage" role="status"></p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="importNotebookModal">Cancel</button><button class="sbtn sbtn-primary" type="submit"><i class="fas fa-file-import"></i> Import</button></div></form>
+  <div class="import-progress" id="importProgressView" hidden>
+    <div class="modal-bdy">
+      <div class="import-progress-row">
+        <span class="import-progress-status" id="importProgressStatus">Preparing notebook...</span>
+        <span class="import-progress-pct" id="importProgressPct">0%</span>
+      </div>
+      <div class="import-progress-track"><div class="import-progress-fill" id="importProgressFill" style="width:0%"></div></div>
+      <p class="import-progress-error" id="importProgressError" role="alert" hidden></p>
+    </div>
+    <div class="modal-ftr" id="importProgressFooter"></div>
+  </div>
+</div></div>
 
 <div class="modal-bd" id="visibilityNotebookModal" aria-hidden="true"><div class="modal-box notes-modal"><div class="modal-hdr"><h5><i class="fas fa-shield-alt" style="color:var(--accent)"></i> Notebook visibility</h5><button class="modal-x" data-close-modal="visibilityNotebookModal"><i class="fas fa-times"></i></button></div><form id="visibilityNotebookForm"><div class="modal-bdy notes-form"><label>Visibility<select class="input" id="visibilityNotebookValue" name="visibility"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><p class="notes-help">Public library access will be enabled in Phase 3. Until then, this setting is safely stored but not exposed to other students.</p><p class="notes-form-message" id="visibilityNotebookMessage" role="status"></p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="visibilityNotebookModal">Cancel</button><button class="sbtn sbtn-primary" type="submit">Update visibility</button></div></form></div></div>
 
@@ -82,4 +146,4 @@
 
 <div class="notes-toast-region" id="notesToastRegion" aria-live="polite"></div>
 {% endblock %}
-{% block scripts %}<script type="module" src="{{ url_for('static', filename='notes/notebooks.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script><script type="module" src="{{ url_for('static', filename='notes/notebooks.js') }}"></script>{% endblock %}

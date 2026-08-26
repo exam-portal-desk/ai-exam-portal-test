@@ -1,0 +1,5 @@
+{# AJAX fragment for "View full leaderboard" load-more. Rendered standalone
+   (no layout extends) and appended client-side. #}
+{% from "partials/_leaderboard_row_macro.html" import leaderboard_row %}
+{% for row in rows %}{{ leaderboard_row(row) }}{% endfor %}
+<div class="lb-more-marker" data-count="{{ rows|length }}" data-last-rank="{{ rows[-1].rank if rows else last_rank }}"></div>

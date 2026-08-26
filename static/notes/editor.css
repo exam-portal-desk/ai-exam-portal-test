@@ -58,6 +58,10 @@
 /* Small read-only indicator badge next to the title (minimal, no new panel) */
 .read-only-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;font-weight:700;color:var(--warning-text);background:var(--warning-bg);border:1px solid var(--warning-border);padding:.16rem .55rem;border-radius:20px;white-space:nowrap;flex-shrink:0}
 .read-only-badge[hidden]{display:none}
+/* Editor-share badge — reuses the same pill shape as the read-only badge but with the
+   violet "shared" palette (see theme.css --shared-*) so it reads as distinct from the
+   warning-colored read-only state. */
+.editor-access-badge{color:var(--shared-text);background:var(--shared-bg);border-color:var(--shared-border)}
 
 /* Read Mode: hide structural/page-editing controls, keep page switching + reading available */
 .note-editor.read-mode .page-dots-btn,

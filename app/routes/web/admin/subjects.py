@@ -17,8 +17,10 @@ from flask import render_template, request, redirect, url_for, flash
 
 from app.routes.web.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
-from app.db.misc import get_all_subjects, get_subject_by_id, create_subject, update_subject, delete_subject
+from app.db.misc import get_subject_by_id, create_subject, update_subject, delete_subject, get_subjects_page
 from app.utils.datetime_service import now_utc_naive
+
+SUBJECTS_PAGE_SIZE = 20
 
 
 @admin_bp.route("/subjects", methods=["GET", "POST"])
@@ -43,7 +45,13 @@ def subjects():
         flash(f"Subject '{name}' created.", "success")
         return redirect(url_for("admin.subjects"))
 
-    return render_template("admin/subjects.html", subjects=get_all_subjects())
+    page_data = get_subjects_page(page=1, per_page=SUBJECTS_PAGE_SIZE)
+    return render_template(
+        "admin/subjects.html",
+        subjects=page_data["subjects"],
+        subjects_total=page_data["total"], subjects_total_pages=page_data["total_pages"],
+        subjects_per_page=SUBJECTS_PAGE_SIZE,
+    )
 
 
 @admin_bp.route("/subjects/edit/<int:subject_id>", methods=["POST"])

@@ -89,7 +89,7 @@ def create_app() -> Flask:
         skip_prefixes = (
             "/static/", "/login", "/admin/login",
             "/", "/home", "/forgot-password", "/reset-password",
-            "/request-admin-access", "/favicon.ico", "/api/", "/dashboard",
+            "/favicon.ico", "/api/", "/dashboard",
         )
         if any(request.path.startswith(p) for p in skip_prefixes):
             return
@@ -103,10 +103,11 @@ def create_app() -> Flask:
             return redirect(url_for("auth.login"))
 
     # ── Date/time — central service + Jinja filters ────────────────────────
-    from app.utils.datetime_service import now_app_tz, format_display, format_display_date
+    from app.utils.datetime_service import now_app_tz, format_display, format_display_date, format_calendar_date
 
     app.jinja_env.filters["display_dt"] = format_display
     app.jinja_env.filters["display_date"] = format_display_date
+    app.jinja_env.filters["calendar_date"] = format_calendar_date
 
     @app.context_processor
     def inject_globals():
@@ -118,7 +119,9 @@ def create_app() -> Flask:
             nav_avatar_url = profile_photo_url_from_key(session["profile_photo_key"])
         return {"CURRENT_YEAR": now_app_tz().year, "DISPLAY_DATE_FORMAT": config.DISPLAY_DATE_FORMAT,
                 "DISPLAY_DATETIME_FORMAT": config.DISPLAY_DATETIME_FORMAT,
-                "NAV_AVATAR_URL": nav_avatar_url}
+                "NAV_AVATAR_URL": nav_avatar_url,
+                "MAX_MESSAGES_PER_CONVERSATION": config.MAX_MESSAGES_PER_CONVERSATION,
+                "BASE_URL": config.BASE_URL}
 
     # ── Error handlers ─────────────────────────────────────────────────────
     _register_error_handlers(app)
@@ -169,6 +172,8 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.api.v01.chat import chat_api_bp
     from app.routes.api.v01.admin import admin_api_bp
     from app.routes.api.v01.profile import profile_api_bp
+    from app.routes.api.v01.dashboard import dashboard_api_bp
+    from app.routes.api.v01.portal import portal_bp
 
     app.register_blueprint(api_auth_bp)
     app.register_blueprint(access_requests_bp)
@@ -183,6 +188,8 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(chat_api_bp)
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(profile_api_bp)
+    app.register_blueprint(dashboard_api_bp)
+    app.register_blueprint(portal_bp)
 
     app.register_blueprint(notes_bp)
     app.register_blueprint(auth_bp)

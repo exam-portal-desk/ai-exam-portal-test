@@ -1,0 +1,59 @@
+{# templates/_dashboard_exam_cards.html
+   Shared macros for one exam card on the student dashboard (Live /
+   Upcoming / Completed tabs) — used by both the initial server render
+   (templates/dashboard.html) and the paginated "Load more" AJAX endpoint
+   (app/routes/api/v01/portal.py), so the two never drift apart. #}
+
+{% macro render_live_card(e) %}
+<div class="ec live" data-n="{{ e.name|lower }}">
+  <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-live"><i class="fas fa-circle" style="font-size:.4rem"></i>Live</span></div>
+  <div class="ec-body">
+    <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
+    <div class="ec-meta">
+      <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date | calendar_date }}</span>
+      <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
+      <span class="ec-tag"><i class="fas fa-stopwatch"></i>{{ e.duration }}m</span>
+      <span class="ec-tag"><i class="fas fa-question-circle"></i>{{ e.total_questions }}Q</span>
+    </div>
+  </div>
+  <div class="ec-foot"><a href="{{ url_for('exam.exam_instructions', exam_id=e.id) }}" class="ec-btn start"><i class="fas fa-play"></i> Start Exam</a></div>
+</div>
+{% endmacro %}
+
+{% macro render_upcoming_card(e) %}
+<div class="ec" data-n="{{ e.name|lower }}">
+  <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-upcoming">Upcoming</span></div>
+  <div class="ec-body">
+    <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
+    <div class="ec-meta">
+      <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date | calendar_date }}</span>
+      <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
+      <span class="ec-tag"><i class="fas fa-stopwatch"></i>{{ e.duration }}m</span>
+      <span class="ec-tag"><i class="fas fa-question-circle"></i>{{ e.total_questions }}Q</span>
+    </div>
+  </div>
+  <div class="ec-foot"><button class="ec-btn off" disabled><i class="fas fa-clock"></i> Not started yet</button></div>
+</div>
+{% endmacro %}
+
+{% macro render_completed_card(e) %}
+<div class="ec" data-n="{{ e.name|lower }}">
+  <div class="ec-head">
+    <div class="ec-title">{{ e.name }}</div>
+    {% if e.result and e.result != 'Pending' %}<span class="ebadge eb-done">Done</span>{% else %}<span class="ebadge eb-pending">Pending</span>{% endif %}
+  </div>
+  <div class="ec-body">
+    <div class="ec-meta">
+      <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date | calendar_date }}</span>
+      {% if e.result and e.result != 'Pending' %}<span class="ec-tag"><i class="fas fa-chart-bar"></i>{{ e.result }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="ec-foot">
+    {% if e.result and e.result != 'Pending' %}
+    <a href="{{ url_for('result.result', exam_id=e.id) }}" class="ec-btn result"><i class="fas fa-eye"></i> View Result</a>
+    {% else %}
+    <button class="ec-btn off" disabled><i class="fas fa-hourglass-half"></i> Result Pending</button>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}

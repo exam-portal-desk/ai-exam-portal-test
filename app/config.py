@@ -82,6 +82,10 @@ QUESTION_GENERATOR_VISION_MODEL = os.environ.get("QUESTION_GENERATOR_VISION_MODE
 AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT_PER_STUDENT", 50))
 AI_MAX_MESSAGE_LENGTH = int(os.environ.get("AI_MAX_MESSAGE_LENGTH", 500))
 AI_REQUEST_TIMEOUT = int(os.environ.get("AI_REQUEST_TIMEOUT", 30))
+AI_CONTEXT_RECENT_MESSAGES = int(os.environ.get("AI_CONTEXT_RECENT_MESSAGES", 12))
+MAX_MESSAGES_PER_CONVERSATION = int(os.environ.get("MAX_MESSAGES_PER_CONVERSATION", 100))
+AI_TITLE_MAX_TOKENS = int(os.environ.get("AI_TITLE_MAX_TOKENS", 300))
+AI_TITLE_TEMPERATURE = float(os.environ.get("AI_TITLE_TEMPERATURE", 0.2))
 EXPLANATION_DAILY_LIMIT = int(os.environ.get("EXPLANATION_DAILY_LIMIT", 5))
 EXPLANATION_PER_QUESTION_LIMIT = int(os.environ.get("EXPLANATION_PER_QUESTION_LIMIT", 2))
 
@@ -127,6 +131,9 @@ MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_KB * 1024
 
 # Profile photos use a smaller, distinct cap from the shared image limit above.
 MAX_PROFILE_PHOTO_SIZE_KB = int(os.environ.get("MAX_PROFILE_PHOTO_SIZE_KB", 200))
+
+# Chat background images can be larger than an avatar but stay capped for performance.
+MAX_CHAT_BACKGROUND_SIZE_KB = int(os.environ.get("MAX_CHAT_BACKGROUND_SIZE_KB", 500))
 
 # ─────────────────────────────────────────────
 # Cache settings

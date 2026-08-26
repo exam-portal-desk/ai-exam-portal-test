@@ -1,0 +1,56 @@
+/* static/shared/date-picker.css
+ * Themed calendar date-picker — same visual language and interaction
+ * pattern as the one built into templates/admin/exams.html (readonly
+ * input + popup calendar, "YYYY-MM-DD" value kept in data-iso), factored
+ * out so any page (e.g. Admin User Analytics) can reuse it via
+ * static/shared/date-picker.js instead of rolling its own date input.
+ */
+.dt-field { position: relative; }
+.dt-field input { padding-right: 2.3rem !important; cursor: pointer; background: var(--bg) !important; }
+.dt-field input:read-only { background: var(--bg) !important; }
+.dt-field-icon {
+  position: absolute; right: .75rem; top: 50%; transform: translateY(-50%);
+  color: var(--text-3); font-size: .82rem; pointer-events: none; transition: color .12s;
+}
+.dt-field:focus-within .dt-field-icon { color: var(--accent); }
+
+.dt-pop {
+  position: fixed; z-index: 2000; background: var(--surface);
+  border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow-lg); display: none; overflow: hidden;
+  animation: dtPopIn .14s ease-out;
+}
+.dt-pop.open { display: block; }
+@keyframes dtPopIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+.dt-cal { width: 288px; padding: .9rem; }
+.dt-cal-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+.dt-cal-nav {
+  width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+  cursor: pointer; font-size: .7rem; transition: all .12s;
+}
+.dt-cal-nav:hover { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
+.dt-cal-title { font-size: .84rem; font-weight: 700; color: var(--text-1); }
+.dt-cal-week { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; margin-bottom: .3rem; }
+.dt-cal-week span { font-size: .62rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .03em; }
+.dt-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dt-cal-day {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-size: .8rem; color: var(--text-2); cursor: pointer;
+  border: 1.5px solid transparent; transition: all .1s; font-weight: 500;
+}
+.dt-cal-day:hover { background: var(--surface-2); }
+.dt-cal-day.other-month { color: var(--text-3); opacity: .38; }
+.dt-cal-day.today { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.dt-cal-day.selected { background: var(--accent) !important; color: var(--accent-on) !important; font-weight: 700; border-color: var(--accent); }
+.dt-cal-ftr {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: .7rem; padding-top: .6rem; border-top: 1px solid var(--border);
+}
+.dt-link-btn {
+  background: none; border: none; font-family: inherit; cursor: pointer;
+  font-size: .74rem; font-weight: 600; color: var(--accent); padding: .2rem .3rem;
+}
+.dt-link-btn:hover { text-decoration: underline; }

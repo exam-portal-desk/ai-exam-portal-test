@@ -284,7 +284,26 @@
   background: var(--accent); color: var(--accent-on);
 }
 .update-btn:disabled { opacity: .6; }
+
+/* ── Toast (mirrors templates/admin/users_manage.html's — this page had
+   toast()/adminToast() calls with no implementation anywhere, so every
+   approve/deny/role-update success handler was throwing a ReferenceError
+   on its very first line and never reaching the modal-close/list-refresh
+   code after it, which is what made Approve/Deny look like they weren't
+   doing anything) ── */
+#toastContainer { position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none; }
+.toast-item { display:flex;align-items:center;gap:0.65rem;padding:0.75rem 1.1rem;border-radius:12px;font-size:0.83rem;font-weight:600;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.35);min-width:240px;max-width:340px;pointer-events:all;animation:toastIn 0.25s cubic-bezier(.34,1.56,.64,1); }
+@keyframes toastIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+.toast-item.removing { animation:toastOut 0.22s ease forwards; }
+@keyframes toastOut { to{opacity:0;transform:translateX(40px)} }
+.toast-success { background:linear-gradient(135deg,#059669,#10b981); }
+.toast-danger  { background:linear-gradient(135deg,#dc2626,#ef4444); }
+.toast-warning { background:linear-gradient(135deg,#d97706,#f59e0b); }
+.toast-close { margin-left:auto;background:none;border:none;color:#fff;opacity:0.7;cursor:pointer;font-size:0.85rem;padding:0;flex-shrink:0; }
+.toast-close:hover { opacity:1; }
 </style>
+
+<div id="toastContainer"></div>
 
 <!-- Bulk Confirm Modal -->
 <div id="bulkModal" class="bulk-modal-overlay" onclick="if(event.target===this)this.style.display='none'">
@@ -619,7 +638,7 @@ function openDeny(id, uname) {
 
 function handleApprove() {
   const access = document.getElementById('approvedAccess').value;
-  if (!access) { adminToast('Select an access level', 'warning'); return; }
+  if (!access) { toast('Select an access level', 'warning'); return; }
   const btn = document.getElementById('confirmApproval');
   setLoading(btn, true);
   fetch(`/api/v01/admin/access-requests/${_reqId}/approve`, {
@@ -627,10 +646,16 @@ function handleApprove() {
     body: JSON.stringify({approved_access: access})
   }).then(r=>r.json()).then(d => {
     if (d.success) {
-      toast(d.message, 'success');
+      // Modal-close + list/stats refresh run BEFORE the toast, not after — so the
+      // visible confirmation that the approval actually took effect can't be
+      // skipped by anything going wrong in the toast call itself (this ordering
+      // bug — toast() called first, throwing before any of this ran — was why
+      // Approve/Deny looked "static"/non-functional even though the request was
+      // actually being processed server-side).
       bootstrap.Modal.getInstance(document.getElementById('approvalModal'))?.hide();
       fetchRequests('pending', _pendingPage);
       loadHeaderStats();
+      toast(d.message, 'success');
     } else toast(d.message, 'danger');
   }).catch(() => toast('Network error', 'danger'))
   .finally(() => setLoading(btn, false));
@@ -646,10 +671,10 @@ function handleDeny() {
     body: JSON.stringify({reason})
   }).then(r=>r.json()).then(d => {
     if (d.success) {
-      toast(d.message, 'success');
       bootstrap.Modal.getInstance(document.getElementById('denialModal'))?.hide();
       fetchRequests('pending', _pendingPage);
       loadHeaderStats();
+      toast(d.message, 'success');
     } else toast(d.message, 'danger');
   }).catch(() => toast('Network error', 'danger'))
   .finally(() => setLoading(btn, false));
@@ -777,11 +802,13 @@ function doUpdateRole(btn) {
     body: JSON.stringify({user_id:uid, new_role:sel.value})
   }).then(r=>r.json()).then(d => {
     if (d.success) {
-      adminToast(d.message, 'success');
+      // List/stats refresh runs BEFORE the toast, not after — so the visible state
+      // update can't be skipped by anything going wrong in the toast call itself.
       umLoadStats();
       umFetch(_umPage);
-    } else adminToast(d.message, 'danger');
-  }).catch(()=>adminToast('Error updating role.', 'danger'))
+      toast(d.message, 'success');
+    } else toast(d.message, 'danger');
+  }).catch(()=>toast('Error updating role.', 'danger'))
   .finally(()=>{ btn.innerHTML=orig; btn.disabled=true; btn.classList.remove('changed'); });
 }
 
@@ -871,10 +898,10 @@ function executeBulkUpdate() {
     body: JSON.stringify({updates: safeIds.map(id=>({user_id:id,new_role:role}))})
   }).then(r=>r.json()).then(d=>{
     if(d.success){
-      toast(d.message || `${safeIds.length} user(s) updated successfully.`,'success');
       _selectedIds.clear();
       document.getElementById('bulkRoleSelect').value='';
       umLoadStats(); umFetch(_umPage);
+      toast(d.message || `${safeIds.length} user(s) updated successfully.`,'success');
     } else toast(d.message,'danger');
   }).catch(()=>toast('Network error.','danger'))
   .finally(()=>{ btn.innerHTML=orig; updateBulkBtn(); });
@@ -950,6 +977,25 @@ function setLoading(btn, on) {
   btn.disabled = on;
   if (on) { btn._orig=btn.innerHTML; btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Processing…'; }
   else if (btn._orig) btn.innerHTML = btn._orig;
+}
+
+/* Same implementation as templates/admin/users_manage.html's toast() — kept
+   local to each page rather than factored into admin_base.html since that's
+   the existing convention here, but this page previously had none at all
+   (see the #toastContainer comment above). */
+function toast(msg, type='success') {
+  const icons={success:'fa-check-circle',danger:'fa-times-circle',warning:'fa-exclamation-triangle'};
+  const el=document.createElement('div');
+  el.className=`toast-item toast-${type}`;
+  el.innerHTML=`<i class="fas ${icons[type]||'fa-info-circle'}" style="flex-shrink:0"></i>
+    <span style="flex:1;line-height:1.4">${msg}</span>
+    <button class="toast-close" onclick="removeToast(this.parentElement)"><i class="fas fa-times"></i></button>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(()=>removeToast(el),4000);
+}
+function removeToast(el){
+  if(!el||el._removing)return;el._removing=true;
+  el.classList.add('removing');setTimeout(()=>el.remove(),220);
 }
 
 /* ═══════════════════════════════════════════════

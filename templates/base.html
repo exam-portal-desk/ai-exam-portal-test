@@ -172,6 +172,12 @@
   .sb {
     width:220px; flex-shrink:0;
     background:var(--surface); border-right:1px solid var(--border);
+    /* static/theme.css defines an unrelated generic `.sb` component with its
+       own border-radius/padding — this nav rail shares the class name, so
+       both must be reset here or the sidebar picks up rounded corners and
+       internal padding that make it look like a floating card instead of a
+       flush, docked navigation rail. */
+    border-radius:0; padding:0;
     display:flex; flex-direction:column;
     position:sticky; top:48px; height:calc(100vh - 48px);
     overflow:hidden;
@@ -248,7 +254,7 @@
 
   /* Icon */
   .sb-ic {
-    width:30px; height:30px; flex-shrink:0;
+    width:30px; height:30px; flex-shrink:0; position:relative;
     display:flex; align-items:center; justify-content:center;
     border-radius:7px; font-size:.85rem;
   }
@@ -269,15 +275,18 @@
   .sb-lbl { overflow:hidden; transition:opacity .15s,width .15s; flex:1; }
   .sb.collapsed .sb-lbl { opacity:0; width:0; flex:0; }
 
-  /* Badge */
+  /* Badge — anchored to the icon's own corner (not the row), so it renders
+     identically whether the sidebar is collapsed or expanded, never affects
+     row layout (fully out of flow), and can't get clipped/offset by the
+     icon's centering in collapsed mode. */
   .sb-badge {
-    margin-left:auto; flex-shrink:0;
+    position:absolute; top:-4px; right:-6px;
+    display:flex; align-items:center; justify-content:center;
+    min-width:15px; height:15px; padding:0 3px; box-sizing:border-box;
     background:var(--danger); color:#fff;
-    font-size:.58rem; font-weight:700;
-    padding:1px 5px; border-radius:8px; min-width:15px; text-align:center;
-    transition:opacity .15s;
+    font-size:.58rem; font-weight:700; line-height:1;
+    border-radius:20px; border:1.5px solid var(--surface);
   }
-  .sb.collapsed .sb-badge { opacity:0; width:0; overflow:hidden; padding:0; margin:0; }
 
   /* Tooltip — JS-rendered fixed tooltip, not CSS overflow */
   .sb-tip { display:none; }
@@ -324,6 +333,88 @@
   .modal-x:hover { color:var(--text-1); }
   .modal-bdy { padding:1.1rem; }
   .modal-ftr { padding:.8rem 1.1rem; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:.5rem; }
+
+  /* ── Updates bell + popup (shared across every student page) ── */
+  .updates-bell {
+    position:relative; width:34px; height:34px; border-radius:50%;
+    background:none; border:1px solid transparent; color:var(--text-2);
+    display:flex; align-items:center; justify-content:center; font-size:.9rem;
+    cursor:pointer; margin-right:.5rem; transition:background .12s,color .12s;
+  }
+  .updates-bell:hover { background:var(--surface-2); color:var(--text-1); }
+  .updates-badge {
+    position:absolute; top:-2px; right:-2px; min-width:16px; height:16px; padding:0 3px;
+    background:var(--accent); color:var(--accent-on); border-radius:20px;
+    font-size:.6rem; font-weight:700; line-height:16px; text-align:center;
+  }
+  #updatesModal .modal-box { max-width:440px; }
+  #updatesModal .modal-bdy { max-height:70vh; overflow-y:auto; padding:.4rem .9rem; }
+
+  /* ── Notification-center rows (compact — one line per item, not a card) ── */
+  .ntf-section-label {
+    font-size:.64rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--text-3); padding:.75rem .3rem .35rem;
+  }
+  .ntf-section-label:first-child { padding-top:.3rem; }
+  .ntf-row {
+    display:flex; align-items:center; gap:.65rem; padding:.5rem .3rem;
+    border-bottom:1px solid var(--border); text-decoration:none; color:inherit;
+  }
+  .ntf-row:last-child { border-bottom:none; }
+  .ntf-row-link { transition:background .1s; border-radius:8px; }
+  .ntf-row-link:hover { background:var(--surface-2); }
+  .ntf-icon {
+    width:32px; height:32px; border-radius:9px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:.8rem;
+  }
+  .ntf-icon-info    { background:var(--info-bg);    color:var(--info-text); }
+  .ntf-icon-success { background:var(--success-bg); color:var(--success-text); }
+  .ntf-icon-warning { background:var(--warning-bg); color:var(--warning-text); }
+  .ntf-icon-danger  { background:var(--danger-bg);  color:var(--danger-text); }
+  .ntf-icon-shared  { background:var(--shared-bg);  color:var(--shared-text); }
+  .ntf-icon-muted   { background:var(--surface-2);  color:var(--text-3); }
+  .ntf-avatar {
+    background:var(--accent-subtle); color:var(--accent); font-weight:700; font-size:.75rem;
+    overflow:hidden;
+  }
+  .ntf-avatar img { width:100%; height:100%; object-fit:cover; }
+  .ntf-body { flex:1; min-width:0; }
+  .ntf-title {
+    font-size:.79rem; font-weight:700; color:var(--text-1);
+    display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; line-height:1.3;
+  }
+  .ntf-tag {
+    font-size:.58rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em;
+    color:var(--text-3); background:var(--surface-2); padding:.08rem .4rem; border-radius:20px;
+  }
+  .ntf-live { display:inline-flex; align-items:center; gap:.28rem; font-size:.6rem; font-weight:700; text-transform:uppercase; color:var(--success-text); }
+  .ntf-live-dot { width:6px; height:6px; border-radius:50%; background:var(--success-text); animation:livepulse2 1.6s infinite; }
+  @keyframes livepulse2 { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .ntf-meta {
+    font-size:.71rem; color:var(--text-3); margin-top:.05rem;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .ntf-meta .countdown { font-weight:700; color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .ntf-action { flex-shrink:0; }
+  .ntf-btn {
+    display:inline-block; padding:.3rem .68rem; border-radius:20px;
+    border:none; font-family:inherit; font-size:.68rem; font-weight:700;
+    text-decoration:none; cursor:pointer; white-space:nowrap;
+  }
+  .ntf-btn.success { background:var(--success); color:#fff; }
+  .ntf-btn.primary { background:var(--accent); color:var(--accent-on); }
+  .ntf-btn.ghost   { background:var(--surface-2); color:var(--text-3); cursor:default; }
+  .ntf-count {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:17px; height:17px; padding:0 4px; border-radius:20px;
+    background:var(--accent); color:var(--accent-on); font-size:.62rem; font-weight:700;
+  }
+  .ntf-chevron { color:var(--text-3); font-size:.68rem; }
+
+  .dash-empty { text-align:center; padding:2.25rem 1.5rem; }
+  .dash-empty-icon { width:42px; height:42px; border-radius:12px; background:var(--surface-2); color:var(--text-3); display:flex; align-items:center; justify-content:center; font-size:1.05rem; margin:0 auto .7rem; }
+  .dash-empty h3 { font-size:.85rem; font-weight:700; color:var(--text-2); margin-bottom:.25rem; }
+  .dash-empty p  { font-size:.74rem; color:var(--text-3); margin:0; }
 
   /* Settings */
   .s-sec { margin-bottom:1rem; }
@@ -529,6 +620,10 @@
   </a>
 
   {% elif session.get('user_id') %}
+  <button class="updates-bell" id="updatesBellBtn" onclick="openUpdatesPopup()" aria-label="Notifications">
+    <i class="fas fa-bell"></i>
+    <span class="updates-badge" id="updatesBadge" style="display:none">0</span>
+  </button>
   <div style="position:relative">
     <button class="prof-chip" id="profBtn" onclick="toggleProf()">
       {% if NAV_AVATAR_URL %}
@@ -575,16 +670,16 @@
 
     <span class="sb-sec">Main</span>
 
-    <a class="sb-item {{ 'active' if active_nav == 'dashboard' else '' }}"
-       href="{{ url_for('dashboard.dashboard') }}" data-tip="Dashboard">
-      <span class="sb-ic"><i class="fas fa-home"></i></span>
-      <span class="sb-lbl">Dashboard</span>
-    </a>
-
     <a class="sb-item {{ 'active' if active_nav == 'categories' else '' }}"
        href="{{ url_for('categories.select_category') }}" data-tip="Categories">
       <span class="sb-ic"><i class="fas fa-layer-group"></i></span>
       <span class="sb-lbl">Categories</span>
+    </a>
+
+    <a class="sb-item {{ 'active' if active_nav == 'dashboard' else '' }}"
+       href="{{ url_for('dashboard.dashboard') }}" data-tip="Dashboard">
+      <span class="sb-ic"><i class="fas fa-home"></i></span>
+      <span class="sb-lbl">Dashboard</span>
     </a>
 
     <span class="sb-sec">Performance</span>
@@ -611,9 +706,11 @@
 
     <a class="sb-item {{ 'active' if active_nav == 'chat' else '' }}"
        href="{{ url_for('chat.chat_page') }}" data-tip="Chat">
-      <span class="sb-ic"><i class="fas fa-comment-dots"></i></span>
+      <span class="sb-ic">
+        <i class="fas fa-comment-dots"></i>
+        <span class="sb-badge" id="sbChatBadge" style="display:none">0</span>
+      </span>
       <span class="sb-lbl">Chat</span>
-      <span class="sb-badge" id="sbChatBadge" style="display:none">0</span>
     </a>
 
     <a class="sb-item {{ 'active' if active_nav == 'notes' else '' }}"
@@ -763,6 +860,32 @@
       <a class="sbtn sbtn-danger" href="{{ url_for('auth.logout') }}" onclick="userLogoutStart(this)" style="text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;">
         <i class="fas fa-sign-out-alt"></i> Yes, Logout
       </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ══ "Your Updates" popup — same component for auto-open-on-entry and the notifications bell ══ #}
+{% if session.get('user_id') and not session.get('admin_id') and not is_exam_page and not standalone %}
+<div class="modal-bd" id="updatesModal">
+  <div class="modal-box">
+    <div class="modal-hdr" style="align-items:flex-start;">
+      <div style="display:flex;align-items:center;gap:.6rem;min-width:0;">
+        <span style="width:30px;height:30px;border-radius:8px;background:var(--accent-subtle);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;margin-top:.1rem;">
+          <i class="fas fa-bell"></i>
+        </span>
+        <div style="min-width:0;">
+          <h5 id="updatesGreetingTitle" style="margin:0;">Your Updates</h5>
+          <div id="updatesGreetingSub" style="font-size:.68rem;font-weight:500;color:var(--text-3);margin-top:.05rem;"></div>
+        </div>
+      </div>
+      <button class="modal-x" onclick="closeUpdatesModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-bdy" id="updatesModalBody">
+      <div class="dash-empty">
+        <div class="dash-empty-icon"><i class="fas fa-spinner fa-spin"></i></div>
+        <p>Loading…</p>
+      </div>
     </div>
   </div>
 </div>
@@ -946,10 +1069,111 @@ document.addEventListener('DOMContentLoaded',function(){
     fetch('/api/v01/chat/unread-count').then(function(r){return r.json();}).then(function(d){
       var n=(d.unread||0)+(d.requests||0);
       var el=document.getElementById('sbChatBadge');
-      if(el){el.textContent=n;el.style.display=n?'inline':'none';}
+      if(el){el.textContent=n>99?'99+':n;el.style.display=n?'flex':'none';}
     }).catch(function(){});
   }
   poll(); setInterval(poll,20000);
+})();
+</script>
+{% endif %}
+
+{% if session.get('user_id') and not session.get('admin_id') and not is_exam_page and not standalone %}
+<script>
+/* ── "Your Updates" popup: one fetch per page load powers the badge, the
+   auto-popup on the portal home page, and the manual bell-icon open — no
+   interval polling (unlike chat, updates don't need near-real-time freshness).
+   Excluded from exam pages: the bell/modal aren't rendered there anyway, and
+   an in-progress exam shouldn't be fetching notification data at all. ── */
+(function(){
+  var cache = null, inFlight = null;
+
+  function fetchUpdates(cb){
+    if (cache) { cb(cache); return; }
+    if (inFlight) { inFlight.then(cb); return; }
+    inFlight = fetch('/api/v01/student/updates').then(function(r){ return r.json(); }).then(function(d){
+      cache = d; inFlight = null; return d;
+    }).catch(function(){ inFlight = null; return {success:false, html:'', count:0}; });
+    inFlight.then(cb);
+  }
+  window.__updatesFetch = fetchUpdates;
+
+  /* Swaps one "upcoming" row's ghost action into a real Start/Resume link
+     once its actual scheduled start time arrives — no re-fetch needed, the
+     can-start/active-attempt facts were already fetched with the row, just
+     not shown as a button until now. */
+  function promoteRowToLive(row){
+    row.querySelector('.ntf-icon').className = 'ntf-icon ntf-icon-success';
+    row.querySelector('.ntf-icon i').className = 'fas fa-play';
+    var liveTag = document.createElement('span');
+    liveTag.className = 'ntf-live';
+    liveTag.innerHTML = '<span class="ntf-live-dot"></span>Live';
+    row.querySelector('.ntf-title').appendChild(liveTag);
+    var meta = row.querySelector('.ntf-meta');
+    var cd = meta.querySelector('.countdown');
+    if (cd && cd.parentNode === meta) { /* strip the "· Starts in …" tail */
+      meta.innerHTML = meta.innerHTML.split('&middot;')[0].split('·')[0];
+    }
+    var href = row.dataset.startHref, canStart = row.dataset.canStart === 'true', active = row.dataset.activeAttempt === 'true';
+    var action = row.querySelector('.ntf-action');
+    if (active) {
+      action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Resume</a>';
+    } else if (canStart) {
+      action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Start</a>';
+    } else {
+      action.innerHTML = '<span class="ntf-btn ghost">Exhausted</span>';
+    }
+  }
+
+  function startCountdowns(body){
+    body.querySelectorAll('[data-exam-row][data-target]').forEach(function(row){
+      var target = new Date(row.dataset.target).getTime();
+      var el = row.querySelector('.countdown');
+      if (!el || isNaN(target)) return;
+      (function tick(){
+        // Always recomputed from the absolute target vs. the current real
+        // clock — never a stored/decremented counter — so this stays
+        // accurate no matter when it runs: on open, on refresh, or on any
+        // later reopen from a cached fetch.
+        var remaining = Math.round((target - Date.now()) / 1000);
+        if (remaining <= 0) { promoteRowToLive(row); return; }
+        var h = Math.floor(remaining/3600), mi = Math.floor((remaining%3600)/60), s = remaining%60;
+        el.textContent = (h>0 ? h+'h ' : '') + (h>0 && mi<10 ? '0' : '') + mi + 'm ' + (s<10?'0':'') + s + 's';
+        setTimeout(tick, 1000);
+      })();
+    });
+  }
+
+  window.openUpdatesPopup = function(){
+    var m = document.getElementById('updatesModal');
+    if (!m) return;
+    m.classList.add('open');
+    fetchUpdates(function(d){
+      var title = document.getElementById('updatesGreetingTitle');
+      var sub = document.getElementById('updatesGreetingSub');
+      if (title && d.greeting_title) title.textContent = d.greeting_title;
+      if (sub && d.greeting_sub) sub.textContent = d.greeting_sub;
+      var body = document.getElementById('updatesModalBody');
+      if (body) {
+        body.innerHTML = d.html || '<div class="dash-empty"><div class="dash-empty-icon"><i class="fas fa-check-circle"></i></div><h3>You\'re all caught up</h3><p>Nothing new right now.</p></div>';
+        startCountdowns(body);
+      }
+    });
+  };
+  window.closeUpdatesModal = function(){
+    // Dismissing the popup is purely visual — it never marks anything seen.
+    var m = document.getElementById('updatesModal');
+    if (m) m.classList.remove('open');
+  };
+  var um = document.getElementById('updatesModal');
+  if (um) um.addEventListener('click', function(e){ if (e.target === this) closeUpdatesModal(); });
+
+  fetchUpdates(function(d){
+    var badge = document.getElementById('updatesBadge');
+    if (badge) { badge.textContent = d.count || 0; badge.style.display = d.count ? 'inline' : 'none'; }
+    if (window.__autoShowUpdates && d.count > 0) {
+      setTimeout(function(){ openUpdatesPopup(); }, 300);
+    }
+  });
 })();
 </script>
 {% endif %}

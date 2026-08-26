@@ -3,6 +3,7 @@
 
 {% block content %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
 <style>
 /* ── Page Header ── */
 .page-top { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
@@ -213,11 +214,17 @@
       </div>
       <div>
         <label>Date From</label>
-        <input type="date" class="f-date" id="rf-from">
+        <div class="dt-field">
+          <input type="text" class="f-date dt-date-input" id="rf-from" placeholder="Select date" readonly autocomplete="off">
+          <i class="fas fa-calendar-days dt-field-icon"></i>
+        </div>
       </div>
       <div>
         <label>Date To</label>
-        <input type="date" class="f-date" id="rf-to">
+        <div class="dt-field">
+          <input type="text" class="f-date dt-date-input" id="rf-to" placeholder="Select date" readonly autocomplete="off">
+          <i class="fas fa-calendar-days dt-field-icon"></i>
+        </div>
       </div>
       <div style="display:flex;gap:.5rem;align-items:flex-end">
         <button class="btn-flat primary" onclick="applyResultsFilter()"><i class="fas fa-search"></i>Filter</button>
@@ -250,8 +257,18 @@
         </select>
       </div>
       <div id="customRange">
-        <div><label>From</label><input type="date" class="f-date" id="af-from"></div>
-        <div><label>To</label>  <input type="date" class="f-date" id="af-to"></div>
+        <div><label>From</label>
+          <div class="dt-field">
+            <input type="text" class="f-date dt-date-input" id="af-from" placeholder="Select date" readonly autocomplete="off">
+            <i class="fas fa-calendar-days dt-field-icon"></i>
+          </div>
+        </div>
+        <div><label>To</label>
+          <div class="dt-field">
+            <input type="text" class="f-date dt-date-input" id="af-to" placeholder="Select date" readonly autocomplete="off">
+            <i class="fas fa-calendar-days dt-field-icon"></i>
+          </div>
+        </div>
       </div>
       <div>
         <label>Exam</label>
@@ -320,6 +337,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
 <script>
 /* ═══════════════════════════════════════════
    STAT CARD HELPERS
@@ -429,14 +447,24 @@ document.addEventListener('click', e => {
 let _resultsCurPage = 1;
 let _resultsLoading = false;
 
-function applyResultsFilter() { _resultsCurPage = 1; _fetchResults(); }
+function applyResultsFilter() {
+  const from = document.getElementById('rf-from').dataset.iso || '';
+  const to   = document.getElementById('rf-to').dataset.iso || '';
+  if (from && to && from > to) {
+    adminToast('"Date From" must be before or equal to "Date To".', 'warning');
+    return;
+  }
+  _resultsCurPage = 1; _fetchResults();
+}
 
 function clearResultsFilter() {
   document.getElementById('rf-user-search').value = '';
   document.getElementById('rf-user-id').value     = '';
   document.getElementById('rf-exam').value         = '';
   document.getElementById('rf-from').value         = '';
+  document.getElementById('rf-from').dataset.iso   = '';
   document.getElementById('rf-to').value           = '';
+  document.getElementById('rf-to').dataset.iso     = '';
   _selectedUserId = '';
   _resultsCurPage = 1;
   _fetchResults();
@@ -450,8 +478,8 @@ function _fetchResults() {
   const wrap = document.getElementById('resultsTableWrap');
   wrap.innerHTML = _skeletonTable();
 
-  const from = document.getElementById('rf-from').value;   // YYYY-MM-DD from date input
-  const to   = document.getElementById('rf-to').value;
+  const from = document.getElementById('rf-from').dataset.iso || '';   // YYYY-MM-DD, kept in sync by date-picker.js
+  const to   = document.getElementById('rf-to').dataset.iso || '';
 
   const params = new URLSearchParams({
     user:     document.getElementById('rf-user-id').value,
@@ -532,12 +560,21 @@ function _destroyChart(k) {
 }
 
 function loadAnalytics() {
+  const periodEl = document.getElementById('af-period');
+  if (periodEl.value === 'custom') {
+    const from = document.getElementById('af-from')?.dataset.iso || '';
+    const to   = document.getElementById('af-to')?.dataset.iso || '';
+    if (from && to && from > to) {
+      adminToast('"From" must be before or equal to "To".', 'warning');
+      return;
+    }
+  }
   _analyticsLoaded = true;
   const params = new URLSearchParams({
-    timePeriod: document.getElementById('af-period').value,
+    timePeriod: periodEl.value,
     exam:       document.getElementById('af-exam').value,
-    startDate:  document.getElementById('af-from')?.value || '',
-    endDate:    document.getElementById('af-to')?.value   || '',
+    startDate:  document.getElementById('af-from')?.dataset.iso || '',
+    endDate:    document.getElementById('af-to')?.dataset.iso   || '',
   });
   ['as-avg','as-att','as-pass','as-users'].forEach(id => {
     const el = document.getElementById(id);
@@ -715,6 +752,14 @@ document.addEventListener('DOMContentLoaded', () => {
   loadStatCards();
   // Load initial results
   _fetchResults();
+
+  // Date pickers — same themed calendar/pattern as the Exams page
+  // (static/shared/date-picker.js), one independent instance per field.
+  const displayFmt = {{ DISPLAY_DATE_FORMAT | tojson }};
+  ['rf-from', 'rf-to', 'af-from', 'af-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) createDatePicker(el, { displayFormat: displayFmt });
+  });
 });
 </script>
 {% endblock %}

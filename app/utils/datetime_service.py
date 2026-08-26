@@ -32,6 +32,13 @@ def now_app_tz() -> datetime:
     return datetime.now(_APP_TZ)
 
 
+def app_timezone() -> ZoneInfo:
+    """The configured business ZoneInfo — for callers that need to attach it
+    to a naive wall-clock value themselves (e.g. an exam's date+start_time)
+    rather than just reading the current time."""
+    return _APP_TZ
+
+
 def today_app_date() -> str:
     """Today's date as YYYY-MM-DD in APP_TIMEZONE — for date-keyed usage rows."""
     return now_app_tz().strftime("%Y-%m-%d")
@@ -57,6 +64,26 @@ def format_display(value, fmt: str = None) -> str:
 def format_display_date(value) -> str:
     dt = to_app_tz(value)
     return dt.strftime(config.DISPLAY_DATE_FORMAT) if dt else ""
+
+
+def format_calendar_date(value) -> str:
+    """Format a plain calendar-date-only value (e.g. exams.date, stored as a
+    bare 'YYYY-MM-DD' string with no time-of-day or timezone meaning) using
+    DISPLAY_DATE_FORMAT — WITHOUT routing it through to_app_tz(). to_app_tz()
+    assumes naive input is UTC and converts to APP_TIMEZONE; applied to a
+    value that was never a UTC instant to begin with, that can silently
+    shift the displayed date by a day whenever APP_TIMEZONE's offset would
+    cross midnight (e.g. any negative-offset zone). Use this — not
+    format_display_date()/display_date — for exams.date and any other
+    pure calendar-date field; keep using display_date for real timestamp
+    columns (created_at, completed_at, updated_at, ...)."""
+    if not value:
+        return ""
+    try:
+        dt = value if isinstance(value, datetime) else datetime.strptime(str(value)[:10], "%Y-%m-%d")
+        return dt.strftime(config.DISPLAY_DATE_FORMAT)
+    except Exception:
+        return str(value)
 
 
 def daily_reset_message() -> str:

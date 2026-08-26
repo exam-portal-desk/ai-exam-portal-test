@@ -1,6 +1,12 @@
 const root = document.getElementById('noteEditor');
 const notebookId = root.dataset.notebookId;
-const isPublicView = root.dataset.readOnly === 'true';
+// True for a currently-public notebook viewed read-only, AND for a
+// notebook shared with this user at Viewer permission — both are the same
+// "can't write" state as far as the editor UI/save path is concerned; see
+// notebook.access below for which one it actually is (used only for the
+// access badge, not for any permission decision — the server is the real
+// enforcement, this only controls what the UI shows/allows attempting).
+const isReadOnly = root.dataset.readOnly === 'true';
 const apiBase = root.dataset.apiBase || '/api/v01/notebooks';
 const canvas = new fabric.Canvas('notesCanvas', { selection: true, preserveObjectStacking: true });
 window.__notesCanvas = canvas;
@@ -29,7 +35,7 @@ function clampedWidthHandlePosition(dim, finalMatrix, fabricObject, currentContr
 });
 let activePageId = document.querySelector('.page-item.active')?.dataset.pageId;
 let pageCache = [];
-let dirty = false, loading = false, saving = false, saveTimer, pan = false, lastPan, deletedIds = [], history = [], historyIndex = -1, activeTool = 'select', autoSaveEnabled = true;
+let dirty = false, loading = false, saving = false, saveAgainNeeded = false, saveTimer, pan = false, lastPan, deletedIds = [], history = [], historyIndex = -1, activeTool = 'select', autoSaveEnabled = true;
 // Must mirror MAX_OBJECTS_PER_PAGE in app/utils/notes_validation.py. NOT a page content limit —
 // a page can hold any number of objects; this only bounds a single save request's payload, so
 // save() below splits a big page into several sequential chunked PUTs to the SAME page. Never
@@ -70,7 +76,7 @@ window.__notesReadOnly = false;    // read by drawing-tools.js to suppress pen/e
 */
 // Custom fabric properties this app relies on — shared by save (objectRecord), undo/redo
 // (snapshot), and copy/paste/export so every serialize/enliven round-trip stays identical.
-const NOTES_PROPS = ['objectId', 'objectType', 'themeText', 'themeSticky', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg', 'strokeOnly', 'globalCompositeOperation'];
+const NOTES_PROPS = ['objectId', 'objectType', 'objectVersion', 'themeText', 'themeSticky', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg', 'strokeOnly', 'globalCompositeOperation', 'arrowKind', 'arrowFamily', 'arrowHeadSize', 'arrowHeadsEnabled'];
 const pageObjectsCache = new Map();   // pageId -> { objects: fabric.Object[], cachedAt: number }
 const assetUrlCache = new Map();      // assetId -> { url: string, expiresAt: number }
 const PAGE_CACHE_TTL_MS = 50 * 60 * 1000;  // must stay comfortably under the 1h signed-URL TTL
@@ -82,7 +88,7 @@ const preloadingPageIds = new Set();
  *  one, and remembering whatever URL we do end up using. Shared by loadPage()
  *  and the background preloader so the two can never drift apart. */
 function buildRawFabricEntry(row) {
-  const entry = { ...(row.payload?.fabric || {}), objectId: row.id, objectType: row.object_type };
+  const entry = { ...(row.payload?.fabric || {}), objectId: row.id, objectType: row.object_type, objectVersion: row.version };
   if (row.object_type === 'image' && row.asset_id && entry.src) {
     const cached = assetUrlCache.get(row.asset_id);
     if (cached && cached.expiresAt > Date.now()) {
@@ -323,6 +329,10 @@ function beginNativeTextEdit(object, point) {
     // drag/resize/paste, applied live so the box's own handles stay reachable while still typing.
     constrainObjectToPage(object);
     canvas.requestRenderAll();
+    // Keeps the format toolbar (size/font/Bold/Italic/Underline/color) honest as the caret moves
+    // or the selection changes inside this overlay — see syncFormatDisplay in drawing-tools.js,
+    // which reads text.selectionStart/selectionEnd set just above.
+    window.__notesSyncFormatDisplay?.();
   };
   nativeTextEditor = { object, element, sync };
   element.addEventListener('keydown', event => handleListContinuation(event, element, sync));
@@ -339,7 +349,12 @@ function beginNativeTextEdit(object, point) {
     // Underline/Font size/Color/Highlight would land on the WHOLE box instead of the
     // selection. Losing focus to a toolbar control just keeps editing (and the selection)
     // alive instead; only losing focus to something outside both actually finishes it.
-    if (document.activeElement?.closest('.object-toolbar')) return;
+    // The color popovers (drawing-tools.js's createColorControl) are the same case one level
+    // removed: they're real floating panels appended to `root` — sibling to, not inside,
+    // .object-toolbar — so their own hex-code input / native custom-color swatch need the
+    // exact same carve-out, or typing a hex code mid-selection would finish editing (collapsing
+    // the selection to wherever the DOM selection last was) right before applying it.
+    if (document.activeElement?.closest('.object-toolbar, [data-notes-color-popover]')) return;
     finishNativeTextEdit();
   }, 0));
   element.focus();
@@ -453,7 +468,7 @@ function updateFullscreenUI() {
 }
 
 async function setMode(next) {
-  if (isPublicView) return; // Public Notebooks are permanently in Read Mode — never toggled here.
+  if (isReadOnly) return; // Read-only (public view or Viewer share) is permanently in Read Mode — never toggled here.
   if (next !== 'edit' && next !== 'read') return;
   if (next === currentMode) return;
 
@@ -489,7 +504,7 @@ async function setMode(next) {
    canvas flags) instead of a second read-only implementation — the difference
    is only that this runs once at load and the toggle button is then disabled,
    so a public viewer can never flip back into Edit Mode. */
-function initPublicReadOnlyView() {
+function initReadOnlyView() {
   currentMode = 'read';
   window.__notesReadOnly = true;
   canvas.isDrawingMode = false;
@@ -506,7 +521,7 @@ function initPublicReadOnlyView() {
 }
 
 function setToolbarVisible(visible) {
-  if (isPublicView) return;
+  if (isReadOnly) return;
   toolbarVisible = !!visible;
   applyToolbarVisibility();
   updateToolbarToggleUI();
@@ -825,6 +840,12 @@ function finalizeLoadedObject(o) {
   // very first paint, not only after the next edit touches the object.
   preserveStickyTextSize(o);
   clampTextHeight(o);
+  // Self-heals any shape saved before strokeUniform was set at creation time (see drawing-tools.js
+  // finalizeShape/mouse:down placement) — without it, a non-uniform scale (e.g. a wide-but-short
+  // resize) visibly thickens/distorts the border because Fabric scales the stroke geometry right
+  // along with the shape by default. Never overrides an explicit false, only fills in the gap for
+  // legacy content that predates this property existing at all.
+  if (o.objectType === 'shape' && o.strokeUniform !== false) o.strokeUniform = true;
 }
 function setTool(name) { activeTool=name; window.__notesEraserActive = false; window.__notesDeactivateInkTools?.(); document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === name)); canvas.isDrawingMode = name === 'draw' && currentMode === 'edit'; canvas.selection = name === 'select' && currentMode === 'edit'; const cursor = name === 'select' ? 'default' : name === 'draw' ? 'crosshair' : 'text'; canvas.defaultCursor = cursor; canvas.hoverCursor = cursor; canvas.freeDrawingCursor = cursor; }
 function addObject(object, type) { if (currentMode === 'read') return; object.objectId = object.objectId || uid(); object.objectType = type; canvas.add(object).setActiveObject(object); canvas.requestRenderAll(); markDirty(); }
@@ -836,7 +857,36 @@ function objectRecord(object) {
   // the way OUT to storage, means a corrupted scale can never be persisted in the first place,
   // on top of finalizeLoadedObject() self-healing it on the way back IN.
   preserveStickyTextSize(object);
-  return { id: object.objectId || (object.objectId = uid()), object_type: object.objectType || 'shape', asset_id: object.assetId || null, transform: { left: object.left || 0, top: object.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0 }, payload: { fabric: object.toObject(NOTES_PROPS) } };
+  const fabricData = object.toObject(NOTES_PROPS);
+  // ROOT CAUSE of a multi-selected object's SAVED position silently corrupting (e.g. visible
+  // after recoloring several selected ink strokes, then closing/reopening the notebook before
+  // ever clicking away to deselect): while an object is part of a live Fabric ActiveSelection,
+  // its own left/top are temporarily relative to the SELECTION's center, not the canvas — that
+  // is normal, correct Fabric behavior while grouped, exactly analogous to the scaleX/scaleY
+  // case preserveStickyTextSize already self-heals just above. The debounced autosave
+  // (markDirty -> setTimeout(save, 1400)) can fire at any point, including while the user still
+  // has several objects selected, and object.toObject() above has no way to know its numbers
+  // are only meaningful in the temporary group's frame — it serializes them exactly as stored.
+  // getBoundingRect(true, true)'s "absolute" flag turned out to only mean "ignore the canvas's
+  // own viewport zoom/pan" (verified live) — it does NOT undo a group's transform, so it
+  // returns the exact same group-relative numbers as object.left/top for a grouped member, not
+  // a fix. The correct primitive is fabric.util.transformPoint: object.left/top for a grouped
+  // member are coordinates in the GROUP's own local plane (origin at the group's center), and
+  // applying the group's full transform matrix (object.group.calcTransformMatrix(), which
+  // itself composes recursively if the group is ever nested) maps that local point to true
+  // canvas-absolute space — confirmed live to reproduce the exact pre-group absolute position.
+  // Only the OUTPUT is touched; the live object and its actual on-screen position/selection are
+  // never modified.
+  if (object.group) {
+    const absolute = fabric.util.transformPoint({ x: object.left, y: object.top }, object.group.calcTransformMatrix());
+    fabricData.left = absolute.x; fabricData.top = absolute.y;
+  }
+  // expected_version is the optimistic-concurrency token: undefined/null means this object has
+  // never been successfully saved to the server yet (a brand-new object — ids are generated
+  // client-side via uid(), so presence of an id alone doesn't distinguish new-vs-existing here),
+  // a number means "this is the version I last read/saved — reject my write if the server's
+  // current version doesn't match, instead of silently overwriting a change I don't know about."
+  return { id: object.objectId || (object.objectId = uid()), object_type: object.objectType || 'shape', asset_id: object.assetId || null, expected_version: typeof object.objectVersion === 'number' ? object.objectVersion : null, transform: { left: fabricData.left || 0, top: fabricData.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0 }, payload: { fabric: fabricData } };
 }
 
 /* A page can hold any number of objects — the ONLY thing chunked here is the save
@@ -845,23 +895,86 @@ function objectRecord(object) {
    page gets. start_index tells the server each chunk's true position so z_index (draw/stacking
    order) stays correct across chunks instead of every chunk restarting from 0. deleted_ids only
    needs to ride along on one chunk — the delete itself doesn't care about ordering. */
+/* Patches the canvas to match what a conflict-safe save's server response reported it could NOT
+   apply — never silently keeps (or re-sends) this client's stale edit to an object someone else
+   changed since it was last read. `current: null` means the object was deleted upstream (removed
+   locally too); `current: {...}` means someone else's newer version wins (this object is
+   replaced in place with the server's current data, going through the same enlivenObjects/
+   finalizeLoadedObject path a normal page load uses, so it renders identically either way).
+   Runs entirely programmatically — resets dirty/deletedIds afterward so this reconciliation
+   itself is never mistaken for a new unsaved user edit that needs saving again. */
+function resolveSaveConflicts(conflicts) {
+  let removedCount = 0, updatedCount = 0;
+  const toEnliven = [];
+  conflicts.forEach(({ id, current }) => {
+    const object = canvas.getObjects().find(o => o.objectId === id);
+    if (object) canvas.remove(object);
+    if (current) { toEnliven.push(buildRawFabricEntry(current)); updatedCount++; }
+    else if (object) removedCount++;
+  });
+  const finish = () => { canvas.discardActiveObject(); canvas.requestRenderAll(); updateObjectCount(); dirty = false; deletedIds = []; };
+  if (toEnliven.length) {
+    fabric.util.enlivenObjects(toEnliven, enlivened => { enlivened.forEach(object => { finalizeLoadedObject(object); canvas.add(object); }); finish(); });
+  } else {
+    finish();
+  }
+  const parts = [];
+  if (updatedCount) parts.push(`${updatedCount} object${updatedCount === 1 ? '' : 's'} refreshed`);
+  if (removedCount) parts.push(`${removedCount} object${removedCount === 1 ? '' : 's'} removed`);
+  toast(`This page changed elsewhere — ${parts.join(', ')} to match the latest version.`, 'error');
+}
+
 async function save() {
-  if (isPublicView) return;
-  if (!dirty || saving || !activePageId) return;
+  if (isReadOnly) return;
+  // ROOT CAUSE of erased/edited content sometimes never reaching the server at all (visually
+  // gone locally, but the DELETE — or a subsequent chunk's upsert — never actually fires): this
+  // used to just `return` here whenever a save was already in flight, silently dropping whatever
+  // markDirty()/eraseAt's object:removed just queued (dirty=true, deletedIds populated) with
+  // nothing left to schedule another attempt — the 1400ms debounce timer that would normally
+  // retry had already been consumed by the save that's currently in flight. On a real network
+  // round trip (this app always talks to a remote Postgres — see app/db/__init__.py) that
+  // in-flight save can easily still be pending when the NEXT edit's timer fires, especially right
+  // after an erase-then-redraw done in quick succession. saveAgainNeeded guarantees a followup
+  // save() once the in-flight one finishes, instead of the edit being lost until some unrelated
+  // future edit happens to schedule a new timer.
+  if (saving) { saveAgainNeeded = true; return; }
+  if (!dirty || !activePageId) return;
   saving = true; status('Saving…', 'saving');
+  const allConflicts = [];
+  const applySavedVersions = savedRows => {
+    const byId = new Map(savedRows.map(row => [row.id, row]));
+    canvas.getObjects().forEach(object => { const row = byId.get(object.objectId); if (row) object.objectVersion = row.version; });
+  };
   try {
     const objects = canvas.getObjects().map(objectRecord);
     const pageId = activePageId;
     if (!objects.length) {
-      await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects: [], deleted_ids: deletedIds, start_index: 0 }) });
+      const data = await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects: [], deleted: deletedIds, start_index: 0 }) });
+      applySavedVersions(data.saved || []); allConflicts.push(...(data.conflicts || []));
     } else {
       for (let start = 0; start < objects.length; start += SAVE_CHUNK_SIZE) {
         const chunk = objects.slice(start, start + SAVE_CHUNK_SIZE);
-        await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects: chunk, deleted_ids: start === 0 ? deletedIds : [], start_index: start }) });
+        const data = await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects: chunk, deleted: start === 0 ? deletedIds : [], start_index: start }) });
+        applySavedVersions(data.saved || []); allConflicts.push(...(data.conflicts || []));
       }
     }
     dirty = false; deletedIds = []; status('Saved');
-  } catch (error) { status('Save failed', 'failed'); toast(error.message, 'error'); } finally { saving = false; }
+    // Never a silent overwrite: anything the server refused (someone else changed or deleted it
+    // since this client last read it) gets patched in from the server's current state instead —
+    // everything else in this same save already succeeded normally above.
+    if (allConflicts.length) resolveSaveConflicts(allConflicts);
+  } catch (error) {
+    // dirty/deletedIds are deliberately left untouched on failure (nothing was actually
+    // persisted) — showUnsavedChangesDialog's "Save & Continue" (or the next edit's own
+    // debounce timer) remains the retry path, exactly as before this fix.
+    status('Save failed', 'failed'); toast(error.message, 'error');
+  } finally {
+    saving = false;
+    // Only re-invoked for the "something else queued a save while this one was in flight"
+    // case above — never on failure, so a persistent error can't turn this into a tight retry
+    // loop hammering the server.
+    if (saveAgainNeeded) { saveAgainNeeded = false; if (dirty) save(); }
+  }
 }
 function updatePageNav() {
   const label = document.getElementById('pageNavLabel');
@@ -1028,6 +1141,13 @@ function placeFloatingPanel(panel, trigger) {
   panel.style.left = `${left}px`; panel.style.top = `${top}px`;
   pageMenuPortal = panel;
 }
+// Shared floating-popover plumbing (position/singleton/outside-click/Escape/scroll-close, all
+// already wired below) reused as-is by drawing-tools.js's shape-color popover — one more
+// consumer of the SAME single-portal machinery already governing page menus/renames/jump, not a
+// second implementation of it.
+window.__notesPlaceFloatingPanel = placeFloatingPanel;
+window.__notesCloseFloatingPanels = closePageMenus;
+window.__notesGetActiveFloatingPanel = () => pageMenuPortal;
 function openPageMenu(page, titleElement, trigger) {
   if (currentMode === 'read') return;
   closePageMenus();
@@ -1150,7 +1270,7 @@ function showUnsavedChangesDialog(action) { if (!dirty) return action(); pending
 function clampTextHeight(object) { if (!['sticky_note', 'rich_text'].includes(object?.objectType)) return; if (object.minHeight && object.height < object.minHeight) object.set('height', object.minHeight); }
 function preserveStickyTextSize(object) { if (!['sticky_note', 'rich_text'].includes(object?.objectType) || object.type !== 'textbox') return; const scaleX = Math.abs(object.scaleX || 1), scaleY = Math.abs(object.scaleY || 1); if (scaleX === 1 && scaleY === 1) return; const requestedWidth = Math.max(140, object.width * scaleX); const requestedHeight = Math.max(40, object.height * scaleY); object.set({ width: requestedWidth, scaleX: 1, scaleY: 1 }); object.initDimensions(); if (scaleY !== 1) object.minHeight = Math.max(requestedHeight, object.height); clampTextHeight(object); object.setCoords(); }
 function updateObjectCount() { const el = document.getElementById('objectCount'); if (el) el.innerHTML = `<i class="fas fa-shapes"></i> Objects: ${canvas.getObjects().length}`; }
-canvas.on('object:added', event => { constrainObjectToPage(event.target); markDirty(); updateObjectCount(); }); canvas.on('object:moving', event => constrainObjectToPage(event.target)); canvas.on('object:scaling', event => preserveStickyTextSize(event.target)); canvas.on('object:modified', event => { preserveStickyTextSize(event.target); constrainObjectToPage(event.target); markDirty(); }); canvas.on('object:removed', e => { if (!loading && e.target?.objectId) deletedIds.push(e.target.objectId); markDirty(); updateObjectCount(); });
+canvas.on('object:added', event => { constrainObjectToPage(event.target); markDirty(); updateObjectCount(); }); canvas.on('object:moving', event => constrainObjectToPage(event.target)); canvas.on('object:scaling', event => preserveStickyTextSize(event.target)); canvas.on('object:modified', event => { preserveStickyTextSize(event.target); constrainObjectToPage(event.target); markDirty(); }); canvas.on('object:removed', e => { if (!loading && e.target?.objectId && typeof e.target.objectVersion === 'number') deletedIds.push({ id: e.target.objectId, expected_version: e.target.objectVersion }); markDirty(); updateObjectCount(); });
 // A Textbox/Sticky Note growing taller mid-edit (constrainObjectToPage) and finishing an edit
 // (clampTextHeight/constrainObjectToPage/markDirty) are handled directly inside the
 // native-text-editor overlay's sync()/finishNativeTextEdit() (see beginNativeTextEdit above) —
@@ -1170,12 +1290,34 @@ canvas.on('path:created', e => {
   if (inkTool === 'highlighter') e.path.set({ globalCompositeOperation: 'multiply' });
 }); canvas.on('mouse:dblclick', event => { if (currentMode === 'read') return; if (['i-text', 'textbox'].includes(event.target?.type)) { event.e.preventDefault(); beginNativeTextEdit(event.target, { x: event.e.clientX, y: event.e.clientY }); } });
 canvas.on('mouse:down', async e => {
+  // ROOT CAUSE of "Ctrl+C/Ctrl+V on a selected canvas object silently does nothing": clicking the
+  // <canvas> element to select an object never moves DOM focus there — canvas isn't a normal
+  // focusable target, so whatever previously had focus (the arrowhead-size field, the text-size
+  // field, the notebook title input, any toolbar <input>) stays focused even though the object is
+  // now visibly selected with handles. copySelection()'s keydown guard (isTypingContext) exists
+  // specifically to NOT hijack Ctrl+C/Ctrl+V while the user is genuinely typing in one of those
+  // fields — necessary (the notebook title needs its own native copy/paste) but it can't tell
+  // "actively typing" apart from "focus just never left after an earlier, unrelated click", so a
+  // real object selection can silently coexist with a stray focused input and copy/paste never
+  // fires despite looking selected on screen. Explicitly returning focus to neutral the moment the
+  // canvas itself is interacted with removes the ambiguity at its source, exactly like clicking
+  // any other normally-focusable surface would; it never touches the native-text-editor overlay
+  // (a contenteditable DIV, not an INPUT/TEXTAREA) so an in-progress text edit is unaffected.
+  if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) document.activeElement.blur();
   // Recovers from the "editing kept alive through a toolbar control" state in beginNativeTextEdit
   // (blur to a <select>/color-input formatting control doesn't itself finish the edit): a canvas
   // click is "elsewhere entirely" — nothing else ends this edit session on its own once the
   // overlay itself is no longer the focused element.
   if (nativeTextEditor && document.activeElement !== nativeTextEditor.element) finishNativeTextEdit();
-  if (e.e.altKey) { pan = true; lastPan = e.e; canvas.selection = false; return; } if (currentMode === 'read') return; if (e.target && ['i-text', 'textbox'].includes(e.target.type)) { e.e.preventDefault(); } if (!e.target && !window.__notesEraserActive && !window.__notesShapeToolActive && !canvas.isDrawingMode && activeTool !== 'image' && activeTool !== 'rect') { const p = canvas.getPointer(e.e); await createEditableText({ left: p.x, top: p.y, fontSize: window.__notesDefaultSize || 22, fill: token('--text-1'), themeText: true }, 'rich_text'); } }); canvas.on('mouse:move', e => { lastPointerCanvas = canvas.getPointer(e.e); if (!pan) return; const v = canvas.viewportTransform; v[4] += e.e.clientX - lastPan.clientX; v[5] += e.e.clientY - lastPan.clientY; lastPan = e.e; canvas.requestRenderAll(); }); canvas.on('mouse:up', () => { pan = false; canvas.selection = currentMode === 'edit'; });
+  if (e.e.altKey) { pan = true; lastPan = e.e; canvas.selection = false; return; } if (currentMode === 'read') return; if (e.target && ['i-text', 'textbox'].includes(e.target.type)) { e.e.preventDefault(); }
+  // ROOT CAUSE of "the Select tool creates text boxes" (worse with multi-select, where every
+  // click-to-deselect/click-to-drag-select on empty canvas silently added another invisible empty
+  // text object): this used to fire click-to-create-text on ANY empty-canvas click as long as the
+  // tool merely WASN'T eraser/shape/drawing/image/rect — Select was never excluded, so it fell
+  // through every time. Text creation must be opt-in to the Text tool specifically, not opt-out of
+  // every other tool; the eraser/shape/drawing-mode checks stay as a safety net for the (separate,
+  // window.__notes*-flagged) ink/shape tools, which don't reset this module's own `activeTool`.
+  if (!e.target && activeTool === 'text' && !window.__notesEraserActive && !window.__notesShapeToolActive && !canvas.isDrawingMode) { const p = canvas.getPointer(e.e); await createEditableText({ left: p.x, top: p.y, fontSize: window.__notesDefaultSize || 22, fill: token('--text-1'), themeText: true }, 'rich_text'); } }); canvas.on('mouse:move', e => { lastPointerCanvas = canvas.getPointer(e.e); if (!pan) return; const v = canvas.viewportTransform; v[4] += e.e.clientX - lastPan.clientX; v[5] += e.e.clientY - lastPan.clientY; lastPan = e.e; canvas.requestRenderAll(); }); canvas.on('mouse:up', () => { pan = false; canvas.selection = currentMode === 'edit'; });
 // Tracked purely so object Ctrl+V (below) can paste near where the user's pointer actually is
 // instead of always offsetting from the original object — cheap (just a coordinate pair, no
 // render triggered) and touches nothing about existing pan/select/draw mouse handling above.
@@ -1249,6 +1391,30 @@ document.addEventListener('keydown', event => {
    clones just as fast. A pasted object is added via canvas.add(), which already triggers the
    existing object:added -> markDirty()/snapshot() handling, so persistence and undo "just work". */
 let clipboard = [], pasteOffset = 0;
+// ROOT CAUSE of "paste an external image once, then Ctrl+C a canvas object, then Ctrl+V re-pastes
+// the OLD image instead of duplicating the object": the OS clipboard is a passive, read-only
+// source from this page's perspective — pasting an image never clears or marks it "consumed", so
+// it's still sitting there, completely unchanged, on every LATER 'paste' event too. The paste
+// handler below used to treat "the OS clipboard currently contains an image" as an unconditional,
+// always-wins signal — correct for the ordinary case (nothing else has happened since), but wrong
+// once the user's MOST RECENT explicit copy action was actually an in-app Ctrl+C on a canvas
+// selection: that action is real and current, but the paste handler couldn't tell "this OS image
+// is what the user just copied" apart from "this is the same stale image from three actions ago"
+// — both look identical in event.clipboardData. internalClipboardFresh + lastExternalImageSignature
+// (a fingerprint of the clipboard's image FILE(S), cheap and good enough to distinguish "the same
+// clipboard content I already saw" from "the user copied something new externally") is what lets
+// the paste handler tell those two cases apart: an in-app Ctrl+C arms internalClipboardFresh, and
+// the next paste only defers to the OS image if its fingerprint has actually CHANGED since — i.e.
+// the user really did copy something new externally, which correctly wins again either way.
+// DELIBERATELY size+type only, NOT File.lastModified — confirmed live that browsers regenerate
+// lastModified fresh (to "now") on every single clipboardData read of the SAME unchanged OS
+// clipboard image, so including it made the fingerprint change on every paste regardless of
+// whether the actual image did, which silently defeated this entire fix (the OS image kept
+// "winning" every time, exactly the bug this was meant to close). size+type is stable across
+// repeated reads of the same clipboard content and, combined with the image count, is specific
+// enough in practice — the rare theoretical collision (two different images of identical byte
+// size and MIME type) is a far smaller risk than a check that never actually matches.
+let internalClipboardFresh = false, lastExternalImageSignature = null;
 function copySelection() {
   const selected = canvas.getActiveObjects();
   if (!selected.length) return;
@@ -1259,6 +1425,7 @@ function copySelection() {
   });
   clipboard = [...set];
   pasteOffset = 0;
+  internalClipboardFresh = true;
 }
 function cloneObject(o) { return new Promise(resolve => o.clone(resolve, NOTES_PROPS)); }
 // Center (in canvas/object coordinates) of whatever portion of the canvas is actually scrolled
@@ -1288,7 +1455,12 @@ async function pasteClipboard() {
   const clones = await Promise.all(clipboard.map(cloneObject));
   clones.forEach((clone, i) => {
     const original = clipboard[i];
-    clone.set({ objectId: idMap.get(original.objectId), left: (original.left || 0) + dx, top: (original.top || 0) + dy });
+    // cloneObject() copies every NOTES_PROP, including objectVersion — but a pasted copy is a
+    // brand-new object as far as the server is concerned (fresh id, never saved). Carrying over
+    // the original's version here would make the next autosave send a version-checked update for
+    // an id that doesn't exist server-side yet, which the conflict logic would read as "this
+    // object was deleted upstream" and silently remove the freshly-pasted copy from the canvas.
+    clone.set({ objectId: idMap.get(original.objectId), objectVersion: undefined, left: (original.left || 0) + dx, top: (original.top || 0) + dy });
     if (clone.shapeTextId && idMap.has(clone.shapeTextId)) clone.set('shapeTextId', idMap.get(clone.shapeTextId));
     if (clone.shapeTextFor && idMap.has(clone.shapeTextFor)) clone.set('shapeTextFor', idMap.get(clone.shapeTextFor));
   });
@@ -1302,17 +1474,27 @@ async function pasteClipboard() {
   if (clones.length === 1) canvas.setActiveObject(clones[0]);
   canvas.requestRenderAll();
 }
+// ROOT CAUSE of "pasting an image only works after selecting/editing a text box first": Ctrl+V
+// used to be caught HERE too (capture-phase keydown), which called event.preventDefault() on the
+// KEYDOWN itself whenever no text box was being edited — and preventing a Ctrl+V keydown stops
+// the browser from ever synthesizing the native 'paste' clipboard event at all. That silently
+// killed the OS-clipboard image-paste listener below for every case except "currently editing
+// text" (the one case this handler already skipped via the nativeTextEditor check), which is
+// exactly the "workaround" that made it look image-paste required a text box. Object-clipboard
+// paste (Ctrl+C'd shapes/text/ink) doesn't need to live in keydown at all — it's folded into the
+// 'paste' listener below instead, as the fallback once that listener has already confirmed there's
+// no image to handle, so both paste paths now share one entry point and can never race/suppress
+// each other. Copy has no such conflict (there's no competing OS-clipboard consumer for it) so it
+// stays here unchanged.
 document.addEventListener('keydown', event => {
   if (currentMode === 'read') return;
   const key = event.key.toLowerCase();
-  const isCopy = (event.ctrlKey || event.metaKey) && key === 'c';
-  const isPaste = (event.ctrlKey || event.metaKey) && key === 'v';
-  if (!isCopy && !isPaste) return;
+  if (!(event.ctrlKey || event.metaKey) || key !== 'c') return;
   if (nativeTextEditor || isTypingContext(document.activeElement)) return;
   event.preventDefault();
-  if (isCopy) copySelection(); else pasteClipboard();
+  copySelection();
 }, true);
-if (!isPublicView) {
+if (!isReadOnly) {
   const manualSaveButton = document.createElement('button'); manualSaveButton.type = 'button'; manualSaveButton.id = 'manualSaveBtn'; manualSaveButton.title = 'Save changes'; manualSaveButton.innerHTML = '<i class="fas fa-save"></i>'; manualSaveButton.addEventListener('click', () => { if (currentMode === 'read') return; save(); }); document.querySelector('[data-group="other"]').append(manualSaveButton);
   const autoSaveLabel = document.createElement('label'); autoSaveLabel.className = 'notes-auto-save'; autoSaveLabel.innerHTML = 'Auto Save <input type="checkbox" aria-label="Auto Save"><span></span>'; const autoSaveToggle = autoSaveLabel.querySelector('input'); autoSaveToggle.checked = autoSaveEnabled; autoSaveToggle.addEventListener('change', () => { if (currentMode === 'read') { autoSaveToggle.checked = autoSaveEnabled; return; } autoSaveEnabled = autoSaveToggle.checked; if (autoSaveEnabled && dirty) { clearTimeout(saveTimer); saveTimer = setTimeout(save, 1400); } }); document.querySelector('[data-group="other"]').append(autoSaveLabel);
 }
@@ -1334,7 +1516,7 @@ async function uploadImageFile(file) {
 }
 document.getElementById('imageInput').addEventListener('change', async e => { if (currentMode === 'read') { e.target.value = ''; return; } for (const file of [...e.target.files]) await uploadImageFile(file); e.target.value = ''; });
 document.addEventListener('paste', event => {
-  if (currentMode === 'read' || isPublicView) return;
+  if (currentMode === 'read' || isReadOnly) return;
   // Guards against hijacking a paste meant for a real text field elsewhere on the page (e.g. the
   // notebook title input). The native-text-editor overlay is a DIV, not an INPUT/TEXTAREA, so
   // pasting an image while editing Text Box/Sticky Note content still reaches here — matching
@@ -1342,10 +1524,37 @@ document.addEventListener('paste', event => {
   // is an edge case, not a regression.
   const active = document.activeElement;
   if (active && ['INPUT', 'TEXTAREA'].includes(active.tagName)) return;
-  const images = [...(event.clipboardData?.items || [])].filter(item => item.type.startsWith('image/'));
-  if (!images.length) return;
+  // Image takes priority whenever the OS clipboard actually has one — regardless of Select tool,
+  // no selection, or an existing text/shape/ink object being present — inserted straight onto the
+  // canvas as a real image object via the SAME uploadImageFile()/addObject() path the toolbar's
+  // own "Upload image" button uses, never into a text box. Real plain-text paste (into an actively
+  // open text box) has no competing image data in that case, so it's untouched below.
+  const imageFiles = [...(event.clipboardData?.items || [])].filter(item => item.type.startsWith('image/')).map(item => item.getAsFile()).filter(Boolean);
+  if (imageFiles.length) {
+    // See internalClipboardFresh's comment above copySelection(): only treat this as "paste the
+    // OS image" when it's either the first time we've seen it (ordinary case) or it has genuinely
+    // changed since we last looked (the user really did copy something new externally) — not when
+    // it's the exact same still-sitting-there image AND the user's most recent explicit action was
+    // an in-app Ctrl+C, which must win instead.
+    const signature = `${imageFiles.length}|${imageFiles.map(f => `${f.size}:${f.type}`).join(',')}`;
+    const isStaleExternalImage = internalClipboardFresh && signature === lastExternalImageSignature;
+    if (!isStaleExternalImage) {
+      event.preventDefault();
+      lastExternalImageSignature = signature;
+      internalClipboardFresh = false;
+      imageFiles.forEach(file => uploadImageFile(file));
+      return;
+    }
+  }
+  // No (usable) image: this is where Ctrl+V for the in-memory canvas-object clipboard (Ctrl+C'd
+  // shapes/text/ink — see copySelection/pasteClipboard above) now lives, folded in here instead of
+  // a separate keydown listener so it can never fire ahead of / suppress this listener's own image
+  // handling (see the keydown handler's comment above for why that used to break image paste
+  // entirely). Skipped while actively editing text so a real text paste reaches the contenteditable
+  // overlay untouched, exactly like the previous keydown guard did.
+  if (nativeTextEditor || isTypingContext(document.activeElement) || !clipboard.length) return;
   event.preventDefault();
-  images.forEach(item => { const file = item.getAsFile(); if (file) uploadImageFile(file); });
+  pasteClipboard();
 });
 function performUndo() {
   if (currentMode === 'read' || historyIndex <= 0) return;
@@ -1420,7 +1629,16 @@ document.getElementById('confirmDeletePage').addEventListener('click', async () 
 document.getElementById('clearPageBtn')?.addEventListener('click', () => { if (currentMode === 'read' || !activePageId || !canvas.getObjects().length) return; document.getElementById('clearPageModal').classList.add('open'); });
 document.querySelectorAll('[data-close-clear-page]').forEach(button => button.addEventListener('click', () => closeModal('clearPageModal')));
 document.getElementById('confirmClearPage').addEventListener('click', () => { if (currentMode === 'read' || !activePageId) return; canvas.discardActiveObject(); canvas.remove(...canvas.getObjects()); canvas.requestRenderAll(); closeModal('clearPageModal'); toast('Page cleared.'); });
-document.addEventListener('click', closePageMenus); document.addEventListener('click', event => { const link = event.target.closest('a[href]'); if (!link || event.defaultPrevented || link.target || link.href === location.href) return; event.preventDefault(); showUnsavedChangesDialog(() => { location.href = link.href; }); }, true); document.addEventListener('keydown', event => { if (event.key === 'Escape') closePageMenus(); }); window.addEventListener('scroll', closePageMenus, true); new MutationObserver(applyCanvasTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); window.addEventListener('resize', () => { closePageMenus(); resize(); }); window.addEventListener('beforeunload', event => { if (!dirty) return; event.preventDefault(); event.returnValue = ''; });
-if (isPublicView) initPublicReadOnlyView();
+document.addEventListener('click', closePageMenus); document.addEventListener('click', event => { const link = event.target.closest('a[href]'); if (!link || event.defaultPrevented || link.target || link.href === location.href) return; event.preventDefault(); showUnsavedChangesDialog(() => { location.href = link.href; }); }, true); document.addEventListener('keydown', event => { if (event.key === 'Escape') closePageMenus(); }); // ROOT CAUSE of "the shape picker (or any popover with its own scrollable content) closes the
+// instant you try to scroll inside it": this listener is capture-phase on window specifically so
+// it catches scroll events from ANY scrollable ancestor, not just window/document itself — but
+// that means scrolling the popover's OWN interior (e.g. the shape picker's overflow-y:auto
+// category list) also bubbles up through the capture phase and immediately closes the very panel
+// being scrolled. No floating panel needed internal scrolling before the shape picker existed, so
+// this was a latent bug, never actually triggered until now. Only skip the close when the scroll
+// event's target is inside the panel that's currently open — every other scroll (canvas, page
+// rail, anywhere else) still closes it exactly as before.
+window.addEventListener('scroll', event => { if (pageMenuPortal && pageMenuPortal.contains(event.target)) return; closePageMenus(); }, true); new MutationObserver(applyCanvasTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); window.addEventListener('resize', () => { closePageMenus(); resize(); }); window.addEventListener('beforeunload', event => { if (!dirty) return; event.preventDefault(); event.returnValue = ''; });
+if (isReadOnly) initReadOnlyView();
 applyToolbarVisibility(); updateReadModeUI(); updateFullscreenUI(); updateToolbarToggleUI();
 resize(); fontMetricsPromise.then(refreshPages).catch(error => { toast(error.message, 'error'); showEmptyEditor(); });

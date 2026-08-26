@@ -7,12 +7,51 @@ app/routes/admin/exams.py.
   POST /admin/exams/<id>/release-results  -> POST   /api/v01/admin/exams/<id>/release-results
 """
 
-from flask import jsonify, flash
+from flask import jsonify, flash, request, render_template_string
 
 from app.routes.api.v01.admin import admin_api_bp
 from app.middleware.session_guard import require_admin_role
-from app.db.exams import get_exam_by_id, release_exam_results
+from app.db.exams import get_exam_by_id, release_exam_results, get_exams_page
+from app.db.categories import get_all_categories
 from app.db import fetch_all, execute
+from app.utils.datetime_service import format_calendar_date
+
+_ROWS_TPL = (
+    '{% from "admin/_exam_rows.html" import render_exam_row, render_exam_card, render_exam_edit_modal %}'
+    '{% for exam in exams %}{{ render_exam_row(exam) }}{% endfor %}'
+    '|||SPLIT|||'
+    '{% for exam in exams %}{{ render_exam_card(exam) }}{% endfor %}'
+    '|||SPLIT|||'
+    '{% for exam in exams %}{{ render_exam_edit_modal(exam, categories) }}{% endfor %}'
+)
+
+
+@admin_api_bp.route("/exams", methods=["GET"])
+@require_admin_role
+def api_exams_list():
+    result = get_exams_page(
+        search=request.args.get("q", "").strip(),
+        category_id=request.args.get("category_id") or None,
+        subcategory_id=request.args.get("subcategory_id") or None,
+        status=request.args.get("status", "").strip(),
+        page=request.args.get("page", 1),
+        per_page=request.args.get("per_page", 20),
+    )
+    for e in result["exams"]:
+        e["date_display"] = format_calendar_date(e.get("date"))
+
+    if request.args.get("partial"):
+        # Server-rendered HTML for the row/card/edit-modal markup, so the
+        # AJAX-paginated page never drifts from the initial server render —
+        # one Jinja macro set (admin/_exam_rows.html) for both.
+        rendered = render_template_string(_ROWS_TPL, exams=result["exams"], categories=get_all_categories())
+        rows_html, cards_html, modals_html = rendered.split("|||SPLIT|||")
+        result["rows_html"] = rows_html
+        result["cards_html"] = cards_html
+        result["modals_html"] = modals_html
+        del result["exams"]
+
+    return jsonify(result)
 
 
 @admin_api_bp.route("/exams/<int:exam_id>", methods=["DELETE"])

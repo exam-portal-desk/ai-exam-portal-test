@@ -1,8 +1,10 @@
 {% extends "admin_base.html" %}
 {% block title %}Manage Subjects{% endblock %}
+{% from "admin/_subject_rows.html" import render_subject_row, render_subject_edit_modal %}
 
 {% block content %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
 <style>
 /* =========================
    PAGE HEADER
@@ -361,6 +363,10 @@
   </button>
 </div>
 
+<div class="admin-list-toolbar">
+  <input type="text" class="admin-list-search" id="subjectSearch" placeholder="Search subjects by name…">
+</div>
+
 <div class="card">
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -374,42 +380,9 @@
             <th style="width:90px">Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="subjectTbody">
           {% if subjects %}
-            {% for subject in subjects %}
-            <tr>
-              <td style="color:var(--text-muted);font-size:0.8rem;font-weight:600">{{ subject.id }}</td>
-              <td>
-                <div style="display:flex;align-items:center;gap:0.6rem">
-                  <div class="subject-avatar">{{ subject.subject_name[0].upper() }}</div>
-                  <span class="subject-name-text">{{ subject.subject_name }}</span>
-                </div>
-              </td>
-              <td>
-                <span class="folder-pill" title="Click to copy: {{ subject.subject_folder_id }}" data-folder="{{ subject.subject_folder_id }}">
-                  {{ subject.subject_folder_id }}
-                </span>
-              </td>
-              <td style="color:var(--text-muted);font-size:0.8rem">
-                {{ subject.subject_folder_created_at | display_dt if subject.subject_folder_created_at else '-' }}
-              </td>
-              <td>
-                <div class="action-btns">
-                  <button class="icon-btn"
-                          data-bs-toggle="modal"
-                          data-bs-target="#editSubjectModal{{ subject.id }}"
-                          title="Edit Subject">
-                    <i class="fas fa-pencil-alt"></i>
-                  </button>
-                  <button class="icon-btn danger"
-                          onclick="showDeleteConfirm({{ subject.id }}, '{{ subject.subject_name | replace("'", "\\'") }}')"
-                          title="Delete Subject">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
+            {% for subject in subjects %}{{ render_subject_row(subject) }}{% endfor %}
           {% else %}
             <tr>
               <td colspan="5">
@@ -424,34 +397,13 @@
       </table>
     </div>
   </div>
+  <div class="admin-pg-bar" id="subjectPaginator" style="padding:0 1.1rem 1rem"></div>
 </div>
 
 <!-- Edit Modals -->
-{% for subject in subjects %}
-<div class="modal fade" id="editSubjectModal{{ subject.id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form method="POST" action="{{ url_for('admin.edit_subject', subject_id=subject.id) }}">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-pencil-alt me-2"></i>Edit: {{ subject.subject_name }}</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <label class="form-label">Subject Name</label>
-          <input type="text" class="form-control" name="subject_name" value="{{ subject.subject_name }}" required>
-          <div class="form-text" style="margin-top:0.4rem;font-size:0.78rem">
-            <i class="fas fa-info-circle me-1"></i>Updating the name will create a new folder if needed.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn-flat primary"><i class="fas fa-save me-1"></i>Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
+<div id="subjectEditModals">
+{% for subject in subjects %}{{ render_subject_edit_modal(subject) }}{% endfor %}
 </div>
-{% endfor %}
 
 <!-- Add Subject Modal -->
 <div class="modal fade" id="addSubjectModal" tabindex="-1" aria-hidden="true">
@@ -494,39 +446,53 @@ function showDeleteConfirm(id, name) {
   new bootstrap.Modal(document.getElementById('deleteSubjectModal')).show();
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('form').forEach(form => {
-    form.addEventListener('submit', function() {
-      const btn = this.querySelector('button[type="submit"]');
-      if (btn && !btn.disabled) {
-        btn.dataset.orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-        btn.disabled = true;
-      }
-    });
-  });
+/* Delegated (not queried-once) so this keeps working for edit-modal forms
+   loaded later via AJAX pagination, not just the ones present at load. */
+document.addEventListener('submit', function(e) {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn && !btn.disabled) {
+    btn.dataset.orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+    btn.disabled = true;
+  }
+});
 
-  document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('hidden.bs.modal', function() {
-      this.querySelectorAll('button[type="submit"]').forEach(btn => {
-        btn.disabled = false;
-        if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig;
-      });
-    });
-  });
-
-  document.querySelectorAll('.folder-pill').forEach(el => {
-    el.addEventListener('click', async function() {
-      const text = this.dataset.folder;
-      try {
-        await navigator.clipboard.writeText(text);
-        adminToast('Folder ID copied to clipboard', 'success');
-      } catch(err) {
-        adminToast('Failed to copy. Try again.', 'danger');
-      }
-    });
+document.addEventListener('hidden.bs.modal', function(e) {
+  e.target.querySelectorAll('button[type="submit"]').forEach(btn => {
+    btn.disabled = false;
+    if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig;
   });
 });
+
+document.addEventListener('click', async function(e) {
+  const pill = e.target.closest('.folder-pill');
+  if (!pill) return;
+  try {
+    await navigator.clipboard.writeText(pill.dataset.folder);
+    adminToast('Folder ID copied to clipboard', 'success');
+  } catch (err) {
+    adminToast('Failed to copy. Try again.', 'danger');
+  }
+});
+</script>
+
+<script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
+<script>
+var subjectList = createAdminList({
+  endpoint: '/api/v01/admin/subjects',
+  paginatorEl: document.getElementById('subjectPaginator'),
+  searchInputEl: document.getElementById('subjectSearch'),
+  searchParam: 'q',
+  perPage: {{ subjects_per_page | default(20) }},
+  extraParams: function () { return { partial: 1 }; },
+  onData: function (data) {
+    document.getElementById('subjectTbody').innerHTML = data.rows_html || '';
+    document.getElementById('subjectEditModals').innerHTML = data.modals_html || '';
+  },
+});
+subjectList.hydrate({ page: 1, total_pages: {{ subjects_total_pages | default(1) }}, total: {{ subjects_total | default(0) }}, per_page: {{ subjects_per_page | default(20) }} });
 </script>
 <div class="modal fade" id="deleteSubjectModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

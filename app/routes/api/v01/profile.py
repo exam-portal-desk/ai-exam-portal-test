@@ -17,7 +17,10 @@ from flask import request, jsonify, session, Blueprint
 from werkzeug.utils import secure_filename
 
 from app.db.users import get_user_by_id, update_user
+from app.db.misc import get_requests_by_user, create_request
+from app.middleware.session_guard import require_user_role
 from app.services import image_storage_service
+from app.utils.datetime_service import now_utc_naive
 import app.config as config
 
 profile_api_bp = Blueprint("profile_api", __name__, url_prefix="/api/v01/profile")
@@ -99,3 +102,47 @@ def remove_photo():
         image_storage_service.delete_profile_photo(old_key)
 
     return jsonify({"success": True})
+
+
+@profile_api_bp.route("/admin-access-request", methods=["POST"])
+@require_user_role
+def submit_admin_access_request():
+    """Submit a new admin-access request from the logged-in user's own
+    Profile page. Reuses the exact same requests_raised table/DB helpers and
+    one-pending-request rule as the old public form (app/routes/api/v01/
+    access_requests.py's api_submit_access_request) — the only real
+    difference is identity: username/email/current role come from the
+    session, not from client-supplied fields, since we now have a real
+    logged-in user instead of a re-typed username+email pair."""
+    user = get_user_by_id(int(session["user_id"]))
+    if not user:
+        return jsonify({"success": False, "message": "Account not found."}), 404
+
+    data = request.get_json() or {}
+    reason = str(data.get("reason", "")).strip()
+    if not reason:
+        return jsonify({"success": False, "message": "Please provide a reason."}), 400
+
+    username = user["username"]
+    email = user["email"]
+    current_access = str(user.get("role") or "user").strip().lower()
+    requested_access = "admin"
+
+    if "admin" in current_access.split(","):
+        return jsonify({"success": False, "message": "You already have admin access."}), 400
+
+    pending = [r for r in get_requests_by_user(username, email) if r.get("request_status") == "pending"]
+    if pending:
+        return jsonify({"success": False, "message": "You already have a pending request."}), 400
+
+    created = create_request({
+        "username": username, "email": email,
+        "current_access": current_access, "requested_access": requested_access,
+        "request_date": now_utc_naive().isoformat(),
+        "request_status": "pending",
+        "reason": f"[USER REQUEST] {reason}",
+    })
+    if not created:
+        return jsonify({"success": False, "message": "Failed to save request. Please try again."}), 500
+
+    return jsonify({"success": True, "message": "Request submitted. Please wait for admin approval."})

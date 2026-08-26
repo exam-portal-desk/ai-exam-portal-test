@@ -22,4 +22,6 @@ from app.routes.api.v01.admin import (  # noqa: E402, F401
     ai_centre,
     categories,
     storage,
+    subjects,
+    preferences,
 )

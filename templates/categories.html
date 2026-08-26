@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 {% set active_nav = 'categories' %}
 {% block title %}Select Category - SmartAIExam{% endblock %}
+{% from "_portal_cards.html" import render_category_card %}
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/view-toggle.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
 <style>
 .cat-main { flex:1; min-width:0; padding:1.5rem 1.75rem; }
-.cat-head { margin-bottom:1.25rem; }
+.cat-head { margin-bottom:1.25rem; display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
 .cat-head h1 { font-size:1.2rem; font-weight:700; color:var(--text-1); letter-spacing:-.02em; margin-bottom:.2rem; }
 .cat-head p  { font-size:.8rem; color:var(--text-3); }
 
@@ -33,6 +36,15 @@
   font-size:.72rem; font-weight:600; color:var(--accent);
 }
 
+/* ── List view ── */
+#catViewWrapper.list-view .cat-grid { grid-template-columns:1fr; gap:.5rem; }
+#catViewWrapper.list-view .cat-card { flex-direction:row; align-items:center; }
+#catViewWrapper.list-view .cat-card:hover { transform:none; }
+#catViewWrapper.list-view .cat-img { height:44px; width:44px; flex-shrink:0; border-bottom:none; border-right:1px solid var(--border); }
+#catViewWrapper.list-view .cat-img i { font-size:1.05rem; }
+#catViewWrapper.list-view .cat-info { flex:1; display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.6rem .9rem; }
+#catViewWrapper.list-view .cat-name { margin-bottom:0; }
+
 .cat-empty { text-align:center; padding:4rem 2rem; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); }
 .cat-empty i { font-size:1.8rem; color:var(--text-3); opacity:.3; display:block; margin-bottom:.75rem; }
 .cat-empty h4 { font-size:.9rem; font-weight:700; color:var(--text-2); margin-bottom:.3rem; }
@@ -43,29 +55,28 @@
 
 <main class="cat-main">
   <div class="cat-head">
-    <h1><i class="fas fa-layer-group" style="color:var(--accent);margin-right:.45rem"></i>Exam Categories</h1>
-    <p>Select a category to view and attempt available exams</p>
+    <div>
+      <h1><i class="fas fa-layer-group" style="color:var(--accent);margin-right:.45rem"></i>Exam Categories</h1>
+      <p>Select a category to view and attempt available exams</p>
+    </div>
+    {% if categories %}
+    <div class="view-toggle" id="catViewToggle" role="group" aria-label="Category view">
+      <button type="button" data-view="grid" class="{{ 'active' if view_mode != 'list' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode != 'list' else 'false' }}"><i class="fas fa-th-large"></i></button>
+      <button type="button" data-view="list" class="{{ 'active' if view_mode == 'list' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode == 'list' else 'false' }}"><i class="fas fa-list"></i></button>
+    </div>
+    {% endif %}
   </div>
 
   {% if categories %}
-  <div class="cat-grid">
-    {% for cat in categories %}
-    <a class="cat-card" href="{{ url_for('categories.set_category', id=cat.id) }}">
-      <div class="cat-img">
-        {% if cat.image_url %}
-        <img src="{{ cat.image_url }}" alt="{{ cat.name }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-        <i class="fas fa-graduation-cap" style="display:none"></i>
-        {% else %}
-        <i class="fas fa-graduation-cap"></i>
-        {% endif %}
-      </div>
-      <div class="cat-info">
-        <div class="cat-name">{{ cat.name }}</div>
-        <span class="cat-link">View Exams <i class="fas fa-arrow-right" style="font-size:.6rem"></i></span>
-      </div>
-    </a>
-    {% endfor %}
+  <div class="admin-list-toolbar">
+    <input type="text" class="admin-list-search" id="catSearch" placeholder="Search categories…">
   </div>
+  <div id="catViewWrapper" class="{{ 'list-view' if view_mode == 'list' else '' }}">
+    <div class="cat-grid" id="catGrid">
+      {% for cat in categories %}{{ render_category_card(cat) }}{% endfor %}
+    </div>
+  </div>
+  <div class="admin-pg-bar" id="catPaginator"></div>
   {% else %}
   <div class="cat-empty">
     <i class="fas fa-folder-open"></i>
@@ -74,4 +85,31 @@
   </div>
   {% endif %}
 </main>
+<script src="{{ url_for('static', filename='shared/view-toggle.js') }}"></script>
+<script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
+<script>
+window.__autoShowUpdates = {{ auto_show_updates|tojson }};
+
+createViewToggle({
+  toggleEl: document.getElementById('catViewToggle'),
+  targetEl: document.getElementById('catViewWrapper'),
+  syncUrl: '/api/v01/portal/view-mode',
+  section: 'categories',
+  initial: {{ (view_mode or 'grid') | tojson }},
+});
+
+var catList = createAdminList({
+  endpoint: '/api/v01/portal/categories',
+  paginatorEl: document.getElementById('catPaginator'),
+  paginatorMode: 'loadmore',
+  searchInputEl: document.getElementById('catSearch'),
+  perPage: {{ categories_per_page | default(24) }},
+  onData: function (data) {
+    var grid = document.getElementById('catGrid');
+    if (data.page === 1) grid.innerHTML = data.cards_html || '';
+    else grid.insertAdjacentHTML('beforeend', data.cards_html || '');
+  },
+});
+catList.hydrate({ page: 1, total_pages: {{ categories_total_pages | default(1) }}, total: {{ categories_total | default(0) }}, per_page: {{ categories_per_page | default(24) }} });
+</script>
 {% endblock %}

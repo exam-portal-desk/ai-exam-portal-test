@@ -135,7 +135,7 @@
       </div>
       <div class="pf-row">
         <span class="pf-row-lbl"><i class="fas fa-clock"></i> Last Login</span>
-        <span class="pf-row-val">{{ profile.last_login | display_dt if profile.last_login else '—' }}</span>
+        <span class="pf-row-val">{{ last_login_display | display_dt if last_login_display else '—' }}</span>
       </div>
       <div class="pf-row">
         <span class="pf-row-lbl"><i class="fas fa-key"></i> Sign-in Method</span>

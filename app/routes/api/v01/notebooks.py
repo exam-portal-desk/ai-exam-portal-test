@@ -12,16 +12,55 @@ also config.STORAGE_LOCAL_URL_PREFIX) live in app/routes/web/notes.py.
 
 from __future__ import annotations
 
+import threading
+import uuid
+
 from flask import Blueprint, jsonify, request, session, Response
 import json
 
+from app.db.users import set_view_pref
 from app.middleware.session_guard import require_user_role
 from app.services import notes_service
 from app.services import notes_storage_service
-from app.utils.notes_validation import NotesValidationError, validate_notebook_id
+from app.utils.notes_validation import NotesValidationError, NotesPermissionError, validate_notebook_id
 
 
 notes_api_bp = Blueprint("notes_api", __name__, url_prefix="/api/v01")
+
+# ── Notebook import job store ────────────────────────────────────────────
+# Same in-memory job + background-thread + polling pattern already used by
+# AI question generation (app/routes/api/v01/admin/ai_centre.py) — process-local,
+# not shared across multiple worker processes, same known/accepted constraint.
+_import_jobs: dict = {}
+_import_jobs_lock = threading.Lock()
+
+
+def _import_job_update(job_id: str, **kwargs):
+    with _import_jobs_lock:
+        if job_id in _import_jobs:
+            _import_jobs[job_id].update(kwargs)
+
+
+def _run_import(job_id: str, user_id: int, payload: dict):
+    def on_progress(phase: str, message: str, percent: int):
+        _import_job_update(job_id, phase=phase, message=message, percent=percent)
+
+    try:
+        notebook = notes_service.import_notebook(user_id, payload, progress=on_progress)
+        _import_job_update(job_id, status="done", phase="complete", percent=100,
+                            message="Import complete", notebook=notebook, error=None)
+    except (NotesValidationError, ValueError) as exc:
+        last = dict(_import_jobs.get(job_id, {}))
+        _import_job_update(job_id, status="failed", error=str(exc),
+                            message=str(exc), percent=last.get("percent", 0))
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        last = dict(_import_jobs.get(job_id, {}))
+        _import_job_update(job_id, status="failed",
+                            error="Unable to import this notebook. Please try again.",
+                            message="Unable to import this notebook. Please try again.",
+                            percent=last.get("percent", 0))
 
 
 def _api_error(message: str, status: int = 400):
@@ -40,6 +79,25 @@ def _payload():
     if not isinstance(data, dict):
         raise NotesValidationError("Send a valid JSON object.")
     return data
+
+
+@notes_api_bp.route("/notebooks/view-mode", methods=["PATCH"])
+@require_user_role
+def set_notes_view_mode_api():
+    """Persists the My Notebooks grid/list view preference, in the
+    'notes' section of the generic users.view_prefs jsonb column (see
+    app.db.users.set_view_pref) — same mechanism the User Portal and
+    Admin toggles use, consolidated from a dedicated notes_view_mode
+    column by migrations/20260826_consolidate_notes_view_mode.sql."""
+    try:
+        view_mode = _payload().get("view_mode")
+    except NotesValidationError as exc:
+        return _api_error(str(exc))
+    if view_mode not in ("grid", "list"):
+        return _api_error("view_mode must be 'grid' or 'list'.")
+    if not set_view_pref(session["user_id"], "notes", view_mode):
+        return _api_error("Unable to save your view preference. Please try again.", 500)
+    return jsonify({"success": True, "view_mode": view_mode})
 
 
 @notes_api_bp.route("/notebooks", methods=["POST"])
@@ -69,11 +127,12 @@ def notebook_api(notebook_id: str):
             if not notes_service.delete_notebook(user_id, notebook_id):
                 return _api_error("Notebook not found.", 404)
             return jsonify({"success": True, "message": "Notebook moved to Trash."})
-        from app.db.notes import get_owned_notebook
-        notebook = get_owned_notebook(notebook_id, user_id)
+        notebook = notes_service.get_editor_notebook(user_id, notebook_id)
         if not notebook:
             return _api_error("Notebook not found.", 404)
         return jsonify({"success": True, "notebook": notebook})
+    except NotesPermissionError as exc:
+        return _api_error(str(exc), 403)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -94,6 +153,88 @@ def restore_notebook_api(notebook_id: str):
         return _api_error("Unable to restore the notebook. Please try again.", 500)
 
 
+@notes_api_bp.route("/notebooks/<notebook_id>/shares", methods=["GET", "POST"])
+@require_user_role
+def notebook_shares_api(notebook_id: str):
+    """Owner-only: list who has access (GET) or bulk-share with one or more
+    users in one request (POST, body {"shares": [{"user_id","permission"}]})."""
+    try:
+        user_id = session["user_id"]
+        if request.method == "GET":
+            shares = notes_service.list_notebook_shares(user_id, notebook_id)
+            if shares is None:
+                return _api_error("Notebook not found.", 404)
+            return jsonify({"success": True, "shares": shares})
+        shares = notes_service.share_notebook(user_id, notebook_id, _payload().get("shares", []))
+        if shares is None:
+            return _api_error("Notebook not found.", 404)
+        return jsonify({"success": True, "shares": shares}), 201
+    except (NotesValidationError, ValueError) as exc:
+        return _api_error(str(exc))
+    except Exception:
+        return _api_error("Unable to update sharing. Please try again.", 500)
+
+
+@notes_api_bp.route("/notebooks/<notebook_id>/shares/<int:target_user_id>", methods=["PATCH", "DELETE"])
+@require_user_role
+def notebook_share_api(notebook_id: str, target_user_id: int):
+    """PATCH (owner-only) changes one person's permission. DELETE removes
+    access — the owner may remove anyone; a recipient may remove only
+    themselves ("leave this shared notebook")."""
+    try:
+        user_id = session["user_id"]
+        if request.method == "PATCH":
+            share = notes_service.update_notebook_share(user_id, notebook_id, target_user_id, _payload().get("permission"))
+            if not share:
+                return _api_error("Share not found.", 404)
+            return jsonify({"success": True, "share": share})
+        if not notes_service.remove_notebook_share(user_id, notebook_id, target_user_id):
+            return _api_error("Share not found.", 404)
+        return jsonify({"success": True})
+    except NotesPermissionError as exc:
+        return _api_error(str(exc), 403)
+    except (NotesValidationError, ValueError) as exc:
+        return _api_error(str(exc))
+    except Exception:
+        return _api_error("Unable to update sharing. Please try again.", 500)
+
+
+@notes_api_bp.route("/notebooks/<notebook_id>/share-search")
+@require_user_role
+def notebook_share_search_api(notebook_id: str):
+    """Owner-only candidate search for the sharing dialog — excludes self
+    and anyone who already has a share, verified server-side."""
+    term = request.args.get("q", "").strip()
+    if len(term) < 2:
+        return jsonify({"success": True, "users": []})
+    try:
+        users = notes_service.search_shareable_users(session["user_id"], notebook_id, term)
+        if users is None:
+            return _api_error("Notebook not found.", 404)
+        return jsonify({"success": True, "users": users})
+    except (NotesValidationError, ValueError) as exc:
+        return _api_error(str(exc))
+    except Exception:
+        return _api_error("Unable to search users. Please try again.", 500)
+
+
+@notes_api_bp.route("/notebooks/<notebook_id>/leave", methods=["POST"])
+@require_user_role
+def leave_notebook_api(notebook_id: str):
+    """A shared user removing their own access — same underlying rule as the
+    owner-or-self check in notebook_share_api's DELETE, just without needing
+    the caller's own numeric user id in the URL."""
+    try:
+        user_id = session["user_id"]
+        if not notes_service.remove_notebook_share(user_id, notebook_id, user_id):
+            return _api_error("You don't have access to this notebook.", 404)
+        return jsonify({"success": True})
+    except (NotesValidationError, ValueError) as exc:
+        return _api_error(str(exc))
+    except Exception:
+        return _api_error("Unable to leave this notebook. Please try again.", 500)
+
+
 @notes_api_bp.route("/notebooks/<notebook_id>/pages", methods=["GET", "POST"])
 @require_user_role
 def pages_api(notebook_id: str):
@@ -107,6 +248,8 @@ def pages_api(notebook_id: str):
         if not page:
             return _api_error("Notebook not found.", 404)
         return jsonify({"success": True, "page": page}), 201
+    except NotesPermissionError as exc:
+        return _api_error(str(exc), 403)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -125,6 +268,8 @@ def page_api(notebook_id: str, page_id: str):
         if not notes_service.delete_page(session["user_id"], notebook_id, page_id):
             return _api_error("Page not found.", 404)
         return jsonify({"success": True})
+    except NotesPermissionError as exc:
+        return _api_error(str(exc), 403)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -145,10 +290,12 @@ def page_objects_api(notebook_id: str, page_id: str):
             start_index = max(0, int(payload.get("start_index", 0)))
         except (TypeError, ValueError):
             return _api_error("Invalid save data.")
-        objects = notes_service.save_page_objects(session["user_id"], notebook_id, page_id, payload.get("objects", []), payload.get("deleted_ids", []), start_index)
-        if objects is None:
+        result = notes_service.save_page_objects(session["user_id"], notebook_id, page_id, payload.get("objects", []), payload.get("deleted", []), start_index)
+        if result is None:
             return _api_error("Page not found.", 404)
-        return jsonify({"success": True, "objects": objects})
+        return jsonify({"success": True, "saved": result["saved"], "conflicts": result["conflicts"]})
+    except NotesPermissionError as exc:
+        return _api_error(str(exc), 403)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -162,8 +309,11 @@ def upload_asset_api(notebook_id: str):
         notebook = notes_service.get_editor_notebook(session["user_id"], notebook_id)
         if not notebook:
             return _api_error("Notebook not found.", 404)
+        notes_service.assert_can_edit(notebook)
         result = notes_storage_service.upload_image(session["user_id"], notebook["id"], request.files.get("image"))
         return jsonify({"success": True, **result}), 201
+    except NotesPermissionError as exc:
+        return _api_error(str(exc), 403)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -174,8 +324,7 @@ def upload_asset_api(notebook_id: str):
 @require_user_role
 def asset_url_api(asset_id: str):
     try:
-        from app.db.notes import get_owned_asset
-        asset = get_owned_asset(asset_id, session["user_id"])
+        asset = notes_service.resolve_asset_for_serving_by_id(session["user_id"], asset_id)
         if not asset:
             return _api_error("Image not found.", 404)
         return jsonify({"success": True, "url": notes_storage_service.signed_asset_url(asset)})
@@ -276,13 +425,45 @@ def export_public_notebook_api(notebook_id: str):
 @notes_api_bp.route("/notebooks/import", methods=["POST"])
 @require_user_role
 def import_notebook_api():
+    """Starts the import as a background job and returns immediately — the actual work (and its
+    real progress) is tracked via GET /notebooks/import/status/<job_id> below. Only the cheap
+    request-shape check happens synchronously here; full schema validation runs inside the job
+    itself (see notes_service.import_notebook's "validating" phase) so a bad file still fails
+    cleanly through the same progress/status UI instead of a different code path."""
     try:
-        notebook = notes_service.import_notebook(session["user_id"], _payload())
-        return jsonify({"success": True, "notebook": notebook}), 201
-    except (NotesValidationError, ValueError) as exc:
+        payload = _payload()
+    except NotesValidationError as exc:
         return _api_error(str(exc))
-    except Exception:
-        return _api_error("Unable to import this notebook. Please try again.", 500)
+
+    user_id = session["user_id"]
+    job_id = uuid.uuid4().hex[:12]
+    with _import_jobs_lock:
+        _import_jobs[job_id] = {
+            "status": "running",
+            "phase": "validating",
+            "message": "Preparing notebook...",
+            "percent": 0,
+            "notebook": None,
+            "error": None,
+            "_owner_id": user_id,
+        }
+
+    thread = threading.Thread(target=_run_import, args=(job_id, user_id, payload), daemon=True)
+    thread.start()
+    return jsonify({"success": True, "job_id": job_id})
+
+
+@notes_api_bp.route("/notebooks/import/status/<job_id>", methods=["GET"])
+@require_user_role
+def import_notebook_status_api(job_id: str):
+    with _import_jobs_lock:
+        job = dict(_import_jobs.get(job_id, {}))
+    # Not found AND not-yours return the identical 404 — never confirm a job_id exists to
+    # anyone but the user who started it (this tracks import progress for a private notebook).
+    if not job or job.get("_owner_id") != session["user_id"]:
+        return _api_error("Import job not found.", 404)
+    job.pop("_owner_id", None)
+    return jsonify({"success": True, **job})
 
 
 @notes_api_bp.route("/notebooks/<notebook_id>/export-pdf", methods=["POST"])

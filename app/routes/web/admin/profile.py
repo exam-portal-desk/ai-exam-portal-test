@@ -17,7 +17,15 @@ import app.config as config
 def profile():
     user = get_user_profile_by_id(int(session["user_id"])) or {}
     photo_url = resolve_profile_photo_url(user.get("profile_photo_key"))
+    # See app/routes/web/profile.py::my_profile() for why "in session" (not
+    # a truthy/.get() check) is required here — None is a valid, correct
+    # value on a genuine first login.
+    if "last_login_display" in session:
+        last_login_display = session["last_login_display"]
+    else:
+        last_login_display = user.get("last_login")
     return render_template(
         "admin/profile.html", profile=user, photo_url=photo_url,
         max_photo_kb=config.MAX_PROFILE_PHOTO_SIZE_KB,
+        last_login_display=last_login_display,
     )

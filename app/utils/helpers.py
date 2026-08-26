@@ -114,3 +114,48 @@ def parse_max_attempts(raw) -> int | None:
     if val < 0:
         raise ValueError("max_attempts must be non-negative")
     return val
+
+
+def parse_passing_percentage(raw) -> float | None:
+    """
+    Parse passing_percentage field: returns None (no cutoff configured) or a
+    float in [0, 100]. Raises ValueError on invalid input.
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if s == "":
+        return None
+    try:
+        val = float(s)
+    except ValueError:
+        raise ValueError("Passing percentage must be a number")
+    if val < 0 or val > 100:
+        raise ValueError("Passing percentage must be between 0 and 100")
+    return val
+
+
+_START_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_EXAM_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def parse_start_time(raw) -> str:
+    """
+    Validate an exam start_time string. Exact minute precision is allowed
+    (no interval restriction) - only the "HH:MM" 24-hour shape is enforced.
+    Raises ValueError on invalid input.
+    """
+    s = str(raw or "").strip()
+    if not _START_TIME_RE.match(s):
+        raise ValueError("Start time must be a valid 24-hour HH:MM value")
+    return s
+
+
+def parse_exam_date(raw) -> str:
+    """
+    Validate an exam date string ("YYYY-MM-DD"). Raises ValueError on invalid input.
+    """
+    s = str(raw or "").strip()
+    if not _EXAM_DATE_RE.match(s):
+        raise ValueError("Date must be a valid YYYY-MM-DD value")
+    return s
