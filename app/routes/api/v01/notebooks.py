@@ -327,7 +327,7 @@ def asset_url_api(asset_id: str):
         asset = notes_service.resolve_asset_for_serving_by_id(session["user_id"], asset_id)
         if not asset:
             return _api_error("Image not found.", 404)
-        return jsonify({"success": True, "url": notes_storage_service.signed_asset_url(asset)})
+        return jsonify({"success": True, "url": notes_storage_service.asset_proxy_url(asset["id"])})
     except Exception:
         return _api_error("Unable to load the image. Please try again.", 500)
 

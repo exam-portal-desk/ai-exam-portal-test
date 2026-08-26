@@ -1,10 +1,12 @@
 """
 app/routes/api/v01/images.py
-Auth-gated streaming for category/question images on the local storage
-backend (STORAGE_BACKEND=local). Category/question images have no per-user
-ownership concept — any authenticated session may view them. S3-backed
-images never hit this route; they resolve straight to a presigned URL (see
-app/services/image_storage_service.py).
+Auth-gated streaming for category/question/profile/chat-background images —
+the same route for either storage backend (get_storage().download() works
+identically for local or S3). Category/question images have no per-user
+ownership concept — any authenticated session may view them. This is the
+only URL app/services/image_storage_service.py ever hands back to the
+browser; the underlying storage/bucket URL (a raw S3 presigned URL, on the
+S3 backend) is never exposed to the client.
 """
 
 import mimetypes

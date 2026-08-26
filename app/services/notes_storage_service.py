@@ -32,7 +32,7 @@ def upload_image(owner_id: int, notebook_id: str, file_storage) -> Dict[str, Any
     try:
         storage.upload(path, content, content_type)
         asset = notes_db.create_asset({"id": asset_id, "notebook_id": notebook_id, "owner_id": owner_id, "storage_path": path, "original_filename": file_storage.filename[:255], "content_type": content_type, "byte_size": len(content)})
-        return {"asset": asset, "url": signed_asset_url(asset)}
+        return {"asset": asset, "url": asset_proxy_url(asset["id"])}
     except Exception:
         try:
             storage.delete([path])
@@ -41,36 +41,15 @@ def upload_image(owner_id: int, notebook_id: str, file_storage) -> Dict[str, Any
         raise
 
 
-def signed_asset_url(asset: Dict[str, Any]) -> str:
-    return get_storage().signed_url(asset["storage_path"], 3600)
-
-
-def signed_asset_urls_bulk(assets: list[Dict[str, Any]], expires_in: int = 3600) -> Dict[str, str]:
-    """
-    Resolve fresh signed URLs for many assets in as few storage round trips
-    as possible — used on notebook/page load so an image-heavy page doesn't
-    pay one request per image. Returns {asset_id: signed_url}; assets that
-    fail to sign (e.g. the underlying file was actually removed) are simply
-    omitted so the caller can fall back gracefully.
-    """
-    assets = [a for a in assets if a.get("id") and a.get("storage_path")]
-    if not assets:
-        return {}
-
-    path_to_id = {a["storage_path"]: a["id"] for a in assets}
-    try:
-        urls_by_path = get_storage().signed_urls_bulk(list(path_to_id.keys()), expires_in)
-        return {path_to_id[path]: url for path, url in urls_by_path.items() if url and path in path_to_id}
-    except Exception as e:
-        print(f"[notes_storage_service] bulk signed-url resolution failed, falling back to per-asset: {e}")
-
-    out = {}
-    for asset in assets:
-        try:
-            out[asset["id"]] = signed_asset_url(asset)
-        except Exception as e:
-            print(f"[notes_storage_service] signed url failed for asset {asset.get('id')}: {e}")
-    return out
+def asset_proxy_url(asset_id: str) -> str:
+    """Same-origin, ownership-checked URL for one asset — never a raw
+    storage/bucket URL. Served by asset_file_api (app/routes/api/v01/
+    notebooks.py), which re-checks uploader/owner/share/public access via
+    notes_service.resolve_asset_for_serving_by_id() before streaming the
+    bytes, regardless of which storage backend holds the file. Pure string
+    formatting — no storage round-trip, and (unlike a presigned URL) never
+    expires, so callers don't need to periodically re-resolve it."""
+    return f"/api/v01/assets/{asset_id}/file"
 
 
 def clone_asset(source_asset: Dict[str, Any], new_owner_id: int, new_notebook_id: str) -> Dict[str, Any]:

@@ -27,15 +27,14 @@ def assert_can_edit(notebook: Dict[str, Any]) -> None:
 
 def _refresh_image_urls(objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Canvas payloads persist a signed URL captured at upload time
-    (fabric.Image serializes its `src`), but Supabase signed URLs expire
-    (see notes_storage_service.signed_asset_url — 1 hour). The durable,
-    canonical reference is asset_id / notes_assets.storage_path, so on
-    every load we resolve a FRESH signed URL keyed off asset_id and swap
-    it into the payload, instead of trusting whatever URL happens to be
-    stored. Batches the Storage calls (one round trip for every distinct
-    asset on the page, not one per image) so this doesn't turn into a
-    sequential per-image bottleneck on image-heavy pages.
+    Canvas payloads persist whatever `src` was captured at upload time
+    (fabric.Image serializes its `src`), which for very old rows may still
+    be a raw signed storage URL. The durable, canonical reference is
+    asset_id / notes_assets.storage_path, so on every load we normalize
+    `src` to the canonical same-origin asset proxy URL
+    (notes_storage_service.asset_proxy_url — ownership-checked, never
+    expires) keyed off asset_id, instead of trusting whatever URL happens
+    to be stored. Pure string formatting, no storage round-trip.
 
     Objects without a resolvable asset_id (very old data saved before
     asset_id tracking existed) are left untouched — we can't recover a
@@ -60,18 +59,13 @@ def _refresh_image_urls(objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         return objects
 
     asset_ids = list({asset_id for _, _, asset_id in image_objects})
-    assets = notes_db.get_assets_by_ids(asset_ids)
-    if not assets:
-        return objects  # none of the referenced assets exist anymore — leave as-is, handled as missing downstream
-
-    fresh_urls = notes_storage_service.signed_asset_urls_bulk(assets)
+    existing_ids = {str(a["id"]) for a in notes_db.get_assets_by_ids(asset_ids)}
     for _, fabric, asset_id in image_objects:
-        url = fresh_urls.get(asset_id)
-        if url:
-            fabric["src"] = url
-        # else: asset genuinely missing or signing failed — leave the old
-        # (likely stale) src so the frontend shows a normal broken-image
-        # state rather than us silently rewriting it to something wrong.
+        if asset_id in existing_ids:
+            fabric["src"] = notes_storage_service.asset_proxy_url(asset_id)
+        # else: asset genuinely missing — leave the old (likely stale) src
+        # so the frontend shows a normal broken-image state rather than us
+        # silently rewriting it to something wrong.
 
     return objects
 
@@ -366,7 +360,6 @@ def import_notebook(user_id: int, raw_payload: Dict[str, Any], progress=None) ->
         # only ever needs notebook_id/user_id (never page_id), so nothing requires doing this
         # interleaved with the per-page loop below. Copying up front also lets it run
         # concurrently (see that function) instead of serially per object.
-        fresh_urls: Dict[str, str] = {}
         if needed_asset_ids:
             _report("processing_images", "Processing images...", (completed_units * 100) // total_units)
             source_metas = {oid: clean["assets_by_original_id"][oid] for oid in needed_asset_ids}
@@ -376,7 +369,6 @@ def import_notebook(user_id: int, raw_payload: Dict[str, Any], progress=None) ->
             )
             if copy_error is not None:
                 raise copy_error
-            fresh_urls = notes_storage_service.signed_asset_urls_bulk(list(copied_assets_by_original_id.values()))
 
         total_pages = len(pages)
         for position, page in enumerate(pages):
@@ -391,7 +383,7 @@ def import_notebook(user_id: int, raw_payload: Dict[str, Any], progress=None) ->
                     new_asset = copied_assets_by_original_id[obj["original_asset_id"]]
                     asset_id = new_asset["id"]
                     if isinstance(payload.get("fabric"), dict):
-                        payload["fabric"]["src"] = fresh_urls.get(new_asset["id"]) or notes_storage_service.signed_asset_url(new_asset)
+                        payload["fabric"]["src"] = notes_storage_service.asset_proxy_url(new_asset["id"])
                 records.append({"page_id": new_page["id"], "object_type": obj["object_type"], "z_index": 0, "transform": obj["transform"], "payload": payload, "asset_id": asset_id})
             for index, record in enumerate(records):
                 record["z_index"] = index

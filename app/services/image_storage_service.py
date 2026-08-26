@@ -15,37 +15,30 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
 
-import app.config as config
 from app.storage import get_storage
 
 
-def _url_for_key(storage, key: str) -> str:
+def _url_for_key(key: str) -> str:
     """
-    Resolve a storage key to a renderable URL.
-
-    S3 backend: storage.signed_url() is a real presigned GET URL — the
-    browser fetches the object directly, no app involvement.
-
-    Local backend: storage.signed_url() would return the *Notes* asset
-    route (config.STORAGE_LOCAL_URL_PREFIX), which enforces per-notebook
-    ownership and would 404 for a category/question image key that isn't a
-    notes_assets row. Route local-backed images through their own
-    auth-gated streaming endpoint instead (same "any authenticated user"
-    model as the existing image proxy — these images have no per-user
-    ownership concept).
+    Resolve a storage key to a same-origin, auth-gated URL — never a raw
+    storage/bucket URL (a leaked presigned S3 URL would bypass the app's
+    own session checks entirely, since it requires no app involvement to
+    fetch). Works identically for either storage backend: the proxy route
+    (app/routes/api/v01/images.py) calls storage.download() under the hood
+    regardless of which backend is active, same "any authenticated user"
+    model as before (these images have no per-user ownership concept). Pure
+    string formatting — no storage round-trip.
     """
-    if config.STORAGE_BACKEND == "local":
-        return f"/api/v01/images/asset/{quote(key)}"
-    return storage.signed_url(key)
+    return f"/api/v01/images/asset/{quote(key)}"
 
 
 def resolve_object_url(key: str) -> str:
-    """Generic backend-aware URL for ANY key in the active storage backend
+    """Generic auth-gated URL for ANY key in the active storage backend
     (not just category/question images) — used by the admin Object Storage
     dashboard to preview arbitrary objects, including ones outside the
     Category/SubjectFolder convention (e.g. Notes assets sharing the same
     bucket)."""
-    return _url_for_key(get_storage(), key)
+    return _url_for_key(key)
 
 
 def resolve_question_image_url(image_path: str) -> Tuple[bool, Optional[str]]:
@@ -57,7 +50,7 @@ def resolve_question_image_url(image_path: str) -> Tuple[bool, Optional[str]]:
     try:
         storage = get_storage()
         if storage.exists(key):
-            return True, _url_for_key(storage, key)
+            return True, _url_for_key(key)
     except Exception as e:
         print(f"[image_storage_service] storage lookup error for {key}: {e}")
 
@@ -96,7 +89,7 @@ def resolve_category_image_url(category: dict) -> Optional[str]:
         try:
             storage = get_storage()
             if storage.exists(key):
-                return _url_for_key(storage, key)
+                return _url_for_key(key)
         except Exception as e:
             print(f"[image_storage_service] category storage lookup error for {key}: {e}")
     return (category or {}).get("image_url")
@@ -109,7 +102,7 @@ def upload_category_image(content: bytes, filename: str, content_type: str) -> T
     storage = get_storage()
     key = f"Category/{filename}"
     storage.upload(key, content, content_type)
-    return key, _url_for_key(storage, key)
+    return key, _url_for_key(key)
 
 
 def upload_question_image(subject_folder: str, filename: str, content: bytes, content_type: str) -> str:
@@ -146,7 +139,7 @@ def upload_profile_photo(user_id: int, content: bytes, filename: str, content_ty
     storage = get_storage()
     key = f"Profile/{user_id}_{filename}"
     storage.upload(key, content, content_type)
-    return key, _url_for_key(storage, key)
+    return key, _url_for_key(key)
 
 
 def resolve_profile_photo_url(profile_photo_key: Optional[str]) -> Optional[str]:
@@ -157,7 +150,7 @@ def resolve_profile_photo_url(profile_photo_key: Optional[str]) -> Optional[str]
     try:
         storage = get_storage()
         if storage.exists(profile_photo_key):
-            return _url_for_key(storage, profile_photo_key)
+            return _url_for_key(profile_photo_key)
     except Exception as e:
         print(f"[image_storage_service] profile photo lookup error for {profile_photo_key}: {e}")
     return None
@@ -169,7 +162,7 @@ def profile_photo_url_from_key(profile_photo_key: Optional[str]) -> Optional[str
     local: cheap but still avoided) happens on every request."""
     if not profile_photo_key:
         return None
-    return _url_for_key(get_storage(), profile_photo_key)
+    return _url_for_key(profile_photo_key)
 
 
 def delete_profile_photo(key: str) -> None:
@@ -188,7 +181,7 @@ def upload_chat_background(user_id: int, content: bytes, filename: str, content_
     storage = get_storage()
     key = f"ChatBackground/{user_id}_{filename}"
     storage.upload(key, content, content_type)
-    return key, _url_for_key(storage, key)
+    return key, _url_for_key(key)
 
 
 def chat_background_url_from_key(key: Optional[str]) -> Optional[str]:
@@ -196,7 +189,7 @@ def chat_background_url_from_key(key: Optional[str]) -> Optional[str]:
     background on every chat page load, no storage round-trip."""
     if not key:
         return None
-    return _url_for_key(get_storage(), key)
+    return _url_for_key(key)
 
 
 def delete_chat_background(key: str) -> None:
