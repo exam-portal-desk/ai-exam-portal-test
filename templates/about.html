@@ -1,13 +1,6 @@
 {% extends "base.html" %}
 {% block title %}About - SmartAIExam{% endblock %}
-{% set org_name     = "SmartAIExam" %}
-{% set org_email    = "examportaldesk@gmail.com" %}
-{% set org_phone    = "+91-755-123-4567" %}
-{% set org_address  = "Tech Park, Noida, UP" %}
-{% set stat_students     = "50K+" %}
-{% set stat_institutions = "100+" %}
-{% set stat_exams        = "1M+" %}
-{% set stat_uptime       = "99.9%" %}
+{% set org_name = "SmartAIExam" %}
 {% block content %}
 <style>
 .ab-wrap {
@@ -460,24 +453,6 @@
           <span class="ab-badge ab-badge-acc"><i class="fas fa-robot"></i> AI-assisted</span>
         </div>
       </div>
-      <div class="ab-stats-row">
-        <div class="ab-stat">
-          <div class="ab-stat-num">{{ stat_students }}</div>
-          <div class="ab-stat-lbl">Students</div>
-        </div>
-        <div class="ab-stat">
-          <div class="ab-stat-num">{{ stat_institutions }}</div>
-          <div class="ab-stat-lbl">Institutions</div>
-        </div>
-        <div class="ab-stat">
-          <div class="ab-stat-num">{{ stat_exams }}</div>
-          <div class="ab-stat-lbl">Exams run</div>
-        </div>
-        <div class="ab-stat">
-          <div class="ab-stat-num">{{ stat_uptime }}</div>
-          <div class="ab-stat-lbl">Uptime</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -518,7 +493,7 @@
                 <i class="fas fa-robot"></i>
               </div>
               <h6>AI Question Generation</h6>
-              <p>Gemini-powered generator creates MCQ and MSQ questions from uploaded PDFs and study material.</p>
+              <p>An AI-powered generator creates MCQ and MSQ questions from uploaded PDFs and study material.</p>
             </div>
             <div class="ab-feat">
               <div class="ab-feat-icon" style="background:var(--accent-subtle);color:var(--accent);">
@@ -532,7 +507,7 @@
                 <i class="fas fa-comments"></i>
               </div>
               <h6>AI Study Assistant</h6>
-              <p>Built-in chat powered by LLaMA 3.3 70B helps students clear doubts between exam attempts.</p>
+              <p>A dedicated academic chat assistant helps students work through doubts, any time — not tied to a specific exam.</p>
             </div>
             <div class="ab-feat">
               <div class="ab-feat-icon" style="background:var(--danger-bg);color:var(--danger-text);">
@@ -579,12 +554,12 @@
           <h3>Built With</h3>
         </div>
         <div class="ab-card-body">
-          <p style="font-size:.78rem;color:var(--text-3);margin:0 0 .1rem;line-height:1.6;">SmartAIExam is a Flask/Jinja2 web application backed by PostgreSQL (Supabase) and S3-compatible object storage for media — optimised for reliability and cost-efficiency.</p>
+          <p style="font-size:.78rem;color:var(--text-3);margin:0 0 .1rem;line-height:1.6;">SmartAIExam is a Flask/Jinja2 web application backed by a PostgreSQL database and S3-compatible object storage for media — optimised for reliability and cost-efficiency.</p>
           <div class="ab-tech-row">
             <span class="ab-tech-pill"><i class="fas fa-circle"></i> Python / Flask</span>
             <span class="ab-tech-pill"><i class="fas fa-circle"></i> PostgreSQL</span>
-            <span class="ab-tech-pill"><i class="fas fa-circle"></i> Google Gemini</span>
-            <span class="ab-tech-pill"><i class="fas fa-circle"></i> LLaMA 3.3 70B</span>
+            <span class="ab-tech-pill"><i class="fas fa-circle"></i> AI Question Generation</span>
+            <span class="ab-tech-pill"><i class="fas fa-circle"></i> AI Study Assistant</span>
             <span class="ab-tech-pill"><i class="fas fa-circle"></i> Object Storage</span>
             <span class="ab-tech-pill"><i class="fas fa-circle"></i> Socket.IO</span>
             <span class="ab-tech-pill"><i class="fas fa-circle"></i> KaTeX / MathJax</span>
@@ -679,9 +654,9 @@
       <div class="ab-info-card">
         <div class="ab-info-hdr"><i class="fas fa-envelope"></i> Get in Touch</div>
         <div class="ab-info-body" style="font-size:.78rem;color:var(--text-2);line-height:1.8;">
-          <div style="margin-bottom:.5rem;"><i class="fas fa-at" style="color:var(--text-3);margin-right:.4rem;width:13px;text-align:center;"></i>{{ org_email }}</div>
-          <div style="margin-bottom:.5rem;"><i class="fas fa-phone" style="color:var(--text-3);margin-right:.4rem;width:13px;text-align:center;"></i>{{ org_phone }}</div>
-          <div><i class="fas fa-map-marker-alt" style="color:var(--text-3);margin-right:.4rem;width:13px;text-align:center;"></i>{{ org_address }}</div>
+          {% if PUBLIC_SUPPORT_EMAIL %}<div style="margin-bottom:.5rem;"><i class="fas fa-at" style="color:var(--text-3);margin-right:.4rem;width:13px;text-align:center;"></i>{{ PUBLIC_SUPPORT_EMAIL }}</div>{% endif %}
+          {% if PUBLIC_CONTACT_PHONE %}<div style="margin-bottom:.5rem;"><i class="fas fa-phone" style="color:var(--text-3);margin-right:.4rem;width:13px;text-align:center;"></i>{{ PUBLIC_CONTACT_PHONE }}</div>{% endif %}
+          <div><i class="fas fa-globe" style="color:var(--text-3);margin-right:.4rem;width:13px;text-align:center;"></i>{{ PUBLIC_ADDRESS or "Online platform" }}</div>
           <a href="{{ url_for('misc.contact') }}" style="display:inline-flex;align-items:center;gap:.35rem;margin-top:.9rem;font-size:.73rem;font-weight:600;color:var(--accent);text-decoration:none;">
             Contact us <i class="fas fa-arrow-right" style="font-size:.6rem;"></i>
           </a>

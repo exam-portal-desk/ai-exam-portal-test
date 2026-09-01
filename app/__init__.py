@@ -103,11 +103,15 @@ def create_app() -> Flask:
             return redirect(url_for("auth.login"))
 
     # ── Date/time — central service + Jinja filters ────────────────────────
-    from app.utils.datetime_service import now_app_tz, format_display, format_display_date, format_calendar_date
+    from app.utils.datetime_service import now_app_tz, format_display, format_display_date, format_calendar_date, format_calendar_time
 
     app.jinja_env.filters["display_dt"] = format_display
     app.jinja_env.filters["display_date"] = format_display_date
     app.jinja_env.filters["calendar_date"] = format_calendar_date
+    app.jinja_env.filters["calendar_time"] = format_calendar_time
+
+    from app.utils.instructions_formatter import render_exam_instructions
+    app.jinja_env.filters["format_instructions"] = render_exam_instructions
 
     @app.context_processor
     def inject_globals():
@@ -121,13 +125,29 @@ def create_app() -> Flask:
                 "DISPLAY_DATETIME_FORMAT": config.DISPLAY_DATETIME_FORMAT,
                 "NAV_AVATAR_URL": nav_avatar_url,
                 "MAX_MESSAGES_PER_CONVERSATION": config.MAX_MESSAGES_PER_CONVERSATION,
-                "BASE_URL": config.BASE_URL}
+                "BASE_URL": config.BASE_URL,
+                # Public contact/footer info — see app/config.py for the
+                # "blank means hide, never fabricate" convention every
+                # footer/legal/about/contact/support template follows.
+                "PUBLIC_SUPPORT_EMAIL": config.PUBLIC_SUPPORT_EMAIL,
+                "PUBLIC_CONTACT_PHONE": config.PUBLIC_CONTACT_PHONE,
+                "PUBLIC_ADDRESS": config.PUBLIC_ADDRESS,
+                "PUBLIC_SOCIAL_TWITTER": config.PUBLIC_SOCIAL_TWITTER,
+                "PUBLIC_SOCIAL_LINKEDIN": config.PUBLIC_SOCIAL_LINKEDIN,
+                "PUBLIC_SOCIAL_GITHUB": config.PUBLIC_SOCIAL_GITHUB,
+                "PUBLIC_SOCIAL_INSTAGRAM": config.PUBLIC_SOCIAL_INSTAGRAM,
+                "LEGAL_PRIVACY_LAST_UPDATED": config.LEGAL_PRIVACY_LAST_UPDATED,
+                "LEGAL_TERMS_LAST_UPDATED": config.LEGAL_TERMS_LAST_UPDATED,
+                "LEGAL_ACCOUNT_DELETION_LAST_UPDATED": config.LEGAL_ACCOUNT_DELETION_LAST_UPDATED}
 
     # ── Error handlers ─────────────────────────────────────────────────────
     _register_error_handlers(app)
 
     # ── Periodic background cache cleanup ──────────────────────────────────
     _start_periodic_cleanup()
+
+    # ── Auto-submit sweep (Scheduled Exam deadline enforcement) ────────────
+    _start_auto_submit_sweep()
 
     return app
 
@@ -264,6 +284,22 @@ def _start_periodic_cleanup() -> None:
                 print(f"[CLEANUP] Error: {e}")
 
     t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+
+
+def _start_auto_submit_sweep() -> None:
+    """Starts the server-side exam-deadline enforcement sweep as an
+    in-process daemon thread — the same threading.Thread(daemon=True)
+    pattern as _start_periodic_cleanup() above, not a new kind of
+    infrastructure. main.py runs this app with use_reloader=False, so
+    create_app() (and this) only ever executes once per process; under a
+    hypothetical multi-process deployment, each process's sweep thread is
+    still safe to run concurrently — see claim_due_attempts_batch() in
+    app/db/attempts.py, which uses FOR UPDATE SKIP LOCKED so two sweeps
+    never claim (or double-finalize) the same attempt."""
+    from app.services.auto_submit_service import run_sweep_loop
+
+    t = threading.Thread(target=run_sweep_loop, daemon=True)
     t.start()
 
 

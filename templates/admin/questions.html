@@ -29,6 +29,7 @@ window.MathJax = {
 {% endblock %}
 
 {% block content %}
+{% from "admin/_question_rows.html" import render_question_row %}
 
 <style>
 /* ── Questions — layout + structure only, all colors via tokens ── */
@@ -85,6 +86,60 @@ window.MathJax = {
   color: var(--accent); font-size: .72rem; font-weight: 700;
   padding: .18rem .6rem; border-radius: 20px;
 }
+
+/* ── Exam picker — replaces the plain <select> with a card-style trigger
+   + searchable dropdown panel so the selected exam (and what it actually
+   is) is unmistakable before importing/exporting into it. A hidden native
+   <select id="exam-select"> stays in the DOM in lockstep so every other
+   script on this page (Load Questions, Export, Import, ...) keeps reading
+   it exactly as before — this is a presentation layer on top of it, not a
+   replacement for it. ── */
+.exam-picker { position: relative; flex: 1; min-width: 0; }
+.exam-picker-trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .55rem .8rem; cursor: pointer; text-align: left; color: var(--text-1);
+}
+.exam-picker-trigger:hover { border-color: var(--border-focus); }
+.exam-picker-trigger.open { border-color: var(--accent); }
+.ept-info { min-width: 0; flex: 1; }
+.ept-name { font-size: .85rem; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ept-meta { font-size: .72rem; color: var(--text-3); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ept-empty { font-size: .82rem; color: var(--text-3); }
+.exam-picker-trigger > i { color: var(--text-3); font-size: .78rem; flex-shrink: 0; transition: transform .12s; }
+.exam-picker-trigger.open > i { transform: rotate(180deg); }
+
+.exam-picker-panel {
+  position: absolute; top: calc(100% + .35rem); left: 0; right: 0; z-index: 50;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); max-height: 380px; display: flex; flex-direction: column; overflow: hidden;
+}
+.exam-picker-search { padding: .55rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.exam-picker-search input {
+  width: 100%; font-size: .8rem; padding: .4rem .6rem; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-1);
+}
+.exam-picker-search input:focus { outline: none; border-color: var(--border-focus); }
+.exam-picker-list { overflow-y: auto; padding: .35rem; }
+.exam-picker-item {
+  padding: .55rem .65rem; border-radius: 8px; cursor: pointer; margin-bottom: .15rem;
+}
+.exam-picker-item:hover { background: var(--surface-2); }
+.exam-picker-item.active { background: var(--accent-subtle); }
+.epi-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.epi-name { font-size: .82rem; font-weight: 700; color: var(--text-1); }
+.epi-badge {
+  flex-shrink: 0; font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em;
+  padding: .1rem .45rem; border-radius: 10px; border: 1px solid;
+}
+.epi-badge.st-upcoming  { background: var(--info-bg);    color: var(--info-text);    border-color: var(--info-border); }
+.epi-badge.st-ongoing   { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.epi-badge.st-completed { background: var(--surface-2);  color: var(--text-3);       border-color: var(--border); }
+.epi-badge.st-cancelled { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
+.epi-meta { font-size: .72rem; color: var(--text-3); margin-top: .2rem; display: flex; flex-wrap: wrap; gap: .3rem; }
+.epi-meta span:not(:last-child)::after { content: "\2022"; margin-left: .3rem; color: var(--text-3); }
+.epi-count { font-size: .68rem; color: var(--text-3); margin-top: .2rem; }
+.exam-picker-empty { padding: 1rem; text-align: center; font-size: .8rem; color: var(--text-3); }
 
 /* ── Search bar ── */
 .search-bar {
@@ -445,24 +500,144 @@ window.MathJax = {
     <label class="mb-0 text-nowrap" style="font-size:0.8rem;font-weight:600;color:var(--text-3);flex-shrink:0;">
       <i class="fas fa-graduation-cap me-1"></i>Select Exam
     </label>
-    <select id="exam-select" class="form-control form-control-sm" name="exam_id" style="flex:1;min-width:0;">
+
+    <div class="exam-picker" id="examPicker">
+      <button type="button" class="exam-picker-trigger" id="examPickerTrigger">
+        {% if selected_exam %}
+        <div class="ept-info">
+          <div class="ept-name">{{ selected_exam.name }}</div>
+          <div class="ept-meta">
+            {%- if selected_exam.category_name %}{{ selected_exam.category_name }}{% endif -%}
+            {%- if selected_exam.subcategory_name %} &middot; {{ selected_exam.subcategory_name }}{% endif -%}
+            {%- if selected_exam.date %} &middot; {{ selected_exam.date | calendar_date }}{% endif -%}
+            {%- if selected_exam.start_time %} {{ selected_exam.start_time }}{% endif -%}
+            {%- if selected_exam.scheduled_mode %} &middot; Scheduled{% endif -%}
+            &middot; {{ selected_exam.question_count }} question{{ 's' if selected_exam.question_count != 1 else '' }}
+          </div>
+        </div>
+        {% else %}
+        <span class="ept-empty">Select an exam&hellip;</span>
+        {% endif %}
+        <i class="fas fa-chevron-down"></i>
+      </button>
+      <div class="exam-picker-panel" id="examPickerPanel" style="display:none">
+        <div class="exam-picker-search">
+          <input type="text" id="examPickerSearch" placeholder="Search exams by name, category&hellip;" autocomplete="off">
+        </div>
+        <div class="exam-picker-list" id="examPickerList">
+          {% for e in exams %}
+          <div class="exam-picker-item {{ 'active' if selected_exam_id == e.id else '' }}"
+               data-exam-id="{{ e.id }}" data-exam-name="{{ e.name }}"
+               data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">
+            <div class="epi-top">
+              <span class="epi-name">{{ e.name }}</span>
+              <span class="epi-badge st-{{ e.effective_status }}">{{ e.effective_status }}</span>
+            </div>
+            <div class="epi-meta">
+              {% if e.category_name %}<span>{{ e.category_name }}</span>{% endif %}
+              {% if e.subcategory_name %}<span>{{ e.subcategory_name }}</span>{% endif %}
+              {% if e.date %}<span>{{ e.date | calendar_date }}{% if e.start_time %} &middot; {{ e.start_time }}{% endif %}</span>{% endif %}
+              {% if e.scheduled_mode %}<span>Scheduled</span>{% endif %}
+            </div>
+            <div class="epi-count">{{ e.question_count }} question{{ 's' if e.question_count != 1 else '' }}</div>
+          </div>
+          {% else %}
+          <div class="exam-picker-empty">No exams yet — create one on Manage Exams.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <select id="exam-select" name="exam_id" style="display:none">
       {% for e in exams %}
         <option value="{{ e.id }}" {% if selected_exam_id == e.id %}selected{% endif %} data-exam-name="{{ e.name }}">
           {{ e.name }} (ID: {{ e.id }})
         </option>
       {% endfor %}
     </select>
-    <button id="reload-btn" type="button" class="btn-flat primary" style="padding:0.42rem 1rem;white-space:nowrap;flex-shrink:0;">
-      <i class="fas fa-sync-alt me-1"></i>Load Questions
+
+    <button id="reload-btn" type="button" class="btn-flat primary" title="Load questions for the selected exam"
+            style="width:42px;height:42px;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i class="fas fa-download"></i>
     </button>
   </form>
-  {% if selected_exam_id %}
-  <div class="exam-info-pill">
-    <span><i class="fas fa-info-circle me-1"></i>Viewing questions for selected exam</span>
-    <span class="exam-id-badge"><i class="fas fa-hashtag me-1"></i>Exam ID: {{ selected_exam_id }}</span>
-  </div>
-  {% endif %}
 </div>
+
+<script>
+/* Exam picker — a presentation layer over the hidden native #exam-select,
+   which stays the single source of truth every other script on this page
+   already reads (.value for Load Questions/Export/Import, .options for
+   the CSV import confirm dialog's exam name lookup). Picking a card here
+   only updates that hidden select and this trigger's own display —
+   nothing actually reloads until "Load Questions" is clicked, exactly
+   like the plain <select> it replaces. */
+(function(){
+  const picker  = document.getElementById('examPicker');
+  const trigger = document.getElementById('examPickerTrigger');
+  const panel   = document.getElementById('examPickerPanel');
+  const search  = document.getElementById('examPickerSearch');
+  const list    = document.getElementById('examPickerList');
+  const hidden  = document.getElementById('exam-select');
+  if (!picker || !trigger || !panel) return;
+
+  function closePanel() {
+    panel.style.display = 'none';
+    trigger.classList.remove('open');
+  }
+  function openPanel() {
+    panel.style.display = 'flex';
+    trigger.classList.add('open');
+    if (search) { search.value = ''; filterItems(''); search.focus(); }
+  }
+  trigger.addEventListener('click', function(e){
+    e.preventDefault();
+    if (panel.style.display === 'none') openPanel(); else closePanel();
+  });
+  document.addEventListener('click', function(e){
+    if (!picker.contains(e.target)) closePanel();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closePanel();
+  });
+
+  function filterItems(q) {
+    q = (q || '').trim().toLowerCase();
+    list.querySelectorAll('.exam-picker-item').forEach(function(item){
+      const hay = item.dataset.search || '';
+      item.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+    });
+  }
+  if (search) search.addEventListener('input', function(){ filterItems(search.value); });
+
+  if (list) list.addEventListener('click', function(e){
+    const item = e.target.closest('.exam-picker-item');
+    if (!item) return;
+
+    const id   = item.dataset.examId;
+    const name = item.dataset.examName || '';
+
+    if (hidden) hidden.value = id;
+
+    list.querySelectorAll('.exam-picker-item').forEach(function(el){ el.classList.remove('active'); });
+    item.classList.add('active');
+
+    // Mirror the picked card's own name/meta/count straight into the
+    // trigger — the exact text the admin just looked at, so what's shown
+    // as "selected" never has to be recomputed separately from it.
+    const metaHtml  = item.querySelector('.epi-meta') ? item.querySelector('.epi-meta').innerHTML : '';
+    const countText = item.querySelector('.epi-count') ? item.querySelector('.epi-count').textContent : '';
+    trigger.innerHTML =
+      '<div class="ept-info">' +
+        '<div class="ept-name"></div>' +
+        '<div class="ept-meta">' + metaHtml + (metaHtml ? ' &middot; ' : '') + countText + '</div>' +
+      '</div>' +
+      '<i class="fas fa-chevron-down"></i>';
+    trigger.querySelector('.ept-name').textContent = name;
+
+    closePanel();
+  });
+})();
+</script>
 
 <!-- Search & Filter -->
 <div class="search-bar">
@@ -498,7 +673,7 @@ window.MathJax = {
 <!-- Questions Table -->
 <div class="card">
   <div class="card-header-flat">
-    <h5><i class="fas fa-list-alt me-2" style="color:var(--accent)"></i>Questions List (<span id="total-count">{{ questions|length }}</span>)</h5>
+    <h5><i class="fas fa-list-alt me-2" style="color:var(--accent)"></i>Questions List (<span id="total-count">{{ questions_total }}</span>)</h5>
     <div style="display:flex;gap:0.4rem">
       <button id="delete-selected" class="btn-flat danger-btn"><i class="fas fa-trash me-1"></i>Delete Selected</button>
       <button id="select-none" class="btn-flat secondary"><i class="fas fa-times me-1"></i>Clear Selection</button>
@@ -538,13 +713,12 @@ window.MathJax = {
   </div>
 
   <div id="questions-container">
-    {% if questions %}
-    <div class="table-responsive">
+    <div class="table-responsive" id="questionsTableWrap" style="{{ '' if questions else 'display:none' }}">
       <table class="table mb-0" id="questions-table">
         <thead>
           <tr>
             <th style="width:44px"><input id="select-all" type="checkbox" class="enhanced-checkbox"></th>
-            <th>ID</th>
+            <th>S.No.</th>
             <th>Question</th>
             <th>Type</th>
             <th>Image</th>
@@ -553,57 +727,13 @@ window.MathJax = {
           </tr>
         </thead>
         <tbody id="questions-tbody">
-          {% for q in questions %}
-          <tr class="question-row"
-              data-question-text="{{ q.question_text|lower }}"
-              data-question-type="{{ q.question_type }}"
-              data-has-image="{{ 'true' if q.image_path else 'false' }}"
-              data-question-id="{{ q.id }}">
-            <td><input class="row-checkbox enhanced-checkbox" data-id="{{ q.id }}" type="checkbox"></td>
-            <td><span class="question-id-badge">{{ q.id }}</span></td>
-            <td><div class="question-text" data-raw="{{ q.question_text | e }}"></div></td>
-            <td>
-              <span class="question-type-badge {% if q.question_type == 'MCQ' %}type-mcq{% elif q.question_type == 'MSQ' %}type-msq{% else %}type-num{% endif %}">
-                {{ q.question_type }}
-              </span>
-            </td>
-            <td>
-              {% if q.image_path %}
-                <span class="image-pill" title="{{ q.image_path }}">{{ q.image_path }}</span>
-              {% else %}
-                <span style="color:var(--text-3);font-size:0.78rem">—</span>
-              {% endif %}
-            </td>
-            <td>
-              <span class="marks-badge">
-                <span class="marks-pos">+{{ q.positive_marks }}</span>
-                <span style="color:var(--text-3)">/</span>
-                <span class="marks-neg">-{{ q.negative_marks }}</span>
-              </span>
-              {% if q.tolerance %}
-                <br><small style="color:var(--text-3);font-size:0.7rem">tol: {{ q.tolerance }}</small>
-              {% endif %}
-            </td>
-            <td>
-              <div class="action-btns">
-                <button class="icon-btn" title="Edit"
-                        onclick="openEditQuestionModal({{ q.id }})">
-                  <i class="fas fa-pencil-alt"></i>
-                </button>
-                <button class="icon-btn danger" title="Delete"
-                        onclick="showDeleteQuestionConfirm({{ q.id }}, '{{ q.question_text[:60] | replace("'", "\\'") | replace('"', '') }}')">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
+          {% for q in questions %}{{ render_question_row(q, q.row_no) }}{% endfor %}
         </tbody>
       </table>
     </div>
 
     <!-- Pagination -->
-    <div class="pagination-wrap">
+    <div class="pagination-wrap" id="questionsPaginationWrap" style="{{ '' if questions else 'display:none' }}">
       <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
         <div class="entries-selector">
           Show
@@ -618,8 +748,8 @@ window.MathJax = {
           entries
         </div>
         <div class="pagination-info">
-          Showing <span id="start-entry">1</span>–<span id="end-entry">10</span> of
-          <span id="filtered-count">{{ questions|length }}</span>
+          Showing <span id="start-entry">1</span>–<span id="end-entry">{{ questions|length }}</span> of
+          <span id="filtered-count">{{ questions_total }}</span>
           <span id="filter-info"></span>
         </div>
       </div>
@@ -632,12 +762,10 @@ window.MathJax = {
       </div>
     </div>
 
-    {% else %}
-    <div class="empty-state">
+    <div class="empty-state" id="questionsEmptyState" style="{{ 'display:none' if questions else '' }}">
       <i class="fas fa-inbox"></i>
-      <p>No questions found for this exam.</p>
+      <p>No questions found{{ ' for this exam' if selected_exam_id else '' }}.</p>
     </div>
-    {% endif %}
   </div>
 </div>
 
@@ -783,6 +911,16 @@ window.MathJax = {
             </div>
           </div>
 
+          <!-- Metadata -->
+          <div class="modal-section-title"><i class="fas fa-tag"></i>Metadata</div>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Source / Previous Year Tag <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+              <input name="source_tag" id="qf-source-tag" class="form-control" placeholder="e.g. ESE 2021">
+              <div class="form-hint"><i class="fas fa-info-circle"></i> Shown as a small badge above the question on the exam page. Leave blank to remove it.</div>
+            </div>
+          </div>
+
         </form>
       </div>
       <div class="modal-footer" style="justify-content:space-between;align-items:center">
@@ -918,83 +1056,86 @@ window.MathJax = {
     modal.show();
   }
 
-  /* ── Pagination ── */
-  let currentPage  = 1;
-  let itemsPerPage = 10;
-  let filteredRows = [];
-  let allRows      = [];
+  /* ── Pagination / search / filter — SERVER-SIDE (see api_questions_list
+     in app/routes/api/v01/admin/questions.py). The exam this page shows
+     can have hundreds/thousands of questions; search/type/image filters
+     and page/entries-per-page changes now re-fetch just the matching page
+     instead of operating on every question already sitting in the DOM.
+     The initial page-1 render below is a client-side-only setup from the
+     values the server already sent with the page — no fetch on load. ── */
+  let currentPage   = 1;
+  let itemsPerPage  = {{ questions_per_page }};
+  let qTotal        = {{ questions_total }};
+  let qTotalPages   = Math.max(1, Math.ceil(qTotal / (itemsPerPage || 1)));
 
-  function initializePagination() {
-    allRows      = Array.from(document.querySelectorAll('.question-row'));
-    filteredRows = [...allRows];
-    updatePagination();
+  function _questionsExamId() {
+    const sel = document.getElementById('exam-select');
+    return sel ? sel.value : '';
   }
 
-  function applyFilters() {
-    const searchTerm  = document.getElementById('search-input').value.toLowerCase();
-    const typeFilter  = document.getElementById('type-filter').value;
-    const imageFilter = document.getElementById('image-filter').value;
-    filteredRows = allRows.filter(row => {
-      const matchesSearch = !searchTerm ||
-        row.dataset.questionText.includes(searchTerm) ||
-        row.dataset.questionId.includes(searchTerm) ||
-        row.dataset.questionType.toLowerCase().includes(searchTerm);
-      const matchesType  = !typeFilter  || row.dataset.questionType === typeFilter;
-      const hasImage     = row.dataset.hasImage === 'true';
-      let   matchesImage = true;
-      if (imageFilter === 'with')    matchesImage = hasImage;
-      else if (imageFilter === 'without') matchesImage = !hasImage;
-      return matchesSearch && matchesType && matchesImage;
-    });
-    currentPage = 1;
-    updatePagination();
-    updateFilterInfo();
-  }
+  async function loadQuestionsPage(page) {
+    const examId = _questionsExamId();
+    if (!examId) return;
+    currentPage = page || 1;
 
-  function updateFilterInfo() {
-    const totalCount   = document.getElementById('total-count');
-    const filteredCount= document.getElementById('filtered-count');
-    const filterInfo   = document.getElementById('filter-info');
-    if (totalCount)    totalCount.textContent    = allRows.length;
-    if (filteredCount) filteredCount.textContent = filteredRows.length;
-    if (filterInfo)    filterInfo.textContent    = filteredRows.length < allRows.length ? ` (filtered from ${allRows.length})` : '';
-  }
+    const params = new URLSearchParams();
+    params.set('exam_id', examId);
+    params.set('page', currentPage);
+    params.set('per_page', itemsPerPage === 'all' ? 'all' : itemsPerPage);
+    if (searchInput  && searchInput.value.trim())  params.set('q', searchInput.value.trim());
+    if (typeFilter   && typeFilter.value)          params.set('type', typeFilter.value);
+    if (imageFilter  && imageFilter.value)         params.set('image', imageFilter.value);
 
-  function updatePagination() {
-    const totalItems = filteredRows.length;
-    const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
-    let startEntry, endEntry;
-    if (itemsPerPage === 'all') { startEntry = totalItems > 0 ? 1 : 0; endEntry = totalItems; }
-    else {
-      startEntry = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-      endEntry   = Math.min(currentPage * itemsPerPage, totalItems);
+    const tbody = document.getElementById('questions-tbody');
+    try {
+      const res  = await fetch(`/api/v01/admin/questions?${params.toString()}`);
+      const data = await res.json();
+      if (tbody) tbody.innerHTML = data.rows_html || '';
+      window.renderQuestionMath(tbody);
+      qTotal = data.total || 0;
+      itemsPerPage = data.per_page || itemsPerPage;
+      qTotalPages = data.total_pages || 1;
+      currentPage = data.page || currentPage;
+      renderPaginationUI();
+      const selectAll = document.getElementById('select-all');
+      if (selectAll) selectAll.checked = false;
+    } catch (err) {
+      console.error('loadQuestionsPage error:', err);
     }
+  }
+
+  function renderPaginationUI() {
+    const totalCount    = document.getElementById('total-count');
+    const filteredCount = document.getElementById('filtered-count');
+    if (totalCount)    totalCount.textContent    = qTotal;
+    if (filteredCount) filteredCount.textContent = qTotal;
+
+    const startEntry = qTotal > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+    const endEntry    = Math.min(currentPage * itemsPerPage, qTotal);
     const s = document.getElementById('start-entry');
     const e = document.getElementById('end-entry');
     if (s) s.textContent = startEntry;
     if (e) e.textContent = endEntry;
-    allRows.forEach(row => row.style.display = 'none');
-    if (itemsPerPage === 'all') { filteredRows.forEach(row => row.style.display = ''); }
-    else {
-      const si = (currentPage - 1) * itemsPerPage;
-      filteredRows.slice(si, si + itemsPerPage).forEach(row => row.style.display = '');
-    }
-    const firstBtn = document.getElementById('first-page');
-    const prevBtn  = document.getElementById('prev-page');
-    const nextBtn  = document.getElementById('next-page');
-    const lastBtn  = document.getElementById('last-page');
-    if (firstBtn) firstBtn.disabled = currentPage === 1 || itemsPerPage === 'all';
-    if (prevBtn)  prevBtn.disabled  = currentPage === 1 || itemsPerPage === 'all';
-    if (nextBtn)  nextBtn.disabled  = currentPage === totalPages || itemsPerPage === 'all';
-    if (lastBtn)  lastBtn.disabled  = currentPage === totalPages || itemsPerPage === 'all';
-    generatePageNumbers(totalPages);
+
+    const tableWrap = document.getElementById('questionsTableWrap');
+    const pagWrap   = document.getElementById('questionsPaginationWrap');
+    const emptyState= document.getElementById('questionsEmptyState');
+    if (tableWrap)  tableWrap.style.display  = qTotal > 0 ? '' : 'none';
+    if (pagWrap)    pagWrap.style.display    = qTotal > 0 ? '' : 'none';
+    if (emptyState) emptyState.style.display = qTotal > 0 ? 'none' : '';
+
+    if (firstBtn) firstBtn.disabled = currentPage <= 1;
+    if (prevBtn)  prevBtn.disabled  = currentPage <= 1;
+    if (nextBtn)  nextBtn.disabled  = currentPage >= qTotalPages;
+    if (lastBtn)  lastBtn.disabled  = currentPage >= qTotalPages;
+    generatePageNumbers(qTotalPages);
   }
 
   function generatePageNumbers(totalPages) {
     const container = document.getElementById('page-numbers');
     if (!container) return;
     container.innerHTML = '';
-    if (itemsPerPage === 'all' || totalPages <= 1) return;
+    if (totalPages <= 1) return;
     const max = 5;
     let start = Math.max(1, currentPage - Math.floor(max / 2));
     let end   = Math.min(totalPages, start + max - 1);
@@ -1015,7 +1156,7 @@ window.MathJax = {
     const btn = document.createElement('button');
     btn.textContent = num;
     btn.className   = 'page-btn' + (num === currentPage ? ' active' : '');
-    btn.addEventListener('click', () => { currentPage = num; updatePagination(); });
+    btn.addEventListener('click', () => loadQuestionsPage(num));
     container.appendChild(btn);
   }
 
@@ -1029,36 +1170,37 @@ window.MathJax = {
   const nextBtn      = document.getElementById('next-page');
   const lastBtn      = document.getElementById('last-page');
 
-  if (searchInput)   searchInput.addEventListener('input',  applyFilters);
-  if (typeFilter)    typeFilter.addEventListener('change',  applyFilters);
-  if (imageFilter)   imageFilter.addEventListener('change', applyFilters);
-  if (clearFilters)  clearFilters.addEventListener('click', () => {
+  let _searchDebounce;
+  if (searchInput) searchInput.addEventListener('input', () => {
+    clearTimeout(_searchDebounce);
+    _searchDebounce = setTimeout(() => loadQuestionsPage(1), 350);
+  });
+  if (typeFilter)  typeFilter.addEventListener('change',  () => loadQuestionsPage(1));
+  if (imageFilter) imageFilter.addEventListener('change', () => loadQuestionsPage(1));
+  if (clearFilters) clearFilters.addEventListener('click', () => {
     if (searchInput)  searchInput.value = '';
     if (typeFilter)   typeFilter.value  = '';
     if (imageFilter)  imageFilter.value = '';
-    applyFilters();
+    loadQuestionsPage(1);
   });
   if (entriesSelect) entriesSelect.addEventListener('change', (ev) => {
-    itemsPerPage = ev.target.value === 'all' ? 'all' : parseInt(ev.target.value);
-    currentPage  = 1; updatePagination();
+    itemsPerPage = ev.target.value === 'all' ? 'all' : parseInt(ev.target.value, 10);
+    loadQuestionsPage(1);
   });
-  if (firstBtn) firstBtn.addEventListener('click', () => { currentPage = 1; updatePagination(); });
-  if (prevBtn)  prevBtn.addEventListener('click',  () => { if (currentPage > 1) { currentPage--; updatePagination(); } });
-  if (nextBtn)  nextBtn.addEventListener('click',  () => {
-    const tp = Math.ceil(filteredRows.length / itemsPerPage);
-    if (currentPage < tp) { currentPage++; updatePagination(); }
-  });
-  if (lastBtn)  lastBtn.addEventListener('click',  () => {
-    currentPage = Math.ceil(filteredRows.length / itemsPerPage); updatePagination();
-  });
+  if (firstBtn) firstBtn.addEventListener('click', () => loadQuestionsPage(1));
+  if (prevBtn)  prevBtn.addEventListener('click',  () => { if (currentPage > 1) loadQuestionsPage(currentPage - 1); });
+  if (nextBtn)  nextBtn.addEventListener('click',  () => { if (currentPage < qTotalPages) loadQuestionsPage(currentPage + 1); });
+  if (lastBtn)  lastBtn.addEventListener('click',  () => loadQuestionsPage(qTotalPages));
 
-  if (document.querySelectorAll('.question-row').length > 0) initializePagination();
+  // Set up button-disabled states / page-number buttons for the
+  // server-rendered page 1 — purely client-side, no fetch.
+  renderPaginationUI();
 
   const examSelect = document.getElementById('exam-select');
   const reloadBtn  = document.getElementById('reload-btn');
   if (reloadBtn) reloadBtn.addEventListener('click', () => {
     const id = examSelect.value;
-    reloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+    reloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(id);
   });
 
@@ -1339,6 +1481,7 @@ function _qResetForm() {
   _qField('qf-positive-marks').value  = '4';
   _qField('qf-negative-marks').value  = '1';
   _qField('qf-image-path').value      = '';
+  _qField('qf-source-tag').value      = '';
   _qField('qModalError').style.display = 'none';
   _toggleToleranceField();
   /* Pre-select the currently loaded exam */
@@ -1400,6 +1543,7 @@ async function openEditQuestionModal(questionId) {
     _qField('qf-positive-marks').value = q.positive_marks != null ? q.positive_marks : '4';
     _qField('qf-negative-marks').value = q.negative_marks != null ? q.negative_marks : '1';
     _qField('qf-image-path').value     = q.image_path     || '';
+    _qField('qf-source-tag').value     = (q.metadata && q.metadata.source_tag) || '';
     _toggleToleranceField();
   } catch (err) {
     _qField('qModalError').textContent    = err.message;
@@ -1439,6 +1583,7 @@ async function submitQuestionModal() {
   form.append('positive_marks', _qField('qf-positive-marks').value);
   form.append('negative_marks', _qField('qf-negative-marks').value);
   form.append('image_path',     _qField('qf-image-path').value);
+  form.append('source_tag',     _qField('qf-source-tag').value);
 
   const url = _qModalMode === 'add'
     ? '/api/v01/admin/questions'
@@ -1542,13 +1687,14 @@ function _renderQText(text){
   return result;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const qTypeEl = document.getElementById('qf-question-type');
-  if (qTypeEl) qTypeEl.addEventListener('change', _toggleToleranceField);
-  _toggleToleranceField();
-
-  // Render \n, markdown tables, and LaTeX in question_text cells
-  const qTextEls = Array.from(document.querySelectorAll('.question-text[data-raw]'));
+// Render \n, markdown tables, and LaTeX in every .question-text[data-raw]
+// cell inside `root` (defaults to the whole document) — factored out of the
+// old DOMContentLoaded-only block so the AJAX search/filter/pagination
+// refresh (see the questions-pagination IIFE above) can re-run it on just
+// the freshly-swapped rows instead of duplicating this logic.
+window.renderQuestionMath = function(root) {
+  root = root || document;
+  const qTextEls = Array.from(root.querySelectorAll('.question-text[data-raw]'));
   qTextEls.forEach(el => {
     el.innerHTML = _renderQText(el.dataset.raw || '');
     el.style.whiteSpace  = 'normal';
@@ -1556,12 +1702,12 @@ document.addEventListener('DOMContentLoaded', function() {
     el.style.textOverflow = 'unset';
     el.style.maxWidth    = 'none';
   });
-  // Typeset via startup.promise — guaranteed to fire after MathJax fully initialises
   function _doTypeset(els) {
     if (!els.length) return;
     if (typeof MathJax.typesetClear === 'function') MathJax.typesetClear(els);
     MathJax.typesetPromise(els).catch(function(e) { console.warn('[MathJax]', e); });
   }
+  // Typeset via startup.promise — guaranteed to fire after MathJax fully initialises
   if (window._mathJaxReady) {
     // startup.ready() already fired (script was blocking, loaded before DOMContentLoaded)
     _doTypeset(qTextEls);
@@ -1569,9 +1715,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Script loaded but startup.ready() not yet called — wait on the promise
     MathJax.startup.promise.then(function() { _doTypeset(qTextEls); });
   } else {
-    // Script still loading — startup.ready() will call this when done
+    // Script still loading — startup.ready() will call this when done, but
+    // only for the initial page load's own elements (captured below);
+    // AJAX-refreshed rows arrive later, once MathJax is already ready, so
+    // they always take the branches above instead.
     window._mathJaxReadyCallback = function() { _doTypeset(qTextEls); };
   }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  const qTypeEl = document.getElementById('qf-question-type');
+  if (qTypeEl) qTypeEl.addEventListener('change', _toggleToleranceField);
+  _toggleToleranceField();
+
+  window.renderQuestionMath();
 
   /* Delete single question modal */
   const confirmDelBtn = document.getElementById('confirmQuestionDeleteBtn');
@@ -1699,6 +1856,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (importBtn) importBtn.addEventListener('click', function(ev) {
     ev.preventDefault();
+    const examInfo = getExamInfo();
+    if (!examInfo) { showCsvAlert('No Exam Selected', 'Please select an exam first.', 'warning'); return; }
     const fileInput = document.createElement('input');
     fileInput.type = 'file'; fileInput.accept = '.csv'; fileInput.style.display = 'none';
     fileInput.addEventListener('change', async function(ev) {
@@ -1708,13 +1867,20 @@ document.addEventListener('DOMContentLoaded', function() {
       showCsvConfirm('Import Questions from CSV',
         `<p><strong>File:</strong> ${file.name}</p>
          <div class="csv-code-block">
-           exam_id, question_text, option_a, option_b, option_c, option_d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance
+           question_text, option_a, option_b, option_c, option_d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance
          </div>
-         <p style="color:var(--danger-text);font-size:0.8rem;margin-top:0.75rem"><i class="fas fa-exclamation-triangle me-1"></i>exam_id must exist in database!</p>`,
-        null,
+         <p style="color:var(--text-3);font-size:0.8rem;margin-top:0.75rem"><i class="fas fa-circle-info me-1"></i>Every question in this file will be added to the exam below — not read from the file.</p>`,
+        examInfo,
         async () => {
+          // SECURITY: the target exam is this page's own selection, sent
+          // as its own field — never re-derived from anything inside the
+          // file (see import_questions_csv() in
+          // app/routes/api/v01/admin/questions.py for the server-side half
+          // of this). A CSV with a leftover/mismatched exam_id column is
+          // rejected server-side rather than silently honored.
           const formData = new FormData();
           formData.append('csv_file', file);
+          formData.append('exam_id', examInfo.id);
           importBtn.disabled  = true;
           importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing...';
           try {
@@ -1722,10 +1888,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await resp.json();
             if (data.success) {
               showCsvAlert('Import Complete',
-                `Successfully imported <strong>${data.inserted}</strong> question(s).`
+                `Successfully imported <strong>${data.inserted}</strong> question(s) into <strong>${examInfo.name}</strong>.`
                 + (data.skipped > 0 ? ` Skipped ${data.skipped} row(s).` : ''), 'success');
               if (data.inserted > 0)
-                setTimeout(() => { window.location.href = `/admin/questions?exam_id=${examSelect?.value || ''}`; }, 3000);
+                setTimeout(() => { window.location.href = `/admin/questions?exam_id=${examInfo.id}`; }, 3000);
             } else {
               showCsvAlert('Import Failed', data.message || 'Unknown error.', 'error');
             }

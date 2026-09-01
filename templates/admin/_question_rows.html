@@ -1,0 +1,55 @@
+{# templates/admin/_question_rows.html
+   Shared macro for one question table row on Manage Questions — used by
+   both the initial server-render (admin/questions.html) and the AJAX
+   search/filter/pagination partial (api_questions_list), so the two never
+   drift out of sync. row_no is the UI-facing serial number (see
+   attach_row_numbers() in app/utils/pagination.py) — never the real
+   question id, which stays available for edit/delete via q.id. #}
+
+{% macro render_question_row(q, row_no) %}
+<tr class="question-row"
+    data-question-id="{{ q.id }}">
+  <td><input class="row-checkbox enhanced-checkbox" data-id="{{ q.id }}" type="checkbox"></td>
+  <td><span class="question-id-badge">{{ row_no }}</span></td>
+  <td>
+    <div class="question-text" data-raw="{{ q.question_text | e }}"></div>
+    {% if q.source_tag %}
+    <span style="display:inline-flex;align-items:center;gap:.25rem;background:var(--accent-subtle);color:var(--accent);border:1px solid var(--accent);border-radius:12px;padding:.05rem .5rem;font-size:.68rem;font-weight:700;margin-top:.25rem"><i class="fas fa-bookmark" style="font-size:.6rem"></i>{{ q.source_tag }}</span>
+    {% endif %}
+  </td>
+  <td>
+    <span class="question-type-badge {% if q.question_type == 'MCQ' %}type-mcq{% elif q.question_type == 'MSQ' %}type-msq{% else %}type-num{% endif %}">
+      {{ q.question_type }}
+    </span>
+  </td>
+  <td>
+    {% if q.image_path %}
+      <span class="image-pill" title="{{ q.image_path }}">{{ q.image_path }}</span>
+    {% else %}
+      <span style="color:var(--text-3);font-size:0.78rem">—</span>
+    {% endif %}
+  </td>
+  <td>
+    <span class="marks-badge">
+      <span class="marks-pos">+{{ q.positive_marks }}</span>
+      <span style="color:var(--text-3)">/</span>
+      <span class="marks-neg">-{{ q.negative_marks }}</span>
+    </span>
+    {% if q.tolerance %}
+      <br><small style="color:var(--text-3);font-size:0.7rem">tol: {{ q.tolerance }}</small>
+    {% endif %}
+  </td>
+  <td>
+    <div class="action-btns">
+      <button class="icon-btn" title="Edit"
+              onclick="openEditQuestionModal({{ q.id }})">
+        <i class="fas fa-pencil-alt"></i>
+      </button>
+      <button class="icon-btn danger" title="Delete"
+              onclick="showDeleteQuestionConfirm({{ q.id }}, '{{ q.question_text[:60] | replace("'", "\\'") | replace('"', '') }}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  </td>
+</tr>
+{% endmacro %}

@@ -99,8 +99,45 @@ def build_result_map(user_results: List[Dict]) -> Dict[int, Dict]:
 
 def build_exam_card(exam: Dict, result_map: Optional[Dict[int, Dict]] = None) -> Dict:
     """Trim an exams-table row down to what the dashboard exam card needs,
-    and (for completed exams) attach the student's own result summary."""
-    status = str(exam.get("status", "draft")).lower().strip()
+    and (for completed exams) attach the student's own result summary.
+
+    BUG FIX: this used to read the literal `status` column, which is
+    correct for a Manual Exam but is ALWAYS 'scheduled' (or 'cancelled')
+    for a Scheduled Exam — see app/services/exam_service.py
+    get_effective_status(), the single source of truth this app uses
+    everywhere else an exam's bucket/state is decided (dashboard listing
+    queries, admin list, notifications). Reading the literal column here
+    meant a completed Scheduled Exam's card never matched status=='completed'
+    below, so its result was never attached and the card showed "Result
+    Pending" forever, even after the student had a real, scored result.
+    Manual Exams are unaffected: get_effective_status() returns the exact
+    same literal column value for them, so this is a no-op for that case.
+
+    Also attaches:
+      prep_open — whether a Scheduled Exam's preparation window is open
+        right now (always False for a Manual Exam, which has no prep-
+        window concept). The dashboard's Upcoming card uses this to show
+        a real "Prepare Exam" link instead of a permanently-disabled
+        "Not started yet" button — before this, prep availability was
+        computed correctly server-side but never surfaced anywhere a
+        student could actually reach it from (the card had no link at
+        all), so the setting had no visible effect until the exact
+        official start second.
+      next_transition_iso — the next server-authoritative instant (ISO
+        8601, APP_TIMEZONE-aware) this card's rendered state will change
+        on its own: prep_start (not-yet-preparable -> "Prepare Exam"
+        available), scheduled_start (upcoming -> ongoing), or
+        official_end + completion_buffer (ongoing -> completed). None for
+        a Manual Exam (no automatic transition exists) or once already
+        completed/cancelled (nothing left to transition to). The
+        dashboard uses this to schedule a single client-side timer per
+        soonest transition, instead of polling — see
+        templates/dashboard.html.
+    """
+    from app.services.exam_service import get_effective_status, get_exam_time_window, is_prep_window_open
+
+    status = get_effective_status(exam)
+    is_scheduled = bool(exam.get("scheduled_mode"))
     ed = {
         "id":              int(exam.get("id", 0)),
         "name":            exam.get("name", "Unnamed Exam"),
@@ -112,10 +149,36 @@ def build_exam_card(exam: Dict, result_map: Optional[Dict[int, Dict]] = None) ->
         "instructions":    exam.get("instructions", ""),
         "positive_marks":  exam.get("positive_marks", "1"),
         "negative_marks":  exam.get("negative_marks", "0"),
+        "prep_open":       False,
+        "next_transition_iso": None,
+        # UI-only — see templates/_dashboard_exam_cards.html. Already on the
+        # `exam` row from the same query that built it; surfaced here rather
+        # than re-derived, so this costs nothing extra.
+        "is_scheduled":    is_scheduled,
     }
+    if is_scheduled and status in ("upcoming", "ongoing"):
+        window = get_exam_time_window(exam)
+        if status == "ongoing":
+            ed["next_transition_iso"] = window.get("buffer_end_iso")
+        else:
+            prep_open = is_prep_window_open(exam)
+            ed["prep_open"] = prep_open
+            ed["next_transition_iso"] = window.get("start_iso") if prep_open else window.get("prep_start_iso")
     if status == "completed" and result_map is not None:
         r = result_map.get(int(ed["id"]))
-        ed["result"] = f"{r.get('score')}/{r.get('max_score')} ({r.get('grade', 'N/A')})" if r else "Pending"
+        # SECURITY: a result_mode of 'manual' (not yet released) or
+        # 'delayed' (delay window not yet elapsed) must hide the actual
+        # score/grade here exactly as it does on the Results page and
+        # Results History — this card is reached via a completely
+        # different path (the dashboard's Completed tab, both the initial
+        # render and the "Load more" AJAX pagination) and was previously
+        # never checking can_user_see_result() at all, so it kept showing
+        # the real score/grade on the card itself regardless of release
+        # status. Applies identically to Scheduled and Normal exams —
+        # can_user_see_result() only branches on result_mode, never on
+        # scheduled_mode.
+        visible = bool(r) and can_user_see_result(exam, r)[0]
+        ed["result"] = f"{r.get('score')}/{r.get('max_score')} ({r.get('grade', 'N/A')})" if visible else "Pending"
     return ed
 
 

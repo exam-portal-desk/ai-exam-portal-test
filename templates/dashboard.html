@@ -102,6 +102,8 @@
 .ec-meta { display:flex; flex-wrap:wrap; gap:.3rem; }
 .ec-tag { display:inline-flex; align-items:center; gap:.25rem; font-size:.7rem; color:var(--text-2); background:var(--surface-2); padding:.2rem .55rem; border-radius:20px; }
 .ec-tag i { color:var(--accent); font-size:.62rem; }
+.ec-tag-sched { color:var(--accent); background:var(--accent-subtle); }
+.ec-tag-sched i { color:var(--accent); }
 .ec-foot { padding:.65rem 1rem; border-top:1px solid var(--border); }
 
 .ec-btn {
@@ -119,6 +121,7 @@
 .ebadge { display:inline-flex; align-items:center; gap:.2rem; padding:.18rem .5rem; border-radius:20px; font-size:.65rem; font-weight:700; text-transform:uppercase; border:1px solid; white-space:nowrap; }
 .eb-live     { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); animation:livepulse 2s infinite; }
 .eb-upcoming { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.eb-prep     { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
 .eb-done     { background:var(--info-bg);    color:var(--info-text);    border-color:var(--info-border); }
 .eb-pending  { background:var(--danger-bg);  color:var(--danger-text);  border-color:var(--danger-border); }
 @keyframes livepulse{0%,100%{box-shadow:0 0 0 0 var(--success-bg)}50%{box-shadow:0 0 0 4px transparent}}
@@ -142,6 +145,16 @@
   .ud-main { padding:1rem; }
   .ud-grid { grid-template-columns:1fr; }
   .ud-search { width:100%; }
+  /* The view-toggle buttons were competing with the 3 tabs for the same
+     row's width, leaving too little room and clipping "Completed" to "Co"
+     with no visible hint it was scrollable. Give the toggle its own row so
+     the tabs get the full width (all 3 fit without scrolling at typical
+     mobile widths; overflow-x:auto below still covers narrower screens). */
+  .ud-tabs-row { flex-wrap:wrap; }
+  /* Wrapper (unstyled) takes the full width and right-aligns the toggle —
+     stretching .view-toggle itself would drag its own bordered/filled pill
+     background across the whole row, leaving an empty-looking bar. */
+  .ud-view-toggle-wrap { flex-basis:100%; display:flex; justify-content:flex-end; }
   .ud-tabs { overflow-x:auto; scrollbar-width:none; }
   .ud-tabs::-webkit-scrollbar{display:none}
 }
@@ -151,7 +164,8 @@
 
   <div class="ud-topbar">
     <div class="ud-greeting">
-      <h1>{{ greeting }}, {{ session.get('full_name','').split()[0] }}</h1>
+      <h1><span id="dashGreetWord">{{ greeting }}</span>, {{ session.get('full_name','').split()[0] }}</h1>
+      <p>Here's what's happening today.</p>
     </div>
     <div class="portal-crumb" id="portalCrumb">
       <button type="button" class="pc-seg" data-kind="category" title="Switch category">
@@ -181,17 +195,28 @@
         <span class="tc">{{ completed_total }}</span>
       </button>
     </div>
-    <div class="view-toggle" id="dashViewToggle" role="group" aria-label="Exam view">
-      <button type="button" data-view="grid" class="{{ 'active' if view_mode != 'list' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode != 'list' else 'false' }}"><i class="fas fa-th-large"></i></button>
-      <button type="button" data-view="list" class="{{ 'active' if view_mode == 'list' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode == 'list' else 'false' }}"><i class="fas fa-list"></i></button>
+    <div class="ud-view-toggle-wrap">
+      <div class="view-toggle" id="dashViewToggle" role="group" aria-label="Exam view">
+        <button type="button" data-view="grid" class="{{ 'active' if view_mode != 'list' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode != 'list' else 'false' }}"><i class="fas fa-th-large"></i></button>
+        <button type="button" data-view="list" class="{{ 'active' if view_mode == 'list' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode == 'list' else 'false' }}"><i class="fas fa-list"></i></button>
+      </div>
     </div>
   </div>
 
   <div id="dashViewWrapper" class="{{ 'list-view' if view_mode == 'list' else '' }}">
+    {# Every pane always renders BOTH the toolbar+grid+paginator AND the
+       empty-state placeholder — never just one or the other. A pane that
+       starts empty (e.g. 0 Live exams at page load) must still have a real
+       #grid-live/#cnt-live in the DOM, because a Scheduled Exam can promote
+       INTO that pane later purely client-side (see scheduleNextDashboard
+       Transition() below) with no page reload — if the grid element didn't
+       exist yet, that promotion would have nothing to render into. Visible/
+       hidden state between the two is toggled by togglePaneEmptyState(),
+       called both here (from server-known totals) and after every
+       createAdminList reload. #}
     {# LIVE #}
     <div class="ud-pane active" id="pane-live">
-      {% if ongoing_exams %}
-      <div class="ud-toolbar">
+      <div class="ud-toolbar" id="toolbar-live" style="{{ 'display:none' if not ongoing_exams }}">
         <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" id="search-live" placeholder="Search…"></div>
         <span class="ud-count" id="cnt-live">{{ ongoing_total }} exams</span>
       </div>
@@ -199,15 +224,12 @@
         {% for e in ongoing_exams %}{{ render_live_card(e) }}{% endfor %}
       </div>
       <div class="admin-pg-bar" id="pg-live"></div>
-      {% else %}
-      <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-play-circle"></i></div><h3>No live exams right now</h3><p>Active exams will appear here when they start.</p></div>
-      {% endif %}
+      <div class="ud-empty" id="empty-live" style="{{ 'display:none' if ongoing_exams }}"><div class="ud-empty-icon"><i class="fas fa-play-circle"></i></div><h3>No live exams right now</h3><p>Active exams will appear here when they start.</p></div>
     </div>
 
     {# UPCOMING #}
     <div class="ud-pane" id="pane-upcoming">
-      {% if upcoming_exams %}
-      <div class="ud-toolbar">
+      <div class="ud-toolbar" id="toolbar-upcoming" style="{{ 'display:none' if not upcoming_exams }}">
         <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" id="search-upcoming" placeholder="Search…"></div>
         <span class="ud-count" id="cnt-upcoming">{{ upcoming_total }} exams</span>
       </div>
@@ -215,15 +237,12 @@
         {% for e in upcoming_exams %}{{ render_upcoming_card(e) }}{% endfor %}
       </div>
       <div class="admin-pg-bar" id="pg-upcoming"></div>
-      {% else %}
-      <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-calendar-alt"></i></div><h3>No upcoming exams</h3><p>Scheduled exams will appear here.</p></div>
-      {% endif %}
+      <div class="ud-empty" id="empty-upcoming" style="{{ 'display:none' if upcoming_exams }}"><div class="ud-empty-icon"><i class="fas fa-calendar-alt"></i></div><h3>No upcoming exams</h3><p>Scheduled exams will appear here.</p></div>
     </div>
 
     {# COMPLETED #}
     <div class="ud-pane" id="pane-completed">
-      {% if completed_exams %}
-      <div class="ud-toolbar">
+      <div class="ud-toolbar" id="toolbar-completed" style="{{ 'display:none' if not completed_exams }}">
         <div class="ud-search-wrap"><i class="fas fa-search"></i><input class="ud-search" id="search-completed" placeholder="Search…"></div>
         <span class="ud-count" id="cnt-completed">{{ completed_total }} exams</span>
       </div>
@@ -231,14 +250,13 @@
         {% for e in completed_exams %}{{ render_completed_card(e) }}{% endfor %}
       </div>
       <div class="admin-pg-bar" id="pg-completed"></div>
-      {% else %}
-      <div class="ud-empty"><div class="ud-empty-icon"><i class="fas fa-clipboard-check"></i></div><h3>No completed exams</h3><p>Finished exams will appear here.</p></div>
-      {% endif %}
+      <div class="ud-empty" id="empty-completed" style="{{ 'display:none' if completed_exams }}"><div class="ud-empty-icon"><i class="fas fa-clipboard-check"></i></div><h3>No completed exams</h3><p>Finished exams will appear here.</p></div>
     </div>
   </div>
 
 </main>
 
+<script src="{{ url_for('static', filename='shared/greeting.js') }}"></script>
 <script src="{{ url_for('static', filename='shared/view-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
 <script>
@@ -263,6 +281,54 @@ createViewToggle({
   initial: {{ (view_mode or 'grid') | tojson }},
 });
 
+/* ── Scheduled Exam auto-promotion (Upcoming -> Live -> Completed) ──
+   Server remains the sole authority on which tab an exam belongs in —
+   this never moves a card itself. It schedules exactly ONE timer for
+   the SOONEST server-provided transition instant (data-transition-target,
+   from build_exam_card()'s next_transition_iso — only ever set for a
+   Scheduled Exam, never a Manual one) currently visible in the Live/
+   Upcoming panes, and when it fires, reloads page 1 of all three tabs
+   via the same createAdminList controllers/endpoint "Load more" already
+   uses — the server's own effective-status bucketing then decides
+   whether the exam actually moved. No polling: reused entirely from the
+   same absolute-target-timer pattern the "Your Updates" popup already
+   uses (see templates/base.html startCountdowns()), just re-triggering
+   a real reload instead of an in-place DOM tweak, since a promoted exam
+   needs to move between separately-paginated panes/counts, not just
+   change one button. Completed cards never carry a transition target,
+   so this naturally has nothing left to schedule once everything visible
+   has settled. */
+// Toggles a pane between its toolbar+grid and its empty-state placeholder.
+// Both are always present in the DOM (see the pane markup above) — this
+// only flips which one is visible, matching whatever the initial
+// server-rendered inline style already encoded for page 1 at load time.
+function togglePaneEmptyState(tab, total) {
+  var toolbar = document.getElementById('toolbar-' + tab);
+  var empty = document.getElementById('empty-' + tab);
+  var isEmpty = !total;
+  if (toolbar) toolbar.style.display = isEmpty ? 'none' : '';
+  if (empty) empty.style.display = isEmpty ? '' : 'none';
+}
+
+var dashListControllers = {};
+var dashTransitionTimer = null;
+function scheduleNextDashboardTransition() {
+  if (dashTransitionTimer) { clearTimeout(dashTransitionTimer); dashTransitionTimer = null; }
+  var targets = [];
+  document.querySelectorAll('#grid-live [data-transition-target], #grid-upcoming [data-transition-target]').forEach(function (card) {
+    var t = new Date(card.dataset.transitionTarget).getTime();
+    if (!isNaN(t)) targets.push(t);
+  });
+  if (!targets.length) return;
+  var soonest = Math.min.apply(null, targets);
+  var delay = Math.max(250, soonest - Date.now());
+  dashTransitionTimer = setTimeout(function () {
+    ['live', 'upcoming', 'completed'].forEach(function (tab) {
+      if (dashListControllers[tab]) dashListControllers[tab].load(1);
+    });
+  }, delay);
+}
+
 /* One paginated "load more" list per tab — server-side search, never the
    whole subcategory's exam list at once. */
 ['live', 'upcoming', 'completed'].forEach(function (tab) {
@@ -281,12 +347,47 @@ createViewToggle({
       else grid.insertAdjacentHTML('beforeend', data.cards_html || '');
       var cnt = document.getElementById('cnt-' + tab);
       if (cnt) cnt.textContent = data.total + ' exam' + (data.total !== 1 ? 's' : '');
+      // The toolbar count above and this tab-header badge are two separate
+      // elements showing the same number at load time, but they mean
+      // different things once a search is active: the toolbar count is
+      // meant to track the search-filtered result count (unchanged, always
+      // updates), while the tab-header badge is meant to stay the tab's
+      // TRUE total regardless of any in-progress search — so only sync it
+      // from a reload that has no search filter applied (an empty search
+      // box means data.total genuinely is the true total: either no search
+      // is active, or a scheduled-transition promotion, which never sets
+      // the search box). Otherwise the header count would go stale the
+      // moment an exam auto-promotes between tabs while the student is
+      // already on the page.
+      var searchEl = document.getElementById('search-' + tab);
+      if (!searchEl || !searchEl.value.trim()) {
+        var tabBadge = document.querySelector('.ud-tab[data-tab="' + tab + '"] .tc');
+        if (tabBadge) tabBadge.textContent = data.total;
+      }
+      // A scheduled-transition promotion's page-1 reload can flip a pane
+      // between empty and non-empty — toggle the toolbar/empty-state
+      // placeholder to match, the same way the server-rendered initial
+      // page already does via inline style. Guarded to an empty search box
+      // for the same reason as the tab badge above: a zero-result SEARCH
+      // must not show "No live exams right now" (there are some — none
+      // just matched), so it keeps the toolbar+blank-grid behaviour this
+      // already had before scheduled-transition promotion existed.
+      if (data.page === 1 && (!searchEl || !searchEl.value.trim())) togglePaneEmptyState(tab, data.total);
+      // Whatever just rendered (fresh page 1, an appended "load more" page,
+      // or a scheduled-transition reload below) may have introduced a new
+      // soonest transition instant — always rescan and reschedule from it.
+      scheduleNextDashboardTransition();
     },
   });
+  dashListControllers[tab] = ctl;
   var totals = { live: {{ ongoing_total }}, upcoming: {{ upcoming_total }}, completed: {{ completed_total }} };
   var totalPages = { live: {{ ongoing_total_pages }}, upcoming: {{ upcoming_total_pages }}, completed: {{ completed_total_pages }} };
   ctl.hydrate({ page: 1, total_pages: totalPages[tab], total: totals[tab], per_page: {{ dashboard_per_page | default(12) }} });
 });
+// hydrate() only sets up the paginator from the already server-rendered
+// page 1 — it never fires onData — so the initial scan/schedule has to be
+// kicked off explicitly here, once, to cover those server-rendered cards.
+scheduleNextDashboardTransition();
 
 /* ── Compact Category/Subcategory breadcrumb switcher ── */
 (function () {

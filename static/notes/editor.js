@@ -393,7 +393,42 @@ function configureNormalText(text) { text.set({ width: Math.max(220, text.width 
 function configureStickyNote(text) { text.set({ width: Math.max(220, text.width || 0), editable: false, objectCaching: false, charSpacing: text.charSpacing || 1, lockUniScaling: false, lockScalingFlip: true, borderColor: token('--accent'), cornerColor: token('--accent'), transparentCorners: false }); text.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: true, mb: true, ml: true, mr: true }); }
 async function createEditableText(options, type) { if (currentMode === 'read') return null; await fontMetricsPromise; fabric.util.clearFabricFontCache('DM Sans'); const TextModel = type === 'rich_text' || type === 'sticky_note' ? fabric.Textbox : fabric.IText; const text = new TextModel('', { fontFamily: window.__notesDefaultFont || 'DM Sans', fontWeight: 400, fontStyle: 'normal', lineHeight: 1.2, editable: false, ...options, fill: window.__notesTextColor || options.fill }); if (type === 'rich_text') configureNormalText(text); if (type === 'sticky_note') configureStickyNote(text); addObject(text, type); text.initDimensions(); canvas.calcOffset(); beginNativeTextEdit(text); return text; }
 function syncNativeTextOverlay() { if (!nativeTextEditor) return; const { object, element } = nativeTextEditor; element.style.fontSize = `${(object.fontSize || 18) * canvas.getZoom()}px`; element.style.fontFamily = object.fontFamily || 'DM Sans'; element.style.fontWeight = object.fontWeight || 'normal'; element.style.fontStyle = object.fontStyle || 'normal'; element.style.textDecoration = object.underline ? 'underline' : 'none'; element.style.textAlign = object.textAlign || 'left'; element.style.color = object.fill || token('--text-1'); }
-function applyTextColor(color) { if (currentMode === 'read') return; window.__notesTextColor = color; const object = nativeTextEditor?.object || canvas.getActiveObject(); if (!object || !['i-text', 'textbox'].includes(object.type)) return; const { start, end } = nativeTextEditor ? textSelectionOffsets(nativeTextEditor.element) : { start: object.selectionStart || 0, end: object.selectionEnd || 0 }; if (start !== end) { object.setSelectionStyles({ fill: color }, start, end); if (nativeTextEditor) document.execCommand('foreColor', false, color); } else object.set({ fill: color }); object.customColor = true; syncNativeTextOverlay(); object.initDimensions(); canvas.fire('object:modified', { target: object }); canvas.requestRenderAll(); markDirty(); }
+// ROOT CAUSE of "mixed selection (shape + ink + text) makes color controls do nothing or apply to
+// the wrong thing": every color handler here used to read ONLY canvas.getActiveObject() and check
+// ITS OWN type/objectType directly — for a multi-object Fabric ActiveSelection that check is
+// always false (an ActiveSelection has no objectType of its own), so the whole handler silently
+// no-op'd the instant more than one object was selected, regardless of what was actually in it.
+// The fix is the same shape in every handler below (applyTextColor here; applyInkColor/
+// applyShapeFillColor/applyShapeBorderColor in drawing-tools.js): when the active object IS an
+// ActiveSelection, filter its members down to just the ones THIS control is actually about, and
+// mutate only those — every other member (a shape sitting under some freehand ink, normal text
+// next to it, etc.) is left completely untouched. The single-object path below is character-for-
+// character the original implementation, unchanged.
+function applyTextColor(color) {
+  if (currentMode === 'read') return;
+  window.__notesTextColor = color;
+  const activeObject = canvas.getActiveObject();
+  if (activeObject?.type === 'activeSelection') {
+    const members = (activeObject.getObjects ? activeObject.getObjects() : []).filter(m => ['i-text', 'textbox'].includes(m.type));
+    if (!members.length) return;
+    members.forEach(member => {
+      const start = member.selectionStart || 0, end = member.selectionEnd || 0;
+      if (start !== end) member.setSelectionStyles({ fill: color }, start, end);
+      else member.set({ fill: color });
+      member.customColor = true;
+      member.initDimensions();
+    });
+    canvas.fire('object:modified', { target: activeObject });
+    canvas.requestRenderAll();
+    markDirty();
+    return;
+  }
+  const object = nativeTextEditor?.object || activeObject;
+  if (!object || !['i-text', 'textbox'].includes(object.type)) return;
+  const { start, end } = nativeTextEditor ? textSelectionOffsets(nativeTextEditor.element) : { start: object.selectionStart || 0, end: object.selectionEnd || 0 };
+  if (start !== end) { object.setSelectionStyles({ fill: color }, start, end); if (nativeTextEditor) document.execCommand('foreColor', false, color); } else object.set({ fill: color });
+  object.customColor = true; syncNativeTextOverlay(); object.initDimensions(); canvas.fire('object:modified', { target: object }); canvas.requestRenderAll(); markDirty();
+}
 function applyStickyBackground(color) { if (currentMode === 'read') return; window.__notesStickyBgColor = color; const object = canvas.getActiveObject(); if (!object || object.objectType !== 'sticky_note') return; object.set({ backgroundColor: color }); object.customBg = true; object.initDimensions(); if (nativeTextEditor?.object === object) nativeTextEditor.element.style.background = color; canvas.fire('object:modified', { target: object }); canvas.requestRenderAll(); markDirty(); }
 window.__notesBeginNativeTextEdit = beginNativeTextEdit; window.__notesApplyTextColor = applyTextColor; window.__notesSyncActiveTextOverlay = syncNativeTextOverlay; window.__notesApplyStickyBackground = applyStickyBackground;
 window.__notesGetNativeEditor = () => nativeTextEditor; window.__notesTextSelectionOffsets = textSelectionOffsets; window.__notesSetCaretOffset = setCaretOffset;

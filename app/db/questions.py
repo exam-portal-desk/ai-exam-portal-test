@@ -16,12 +16,49 @@ DELETE FIX (v2):
 
 from typing import Optional, List, Dict
 from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning, insert_many
+from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
 
 
 _ALL_COLS = (
     "id,exam_id,question_text,option_a,option_b,option_c,option_d,"
-    "correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance"
+    "correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance,metadata"
 )
+
+
+def get_questions_by_type_counts() -> Dict[str, int]:
+    """Question count per question_type — one aggregate query, not a row
+    fetch, for the dashboard's Questions-by-Type chart."""
+    try:
+        rows = fetch_all("SELECT question_type, COUNT(*) AS count FROM questions GROUP BY question_type")
+        return {r["question_type"]: r["count"] for r in rows}
+    except Exception as e:
+        print(f"[db.questions] get_questions_by_type_counts error: {e}")
+        return {}
+
+
+def get_top_exams_by_question_count(limit: int = 5) -> List[Dict]:
+    """Exams with the most questions (top N) — one aggregate JOIN query,
+    for the dashboard's Exams by Question Count chart."""
+    try:
+        return fetch_all(
+            "SELECT ex.name AS name, COUNT(q.id) AS count FROM questions q "
+            "JOIN exams ex ON ex.id = q.exam_id "
+            "GROUP BY ex.id, ex.name ORDER BY count DESC LIMIT %s",
+            (limit,),
+        )
+    except Exception as e:
+        print(f"[db.questions] get_top_exams_by_question_count error: {e}")
+        return []
+
+
+def get_questions_count() -> int:
+    """Total question count (across all exams) via COUNT query — no data fetch."""
+    try:
+        row = fetch_one("SELECT COUNT(*) AS count FROM questions")
+        return row["count"] if row else 0
+    except Exception as e:
+        print(f"[db.questions] get_questions_count error: {e}")
+        return 0
 
 
 def get_question_by_id(question_id: int) -> Optional[Dict]:
@@ -33,11 +70,69 @@ def get_question_by_id(question_id: int) -> Optional[Dict]:
 
 
 def get_questions_by_exam(exam_id: int) -> List[Dict]:
+    """Every question for one exam, unpaginated — used by Import/Export
+    (a CSV export means "every question", not "the currently visible
+    page") and by anything else that genuinely needs the complete set.
+    Manage Questions' own "Load Questions" list uses
+    get_questions_by_exam_page() below instead — see its docstring."""
     try:
         return fetch_all(f"SELECT {_ALL_COLS} FROM questions WHERE exam_id=%s ORDER BY id", (exam_id,))
     except Exception as e:
         print(f"[db.questions] get_questions_by_exam error: {e}")
         return []
+
+
+# Sentinel per_page value for the admin's explicit "Show All" choice on
+# Manage Questions — deliberately large rather than "no LIMIT at all" so a
+# single malformed/huge exam can't turn one click into an unbounded fetch.
+QUESTIONS_SHOW_ALL_PER_PAGE = 5000
+
+
+def get_questions_by_exam_page(exam_id: int, search: str = "", question_type: str = "",
+                                has_image: str = "", page=1, per_page=20) -> Dict:
+    """Server-side searched/filtered/paginated question list for one exam —
+    Manage Questions' "Load Questions". Replaces fetching and rendering
+    EVERY question in the exam on every page load/search keystroke: this
+    app's database is a remote Supabase instance, so each round trip costs
+    real network latency regardless of query complexity, but the amount of
+    HTML generated, sanitized (sanitize_html() per field) and sent to the
+    browser scales with row count — that part matters a lot once an exam
+    has hundreds/thousands of questions, which get_questions_by_exam()
+    above had no way to bound.
+
+    search matches question_text, the question's own id (as text), or its
+    question_type — the same three fields the old client-side search box
+    matched against, now done in SQL instead of over an in-DOM array.
+    question_type/has_image are the existing Type/Image filter dropdowns.
+    """
+    page, per_page, offset = paginate_params(page, per_page, max_per_page=QUESTIONS_SHOW_ALL_PER_PAGE)
+    try:
+        where = ["exam_id=%s"]
+        params: List = [exam_id]
+        if search:
+            where.append("(question_text ILIKE %s OR CAST(id AS TEXT) ILIKE %s OR question_type ILIKE %s)")
+            like = f"%{search}%"
+            params += [like, like, like]
+        if question_type:
+            where.append("question_type=%s")
+            params.append(question_type)
+        if has_image == "with":
+            where.append("(image_path IS NOT NULL AND image_path <> '')")
+        elif has_image == "without":
+            where.append("(image_path IS NULL OR image_path = '')")
+        where_sql = "WHERE " + " AND ".join(where)
+
+        total = fetch_one(f"SELECT COUNT(*) AS count FROM questions {where_sql}", params)["count"]
+        rows = fetch_all(
+            f"SELECT {_ALL_COLS} FROM questions {where_sql} ORDER BY id LIMIT %s OFFSET %s",
+            params + [per_page, offset],
+        )
+        attach_row_numbers(rows, page, per_page)
+        return {"questions": rows, **pagination_meta(total, page, per_page)}
+    except Exception as e:
+        print(f"[db.questions] get_questions_by_exam_page error: {e}")
+        page, per_page, _ = paginate_params(page, per_page)
+        return {"questions": [], **pagination_meta(0, page, per_page)}
 
 
 def create_question(question_data: Dict) -> Optional[Dict]:
@@ -64,6 +159,54 @@ def update_question(question_id: int, updates: Dict) -> bool:
         return True
     except Exception as e:
         print(f"[db.questions] update_question error: {e}")
+        return False
+
+
+# ─────────────────────────────────────────────
+# Optional per-question metadata (questions.metadata JSONB) — e.g. a
+# previous-year source tag like "ESE 2021". Deliberately open-ended: no
+# separate column per metadata kind, just keys inside this one JSONB blob.
+# ─────────────────────────────────────────────
+
+def build_question_metadata(source_tag: Optional[str]) -> Optional[Dict]:
+    """Canonical shape for the metadata this app currently understands —
+    the ONE place that decides what a "source tag" value becomes in
+    storage. Every create path (single add, batch add, CSV import) should
+    build its metadata column value through this, not by hand, so the
+    representation never drifts between callers. Returns None for a blank
+    tag (nothing to store) — a fresh row's metadata column simply stays NULL."""
+    tag = (source_tag or "").strip()
+    return {"source_tag": tag} if tag else None
+
+
+def merge_question_metadata(question_id: int, patch: Dict) -> bool:
+    """Shallow-merge `patch` into an EXISTING question's metadata, leaving
+    every other key already stored there untouched — e.g. a question saved
+    with {"difficulty": "medium", "source_tag": "ESE 2021"} keeps its
+    difficulty if only source_tag is edited afterward. A key whose patch
+    value is falsy/None is REMOVED from metadata rather than stored as an
+    empty string, so clearing the Source Tag field deletes 'source_tag'
+    instead of leaving clutter behind. This is the only function that
+    should ever mutate metadata after a row already exists — every editor
+    (admin single-edit today, anything else later) should call this
+    instead of writing `metadata` through update_question() directly,
+    which would replace the whole JSONB value."""
+    try:
+        set_keys = {k: v for k, v in patch.items() if v not in (None, "")}
+        remove_keys = [k for k, v in patch.items() if v in (None, "")]
+        if set_keys:
+            execute(
+                "UPDATE questions SET metadata = COALESCE(metadata,'{}'::jsonb) || %s::jsonb WHERE id=%s",
+                (set_keys, question_id),
+            )
+        for k in remove_keys:
+            execute(
+                "UPDATE questions SET metadata = COALESCE(metadata,'{}'::jsonb) - %s WHERE id=%s",
+                (k, question_id),
+            )
+        return True
+    except Exception as e:
+        print(f"[db.questions] merge_question_metadata error: {e}")
         return False
 
 

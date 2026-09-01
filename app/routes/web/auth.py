@@ -13,7 +13,7 @@ DELETE ACCOUNT: delegates to app.services.user_deletion_service
 """
 
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.utils.datetime_service import now_utc_naive
 
 from flask import (
@@ -21,22 +21,27 @@ from flask import (
     url_for, session, flash,
 )
 
+import app.config as config
 from app.db.users import (
     get_user_by_username, get_user_by_email,
     get_user_by_google_id, get_all_users, create_user,
     update_user, get_user_by_id, update_last_login,
 )
 from app.db.password_history import get_recent_password_hashes, record_password_history
-from app.db.sessions import create_session, invalidate_session, set_exam_active
+from app.db.sessions import create_session, invalidate_session, set_exam_active, has_active_session
 from app.db.auth import (
     check_login_attempts, record_failed_login, clear_login_attempts, mark_token_used,
+    count_recent_otp_challenges, create_otp_challenge, get_otp_challenge,
+    increment_otp_attempts, delete_otp_challenge,
 )
 from app.services.auth_service import (
     is_password_hashed, verify_password, hash_password,
     validate_password_strength, create_password_token,
-    is_password_reused,
+    is_password_reused, generate_otp_code,
 )
-from app.services.email_service import send_password_setup_email, send_password_reset_email
+from app.services.email_service import (
+    send_password_setup_email, send_password_reset_email, send_otp_verification_email,
+)
 from app.utils.helpers import generate_username, is_valid_email
 
 auth_bp = Blueprint("auth", __name__)
@@ -97,9 +102,15 @@ def login():
             flash("Please use the admin login portal.", "error")
             return redirect(url_for("admin.admin_login"))
 
-        # User-only session
+        # User-only session — if this account already has another active
+        # session, don't silently kick it out: show a confirmation prompt
+        # first. OTP is only generated once the user explicitly opts in
+        # (see verify_session_start) — never on this detection alone.
+        if has_active_session(int(user["id"])):
+            return _pending_session_conflict(user, role, admin=False)
+
         _create_user_session(user, role, admin=False)
-        flash(f'Welcome {user.get("full_name")}!', "success")
+        flash(f'Welcome back, {user.get("full_name")}!', "success")
         return redirect(url_for("dashboard.dashboard"))
 
     return render_template("login.html")
@@ -147,6 +158,201 @@ def _create_user_session(user, role, admin=False):
 
 
 # ─────────────────────────────────────────────
+# Existing Active Session — email OTP verification
+# ─────────────────────────────────────────────
+
+def _pending_session_conflict(user, role, admin):
+    """A login/portal choice found another active session already on file.
+    Stash the pending identity and show the confirmation prompt — NO OTP is
+    generated here. Falls back to the old (auto-invalidate) behaviour only
+    if the account has no email on file to verify with."""
+    if not user.get("email"):
+        _create_user_session(user, role, admin=admin)
+        flash(f'Welcome back, {user.get("full_name")}!', "success")
+        return redirect(url_for("admin.dashboard" if admin else "dashboard.dashboard"))
+
+    session.pop("otp_challenge_id", None)
+    session["otp_user_id"] = int(user["id"])
+    session["otp_role"] = role
+    session["otp_admin"] = admin
+    session["otp_email"] = user["email"]
+    session.modified = True
+    return redirect(url_for("auth.verify_session"))
+
+
+def _issue_otp_challenge(user_id: int, email: str, full_name: str) -> bool:
+    """Generate, store, and email a fresh OTP challenge for a pending
+    conflict the user has explicitly opted to continue past. Only called
+    from verify_session_start / verify_session_resend — never on session-
+    conflict detection alone. Returns False (with a flash already set) if
+    the rate limit is hit or persistence fails."""
+    if count_recent_otp_challenges(user_id, config.OTP_RATE_LIMIT_WINDOW_SECONDS) >= config.OTP_MAX_REQUESTS:
+        flash("Too many verification attempts. Please try again later.", "error")
+        return False
+
+    otp = generate_otp_code(config.OTP_LENGTH)
+    expires_at = (now_utc_naive() + timedelta(seconds=config.OTP_EXPIRY_SECONDS)).strftime("%Y-%m-%d %H:%M:%S")
+    challenge = create_otp_challenge(user_id, hash_password(otp), expires_at, config.OTP_RATE_LIMIT_WINDOW_SECONDS)
+    if not challenge:
+        flash("Could not send verification code. Please try again.", "error")
+        return False
+
+    try:
+        send_otp_verification_email(email, full_name or "there", otp, max(1, config.OTP_EXPIRY_SECONDS // 60))
+    except Exception as e:
+        print(f"[auth] otp email error: {e}")
+
+    session["otp_challenge_id"] = challenge["id"]
+    session.modified = True
+    return True
+
+
+def _otp_expired(challenge: dict) -> bool:
+    return now_utc_naive() > _parse_dt(challenge["expires_at"])
+
+
+def _parse_dt(value) -> datetime:
+    try:
+        return datetime.fromisoformat(str(value))
+    except Exception:
+        return datetime.strptime(str(value), "%Y-%m-%d %H:%M:%S")
+
+
+def _clear_otp_session():
+    for key in ("otp_user_id", "otp_role", "otp_admin", "otp_challenge_id", "otp_email"):
+        session.pop(key, None)
+
+
+@auth_bp.route("/verify-session", methods=["GET", "POST"])
+def verify_session():
+    user_id = session.get("otp_user_id")
+    if not user_id:
+        flash("Please login first.", "error")
+        return redirect(url_for("auth.login"))
+
+    challenge_id = session.get("otp_challenge_id")
+
+    if request.method == "POST":
+        if not challenge_id:
+            # Confirmation stage has no OTP field to submit — the "Continue
+            # on this device" button posts to verify_session_start instead.
+            return redirect(url_for("auth.verify_session"))
+
+        code = "".join(ch for ch in request.form.get("otp", "") if ch.isdigit())[:config.OTP_LENGTH]
+        challenge = get_otp_challenge(challenge_id, user_id)
+
+        if not challenge or _otp_expired(challenge):
+            flash("Your verification code has expired. Please request a new one.", "error")
+            return redirect(url_for("auth.verify_session"))
+
+        if len(code) != config.OTP_LENGTH or not verify_password(code, challenge["otp_hash"]):
+            attempts = increment_otp_attempts(challenge_id, config.OTP_MAX_VERIFY_ATTEMPTS)
+            if attempts >= config.OTP_MAX_VERIFY_ATTEMPTS:
+                # Leave the row in place (still counts toward the request
+                # rate limit) but this challenge is dead — force a fresh
+                # login rather than allowing further guesses against it.
+                _clear_otp_session()
+                flash("Too many incorrect attempts. Please login again.", "error")
+                return redirect(url_for("auth.login"))
+            flash("Incorrect code. Please try again.", "error")
+            return redirect(url_for("auth.verify_session"))
+
+        # Correct code — only now do we touch the old device's session.
+        delete_otp_challenge(challenge_id)
+        user = get_user_by_id(user_id)
+        if not user:
+            _clear_otp_session()
+            flash("Account not found.", "error")
+            return redirect(url_for("auth.login"))
+
+        role = session.get("otp_role") or str(user.get("role", "")).lower()
+        admin = bool(session.get("otp_admin"))
+        _clear_otp_session()
+        _create_user_session(user, role, admin=admin)
+        flash(f'Welcome back, {user.get("full_name")}!', "success")
+        return redirect(url_for("admin.dashboard" if admin else "dashboard.dashboard"))
+
+    # GET — confirmation stage (no challenge issued yet) or OTP-entry stage.
+    if not challenge_id:
+        return render_template("verify_session.html", stage="confirm", email=session.get("otp_email", ""))
+
+    challenge = get_otp_challenge(challenge_id, user_id)
+    expiry_remaining, resend_remaining = 0, 0
+    if not challenge or _otp_expired(challenge):
+        flash("Your verification code has expired. Please request a new one.", "warning")
+    else:
+        expiry_remaining = max(0, int((_parse_dt(challenge["expires_at"]) - now_utc_naive()).total_seconds()))
+        elapsed = int((now_utc_naive() - _parse_dt(challenge["created_at"])).total_seconds())
+        resend_remaining = max(0, config.OTP_RESEND_COOLDOWN_SECONDS - elapsed)
+
+    return render_template(
+        "verify_session.html", stage="otp",
+        email=session.get("otp_email", ""),
+        otp_length=config.OTP_LENGTH,
+        expiry_seconds=expiry_remaining,
+        resend_cooldown=resend_remaining,
+    )
+
+
+@auth_bp.route("/verify-session/start", methods=["POST"])
+def verify_session_start():
+    """The user's explicit "Continue on this device / Reset session"
+    choice — the ONLY point where an OTP is generated and emailed."""
+    user_id = session.get("otp_user_id")
+    email = session.get("otp_email")
+    if not user_id or not email:
+        flash("Please login first.", "error")
+        return redirect(url_for("auth.login"))
+
+    if session.get("otp_challenge_id"):
+        return redirect(url_for("auth.verify_session"))
+
+    user = get_user_by_id(user_id)
+    if not user:
+        _clear_otp_session()
+        flash("Account not found.", "error")
+        return redirect(url_for("auth.login"))
+
+    if _issue_otp_challenge(user_id, email, user.get("full_name")):
+        flash("A verification code has been sent to your email.", "success")
+    return redirect(url_for("auth.verify_session"))
+
+
+@auth_bp.route("/verify-session/resend", methods=["POST"])
+def verify_session_resend():
+    user_id = session.get("otp_user_id")
+    email = session.get("otp_email")
+    challenge_id = session.get("otp_challenge_id")
+    if not user_id or not email or not challenge_id:
+        flash("Please login first.", "error")
+        return redirect(url_for("auth.login"))
+
+    current = get_otp_challenge(challenge_id, user_id)
+    if current:
+        elapsed = (now_utc_naive() - _parse_dt(current["created_at"])).total_seconds()
+        if elapsed < config.OTP_RESEND_COOLDOWN_SECONDS:
+            flash("Please wait before requesting another code.", "warning")
+            return redirect(url_for("auth.verify_session"))
+
+    user = get_user_by_id(user_id)
+    if not user:
+        _clear_otp_session()
+        flash("Account not found.", "error")
+        return redirect(url_for("auth.login"))
+
+    if _issue_otp_challenge(user_id, email, user.get("full_name")):
+        flash("A new verification code has been sent.", "success")
+    return redirect(url_for("auth.verify_session"))
+
+
+@auth_bp.route("/verify-session/cancel")
+def verify_session_cancel():
+    """Nothing changes: no session is touched, no OTP is left dangling."""
+    _clear_otp_session()
+    return redirect(url_for("auth.login"))
+
+
+# ─────────────────────────────────────────────
 # Portal selection (dual-role users)
 # ─────────────────────────────────────────────
 
@@ -175,13 +381,20 @@ def select_portal():
         user = get_user_by_id(user_id) or \
             {"id": user_id, "username": username, "full_name": full_name, "role": role}
         is_admin = portal == "admin"
+
+        # Same "existing active session" gate as login() — a dual-role
+        # account choosing a portal must not silently kick out another
+        # device either.
+        if has_active_session(int(user_id)):
+            return _pending_session_conflict(user, role, admin=is_admin)
+
         _create_user_session(user, role, admin=is_admin)
 
         if is_admin:
-            flash(f"Welcome {full_name}! You are in the Admin Portal.", "success")
+            flash(f"Welcome back, {full_name}!", "success")
             return redirect(url_for("admin.dashboard"))
 
-        flash(f"Welcome {full_name}! You are in the User Portal.", "success")
+        flash(f"Welcome back, {full_name}!", "success")
         return redirect(url_for("dashboard.dashboard"))
 
     return render_template("select_portal.html")
@@ -539,12 +752,19 @@ def google_callback():
     if has_admin and not has_user:
         # Admin-only account — send to admin portal
         _create_user_session(user, role, admin=True)
-        flash(f'Welcome {user.get("full_name")}!', "success")
+        flash(f'Welcome back, {user.get("full_name")}!', "success")
         return redirect(url_for("admin.dashboard"))
 
-    # Regular user session
+    # Regular user session — Google authentication succeeding is NOT the
+    # same as this app's session being switched: same existing-active-
+    # session gate as the password login path, so an account already
+    # logged in elsewhere gets the confirm-then-OTP flow here too instead
+    # of silently kicking out the other device.
+    if has_active_session(int(user["id"])):
+        return _pending_session_conflict(user, role, admin=False)
+
     _create_user_session(user, role, admin=False)
-    flash(f'Welcome {user.get("full_name")}!', "success")
+    flash(f'Welcome back, {user.get("full_name")}!', "success")
     return redirect(url_for("dashboard.dashboard"))
 
 

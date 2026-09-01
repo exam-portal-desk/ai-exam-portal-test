@@ -1,10 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Support Center - SmartAIExam{% endblock %}
-{% set org_name    = "SmartAIExam" %}
-{% set org_email   = "examportaldesk@gmail.com" %}
-{% set org_phone   = "+91-755-123-4567" %}
-{% set org_address = "Tech Park, Noida, UP" %}
-{% set support_hours = "Mon – Fri, 9:00 AM – 6:00 PM IST" %}
+{% set org_name = "SmartAIExam" %}
 {% block content %}
 <style>
 .sp-wrap {
@@ -55,12 +51,10 @@
 /* ── CONTACT CARDS ── */
 .sp-contact-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
-@media (max-width: 900px) { .sp-contact-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 520px) { .sp-contact-grid { grid-template-columns: 1fr; } }
 
 .sp-ccard {
   background: var(--surface);
@@ -367,40 +361,26 @@
   </div>
 
   <!-- Contact cards -->
+  {% if PUBLIC_SUPPORT_EMAIL %}
   <div class="sp-contact-grid">
     <div class="sp-ccard">
       <div class="sp-ccard-icon" style="background:var(--info-bg);color:var(--info-text);">
         <i class="fas fa-envelope"></i>
       </div>
       <h5>Email Support</h5>
-      <div class="sp-ccard-val">{{ org_email }}</div>
-      <div class="sp-ccard-sub">For general queries and non-urgent issues. Response within 24 hours.</div>
-    </div>
-    <div class="sp-ccard">
-      <div class="sp-ccard-icon" style="background:var(--success-bg);color:var(--success-text);">
-        <i class="fas fa-phone"></i>
-      </div>
-      <h5>Phone Support</h5>
-      <div class="sp-ccard-val">{{ org_phone }}</div>
-      <div class="sp-ccard-sub">For urgent issues during live exams. {{ support_hours }}.</div>
-    </div>
-    <div class="sp-ccard">
-      <div class="sp-ccard-icon" style="background:var(--warning-bg);color:var(--warning-text);">
-        <i class="fas fa-map-marker-alt"></i>
-      </div>
-      <h5>Office</h5>
-      <div class="sp-ccard-val">{{ org_address }}</div>
-      <div class="sp-ccard-sub">Walk-ins by appointment only. Contact us before visiting.</div>
+      <div class="sp-ccard-val">{{ PUBLIC_SUPPORT_EMAIL }}</div>
+      <div class="sp-ccard-sub">For general queries and non-urgent issues.</div>
     </div>
     <div class="sp-ccard">
       <div class="sp-ccard-icon" style="background:var(--accent-subtle);color:var(--accent);">
         <i class="fas fa-bug"></i>
       </div>
       <h5>Report a Bug</h5>
-      <div class="sp-ccard-val">{{ org_email }}</div>
-      <div class="sp-ccard-sub">Include your browser, OS, and a screenshot if possible. We prioritise platform bugs.</div>
+      <div class="sp-ccard-val">{{ PUBLIC_SUPPORT_EMAIL }}</div>
+      <div class="sp-ccard-sub">Include your browser, OS, and a screenshot if possible.</div>
     </div>
   </div>
+  {% endif %}
 
   <!-- Two-col layout -->
   <div class="sp-cols">
@@ -583,73 +563,13 @@
     <!-- Right sidebar -->
     <div>
 
-      <!-- Response times -->
-      <div class="sp-info-card">
-        <div class="sp-info-hdr"><i class="fas fa-clock"></i> Response Times</div>
-        <div class="sp-info-body">
-          <div class="sp-rt-item">
-            <div class="sp-rt-left">
-              <div class="sp-rt-dot" style="background:#10b981;box-shadow:0 0 5px rgba(16,185,129,.4);"></div>
-              Live Exam Emergency
-            </div>
-            <span class="sp-rt-time">Call directly</span>
-          </div>
-          <div class="sp-rt-item">
-            <div class="sp-rt-left">
-              <div class="sp-rt-dot" style="background:#fbbf24;"></div>
-              Urgent (exam day)
-            </div>
-            <span class="sp-rt-time">2 – 4 hours</span>
-          </div>
-          <div class="sp-rt-item">
-            <div class="sp-rt-left">
-              <div class="sp-rt-dot" style="background:var(--accent);"></div>
-              General support
-            </div>
-            <span class="sp-rt-time">Within 24 hours</span>
-          </div>
-          <div class="sp-rt-item">
-            <div class="sp-rt-left">
-              <div class="sp-rt-dot" style="background:var(--border);"></div>
-              Feature requests
-            </div>
-            <span class="sp-rt-time">48 – 72 hours</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Support hours -->
-      <div class="sp-info-card">
-        <div class="sp-info-hdr"><i class="fas fa-calendar-alt"></i> Support Hours</div>
-        <div class="sp-info-body">
-          <div class="sp-hours-item">
-            <span class="sp-hours-day">Mon – Fri</span>
-            <span class="sp-hours-time">9:00 AM – 6:00 PM</span>
-            <span class="sp-hours-avail open"><i class="fas fa-circle" style="font-size:.45rem;"></i> Open</span>
-          </div>
-          <div class="sp-hours-item">
-            <span class="sp-hours-day">Saturday</span>
-            <span class="sp-hours-time">—</span>
-            <span class="sp-hours-avail close">Closed</span>
-          </div>
-          <div class="sp-hours-item">
-            <span class="sp-hours-day">Sunday</span>
-            <span class="sp-hours-time">—</span>
-            <span class="sp-hours-avail close">Closed</span>
-          </div>
-          <div style="margin-top:.75rem;font-size:.7rem;color:var(--text-3);line-height:1.6;">
-            All times in IST (UTC+5:30). Email support is monitored outside hours for critical exam-day issues.
-          </div>
-        </div>
-      </div>
-
       <!-- Contact info -->
       <div class="sp-info-card">
         <div class="sp-info-hdr"><i class="fas fa-envelope"></i> Direct Contact</div>
         <div class="sp-info-body" style="font-size:.78rem;color:var(--text-2);line-height:1.9;">
-          <div><i class="fas fa-at" style="color:var(--text-3);margin-right:.5rem;width:13px;text-align:center;"></i>{{ org_email }}</div>
-          <div><i class="fas fa-phone" style="color:var(--text-3);margin-right:.5rem;width:13px;text-align:center;"></i>{{ org_phone }}</div>
-          <div><i class="fas fa-map-marker-alt" style="color:var(--text-3);margin-right:.5rem;width:13px;text-align:center;"></i>{{ org_address }}</div>
+          {% if PUBLIC_SUPPORT_EMAIL %}<div><i class="fas fa-at" style="color:var(--text-3);margin-right:.5rem;width:13px;text-align:center;"></i>{{ PUBLIC_SUPPORT_EMAIL }}</div>{% endif %}
+          {% if PUBLIC_CONTACT_PHONE %}<div><i class="fas fa-phone" style="color:var(--text-3);margin-right:.5rem;width:13px;text-align:center;"></i>{{ PUBLIC_CONTACT_PHONE }}</div>{% endif %}
+          <div><i class="fas fa-globe" style="color:var(--text-3);margin-right:.5rem;width:13px;text-align:center;"></i>{{ PUBLIC_ADDRESS or "Online platform" }}</div>
           <a href="{{ url_for('misc.contact') }}" style="display:inline-flex;align-items:center;gap:.35rem;margin-top:.9rem;font-size:.73rem;font-weight:600;color:var(--accent);text-decoration:none;">
             Contact page <i class="fas fa-arrow-right" style="font-size:.6rem;"></i>
           </a>

@@ -2,125 +2,96 @@
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-3.1.0-000000?style=for-the-badge&logo=flask&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![Google Gemini](https://img.shields.io/badge/Gemini_API-AI_Engine-4285F4?style=for-the-badge&logo=google&logoColor=white)
-![Google OAuth](https://img.shields.io/badge/Google_OAuth-Sign_In-4285F4?style=for-the-badge&logo=google&logoColor=white)
-![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=flat-square&logo=flask&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-database-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-realtime-010101?style=flat-square&logo=socketdotio&logoColor=white)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=flat-square&logo=bootstrap&logoColor=white)
 
-**A production-grade, AI-powered examination platform built for modern educational institutions.**  
-Secure exam delivery · AI question generation · Real-time analytics · Intelligent study assistance
-
----
+**A full-stack examination platform for institutions and coaching centres.**
+Secure exam delivery · AI question generation · Real-time analytics · Student notebooks · Study assistant
 
 </div>
 
+---
+
 ## Overview
 
-ExamPortal is a full-stack web application that modernizes the online examination workflow for both administrators and students. It integrates Google Gemini AI for automated question generation from academic documents, enforces secure exam environments via fullscreen monitoring and session control, and provides detailed post-exam analytics for both students and instructors.
+ExamPortal is a Flask web application covering the full exam lifecycle: administrators organize exams under a category → subcategory hierarchy, build question banks manually, in bulk, via CSV, or with AI generation from PDFs/images, and control exactly when results become visible. Students take exams in a monitored, distraction-free interface, review detailed per-question results, track their ranking, keep private notebooks, and get AI-assisted explanations and study help.
 
-The platform uses server-side sessions and real-time features, **Supabase (PostgreSQL)** as its primary database, and is deployed on Render using Gunicorn with gevent workers.
+Every external dependency — database, object storage, email, and AI models — is accessed through a provider-independent abstraction, so swapping providers is a configuration change, not a code change.
 
 ---
 
 ## Key Features
 
-### AI Capabilities
-- **AI Question Generator** — Upload PDF documents and automatically extract concepts and generate MCQ questions using the Google Gemini API
-- **Configurable Generation** — Control difficulty, question count, and topic coverage
-- **Export & Import** — Export AI-generated question sets to CSV or save them directly into the question bank
-- **AI Command Centre** — Dedicated admin interface for managing AI generation workflows
-- **AI Study Assistant** — Student-facing chat interface powered by Groq LLM (LLaMA 3.3 70B) for exam preparation, with LaTeX-aware responses and daily usage limits
-
 ### Exam Management
-- Create and configure exams with custom duration, question count, and marking schemes
-- Positive and negative marking support with per-question overrides
-- Maximum attempt limits per student
-- CSV batch upload for bulk question import
-- Image upload support for question attachments (provider-independent object storage)
-- Full LaTeX editor for mathematical and scientific question authoring
-- MSQ (multi-select) and Numeric answer type support alongside standard MCQ
+- Category → Subcategory → Exam hierarchy for organizing content
+- MCQ, MSQ (multi-select), and Numeric question types
+- Manual single-question entry, batch add, or CSV bulk import/export
+- Full LaTeX editor for mathematical/scientific question authoring
+- Per-question image attachments and per-question source/previous-year tags
+- Positive/negative marking with per-question overrides, max attempts per student
+
+### AI Capabilities
+All AI calls are routed through a config-driven model registry (`config/ai_models.json`) rather than hardcoded to one vendor — each flow below can independently point at Groq or Gemini (or any OpenAI-compatible/Gemini-compatible endpoint) purely via configuration.
+- **AI Question Generator** — upload a PDF or image set and generate MCQ/numeric questions, reviewed and edited in the same CSV-style editor used for bulk import before saving
+- **AI Study Assistant** — chat interface for exam preparation with LaTeX-aware responses and daily usage limits
+- **AI Explanations** — Chain-of-Thought explanations for exam questions, including image-based (vision model) questions, with a persisted per-question explanation history
 
 ### Secure Exam Delivery
-- Fullscreen enforcement with violation monitoring
-- Tab-switch detection and visibility change tracking
-- Server-side session management with exam state persistence
-- Auto-submit on timer expiry
-- Progressive answer sync to server during exam
+- Fullscreen enforcement with violation monitoring and tab-switch/visibility-change detection
+- Server-side exam session state with auto-submit on timer expiry
+- Progressive answer sync during the exam to survive connection drops
 
-### Result Control System
-Administrators have granular control over result visibility:
-- **Instant mode** — Results visible immediately after submission
-- **Delayed mode** — Results released after a configurable time window
-- **Manual release** — Admin triggers result publication for the entire cohort
+### Result Control
+Per-exam result visibility: **instant** (visible on submission), **delayed** (released after a configurable window), or **manual** (admin-triggered release for the whole cohort).
 
-### Student Experience
-- Clean, distraction-free exam interface
-- Question palette with answered / reviewed / visited state tracking
-- Detailed post-exam result breakdown with score, grade, and accuracy
-- Full response review with correct-answer comparison (after result release)
-- Exam history and performance trends
-- Per-question discussion threads with replies, pinning, and best-answer marking
+### Analytics & Ranking
+- Student-level performance analytics and exam history
+- Live percentile-based ranking/leaderboard per exam
+- Full response review with correct-answer comparison and image support
+- Admin-side cross-student and cross-exam analytics dashboards, PDF result export
 
-### Analytics
-- Student-level performance analytics with accuracy tracking
-- Exam-level statistics across the entire cohort
-- Leaderboard / top-performer views
-- Detailed response analysis per question
-- Admin analytics dashboard with cross-exam comparisons
-
-### Authentication
-- **Sign in with Google** — One-click OAuth login via Google accounts (Authlib + OpenID Connect)
-- Automatic account creation for new Google users with first-admin role logic
-- Seamless linking of existing email accounts to Google identity
-- Standard email/password login retained alongside OAuth
+### Notes
+Private student notebooks with a canvas-based page editor, drawing tools, a notebook library with sharing, trash with configurable retention, and export.
 
 ### Communication
-- Built-in peer-to-peer and group chat system with Socket.IO
-- Connection request / accept flow
-- Real-time presence indicators and unread message badges
-- Message edit, delete, and reply-to support
-- Per-conversation visibility control (clear history without deleting)
+- Peer-to-peer and group chat over Socket.IO, with connection requests, presence, unread badges, and per-conversation visibility control
+- Per-question discussion threads with replies, pinning, and best-answer marking
+
+### Access Requests & User Management
+Students can request elevated access; admins approve/deny with a recorded reason. Every request/decision is kept as an append-only audit trail. Removing a request from the list soft-deletes it (hidden, never erased) so audit history is never lost, and never touches the affected user's role.
+
+### Authentication & Security
+- Email/password login and **Sign in with Google** (Authlib/OpenID Connect), including automatic linking of an existing email account to a Google identity
+- Passwords hashed with bcrypt; password history prevents reusing recent passwords
+- Single active session per account, enforced with an email OTP challenge when a second login is attempted
+- Login attempt rate limiting with temporary lockout
+- Optional JWT bearer-token authentication layered on top of the normal cookie session, for non-browser/API clients — opt-in and fully backward compatible with existing session-based routes
 
 ---
 
-## System Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Client (Browser)                     │
-│         HTML / CSS / Bootstrap 5 / JavaScript           │
-│         Socket.IO · MathJax · KaTeX · LaTeX Editor      │
-└───────────────────────┬─────────────────────────────────┘
-                        │ HTTP / WebSocket
-┌───────────────────────▼─────────────────────────────────┐
-│               Flask Application Server                  │
-│                                                         │
-│  app/routes/        ── Blueprints (exam, auth, admin…)  │
-│  app/db/            ── DB layer per domain              │
-│  app/services/      ── Business logic layer             │
-│  app/utils/         ── Helpers, LaTeX, cache, sanitize  │
-│  app/middleware/    ── Session guard, decorators        │
-│  main.py            ── App entry point                  │
-└─────┬───────────────────────┬───────────────────────────┘
-      │                       │
-┌─────▼──────────┐
-│   Supabase     │
-│  (PostgreSQL)  │
-│                │   │  Flask Sessions (server-side)     │
-│  Users         │   │  Socket.IO message queue          │
-│  Exams         │   └───────────────────────────────────┘
-│  Questions     │
-│  Results       │   ┌─────────────────────────────────┐
-│  Responses     │   │        External APIs            │
-│  Sessions      │   │                                 │
-│  Chat          │   │  Google Gemini  ── AI generation│
-│  Discussions   │   │  Groq LLM      ── Study chat    │
-└────────────────┘   │  Object Storage ── Image storage │
-                     │  Generic HTTP  ── Email service │
-                     └─────────────────────────────────┘
+Browser (Bootstrap 5, vanilla JS, Socket.IO client, MathJax/KaTeX, Chart.js)
+        │  HTTP + WebSocket
+        ▼
+Flask application (main.py → app/__init__.py, gevent worker)
+├─ app/routes/web/       Page routes (server-rendered HTML)
+├─ app/routes/api/v01/   JSON API routes consumed by page JS
+├─ app/services/         Business logic (exam scoring, AI, email, PDF, ranking, ...)
+├─ app/db/               One module per DB domain — all SQL lives here
+├─ app/storage/          Object storage abstraction (local disk or S3-compatible)
+├─ app/middleware/       Session guard decorators, hybrid JWT auth
+└─ app/utils/            Shared helpers (datetime, LaTeX, cache, sanitize, pagination)
+        │
+        ▼
+PostgreSQL (via a pooled psycopg2 connection — any Postgres provider)
 ```
+
+Both `app/routes/web/` and `app/routes/api/v01/` are split into a flat set of feature modules (auth, exams, questions, chat, notes, ...) plus an `admin/` subpackage for admin-only routes — web modules render templates, API modules return JSON for the same page's AJAX calls.
 
 ---
 
@@ -128,472 +99,249 @@ Administrators have granular control over result visibility:
 
 | Layer | Technology |
 |---|---|
-| **Backend Framework** | Python 3.11, Flask 3.1.0 |
-| **Real-time** | Flask-SocketIO 5.3.6, gevent-websocket 0.10.1 |
-| **Database** | Supabase (PostgreSQL), supabase-py 2.28.0 |
-| **Auth & Sessions** | Flask-Session 0.8.0, bcrypt 5.0.0 |
-| **Google OAuth** | Authlib 1.3.2 (Sign in with Google, OpenID Connect) |
-| **AI — Question Generation** | Google Gemini API (google-genai 1.14.0) |
-| **AI — Study Assistant** | Groq API (LLaMA 3.3 70B) |
-| **Image Storage** | Provider-independent (`app/storage/`) — local filesystem or any S3-compatible provider via boto3 |
-| **PDF** | ReportLab 4.4.10 (generation), pypdf 4.3.1 (parsing), xhtml2pdf 0.2.16 |
-| **Frontend** | HTML5, CSS3, Bootstrap 5.3, JavaScript (ES6+) |
-| **Math Rendering** | MathJax 3, KaTeX, latex2mathml 3.76.0 |
-| **Data Processing** | pandas 2.2.3, numpy 1.26.4 |
-| **Email** | Generic HTTP email API (provider-independent) |
-| **Deployment** | Render (Gunicorn + gevent-websocket worker) |
-
----
-
- # Object Storage Setup
-
- Question/category images and Notes attachments are served through a
- provider-independent storage abstraction (`app/storage/`) — application code
- never talks to a specific storage SDK or vendor API, only this interface.
- Switching providers later is a config change, not a code change.
-
- Set `STORAGE_BACKEND` to one of:
-
- - **`local`** — files live under `STORAGE_LOCAL_ROOT` on disk. Good for
-   development; nothing else to configure.
- - **`s3`** — any S3-compatible object storage (AWS S3, Cloudflare R2, MinIO,
-   Supabase Storage's S3 interface, Filebase, etc.), via `boto3` with a
-   configurable `endpoint_url` — no vendor-specific SDK. Configure:
-   - `STORAGE_BUCKET` — bucket name
-   - `STORAGE_ENDPOINT_URL` — the provider's S3-compatible endpoint
-   - `STORAGE_REGION` — region (some providers accept any value)
-   - `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` — credentials
-
- See the env var table below for defaults.
-
- ---
-
- ## 6. Run Script
-
- ```bash
- python generate_token.py
- ```
-
- ---
-
- ## 7. What Happens
-
- - Browser will open automatically
- - Login with your Google account
- - Grant permissions
- - `token.json` will be generated
-
- ---
-
- ## 8. Final Project Structure
-
- ```
- project/
- ├── service_account.json
- ├── client_secret_web_local.json
- ├── token.json
- └── generate_token.py
- ```
-
- ---
-
- ## 9. Notes
-
- - `token.json` is reusable
- - Do NOT commit credentials to public repositories
- - If you get `access_denied`, add your email in Test Users
-
-  - Add the below URI in your web app cloud console for one time OAuth
-```
-http://localhost:8080/
-```
- ---
-
- ## 10. When to Use What
-
- | Use Case            | Method           |
- |--------------------|------------------|
- | Backend automation | Service Account  |
- | User uploads       | OAuth token.json |
-
-## Installation
-
-### Prerequisites
-
-- Python 3.11
-- A [Supabase](https://supabase.com) project with the schema applied
-- Google Cloud project with **Gemini API** enabled
-- A [Groq](https://console.groq.com) API key
-- Credentials for a transactional email API (any HTTP-based provider)
-- Local disk (dev) or an S3-compatible object storage bucket (production) — see Object Storage Setup above
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/examportal.git
-cd examportal
-```
-
-### 2. Create and activate a virtual environment
-
-```bash
-python -m venv venv
-
-# Linux / macOS
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-> **Note:** `gunicorn` is commented out in `requirements.txt` for local development. It is installed automatically on Render via the build command. Do not uncomment it locally unless needed.
-
-### 4. Configure environment variables
-
-```bash
-cp .env.example .env
-# Fill in all values — see Environment Variables section below
-```
-
-### 5. Apply the database schema
-
-Run the contents of `supabase_schema.txt` in your Supabase SQL editor to create all required tables.
-
-### 6. Run locally
-
-```bash
-python main.py
-```
-
-The application will be available at `http://localhost:5000`.
-
----
-
-## Environment Variables
-
-Create a `.env` file in the project root. **Never commit this file or any credential JSON files to version control.**
-
-```env
-# ── Application ───────────────────────────────────────────────────────────────
-SECRET_KEY=your-secret-key-here
-BASE_URL=http://127.0.0.1:5000
-
-# ── Supabase ───────────────────────────────────────────────────────────────────
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_KEY=your-supabase-anon-or-service-role-key
-
-
-# ── Google OAuth & Service Account ────────────────────────────────────────────
-OAUTHLIB_INSECURE_TRANSPORT=1        # Set to 0 in production (HTTPS only)
-
-# ── Google Sign In (OAuth 2.0) ─────────────────────────────────────────────────
-GOOGLE_OAUTH_CLIENT_ID=xxxx.apps.googleusercontent.com
-GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
-
-# ── Object Storage ────────────────────────────────────────────────────────────
-STORAGE_BACKEND=local                # local | s3
-STORAGE_LOCAL_ROOT=./storage
-STORAGE_LOCAL_URL_PREFIX=/notes/asset-file
-STORAGE_BUCKET=your-bucket-name              # s3 backend only
-STORAGE_ENDPOINT_URL=https://your-provider-s3-endpoint   # s3 backend only
-STORAGE_REGION=auto                          # s3 backend only
-STORAGE_ACCESS_KEY=your-access-key           # s3 backend only
-STORAGE_SECRET_KEY=your-secret-key           # s3 backend only
-
-# ── Email ─────────────────────────────────────────────────────────────────────
-EMAIL_SERVICE_API_KEY=your-email-api-key
-EMAIL_SERVICE_URL=https://your-email-provider.example.com/send
-DEFAULT_FROM_EMAIL=noreply@your-domain.com
-
-# ── AI — Groq (Study Assistant) ───────────────────────────────────────────────
-GROQ_API_KEY=gsk_xxxx
-AI_MODEL_NAME=llama-3.3-70b-versatile
-AI_DAILY_LIMIT_PER_STUDENT=50
-AI_MAX_MESSAGE_LENGTH=500
-AI_REQUEST_TIMEOUT=30
-
-# ── AI — Gemini (Question Generation) ────────────────────────────────────────
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL_NAME=gemini-2.5-flash
-```
-
-### Environment Variable Reference
-
-| Variable | Required | Description |
-|---|---|---|
-| `SECRET_KEY` | ✅ | Flask session signing key — use a long random string |
-| `BASE_URL` | ✅ | Full base URL of the app (used in email links) |
-| `SUPABASE_URL` | ✅ | Supabase project URL |
-| `SUPABASE_KEY` | ✅ | Supabase anon or service role key |
-| `GOOGLE_OAUTH_CLIENT_ID` | ✅ | Google OAuth 2.0 Client ID (Sign in with Google) |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | ✅ | Google OAuth 2.0 Client Secret (Sign in with Google) |
-| `OAUTHLIB_INSECURE_TRANSPORT` | ✅ | `1` for local HTTP dev, `0` for HTTPS production |
-| `STORAGE_BACKEND` | ✅ | `local` or `s3` — selects the active storage provider |
-| `STORAGE_LOCAL_ROOT` | local only | Filesystem root for locally-stored objects |
-| `STORAGE_BUCKET` / `STORAGE_ENDPOINT_URL` / `STORAGE_REGION` / `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | s3 only | S3-compatible bucket + credentials (any provider — AWS S3, R2, MinIO, Supabase Storage, etc.) |
-| `EMAIL_SERVICE_API_KEY` | ✅ | API key for the configured email HTTP API |
-| `EMAIL_SERVICE_URL` | ✅ | Endpoint URL of the configured email HTTP API |
-| `DEFAULT_FROM_EMAIL` | ✅ | Sender address shown in outgoing emails |
-| `GROQ_API_KEY` | ✅ | Groq API key for the AI study assistant |
-| `AI_MODEL_NAME` | ✅ | Groq model (default: `llama-3.3-70b-versatile`) |
-| `AI_DAILY_LIMIT_PER_STUDENT` | ⚙️ | Max AI messages per student per day (default: `50`) |
-| `AI_MAX_MESSAGE_LENGTH` | ⚙️ | Max characters per AI message (default: `500`) |
-| `AI_REQUEST_TIMEOUT` | ⚙️ | Groq request timeout in seconds (default: `30`) |
-| `GEMINI_API_KEY` | ✅ | Google Gemini API key for question generation |
-| `GEMINI_MODEL_NAME` | ✅ | Gemini model (default: `gemini-2.5-flash`) |
-
-> ⚠️ **Never commit** `.env`, `service_account.json`, `token.json`, or `client_secret_web_local.json`. All four must be in `.gitignore`. `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` must also stay in `.env` only.
-
----
-
-## Running in Production
-
-The application is deployed on [Render](https://render.com) using Gunicorn with the `GeventWebSocketWorker` for WebSocket support.
-
-**Render start command:**
-
-```bash
-gunicorn --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker --workers 1 --bind 0.0.0.0:$PORT --timeout 120 --keep-alive 5 main:app
-```
-
-> **Note:** Use a single worker (`--workers 1`) for Flask-SocketIO with gevent in single-instance deployments. Multi-instance horizontal scaling requires a shared SocketIO message queue, which is not currently configured.
-
-### Environment-specific settings
-
-| Variable | Development | Production |
-|---|---|---|
-| `OAUTHLIB_INSECURE_TRANSPORT` | `1` | `0` |
-| `BASE_URL` | `http://127.0.0.1:5000` | `https://your-app.onrender.com` |
-| `FLASK_DEBUG` | `True` | `False` |
+| **Backend framework** | Python 3.11+, Flask 3.1 |
+| **Real-time** | Flask-SocketIO, gevent + gevent-websocket |
+| **Database** | PostgreSQL via `psycopg2` (pooled connections) — provider-independent |
+| **Sessions** | Flask-Session (server-side, filesystem-backed by default) |
+| **Password hashing** | bcrypt |
+| **Google OAuth** | Authlib (Sign in with Google / OpenID Connect) |
+| **API auth** | Custom hybrid JWT middleware, opt-in alongside cookie sessions |
+| **AI** | Config-driven model registry (`config/ai_models.json`); calls Groq and Google Gemini directly over HTTP — no vendor SDK |
+| **Object storage** | Local filesystem, or any S3-compatible provider via `boto3` |
+| **Email** | Generic HTTP email API — provider-independent, no vendor SDK |
+| **PDF** | ReportLab (generation), pypdf (parsing) |
+| **Data processing** | pandas, numpy (CSV import/export) |
+| **Frontend** | Bootstrap 5.3, vanilla JavaScript (ES6+), Socket.IO client |
+| **Math rendering** | MathJax 3, KaTeX, latex2mathml |
+| **Charts** | Chart.js |
+| **Serialization** | orjson |
+| **Deployment** | Gunicorn + `GeventWebSocketWorker`, deployed on Render |
 
 ---
 
 ## Project Structure
 
 ```
-examportal/
-│
-├── main.py                          # App entry point, app factory, Socket.IO init
-├── config.py                        # Config class (loads .env)
-├── supabase_db.py                   # Legacy DB abstraction (being phased out)
-├── ai_question_generator.py         # Google Gemini AI integration
-├── email_utils.py                   # Transactional email (password reset, setup)
-├── login_attempts_cache.py          # In-memory login attempt rate limiting
-├── sessions.py                      # Session utility helpers
-├── chat.py                          # Real-time chat Socket.IO handlers
-├── discussion.py                    # Question discussion Socket.IO handlers
-├── latex_editor.py                  # LaTeX editor blueprint
-├── requirements.txt                 # Python dependencies (gunicorn commented for local)
-├── supabase_schema.txt              # DB schema reference — run once on Supabase
+ExamPortal/
+├── main.py                    # Entry point — gevent monkey-patch, app factory, socketio.run()
+├── requirements.txt
+├── config/
+│   └── ai_models.json         # AI provider/model registry (text + vision models)
+├── migrations/                 # Incremental SQL migrations (applied manually)
 │
 ├── app/
-│   ├── __init__.py                  # Blueprint registration
-│   │
-│   ├── db/                          # Database access layer (per-domain modules)
-│   │   ├── ai.py                    # AI usage tracking queries
-│   │   ├── attempts.py              # Exam attempt queries
-│   │   ├── auth.py                  # Auth/user lookup queries
-│   │   ├── exams.py                 # Exam CRUD queries
-│   │   ├── misc.py                  # Utility queries
-│   │   ├── questions.py             # Question bank queries
-│   │   ├── results.py               # Result & response queries
-│   │   ├── sessions.py              # Session table queries
-│   │   └── users.py                 # User management queries
-│   │
-│   ├── middleware/
-│   │   └── session_guard.py         # Auth decorators (login_required, admin_required, etc.)
+│   ├── __init__.py            # App factory: sessions, SocketIO, OAuth, JWT, blueprints
+│   ├── config.py              # All environment variables read here, nowhere else
 │   │
 │   ├── routes/
-│   │   ├── ai_assistant.py          # AI study assistant routes
-│   │   ├── auth.py                  # Login, logout, registration
-│   │   ├── dashboard.py             # Student dashboard
-│   │   ├── exam.py                  # Exam delivery (start, submit, sync)
-│   │   ├── misc.py                  # Static pages, error handlers
-│   │   ├── result.py                # Result view, response review
-│   │   │
-│   │   └── admin/                   # Admin-only blueprints
-│   │       ├── ai_centre.py         # AI Command Centre
-│   │       ├── attempts.py          # Student attempt overview
-│   │       ├── auth.py              # Admin login/logout
-│   │       ├── dashboard.py         # Admin dashboard
-│   │       ├── exams.py             # Exam management
-│   │       ├── images.py            # Question image upload
-│   │       ├── questions.py         # Question bank management
-│   │       ├── requests.py          # Admin access request handling
-│   │       ├── results.py           # Results & release control
-│   │       ├── subjects.py          # Subject management
-│   │       └── users.py             # User management & analytics
+│   │   ├── web/                # Server-rendered page routes
+│   │   │   ├── admin/          # Admin-only page routes
+│   │   │   └── *.py             # auth, exams, dashboard, chat, notes, results, ...
+│   │   └── api/v01/            # JSON API routes (versioned)
+│   │       └── admin/          # Admin-only API routes
 │   │
-│   ├── services/                    # Business logic layer
-│   │   ├── ai_service.py            # Groq / LLM chat orchestration
-│   │   ├── auth_service.py          # Authentication logic
-│   │   ├── image_storage_service.py # Category/question image resolver & upload
-│   │   ├── email_service.py         # Email dispatch logic
-│   │   ├── exam_service.py          # Exam session & scoring logic
-│   │   ├── pdf_service.py           # PDF generation
-│   │   └── result_service.py        # Result calculation & grading
-│   │   └── user_deletion_service.py # Delete user account
-│   │
-│   └── utils/                       # Shared utilities
-│       ├── cache.py                 # In-memory cache helpers
-│       ├── helpers.py               # General-purpose helpers
-│       ├── latex.py                 # LaTeX processing utilities
-│       └── sanitize.py             # Input sanitization
+│   ├── services/               # Business logic — exam scoring, AI, email, PDF, ranking,
+│   │                            # notes, chat, discussions, auth, user deletion
+│   ├── db/                     # One module per DB domain (users, exams, questions, ...)
+│   ├── storage/                # Object storage backends: local.py, s3.py
+│   ├── middleware/              # session_guard.py, jwt_middleware.py
+│   └── utils/                  # datetime_service, latex, cache, sanitize, pagination
 │
 ├── templates/
-│   ├── base.html                    # Base layout (navbar, footer, dark theme)
-│   ├── index.html                   # Landing / home page
-│   ├── login.html                   # User authentication
-│   ├── create_account.html          # Student self-registration
-│   ├── dashboard.html               # Student dashboard
-│   ├── exam_instructions.html       # Pre-exam instructions
-│   ├── exam_page.html               # Secure exam delivery interface
-│   ├── result.html                  # Post-exam result summary
-│   ├── result_pending.html          # Result pending (awaiting admin release)
-│   ├── response.html                # Detailed response review
-│   ├── results_history.html         # Exam history list
-│   ├── student_analytics.html       # Student performance analytics
-│   ├── ai_assistant.html            # AI study assistant chat
-│   ├── chat.html                    # Peer-to-peer / group chat
-│   ├── select_portal.html           # Portal selector (multi-role accounts)
-│   ├── password_reset.html          # Password reset request
-│   ├── password_reset_form.html     # Token-based password reset
-│   ├── password_setup_form.html     # Account creation password setup
-│   ├── registration_success.html    # Post-registration confirmation
-│   ├── logout_redirect.html         # Post-logout redirect
-│   ├── request_admin_access.html    # Admin access request form
-│   ├── error.html                   # Generic error page
-│   ├── about.html / contact.html / support.html
-│   ├── privacy_policy.html / terms_of_service.html
-│   │
-│   └── admin/
-│       ├── admin_base.html          # Admin layout base
-│       ├── admin_login.html         # Admin authentication
-│       ├── dashboard.html           # Admin dashboard
-│       ├── ai_command_centre.html   # AI question generation hub
-│       ├── exams.html               # Exam management
-│       ├── questions.html           # Question bank
-│       ├── csv_upload.html          # Bulk CSV question import (modal partial)
-│       ├── upload_images.html       # Question image upload
-│       ├── attempts.html            # Student attempt overview
-│       ├── users_manage.html        # User management
-│       ├── users_analytics.html     # Cross-student analytics
-│       ├── subjects.html            # Subject management
-│       ├── requests.html            # Pending admin access requests
-│       ├── requests_history.html    # Access request history
-│       ├── new_requests.html        # New request notifications
-│       ├── latex_editor.html        # In-browser LaTeX editor
-│       └── view_responses_popup.html / view_result_popup.html
+│   ├── admin/                  # Admin portal pages
+│   ├── notes/                  # Notebook editor/library/trash
+│   ├── emails/                 # Transactional email templates
+│   ├── partials/               # Shared Jinja fragments
+│   └── *.html                  # Student-facing pages (dashboard, exam, results, chat, ...)
 │
 └── static/
-    └── favicon.png
+    ├── shared/                 # Reusable UI components (date-picker, view-toggle, ...)
+    ├── notes/                  # Notebook editor JS/CSS (drawing tools, export)
+    ├── ai_assistant/           # Study assistant chat UI
+    ├── admin/                  # Admin list-controller UI
+    └── theme.css                # Multi-theme design system (dark/light + variants)
 ```
 
 ---
 
-## Python Dependencies
+## Setup
 
-All dependencies are pinned in `requirements.txt`. Key packages:
+### Prerequisites
+- Python 3.11+
+- A PostgreSQL database (Supabase, Render Postgres, or self-hosted — any provider works, only `DATABASE_URL` changes)
+- A Google Cloud OAuth client (for Sign in with Google)
+- API keys for whichever AI providers you enable in `config/ai_models.json` (Groq and/or Gemini)
+- Credentials for an HTTP-based transactional email provider
+- Local disk (dev) or an S3-compatible bucket (production) for object storage
 
-| Package | Version | Purpose |
-|---|---|---|
-| `flask` | 3.1.0 | Core web framework |
-| `flask-socketio` | 5.3.6 | WebSocket / real-time support |
-| `flask-session` | 0.8.0 | Server-side session management |
-| `gevent-websocket` | 0.10.1 | gevent WebSocket worker for Gunicorn |
-| `supabase` | 2.28.0 | Supabase Python client |
-| `authlib` | 1.3.2 | Google OAuth 2.0 / Sign in with Google |
-| `google-genai` | 1.14.0 | Google Gemini AI (question generation) |
-| `google-auth` | 2.34.0 | Google OAuth2 |
-| `google-auth-oauthlib` | 1.3.0 | Google OAuth flow |
-| `bcrypt` | 5.0.0 | Password hashing |
-| `reportlab` | 4.4.10 | PDF generation |
-| `pypdf` | 4.3.1 | PDF parsing |
-| `xhtml2pdf` | 0.2.16 | HTML-to-PDF conversion |
-| `latex2mathml` | 3.76.0 | LaTeX to MathML conversion |
-| `pandas` | 2.2.3 | CSV processing |
-| `numpy` | 1.26.4 | Numerical computing |
-| `orjson` | 3.11.7 | Fast JSON serialization |
-| `python-dotenv` | 1.0.1 | Environment variable loading |
-| `requests` | 2.31.0 | HTTP client (used for the generic email API + more) |
-| `aiohttp` | 3.10.5 | Async HTTP |
-| `gunicorn` | *(prod only)* | WSGI server — **commented out locally** |
+### 1. Clone and install
 
-> `gunicorn` is commented out in `requirements.txt` for local development to avoid install issues. Render installs it automatically via the build process.
+```bash
+git clone <repository-url>
+cd ExamPortal
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+# Linux / macOS
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### 2. Configure environment
+
+Create a `.env` file in the project root — see [Environment Variables](#environment-variables) below.
+
+### 3. Set up the database
+
+Apply the SQL files in `migrations/` (in filename/date order) against your PostgreSQL database, then point `DATABASE_URL` at it.
+
+### 4. Run locally
+
+```bash
+python main.py
+```
+
+The app is served at `http://localhost:5000`.
 
 ---
 
-## Database Schema
+## Environment Variables
 
-The platform uses PostgreSQL via Supabase. Core tables:
+All configuration is read once, centrally, in `app/config.py`. Never commit `.env` or any credential file.
 
-| Table | Purpose |
+```env
+# Core
+SECRET_KEY=change-me
+BASE_URL=http://127.0.0.1:5000
+APP_TIMEZONE=Asia/Kolkata
+
+# Database
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+DB_POOL_MIN=1
+DB_POOL_MAX=10
+
+# Google OAuth (Sign in with Google)
+GOOGLE_OAUTH_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+OAUTHLIB_INSECURE_TRANSPORT=1        # 1 for local HTTP dev, 0 in production (HTTPS only)
+
+# Object storage
+STORAGE_BACKEND=local                # local | s3
+STORAGE_LOCAL_ROOT=./storage
+STORAGE_LOCAL_URL_PREFIX=/notes/asset-file
+STORAGE_BUCKET=                      # s3 only
+STORAGE_ENDPOINT_URL=                # s3 only — any S3-compatible endpoint
+STORAGE_REGION=                      # s3 only
+STORAGE_ACCESS_KEY=                  # s3 only
+STORAGE_SECRET_KEY=                  # s3 only
+
+# Email (generic HTTP provider)
+EMAIL_SERVICE_API_KEY=
+EMAIL_SERVICE_URL=
+DEFAULT_FROM_EMAIL=noreply@your-domain.com
+EMAIL_SERVICE_AUTH_HEADER=Authorization
+EMAIL_SERVICE_AUTH_PREFIX=Bearer 
+
+# AI — selects which config/ai_models.json entry is active per flow
+ASSISTANT_TEXT_MODEL=assistant-default
+EXPLANATION_TEXT_MODEL=explanation-default
+EXPLANATION_VISION_MODEL_NAME=explanation-vision-default
+QUESTION_GENERATOR_TEXT_MODEL=question-generator-default
+QUESTION_GENERATOR_VISION_MODEL=question-generator-vision-default
+
+# AI — one API key per registry entry (names must match config/ai_models.json's api_key_env)
+TEXT_MODEL_ASSISTANT_API_KEY=
+TEXT_MODEL_EXPLANATION_API_KEY=
+TEXT_MODEL_QUESTIONGEN_API_KEY=
+VISION_MODEL_EXPLANATION_API_KEY=
+VISION_MODEL_QUESTIONGEN_API_KEY=
+
+AI_DAILY_LIMIT_PER_STUDENT=50
+AI_MAX_MESSAGE_LENGTH=500
+
+# OTP — second-device login verification
+OTP_LENGTH=6
+OTP_EXPIRY_SECONDS=600
+```
+
+### Reference
+
+| Variable | Purpose |
 |---|---|
-| `users` | Student and admin accounts (includes `google_id`, `auth_provider` for OAuth) |
-| `exams` | Exam configuration and metadata |
-| `questions` | Question bank (MCQ, MSQ, Numeric) |
-| `exam_attempts` | Attempt tracking per student per exam |
-| `results` | Aggregated result records |
-| `responses` | Per-question student responses |
-| `sessions` | Server-side session store |
-| `subjects` | Subject / folder management |
-| `ai_chat_history` | AI study assistant conversation logs |
-| `ai_usage_tracking` | Daily AI usage limits per student |
-| `chat_conversations` | Chat threads (direct + group) |
-| `chat_messages` | Individual chat messages (with edit/reply) |
-| `chat_members` | Conversation membership |
-| `chat_unread` | Unread message counts per user |
-| `chat_visibility` | Per-user conversation clear timestamps |
-| `chat_connections` | Connection request / accept flow |
-| `question_discussions` | Per-question discussion threads |
-| `discussion_counts` | Cached discussion count per question |
-| `login_attempts` | Failed login tracking and lockout |
-| `requests_raised` | Admin access request workflow |
-| `pw_tokens` | Password reset / setup tokens |
+| `SECRET_KEY` | Flask session signing key |
+| `DATABASE_URL` | PostgreSQL connection string — any provider |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Sign in with Google |
+| `STORAGE_BACKEND` | `local` or `s3` — selects the active storage provider |
+| `EMAIL_SERVICE_*` | Endpoint, key, and payload shape for the HTTP email provider in use |
+| `ASSISTANT_TEXT_MODEL` / `EXPLANATION_*` / `QUESTION_GENERATOR_*` | Which `config/ai_models.json` entry each AI flow uses |
+| `*_API_KEY` (per model) | API key for that specific registry entry — see `api_key_env` in `config/ai_models.json` |
+| `OTP_*` | Tuning for the existing-active-session email verification flow |
+| `APP_TIMEZONE` | Timezone used for all display timestamps (storage is always UTC) |
 
-The full schema with all constraints is in `supabase_schema.txt`. Run it once in your Supabase SQL editor to initialise the database.
+Adding or swapping an AI model only requires editing `config/ai_models.json` and setting its `api_key_env` variable — no code changes.
 
 ---
 
-## Security
+## Database
 
-- Passwords hashed with **bcrypt** (no plaintext storage anywhere)
-- Server-side sessions with `HttpOnly` and `Secure` cookie flags
-- Login attempt rate limiting with automatic temporary lockout (`login_attempts` table)
-- Exam sessions are isolated and validated server-side on every request
-- Fullscreen enforcement deters screen-sharing during exams
-- Tab-switch and visibility-change monitoring with configurable violation thresholds
-- Progressive answer sync prevents data loss on connection drops
+PostgreSQL, accessed through a pooled `psycopg2` connection (`app/db/__init__.py`) — no ORM, no vendor-specific client library, so it works identically against Supabase Postgres, Render Postgres, or a self-hosted instance.
+
+Core table groups:
+
+| Group | Tables |
+|---|---|
+| **Identity & access** | `users`, `sessions`, `login_attempts`, `otp_challenges`, `password_history`, `pw_tokens`, `jwt_refresh_tokens`, `requests_raised` |
+| **Exam content** | `categories`, `subcategories`, `exams`, `subjects`, `questions` |
+| **Attempts & results** | `exam_attempts`, `results`, `responses` |
+| **AI** | `ai_chat_history`, `ai_conversations`, `ai_usage_tracking`, `ai_explanation_history`, `ai_explanation_usage` |
+| **Chat** | `chat_conversations`, `chat_messages`, `chat_members`, `chat_unread`, `chat_visibility`, `chat_connections` |
+| **Discussions** | `question_discussions`, `discussion_counts` |
+| **Notes** | `notes_notebooks`, `notes_pages`, `notes_objects`, `notes_assets`, `notes_revisions`, `notes_bookmarks`, `notes_likes`, `notes_views`, `notes_downloads`, `notes_reports`, `notes_notebook_metrics`, `notes_notebook_shares` |
+| **Misc** | `dashboard_event_seen` |
+
+Schema changes are applied as incremental SQL files in `migrations/`, one file per change, applied directly against the database.
+
+---
+
+## Object Storage
+
+Question/category images and notebook attachments go through a provider-independent storage abstraction (`app/storage/`) — application code only ever talks to this interface, never a vendor SDK directly.
+
+- **`local`** — files live under `STORAGE_LOCAL_ROOT` on disk. Nothing else to configure; good for development.
+- **`s3`** — any S3-compatible provider (AWS S3, Cloudflare R2, MinIO, Supabase Storage's S3 interface, etc.) via `boto3` with a configurable `endpoint_url`.
+
+Switching providers is a `.env` change, not a code change.
+
+---
+
+## Running in Production
+
+Deployed on [Render](https://render.com) with Gunicorn's gevent WebSocket worker (required for Flask-SocketIO):
+
+```bash
+gunicorn --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
+  --workers 1 --bind 0.0.0.0:$PORT --timeout 120 --keep-alive 5 main:app
+```
+
+Use a single worker per instance — Flask-SocketIO with gevent needs a shared message queue (e.g. Redis) to scale across multiple workers/instances, which is not currently configured.
+
+Set `OAUTHLIB_INSECURE_TRANSPORT=0` and `SESSION_COOKIE_SECURE`-backing config appropriately once served over HTTPS.
+
+---
+
+## Security Notes
+
+- Passwords hashed with bcrypt; last-3-password reuse blocked via `password_history`
+- Server-side sessions, `HttpOnly` cookies, single active session per account (second login requires an emailed OTP)
+- Login attempt rate limiting with temporary lockout
+- Fullscreen enforcement and tab-switch/visibility monitoring during exams
+- Admin access-request removal is a soft delete — the audit row and its history are kept, only hidden from the list, and a user's role is never changed by deleting a request
 - All credential files (`.env`, `service_account.json`, `token.json`, `client_secret_web_local.json`) are gitignored
-
----
-
-## Future Improvements
-
-- **Proctoring integration** — webcam snapshot analysis during exams
-- **Question bank tagging** — difficulty levels, topic tags, Bloom's taxonomy
-- **Adaptive exam engine** — dynamic question selection based on performance
-- **Detailed item analysis** — discrimination index and difficulty coefficient per question
-- **LMS integration** — LTI 1.3 provider support (Moodle, Canvas, Blackboard)
-- **Multi-language support** — i18n for question content and UI
-- **Admin mobile app** — React Native companion for on-the-go management
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-<div align="center">
-
-Built with Flask · Powered by Gemini AI · Backed by Supabase
-
-</div>
+Licensed under the [MIT License](LICENSE).

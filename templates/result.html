@@ -52,6 +52,11 @@
   margin:0 0 .2rem; word-break:break-word;
 }
 .res-hero-meta { font-size:.78rem; color:var(--text-3); }
+.res-sched-pill {
+  display:inline-flex; align-items:center; gap:.3rem; vertical-align:middle; margin-left:.5rem;
+  font-size:.62rem; font-weight:700; color:var(--accent); background:var(--accent-subtle);
+  border:1px solid var(--border); padding:.12rem .5rem; border-radius:20px;
+}
 
 /* ── Score hero: the main focus of the page ──────────────────────── */
 .res-score-hero {
@@ -321,7 +326,7 @@
       <span class="res-hero-icon"><i class="fas fa-check-circle"></i></span>
       <div class="res-hero-body">
         <div class="res-hero-tag">Exam Completed</div>
-        <h1>{{ exam.name }}</h1>
+        <h1>{{ exam.name }}{% if exam.scheduled_mode %}<span class="res-sched-pill" title="This was a Scheduled Exam"><i class="fas fa-calendar-check"></i>Scheduled</span>{% endif %}</h1>
         <div class="res-hero-meta">{{ session.full_name }} &nbsp;·&nbsp; Completed {{ result.completed_at | display_dt if result.completed_at else '—' }}</div>
       </div>
     </div>

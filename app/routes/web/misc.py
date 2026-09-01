@@ -3,17 +3,66 @@ app/routes/misc.py
 Miscellaneous routes: home, footer pages, debug endpoints.
 """
 
-from flask import Blueprint, render_template, jsonify, session
+from flask import Blueprint, render_template, jsonify, session, Response, url_for
 import os
+import mimetypes
 
 from app.middleware.session_guard import require_admin_role
+import app.config as config
 
 misc_bp = Blueprint("misc", __name__)
 
 
 @misc_bp.route("/")
 def home():
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        ceo_name=config.CEO_NAME,
+        ceo_title=config.CEO_TITLE,
+        ceo_image_url=url_for("misc.ceo_photo") if config.CEO_IMAGE_KEY else None,
+    )
+
+
+# ─────────────────────────────────────────────
+# Public landing-page asset: the Founder/CEO photo. Unlike
+# app/routes/api/v01/images.py (auth-gated — every other image in the app
+# has a logged-in viewer), this one MUST be reachable by anonymous visitors
+# since it's on the public landing page — but it still never exposes the
+# underlying storage key/URL to the browser, exactly the same "resolve
+# through the app, never hand out a raw bucket URL" pattern. The actual key
+# comes from config.CEO_IMAGE_KEY (env var), never hardcoded here.
+#
+# Cached in-process after the first request — this is a single, essentially
+# static asset (an admin manually swaps CEO_IMAGE_KEY + restarts to change
+# it), so there is no reason a public page getting real traffic should hit
+# object storage on every single load. Falls back to re-fetching if the
+# bytes were never successfully cached (e.g. storage was briefly down).
+# ─────────────────────────────────────────────
+_ceo_photo_cache = {"key": None, "bytes": None, "mime": None}
+
+
+@misc_bp.route("/assets/ceo-photo")
+def ceo_photo():
+    key = config.CEO_IMAGE_KEY
+    if not key:
+        return jsonify({"success": False, "message": "Not configured"}), 404
+
+    cached = _ceo_photo_cache
+    if cached["key"] != key or cached["bytes"] is None:
+        try:
+            from app.storage import get_storage
+            content = get_storage().download(key)
+        except Exception:
+            return jsonify({"success": False, "message": "Image not found"}), 404
+        cached["key"] = key
+        cached["bytes"] = content
+        cached["mime"] = mimetypes.guess_type(key)[0] or "image/jpeg"
+
+    resp = Response(cached["bytes"], mimetype=cached["mime"])
+    # Public + long-lived: a static founder photo, safe for browsers/CDNs to
+    # cache aggressively rather than re-requesting on every landing-page view.
+    resp.headers["Cache-Control"] = "public, max-age=604800, immutable"
+    return resp
 
 
 # Footer / static info pages

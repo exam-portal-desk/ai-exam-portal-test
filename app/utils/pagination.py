@@ -6,7 +6,20 @@ hand-rolling its own math — same {page, per_page, total, total_pages} shape
 already used by api_users_search / api_access_requests.
 """
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
+
+
+def attach_row_numbers(rows: List[Dict], page: int, per_page: int) -> List[Dict]:
+    """Stamp each row (in place) with a UI-facing 'row_no' — the row's
+    absolute position across the whole result set (1, 2, 3... on page 1,
+    continuing 21, 22... on page 2 of a 20-per-page list), never the row's
+    real DB id. Used by every admin list that currently shows the DB id as
+    if it were a serial number; the real id stays untouched on the row for
+    anything that still needs it (edit/delete links, etc.)."""
+    offset = (page - 1) * per_page
+    for i, r in enumerate(rows):
+        r["row_no"] = offset + i + 1
+    return rows
 
 
 def paginate_params(page, per_page, max_per_page: int = 200) -> Tuple[int, int, int]:

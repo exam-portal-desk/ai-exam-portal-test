@@ -5,12 +5,23 @@ PostgreSQL queries for subjects and requests_raised tables.
 
 from typing import Optional, List, Dict
 from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
-from app.utils.pagination import paginate_params, pagination_meta
+from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
+from app.utils.datetime_service import now_utc_naive
 
 
 # ─────────────────────────────────────────────
 # Subjects
 # ─────────────────────────────────────────────
+
+def get_subjects_count() -> int:
+    """Total subject count via COUNT query — no data fetch."""
+    try:
+        row = fetch_one("SELECT COUNT(*) AS count FROM subjects")
+        return row["count"] if row else 0
+    except Exception as e:
+        print(f"[db.misc] get_subjects_count error: {e}")
+        return 0
+
 
 def get_all_subjects() -> List[Dict]:
     try:
@@ -36,6 +47,7 @@ def get_subjects_page(search: str = "", page=1, per_page=20) -> Dict:
             f"{where_sql} ORDER BY subject_name LIMIT %s OFFSET %s",
             params + [per_page, offset],
         )
+        attach_row_numbers(rows, page, per_page)
         return {"subjects": rows, **pagination_meta(total, page, per_page)}
     except Exception as e:
         print(f"[db.misc] get_subjects_page error: {e}")
@@ -97,6 +109,17 @@ def delete_subject(subject_id: int) -> bool:
 # Access Requests
 # ─────────────────────────────────────────────
 
+def get_requests_status_counts() -> Dict[str, int]:
+    """Access-request count per request_status — one aggregate query, for
+    the admin dashboard's Requests chart."""
+    try:
+        rows = fetch_all("SELECT request_status, COUNT(*) AS count FROM requests_raised GROUP BY request_status")
+        return {r["request_status"]: r["count"] for r in rows}
+    except Exception as e:
+        print(f"[db.misc] get_requests_status_counts error: {e}")
+        return {}
+
+
 def get_pending_requests() -> List[Dict]:
     try:
         return fetch_all(
@@ -144,4 +167,20 @@ def update_request(request_id: int, updates: Dict) -> bool:
         return True
     except Exception as e:
         print(f"[db.misc] update_request error: {e}")
+        return False
+
+
+def soft_delete_request(request_id: int, deleted_by: str) -> bool:
+    """Hide a request/history row from every list view while keeping the row
+    (and its append-only `reason` audit trail) intact in the DB — never
+    touches users.role, so removing a request from the UI can never look
+    like an approved access grant being revoked."""
+    try:
+        execute(
+            "UPDATE requests_raised SET is_deleted=TRUE, deleted_at=%s, deleted_by=%s WHERE request_id=%s",
+            (now_utc_naive().isoformat(), deleted_by, request_id),
+        )
+        return True
+    except Exception as e:
+        print(f"[db.misc] soft_delete_request error: {e}")
         return False

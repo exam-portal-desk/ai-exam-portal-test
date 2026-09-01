@@ -1,10 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Privacy Policy - SmartAIExam{% endblock %}
-{% set org_name     = "SmartAIExam" %}
-{% set org_email    = "examportaldesk@gmail.com" %}
-{% set org_phone    = "+91-755-123-4567" %}
-{% set org_address  = "Tech Park, Noida, UP" %}
-{% set last_updated = "May 2026" %}
+{% set org_name = "SmartAIExam" %}
 {% block content %}
 <style>
 .pp-wrap {
@@ -346,7 +342,7 @@
     <div class="pp-phdr-left">
       <h1><i class="fas fa-shield-alt"></i> Privacy Policy</h1>
       <p>How we collect, use, store, and protect your personal information</p>
-      <span class="pp-upd"><i class="fas fa-clock"></i> Last updated: {{ last_updated }}</span>
+      {% if LEGAL_PRIVACY_LAST_UPDATED %}<span class="pp-upd"><i class="fas fa-clock"></i> Last updated: {{ LEGAL_PRIVACY_LAST_UPDATED }}</span>{% endif %}
     </div>
       <div style="display:flex;gap:.5rem;">
         <a href="{{ url_for('misc.home') }}" class="pp-back"><i class="fas fa-home"></i> Home</a>
@@ -680,14 +676,13 @@
           <h3>Contact Us</h3>
         </div>
         <div class="pp-sec-body">
-          <p>For any questions, concerns, or requests related to this Privacy Policy or your personal data, reach out to our privacy team:</p>
+          <p>For any questions, concerns, or requests related to this Privacy Policy or your personal data, reach out to us:</p>
           <div class="pp-contact-box">
-            <strong>{{ org_name }} — Privacy Team</strong>
-            <div><i class="fas fa-at" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ org_email }}</div>
-            <div><i class="fas fa-phone" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ org_phone }}</div>
-            <div><i class="fas fa-map-marker-alt" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ org_address }}</div>
+            <strong>{{ org_name }}</strong>
+            {% if PUBLIC_SUPPORT_EMAIL %}<div><i class="fas fa-at" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ PUBLIC_SUPPORT_EMAIL }}</div>{% endif %}
+            {% if PUBLIC_CONTACT_PHONE %}<div><i class="fas fa-phone" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ PUBLIC_CONTACT_PHONE }}</div>{% endif %}
+            <div><i class="fas fa-globe" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ PUBLIC_ADDRESS or "Online platform" }}</div>
           </div>
-          <p style="margin-top:.85rem;">We aim to respond to all privacy-related requests within 7 business days.</p>
         </div>
       </div>
 

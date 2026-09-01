@@ -29,3 +29,9 @@ supabase_schema.txt
 .claude/
 database/
 migrations/
+
+# Transient upload staging (app/config.py: UPLOAD_TMP_DIR)
+/uploads_tmp/
+
+# Logs
+*.log

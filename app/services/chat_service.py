@@ -23,7 +23,7 @@ import re
 
 from app.utils.datetime_service import now_utc_naive
 import app.db.chat as chat_db
-from app.services.image_storage_service import profile_photo_url_from_key
+from app.services.image_storage_service import profile_photo_url_from_key, group_photo_url_from_key
 
 CHAT_RATE_LIMIT = 2
 MAX_CHAT_MSG_LEN = 1000
@@ -87,18 +87,47 @@ def invalidate_member_cache(conv_id: int) -> None:
         _member_cache.pop(conv_id, None)
 
 
+def _sweep_expired_member_cache() -> None:
+    """Same memory-hygiene idea as _sweep_stale_presence(): get_members_cached()
+    already ignores an entry once it's past MEMBER_CACHE_TTL, this just stops
+    it from sitting in the dict forever for a conversation nobody re-reads."""
+    now = time.time()
+    with _member_cache_lock:
+        for conv_id in [cid for cid, e in _member_cache.items() if now - e['ts'] >= MEMBER_CACHE_TTL]:
+            del _member_cache[conv_id]
+
+
 # ─────────────────────────────────────────────
 # Online presence
 # ─────────────────────────────────────────────
 
 def set_online(uid, sid) -> None:
+    """Each open tab/socket for a user registers its own sid, keyed under
+    that user — losing one tab's connection must not mark the user offline
+    while another tab is still connected, and get_sids_for() below needs
+    every one of a sender's own sids (not just the most recent) so a
+    room-broadcast self-echo can be suppressed on ALL of that sender's tabs,
+    not just one."""
+    now = time.time()
     with _online_lock:
-        _online_users[uid] = {'sid': sid, 'ts': time.time()}
+        _online_users.setdefault(uid, {})[sid] = now
 
 
-def set_offline(uid) -> None:
+def set_offline(uid, sid=None) -> None:
+    """Remove one socket (sid) for this user. sid=None removes every socket
+    for this user — used by the explicit-logout path (app/routes/web/auth.py),
+    where the intent really is "this user is offline everywhere", unlike a
+    single tab's socket 'disconnect' event."""
     with _online_lock:
-        _online_users.pop(uid, None)
+        if sid is None:
+            _online_users.pop(uid, None)
+            return
+        entry = _online_users.get(uid)
+        if not entry:
+            return
+        entry.pop(sid, None)
+        if not entry:
+            _online_users.pop(uid, None)
 
 
 def is_online(uid) -> bool:
@@ -106,13 +135,36 @@ def is_online(uid) -> bool:
         entry = _online_users.get(uid)
         if not entry:
             return False
-        return (time.time() - entry['ts']) < 120
+        now = time.time()
+        return any(now - ts < 120 for ts in entry.values())
 
 
-def get_sid_for(uid):
+def get_sids_for(uid) -> list:
+    """All currently-tracked sids for this user across every open tab —
+    used to skip ALL of the sender's own sockets when broadcasting their
+    message to a conversation room, so no tab receives a duplicate
+    self-echo (see _emit() in app/routes/api/v01/chat.py)."""
     with _online_lock:
         entry = _online_users.get(uid)
-        return entry['sid'] if entry else None
+        return list(entry.keys()) if entry else []
+
+
+def _sweep_stale_presence() -> None:
+    """Reclaim memory for sockets that never got a clean 'disconnect' event
+    (rare, but possible — e.g. the process losing the connection under some
+    network conditions). Purely memory hygiene: is_online()/get_sids_for()
+    already treat anything past the 120s staleness window as gone, so this
+    never changes observed behavior for an active connection — it only
+    physically removes an entry a little after it stopped mattering."""
+    now = time.time()
+    with _online_lock:
+        for uid in list(_online_users.keys()):
+            entry = _online_users[uid]
+            for sid in list(entry.keys()):
+                if now - entry[sid] > 150:
+                    del entry[sid]
+            if not entry:
+                del _online_users[uid]
 
 
 # ─────────────────────────────────────────────
@@ -148,6 +200,23 @@ def _flush_unread_loop():
 
 
 threading.Thread(target=_flush_unread_loop, daemon=True).start()
+
+
+def _sweep_loop():
+    """Periodic memory hygiene for the in-process presence/member caches —
+    see _sweep_stale_presence() and _sweep_expired_member_cache() above.
+    A longer interval than the unread flush loop since this is pure cleanup,
+    not something anything else is waiting on."""
+    while True:
+        time.sleep(90)
+        try:
+            _sweep_stale_presence()
+            _sweep_expired_member_cache()
+        except Exception:
+            pass
+
+
+threading.Thread(target=_sweep_loop, daemon=True).start()
 
 
 # ─────────────────────────────────────────────
@@ -247,6 +316,7 @@ def get_conversations_for_user(uid: int) -> list:
         photo_url = None
         if c['is_group']:
             name = c['group_name'] or 'Group'
+            photo_url = group_photo_url_from_key(c.get('group_photo_key'))
             members_list = [
                 {'id': m, 'name': 'You' if m == uid else (user_cache.get(m, {}).get('full_name') or user_cache.get(m, {}).get('username') or '?'),
                  'photo_url': None if m == uid else profile_photo_url_from_key(user_cache.get(m, {}).get('profile_photo_key'))}

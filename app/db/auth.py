@@ -5,7 +5,7 @@ PostgreSQL queries for login_attempts and pw_tokens tables.
 
 from typing import Optional, Dict, Tuple
 from datetime import datetime, timedelta
-from app.db import fetch_one, fetch_all, execute, insert_returning
+from app.db import fetch_one, fetch_all, execute, execute_returning, insert_returning
 from app.utils.datetime_service import now_utc_naive
 
 
@@ -141,3 +141,75 @@ def mark_token_used(token: str) -> bool:
     except Exception as e:
         print(f"[db.auth] mark_token_used error: {e}")
         return False
+
+
+# ─────────────────────────────────────────────
+# OTP Challenges ("Existing Active Session" login verification)
+# ─────────────────────────────────────────────
+
+def count_recent_otp_challenges(user_id: int, window_seconds: int) -> int:
+    """How many OTP challenges have been requested for this user within the
+    rate-limit window — used to enforce OTP_MAX_REQUESTS."""
+    try:
+        row = fetch_one(
+            "SELECT COUNT(*) AS count FROM otp_challenges WHERE user_id=%s AND created_at > %s",
+            (user_id, now_utc_naive() - timedelta(seconds=window_seconds)),
+        )
+        return row["count"] if row else 0
+    except Exception as e:
+        print(f"[db.auth] count_recent_otp_challenges error: {e}")
+        return 0
+
+
+def create_otp_challenge(user_id: int, otp_hash: str, expires_at: str, window_seconds: int) -> Optional[Dict]:
+    """Insert a new OTP challenge. Opportunistically deletes this user's
+    rows older than the rate-limit window first — they no longer count
+    toward the limit, so nothing is lost by removing them."""
+    try:
+        execute(
+            "DELETE FROM otp_challenges WHERE user_id=%s AND created_at <= %s",
+            (user_id, now_utc_naive() - timedelta(seconds=window_seconds)),
+        )
+        return insert_returning("otp_challenges", {
+            "user_id": user_id,
+            "otp_hash": otp_hash,
+            "expires_at": expires_at,
+            "attempts": 0,
+            "created_at": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
+        })
+    except Exception as e:
+        print(f"[db.auth] create_otp_challenge error: {e}")
+        return None
+
+
+def get_otp_challenge(challenge_id: int, user_id: int) -> Optional[Dict]:
+    try:
+        return fetch_one(
+            "SELECT * FROM otp_challenges WHERE id=%s AND user_id=%s",
+            (challenge_id, user_id),
+        )
+    except Exception as e:
+        print(f"[db.auth] get_otp_challenge error: {e}")
+        return None
+
+
+def increment_otp_attempts(challenge_id: int, fail_safe_max: int) -> int:
+    """Atomically bump the attempt counter, returning the new count. On
+    error, fails safe by returning fail_safe_max so the caller treats it as
+    exhausted rather than allowing unlimited guesses."""
+    try:
+        rows = execute_returning(
+            "UPDATE otp_challenges SET attempts=attempts+1 WHERE id=%s RETURNING attempts",
+            (challenge_id,),
+        )
+        return rows[0]["attempts"] if rows else fail_safe_max
+    except Exception as e:
+        print(f"[db.auth] increment_otp_attempts error: {e}")
+        return fail_safe_max
+
+
+def delete_otp_challenge(challenge_id: int) -> None:
+    try:
+        execute("DELETE FROM otp_challenges WHERE id=%s", (challenge_id,))
+    except Exception as e:
+        print(f"[db.auth] delete_otp_challenge error: {e}")

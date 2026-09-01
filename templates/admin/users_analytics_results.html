@@ -149,7 +149,7 @@
                             <div style="font-size:.73rem;color:var(--text-3)">{{ result.full_name }}</div>
                         </td>
                         <td>
-                            <div style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ result.exam_name }}</div>
+                            <div style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ result.exam_name }}{% if result.is_scheduled %}<i class="fas fa-calendar-check" style="color:var(--accent);font-size:.68rem;margin-left:.3rem" title="Scheduled Exam"></i>{% endif %}</div>
                             <div style="font-size:.73rem;color:var(--text-3)">{{ result.subject_name }}</div>
                         </td>
                         <td style="font-size:.78rem;color:var(--text-3)">{{ result.created_at | display_dt if result.created_at and result.created_at != 'N/A' else '—' }}</td>

@@ -14,7 +14,7 @@ from app.db import fetch_one, fetch_all, insert_returning, insert_many
 _RESULT_COLS = (
     "id,student_id,exam_id,score,max_score,percentage,grade,"
     "completed_at,time_taken_minutes,correct_answers,incorrect_answers,"
-    "unanswered_questions,total_questions"
+    "unanswered_questions,total_questions,attempt_id"
 )
 
 
@@ -71,6 +71,20 @@ def create_result(result_data: Dict) -> Optional[Dict]:
         return insert_returning("results", result_data)
     except Exception as e:
         print(f"[db.results] create_result error: {e}")
+        return None
+
+
+def get_result_by_attempt_id(attempt_id: int) -> Optional[Dict]:
+    """The idempotency check for finalize_exam_attempt(): if a result
+    already exists for this specific attempt, it was already scored (by
+    an earlier, possibly-interrupted finalization run) — never insert a
+    second one for the same attempt. attempt_id is unique-indexed
+    (idx_results_attempt_id_unique, partial WHERE NOT NULL) as a database-
+    level backstop behind this check."""
+    try:
+        return fetch_one(f"SELECT {_RESULT_COLS} FROM results WHERE attempt_id=%s", (attempt_id,))
+    except Exception as e:
+        print(f"[db.results] get_result_by_attempt_id error: {e}")
         return None
 
 

@@ -7,7 +7,7 @@
 
 {% macro render_exam_row(exam) %}
 <tr>
-  <td><span class="exam-id-badge">{{ exam.id }}</span></td>
+  <td><span class="exam-id-badge">{{ exam.row_no if exam.row_no is not none else exam.id }}</span></td>
   <td><div class="exam-name-text">{{ exam.name }}</div></td>
   <td>
     {% if exam.category_name %}
@@ -18,7 +18,7 @@
   </td>
   <td>
     <div class="meta-pill">{{ exam.date | calendar_date if exam.date else exam.date }}</div>
-    <div style="font-size:.75rem;color:var(--text-3);margin-top:3px">{{ exam.start_time }}</div>
+    <div style="font-size:.75rem;color:var(--text-3);margin-top:3px">{{ exam.start_time | calendar_time }}</div>
   </td>
   <td><span class="meta-pill">{{ exam.duration }} min</span></td>
   <td>
@@ -27,7 +27,11 @@
       Max: <strong style="color:var(--text-2)">{{ exam.max_attempts if exam.max_attempts else '∞' }}</strong>
     </div>
   </td>
-  <td><span class="status-badge status-{{ exam.status }}">{{ exam.status }}</span></td>
+  <td>
+    <span class="status-badge status-{{ exam.effective_status or exam.status }}">{{ exam.effective_status or exam.status }}</span>
+    {% if exam.scheduled_mode %}<span class="sched-pill" title="Scheduled Exam — status is computed automatically"><i class="fas fa-clock"></i> Scheduled</span>{% endif %}
+    {% if not exam.scheduled_mode and exam.available_after_datetime %}<span class="sched-pill" title="Available After Selected Date/Time is ON — this exam stays attemptable while Ongoing, even after its configured date/time has passed"><i class="fas fa-infinity"></i> No Expiry</span>{% endif %}
+  </td>
   <td>
     <div class="instructions-text" title="{{ exam.instructions }}">
       {{ exam.instructions or '—' }}
@@ -66,6 +70,12 @@
               data-bs-target="#editExamModal{{ exam.id }}">
         <i class="fas fa-pencil-alt"></i>
       </button>
+      {% if exam.scheduled_mode %}
+      <button class="icon-btn{{ ' danger' if exam.status != 'cancelled' else '' }}" title="{{ 'Uncancel' if exam.status == 'cancelled' else 'Cancel Exam' }}"
+              onclick="cancelScheduledExam({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', {{ 'true' if exam.status == 'cancelled' else 'false' }})">
+        <i class="fas fa-{{ 'undo' if exam.status == 'cancelled' else 'ban' }}"></i>
+      </button>
+      {% endif %}
       <button class="icon-btn danger" title="Delete"
               onclick="showDeleteConfirm({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}')">
         <i class="fas fa-trash"></i>
@@ -78,20 +88,43 @@
 {% macro render_exam_card(exam) %}
 <div class="exam-grid-item">
   <div class="egi-top">
-    <span class="exam-id-badge">{{ exam.id }}</span>
-    <span class="status-badge status-{{ exam.status }}">{{ exam.status }}</span>
+    <span class="exam-id-badge">{{ exam.row_no if exam.row_no is not none else exam.id }}</span>
+    <span class="status-badge status-{{ exam.effective_status or exam.status }}">{{ exam.effective_status or exam.status }}</span>
   </div>
-  <div class="egi-name">{{ exam.name }}</div>
+  <div class="egi-name">{{ exam.name }}{% if exam.scheduled_mode %}<span class="sched-pill" title="Scheduled Exam — status is computed automatically"><i class="fas fa-clock"></i> Scheduled</span>{% endif %}</div>
   <div class="egi-meta">
     {% if exam.category_name %}<span class="cat-pill">{{ exam.category_name }}</span>{% endif %}
     {% if exam.subcategory_name %}<span class="cat-pill" style="opacity:.72">{{ exam.subcategory_name }}</span>{% endif %}
   </div>
-  <div class="egi-row"><i class="fas fa-calendar-days"></i> {{ exam.date | calendar_date if exam.date else exam.date }} &nbsp;·&nbsp; {{ exam.start_time }}</div>
+  <div class="egi-row"><i class="fas fa-calendar-days"></i> {{ exam.date | calendar_date if exam.date else exam.date }} &nbsp;·&nbsp; {{ exam.start_time | calendar_time }}</div>
   <div class="egi-row"><i class="fas fa-hourglass-half"></i> {{ exam.duration }} min &nbsp;·&nbsp; <i class="fas fa-list-ol"></i> {{ exam.total_questions }}Q</div>
+  <div class="egi-row">
+    {% set rmode = exam.result_mode or 'instant' %}
+    <span class="result-mode-badge mode-{{ rmode }}">{{ rmode }}</span>
+    {% if rmode == 'delayed' %}
+      <span style="font-size:.68rem;color:var(--text-3);margin-left:4px;">{{ exam.result_delay or 0 }} min delay</span>
+    {% elif rmode == 'manual' and not exam.results_released %}
+      <button class="release-btn mt-1"
+        onclick="releaseResults({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', false)">
+        <i class="fas fa-unlock-alt"></i> Release
+      </button>
+    {% elif rmode == 'manual' and exam.results_released %}
+      <button class="release-btn unrelease mt-1"
+        onclick="releaseResults({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', true)">
+        <i class="fas fa-lock"></i> Unrelease
+      </button>
+    {% endif %}
+  </div>
   <div class="egi-actions">
     <button class="icon-btn" title="Edit" data-bs-toggle="modal" data-bs-target="#editExamModal{{ exam.id }}">
       <i class="fas fa-pencil-alt"></i>
     </button>
+    {% if exam.scheduled_mode %}
+    <button class="icon-btn{{ ' danger' if exam.status != 'cancelled' else '' }}" title="{{ 'Uncancel' if exam.status == 'cancelled' else 'Cancel Exam' }}"
+            onclick="cancelScheduledExam({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}', {{ 'true' if exam.status == 'cancelled' else 'false' }})">
+      <i class="fas fa-{{ 'undo' if exam.status == 'cancelled' else 'ban' }}"></i>
+    </button>
+    {% endif %}
     <button class="icon-btn danger" title="Delete" onclick="showDeleteConfirm({{ exam.id }}, '{{ exam.name | replace("'", "\\'") }}')">
       <i class="fas fa-trash"></i>
     </button>
@@ -124,7 +157,7 @@
             <div class="col-md-3 col-sm-6 col-12">
               <label class="form-label">Start Time</label>
               <div class="dt-field">
-                <input type="text" class="form-control dt-time-input" name="start_time" value="{{ exam.start_time }}" placeholder="Select time" readonly autocomplete="off" required>
+                <input type="text" class="form-control dt-time-input" name="start_time" value="{{ exam.start_time | calendar_time }}" data-value="{{ exam.start_time }}" placeholder="Select time" readonly autocomplete="off" required>
                 <i class="fas fa-clock dt-field-icon"></i>
               </div>
             </div>
@@ -136,13 +169,30 @@
               <label class="form-label">Total Questions</label>
               <input type="number" class="form-control" name="total_questions" value="{{ exam.total_questions }}" required>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4" id="edit-{{ exam.id }}-status-field" style="{% if exam.scheduled_mode %}display:none{% endif %}">
               <label class="form-label">Status</label>
               <select class="form-select" name="status">
                 <option value="upcoming"  {% if exam.status == "upcoming"  %}selected{% endif %}>Upcoming</option>
                 <option value="ongoing"   {% if exam.status == "ongoing"   %}selected{% endif %}>Ongoing</option>
                 <option value="completed" {% if exam.status == "completed" %}selected{% endif %}>Completed</option>
               </select>
+            </div>
+            <div class="col-md-4" id="edit-{{ exam.id }}-readonly-status" style="{% if not exam.scheduled_mode %}display:none{% endif %}">
+              <label class="form-label">Current Status <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(automatic)</span></label>
+              <div class="sched-readonly-status">{{ exam.effective_status or 'upcoming' }}</div>
+            </div>
+            <div class="col-12" id="edit-{{ exam.id }}-normal-fields" style="{% if exam.scheduled_mode %}display:none{% endif %}">
+              <div class="sched-toggle-box">
+                <label class="sched-toggle-switch">
+                  <input type="checkbox" name="available_after_datetime" value="1" id="edit-{{ exam.id }}-available-after-datetime"
+                         {% if exam.available_after_datetime %}checked{% endif %}>
+                  <span class="sched-toggle-slider"></span>
+                </label>
+                <div>
+                  <div class="sched-toggle-label">Available After Selected Date/Time</div>
+                  <div class="sched-toggle-hint">On: this exam stays attemptable purely based on its Status (Ongoing = Live) even after its configured date/time has passed — no need to edit the date/time to reuse it. Off (default): the configured date/time still expires it as before. Normal Exams only — has no effect on Scheduled Exams.</div>
+                </div>
+              </div>
             </div>
             <div class="col-md-4">
               <label class="form-label">Category</label>
@@ -155,17 +205,83 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">Subcategory</label>
-              <select name="subcategory_id" class="form-select" data-subcat-select>
+              {# data-subcategory-id is the exam's real subcategory_id, independent
+                 of whether category_name/subcategory_name resolved via the
+                 admin list's JOIN below — it's what the modal-open handler
+                 (see admin/exams.html) uses to always refresh this dropdown
+                 with the live subcategory list for the exam's actual category,
+                 restoring the correct selection. Without that refresh this
+                 dropdown only ever repopulates when the Category select itself
+                 changes — useless when the category is already correct and
+                 only the subcategory is missing or stale, which is exactly the
+                 broken state an admin needs to be able to fix here. #}
+              <select name="subcategory_id" class="form-select" data-subcat-select data-subcategory-id="{{ exam.subcategory_id or '' }}">
                 {% if exam.subcategory_id and exam.subcategory_name %}
                   <option value="{{ exam.subcategory_id }}" selected>{{ exam.subcategory_name }}</option>
+                {% elif exam.category_id %}
+                  <option value="">Select Subcategory</option>
                 {% else %}
                   <option value="">Select Category first</option>
                 {% endif %}
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label">Instructions</label>
-              <textarea class="form-control" name="instructions" rows="3">{{ exam.instructions }}</textarea>
+              {% if exam.scheduled_mode and exam.effective_status and exam.effective_status != 'upcoming' %}
+              <div class="sched-locked-hint" style="margin-bottom:.75rem">
+                <i class="fas fa-lock"></i>
+                This exam is already {{ exam.effective_status }} — its schedule (date, time, duration, preparation window, completion buffer) can no longer be changed. Other details can still be edited.
+              </div>
+              {% endif %}
+              <div class="sched-toggle-box">
+                <label class="sched-toggle-switch">
+                  <input type="checkbox" name="scheduled_mode" value="1" id="edit-{{ exam.id }}-scheduled-toggle"
+                         onchange="toggleScheduledFields(this, 'edit-{{ exam.id }}')"
+                         {% if exam.scheduled_mode %}checked{% endif %}>
+                  <span class="sched-toggle-slider"></span>
+                </label>
+                <div>
+                  <div class="sched-toggle-label">Scheduled Exam</div>
+                  <div class="sched-toggle-hint">Automatically goes Live at the scheduled start time and Completed once it ends — status updates on its own, no manual changes needed.</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6" id="edit-{{ exam.id }}-scheduled-fields" style="{% if not exam.scheduled_mode %}display:none{% endif %}">
+              <label class="form-label">Preparation Window (min)
+                <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = 0)</span>
+              </label>
+              <input type="number" class="form-control" name="prep_window_minutes" min="0" step="1" value="{{ exam.prep_window_minutes if exam.prep_window_minutes is not none else '' }}" placeholder="e.g. 10">
+              <small class="text-muted">How early students may open the exam to prepare, before it goes Live</small>
+            </div>
+            <div class="col-md-6" id="edit-{{ exam.id }}-scheduled-fields-2" style="{% if not exam.scheduled_mode %}display:none{% endif %}">
+              <label class="form-label">Completion Buffer (min)
+                <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = 0)</span>
+              </label>
+              <input type="number" class="form-control" name="completion_buffer_minutes" min="0" step="1" value="{{ exam.completion_buffer_minutes if exam.completion_buffer_minutes is not none else '' }}" placeholder="e.g. 5">
+              <small class="text-muted">Extra system time to accept in-flight submissions — not extra time for students</small>
+            </div>
+            <div class="col-12" id="edit-{{ exam.id }}-scheduled-fields-3" style="{% if not exam.scheduled_mode %}display:none{% endif %}">
+              <div class="sched-toggle-box">
+                <label class="sched-toggle-switch">
+                  <input type="checkbox" name="allow_manual_submission" value="1" id="edit-{{ exam.id }}-allow-manual-submission" {% if exam.allow_manual_submission is none or exam.allow_manual_submission %}checked{% endif %}>
+                  <span class="sched-toggle-slider"></span>
+                </label>
+                <div>
+                  <div class="sched-toggle-label">Allow Manual Submission</div>
+                  <div class="sched-toggle-hint">On: students can submit before time ends. Off: the Submit button is hidden — the exam only ends automatically when the timer reaches zero, and the server enforces this even if the button is bypassed.</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Instructions <span style="color:var(--danger-text)">*</span></label>
+              <div class="instr-toolbar">
+                <button type="button" class="instr-tb-btn" data-instr-cmd="bullet" title="Bullet list"><i class="fas fa-list-ul"></i></button>
+                <button type="button" class="instr-tb-btn" data-instr-cmd="number" title="Numbered list"><i class="fas fa-list-ol"></i></button>
+                <button type="button" class="instr-tb-btn" data-instr-cmd="bold" title="Bold"><i class="fas fa-bold"></i></button>
+                <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Warning callout"><i class="fas fa-triangle-exclamation"></i></button>
+              </div>
+              <textarea class="form-control" name="instructions" rows="6" required>{{ exam.instructions }}</textarea>
+              <div class="instr-preview-label">Preview</div>
+              <div class="instr-preview">{{ exam.instructions | format_instructions if exam.instructions else '<span class="instr-preview-empty">Nothing to preview yet.</span>' | safe }}</div>
             </div>
             <div class="col-md-4 col-sm-6 col-12">
               <label class="form-label">Positive Marks</label>

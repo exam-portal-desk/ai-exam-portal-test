@@ -506,10 +506,12 @@ class AIAssistant {
   openMobileSidebar() {
     document.getElementById('aiSidebar')?.classList.add('mobile-open');
     document.getElementById('aiSbOverlay')?.classList.add('show');
+    document.body.style.overflow = 'hidden';
   }
   closeMobileSidebar() {
     document.getElementById('aiSidebar')?.classList.remove('mobile-open');
     document.getElementById('aiSbOverlay')?.classList.remove('show');
+    document.body.style.overflow = '';
   }
 
   renderMath(root) {

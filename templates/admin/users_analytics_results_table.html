@@ -32,7 +32,7 @@
           <div style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ r.username }}</div>
           <div style="font-size:.75rem;color:var(--text-3)">{{ r.full_name }}</div>
         </td>
-        <td style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ r.exam_name }}</td>
+        <td style="font-size:.83rem;font-weight:600;color:var(--text-1)">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check" style="color:var(--accent);font-size:.68rem;margin-left:.3rem" title="Scheduled Exam"></i>{% endif %}</td>
         <td style="font-size:.78rem;color:var(--text-3)">{{ r.created_at | display_dt if r.created_at and r.created_at != 'N/A' else '—' }}</td>
         <td style="font-weight:700;color:var(--text-1)">{{ r.score }}/{{ r.max_score }}</td>
         <td>

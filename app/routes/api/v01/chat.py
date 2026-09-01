@@ -32,6 +32,8 @@ Endpoints:
   POST   /api/v01/chat/groups
   POST   /api/v01/chat/groups/<conv_id>/members
   DELETE /api/v01/chat/groups/<conv_id>/members/<target_uid>
+  POST   /api/v01/chat/groups/<conv_id>/photo
+  DELETE /api/v01/chat/groups/<conv_id>/photo
   GET    /api/v01/chat/unread-count
   GET    /api/v01/chat/online-status
 """
@@ -79,11 +81,52 @@ def _uname():
 def _emit(event, data, room, skip_uid=None):
     if not socketio:
         return
-    skip_sid = chat_service.get_sid_for(skip_uid) if skip_uid else None
+    # A user can have more than one tab/socket open (see chat_service.set_online);
+    # skip ALL of the sender's own sids, not just one, so a second open tab
+    # doesn't get a duplicate self-echo of a message it already has via the
+    # HTTP response that triggered this emit.
+    skip_sids = chat_service.get_sids_for(skip_uid) if skip_uid else None
     try:
-        socketio.emit(event, data, room=room, skip_sid=skip_sid)
+        socketio.emit(event, data, room=room, skip_sid=skip_sids)
     except Exception:
         socketio.emit(event, data, room=room)
+
+
+def _insert_system_message(conv_id: int, text: str) -> int:
+    """Persist + broadcast a system/event row in a group's chat (e.g. a
+    photo change). Reuses the exact chat_messages schema and the same
+    'chat_message' socket event normal messages use, so the existing
+    client-side message list picks it up with zero new socket wiring —
+    only buildMsgEl() needs an is_system rendering branch. Deliberately
+    does NOT call chat_service.buffer_unread(): this is a metadata event,
+    not an interpersonal message, so it shouldn't bump the unread badge
+    or surface as a "new message" in the global notification popup —
+    consistent with how member_joined/member_left never touch unread
+    state today. It still becomes each conversation's most-recent row,
+    so the conversation list's last-message preview naturally reflects
+    it with no extra code."""
+    now = now_utc_naive().isoformat()
+    uid = _uid()
+    name = _uname()
+    record = {
+        'conversation_id': conv_id, 'sender_id': uid, 'sender_name': name,
+        'message': text, 'created_at': now, 'is_system': True,
+    }
+    res = chat_db.insert_message(record)
+    msg_id = res['id']
+    broadcast = {
+        'id': msg_id, 'sender_name': name, 'message': text, 'created_at': now,
+        'is_own': False, 'conv_id': conv_id, 'is_deleted_account': False,
+        'is_system': True, 'reply_to_id': None, 'reply_to_text': None, 'reply_to_name': None,
+    }
+    _emit('chat_message', broadcast, room=f'conv_{conv_id}')
+    return msg_id
+
+
+def _can_manage_group(conv: dict, uid: int) -> bool:
+    if conv['created_by'] == uid:
+        return True
+    return chat_db.get_member_role(conv['id'], uid) == 'admin'
 
 
 @chat_api_bp.route('/users/search')
@@ -210,12 +253,33 @@ def get_messages(conv_id):
     try:
         cleared_at = membership.get('joined_at')
         before = request.args.get('before')
+        after = request.args.get('after')
+
+        # 'after' is the reconnect-resync path (see templates/chat.html's
+        # socket 'connect' handler): "what landed in this conversation while
+        # my socket was disconnected" — cheap, id-cursor based, and never
+        # touches the normal before=/full-history path below.
+        if after is not None:
+            try:
+                after_id = int(after)
+            except (TypeError, ValueError):
+                return jsonify({'success': False}), 400
+            res = chat_db.get_messages_after(conv_id, after_id)
+            msgs = [chat_service.normalize_message(m, uid) for m in res]
+            if msgs:
+                chat_db.reset_unread(uid, conv_id)
+            return jsonify({'success': True, 'messages': msgs})
 
         res = chat_db.get_messages(conv_id, before, cleared_at)
         msgs = list(reversed(res))
         msgs = [chat_service.normalize_message(m, uid) for m in msgs]
 
         chat_db.reset_unread(uid, conv_id)
+        # Piggyback on the membership lookup already done above (no extra
+        # query) to mark any "added to this group" notification seen —
+        # opening the conversation is the natural view action for it.
+        from app.db.dashboard_events import mark_event_seen
+        mark_event_seen(uid, 'group_added', conv_id)
         return jsonify({'success': True, 'messages': msgs})
     except Exception:
         return jsonify({'success': False}), 500
@@ -481,6 +545,75 @@ def remove_group_member(conv_id, target_uid):
         return jsonify({'success': False}), 500
 
 
+@chat_api_bp.route('/groups/<int:conv_id>/photo', methods=['POST'])
+def upload_group_photo(conv_id):
+    if not _uid():
+        return jsonify({'success': False}), 401
+    uid = _uid()
+    conv = chat_db.get_conversation(conv_id)
+    if not conv or not conv.get('is_group'):
+        return jsonify({'success': False, 'message': 'Group not found'}), 404
+    if not _can_manage_group(conv, uid):
+        return jsonify({'success': False, 'message': 'Only the group creator or an admin can change the group photo'}), 403
+
+    file = request.files.get('photo')
+    if not file or not file.filename:
+        return jsonify({'success': False, 'message': 'No file provided.'}), 400
+    ext = os.path.splitext(secure_filename(file.filename))[1].lower()
+    if ext not in CHAT_BG_ALLOWED_EXTS:
+        return jsonify({'success': False, 'message': f'Unsupported image type ({ext or "unknown"}).'}), 400
+    file.seek(0, os.SEEK_END)
+    size_kb = file.tell() / 1024
+    if size_kb > config.MAX_PROFILE_PHOTO_SIZE_KB:
+        return jsonify({'success': False, 'message': f'Image exceeds the {config.MAX_PROFILE_PHOTO_SIZE_KB} KB size limit.'}), 400
+    file.seek(0)
+
+    filename = f"{uuid.uuid4().hex[:12]}{ext}"
+    mime = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+    content = file.read()
+    old_key = conv.get('group_photo_key')
+
+    try:
+        key, url = image_storage_service.upload_group_photo(conv_id, content, filename, mime)
+    except Exception as e:
+        print(f'[Chat] group photo upload error: {e}')
+        return jsonify({'success': False, 'message': 'Photo upload failed. Please try again.'}), 500
+
+    chat_db.update_group_photo(conv_id, key)
+    if old_key and old_key != key:
+        image_storage_service.delete_group_photo(old_key)
+
+    verb = 'changed' if old_key else 'added'
+    _insert_system_message(conv_id, f'{_uname()} {verb} the group profile photo.')
+    _emit('group_photo_updated', {'conv_id': conv_id, 'photo_url': url}, room=f'conv_{conv_id}')
+
+    return jsonify({'success': True, 'photo_url': url})
+
+
+@chat_api_bp.route('/groups/<int:conv_id>/photo', methods=['DELETE'])
+def remove_group_photo(conv_id):
+    if not _uid():
+        return jsonify({'success': False}), 401
+    uid = _uid()
+    conv = chat_db.get_conversation(conv_id)
+    if not conv or not conv.get('is_group'):
+        return jsonify({'success': False, 'message': 'Group not found'}), 404
+    if not _can_manage_group(conv, uid):
+        return jsonify({'success': False, 'message': 'Only the group creator or an admin can change the group photo'}), 403
+
+    old_key = conv.get('group_photo_key')
+    if not old_key:
+        return jsonify({'success': True, 'photo_url': None})
+
+    chat_db.update_group_photo(conv_id, None)
+    image_storage_service.delete_group_photo(old_key)
+
+    _insert_system_message(conv_id, f'{_uname()} removed the group profile photo.')
+    _emit('group_photo_updated', {'conv_id': conv_id, 'photo_url': None}, room=f'conv_{conv_id}')
+
+    return jsonify({'success': True, 'photo_url': None})
+
+
 @chat_api_bp.route('/unread-count')
 def unread_count():
     if not _uid():
@@ -694,11 +827,14 @@ def register_chat_socketio_events(sio):
     def on_disconnect(reason=None):
         uid = session.get('user_id')
         if uid:
-            chat_service.set_offline(uid)
-            try:
-                sio.emit('user_offline', {'user_id': uid})
-            except Exception:
-                pass
+            # Only this socket goes away — a second open tab for the same
+            # user (if any) must stay marked online. See chat_service.set_offline().
+            chat_service.set_offline(uid, request.sid)
+            if not chat_service.is_online(uid):
+                try:
+                    sio.emit('user_offline', {'user_id': uid})
+                except Exception:
+                    pass
 
     @sio.on('join_conv')
     def on_join_conv(data):

@@ -98,7 +98,53 @@
 .eb-live    { background:var(--success-bg);color:var(--success-text);border-color:var(--success-border);animation:lp 2s infinite; }
 .eb-upcoming{ background:var(--warning-bg);color:var(--warning-text);border-color:var(--warning-border); }
 .eb-done    { background:var(--info-bg);   color:var(--info-text);   border-color:var(--info-border); }
+.eb-cancelled{ background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
 @keyframes lp{0%,100%{box-shadow:0 0 0 0 var(--success-bg)}50%{box-shadow:0 0 0 4px transparent}}
+
+/* ── Scheduled Exam: live-in countdown strip + Start-Now countdown modal ── */
+.ei-countdown-strip {
+  display:flex; align-items:center; gap:.5rem;
+  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
+  border-radius:var(--radius); padding:.55rem .85rem; font-size:.8rem; font-weight:700; margin-bottom:1rem;
+}
+.ei-countdown-strip .cds-time { font-variant-numeric:tabular-nums; }
+.ei-btn.start[disabled] { opacity:.55; cursor:not-allowed; }
+.ei-btn.start[disabled]:hover { transform:none; }
+.ei-countdown-modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:5000;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  display:none; align-items:center; justify-content:center; padding:1rem;
+}
+.ei-countdown-modal-overlay.open { display:flex; }
+.ei-countdown-modal {
+  background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 4px);
+  padding:2rem 2.2rem; text-align:center; max-width:360px; width:100%;
+  box-shadow:var(--shadow-lg);
+}
+.ei-countdown-icon  { font-size:1.8rem; color:var(--accent); margin-bottom:.6rem; }
+.ei-countdown-title { font-size:1.05rem; font-weight:800; color:var(--text-1); margin-bottom:.25rem; }
+.ei-countdown-sub   { font-size:.82rem; color:var(--text-3); margin-bottom:.75rem; }
+.ei-countdown-big   { font-size:2.6rem; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; margin-bottom:.75rem; line-height:1; }
+.ei-countdown-hint  { font-size:.72rem; color:var(--text-3); line-height:1.5; margin-bottom:.85rem; }
+.ei-countdown-warning {
+  display:flex; align-items:flex-start; gap:.5rem; text-align:left;
+  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
+  border-radius:var(--radius); padding:.6rem .75rem; font-size:.74rem; font-weight:600; line-height:1.5;
+}
+.ei-countdown-warning i { margin-top:.15rem; flex-shrink:0; }
+
+/* ── Structured instructions (rendered by app/utils/instructions_formatter.py
+   — see the `format_instructions` filter below). Same rules reused in
+   exam_kiosk.html and the admin create/edit preview. ── */
+.instr-list { margin:0 0 .8rem 1.1rem; padding:0; }
+.instr-list li { margin-bottom:.4rem; }
+.ei-instr p { margin:0 0 .8rem; }
+.ei-instr .instr-warning {
+  display:flex; align-items:flex-start; gap:.5rem;
+  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
+  border-radius:var(--radius); padding:.65rem .85rem; font-size:.82rem; font-weight:600; margin-bottom:.8rem;
+}
+.ei-instr .instr-warning i { margin-top:.15rem; flex-shrink:0; }
 
 /* spinner */
 .spin{display:inline-block;animation:sp .7s linear infinite}
@@ -123,9 +169,11 @@
   <div class="ei-card">
     <div class="ei-card-header">
       <h3>{{ exam.name }}</h3>
-      {% if exam.status == 'ongoing' %}<span class="ebadge eb-live"><i class="fas fa-circle" style="font-size:.4rem"></i>Live</span>
-      {% elif exam.status == 'upcoming' %}<span class="ebadge eb-upcoming">Upcoming</span>
-      {% else %}<span class="ebadge eb-done">{{ exam.status|title }}</span>{% endif %}
+      {% set _disp_status = effective_status if is_scheduled else exam.status %}
+      {% if _disp_status == 'ongoing' %}<span class="ebadge eb-live"><i class="fas fa-circle" style="font-size:.4rem"></i>Live</span>
+      {% elif _disp_status == 'upcoming' %}<span class="ebadge eb-upcoming">Upcoming</span>
+      {% elif _disp_status == 'cancelled' %}<span class="ebadge eb-cancelled">Cancelled</span>
+      {% else %}<span class="ebadge eb-done">{{ _disp_status|title }}</span>{% endif %}
     </div>
     <div class="ei-card-body">
 
@@ -134,7 +182,14 @@
         <span class="exam-meta-tag"><i class="fas fa-clock"></i>{{ exam.start_time }}</span>
         <span class="exam-meta-tag"><i class="fas fa-stopwatch"></i>{{ exam.duration }} mins</span>
         <span class="exam-meta-tag"><i class="fas fa-question-circle"></i>{{ exam.total_questions }} questions</span>
+        {% if is_scheduled %}<span class="exam-meta-tag"><i class="fas fa-calendar-check"></i>Scheduled Exam</span>{% endif %}
       </div>
+
+      {% if is_scheduled and effective_status == 'upcoming' and window and window.start_iso %}
+      <div class="ei-countdown-strip" id="liveCountdownStrip">
+        <i class="fas fa-hourglass-half"></i> Exam goes live in <span class="cds-time" id="liveCountdownText">--:--:--</span>
+      </div>
+      {% endif %}
 
       <div class="marking-scheme">
         <div class="mark-box"><div class="mark-box-label">Correct</div><div class="mark-box-val mark-pos">+{{ exam.positive_marks }}</div></div>
@@ -142,7 +197,7 @@
         <div class="mark-box"><div class="mark-box-label">Skipped</div><div class="mark-box-val mark-zero">0</div></div>
       </div>
 
-      <div class="ei-instr">{{ exam.instructions }}</div>
+      <div class="ei-instr">{{ exam.instructions | format_instructions }}</div>
       <hr class="ei-divider">
 
       <div class="ei-section-title">Question Types</div>
@@ -177,12 +232,31 @@
           <a id="resumeBtn" href="{{ url_for('exam.exam_page', exam_id=exam.id) }}?secure=1&resume=1" class="ei-btn resume"><i class="fas fa-redo"></i> Resume Exam</a>
         {% elif can_start %}
           <button id="startExamBtn" class="ei-btn start" type="button"><i class="fas fa-play"></i> Start Exam Now</button>
+        {% elif is_scheduled and effective_status == 'cancelled' %}
+          <div class="ei-btn disabled"><i class="fas fa-ban"></i> This exam has been cancelled</div>
+        {% elif is_scheduled and not has_started %}
+          {# Scheduled Exam, before its official start: the button stays
+             visually active (enabled once the preparation window has
+             opened) so students can preload and wait — clicking it before
+             the official start never starts the exam early; it shows a
+             server-timestamp-driven countdown instead (see startExamBtn
+             click handler below). #}
+          <button id="startExamBtn" class="ei-btn start" type="button" {{ '' if prep_open else 'disabled' }}>
+            <i class="fas fa-clipboard-check"></i> Prepare Exam
+          </button>
+        {% elif not has_started %}
+          <div class="ei-btn disabled"><i class="fas fa-clock"></i> Exam hasn't started yet</div>
+        {% elif has_ended %}
+          <div class="ei-btn disabled"><i class="fas fa-flag-checkered"></i> Exam has ended</div>
         {% else %}
           <div class="ei-btn disabled"><i class="fas fa-info-circle"></i> Exam Not Available</div>
         {% endif %}
         <a href="{{ url_for('dashboard.dashboard') }}" class="ei-btn back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
       </div>
 
+      {% if not can_start and not active_attempt and not attempts_exhausted and not has_started and window and window.start_dt and (not is_scheduled or effective_status != 'cancelled') %}
+      <div class="attempts-info">Scheduled for: <strong>{{ exam.date | calendar_date }} at {{ window.start_time_ampm }}</strong></div>
+      {% endif %}
       {% if attempts_left is not none and attempts_left >= 0 %}
       <div class="attempts-info">Attempts left: <strong>{{ attempts_left }}</strong> / {{ max_attempts }}</div>
       {% elif max_attempts == 0 %}
@@ -296,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const examId = {{ exam.id|tojson }};
     const POLL_INTERVAL = 30000;
     let startInProgress = false;
-    
+
     // ✅ CRITICAL: Track initial state from server
     const INITIAL_STATE = {
         hasActiveAttempt: {{ 'true' if active_attempt else 'false' }},
@@ -304,6 +378,77 @@ document.addEventListener('DOMContentLoaded', function () {
         canStart: {{ 'true' if can_start else 'false' }}
     };
 
+    // ── Scheduled Exam: prep/countdown state — server-authoritative
+    // timestamps only, the client never invents or trusts its own clock
+    // for anything that gates access (see attemptStartOrCountdown()).
+    const IS_SCHEDULED = {{ 'true' if is_scheduled else 'false' }};
+    let PREP_OPEN = {{ 'true' if prep_open else 'false' }};
+    const SCHEDULED_START_ISO = {{ (window.start_iso if window else None) | tojson }};
+    // Server-computed from the session's own preload cache (see
+    // exam_instructions() in app/routes/web/exams.py) — true iff THIS
+    // student already clicked Prepare for this exam at some point, even
+    // in a now-gone previous page load. This is what makes preparation
+    // state survive a refresh: it's read fresh from the server on every
+    // render, never invented client-side.
+    const PREP_ALREADY_STARTED = {{ 'true' if prep_already_started else 'false' }};
+
+    const liveCountdownStrip = document.getElementById('liveCountdownStrip');
+    const liveCountdownText = document.getElementById('liveCountdownText');
+
+    // Scheduled Exam: fullscreen, the preparation countdown, and the exam
+    // itself are ALL now handled by a dedicated Kiosk window/page (see
+    // openKioskWindow() below and templates/exam_kiosk.html) instead of on
+    // this page. This page is never itself a fullscreen host — it's a
+    // normal, persistently-navigable page, so it must never be the thing
+    // enforcing or prompting to restore fullscreen (that used to linger
+    // and resurface here even after an exam had ended). Manual Exams are
+    // completely unaffected — they never set IS_SCHEDULED and keep using
+    // launchPopupExam()/attemptStartOrCountdown() below exactly as before.
+
+    function formatHMS(totalSeconds) {
+        totalSeconds = Math.max(0, Math.floor(totalSeconds));
+        const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60), s = totalSeconds % 60;
+        const pad = n => String(n).padStart(2, '0');
+        return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    }
+
+    // Swaps the button from its pre-start "Prepare Exam" label to the real
+    // "Start Exam Now" label — called once the exam has actually gone
+    // live, whether that's noticed via the local countdown reaching zero
+    // or a poll reporting official_open. Label-only; every actual start
+    // decision still goes through attemptStartOrCountdown()/the server.
+    function markStartBtnLive() {
+        if (!startBtn) return;
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play"></i> Start Exam Now';
+    }
+
+    // Purely visual — ticks down using the browser's own clock against the
+    // server-provided target instant. Never itself decides whether the
+    // exam may start; that decision is always re-verified server-side.
+    let liveStripHandle = null;
+    function startLiveCountdownStrip(targetIso) {
+        if (!liveCountdownText || !targetIso) return;
+        const target = new Date(targetIso).getTime();
+        function tick() {
+            const remain = (target - Date.now()) / 1000;
+            if (remain <= 0) {
+                if (liveCountdownStrip) liveCountdownStrip.style.display = 'none';
+                clearInterval(liveStripHandle);
+                markStartBtnLive();
+                return;
+            }
+            liveCountdownText.textContent = formatHMS(remain);
+        }
+        tick();
+        liveStripHandle = setInterval(tick, 1000);
+    }
+    if (IS_SCHEDULED && SCHEDULED_START_ISO) startLiveCountdownStrip(SCHEDULED_START_ISO);
+
+    // Manual Exam only — a Scheduled Exam never calls /start from this
+    // page any more (the Kiosk does, see openKioskWindow() below), so it
+    // can never actually reach a too_early response here; nothing special
+    // for that case is needed on this path.
     function showError(message) {
         if (preloadingAlert) preloadingAlert.style.display = 'none';
         if (errorAlert) {
@@ -354,6 +499,20 @@ document.addEventListener('DOMContentLoaded', function () {
     // ✅ FIXED: Only update UI if state actually changed
     function renderAttemptUI(info) {
         try {
+            // Scheduled Exam: a student who loaded this page before the
+            // preparation window opened sees the Start button rendered
+            // disabled (server-side, at page load). Enable it the moment a
+            // poll reports prep_open (or the window has gone fully live)
+            // without waiting for a manual page refresh.
+            if (IS_SCHEDULED && startBtn && (info.prep_open || info.official_open) && !startInProgress) {
+                PREP_OPEN = true;
+                if (info.official_open) {
+                    markStartBtnLive();
+                } else {
+                    startBtn.disabled = false;
+                }
+            }
+
             const attemptsLeft = Number(info.attempts_remaining);
             const maxAttempts = Number(info.max_attempts);
             const activeAttempt = !!info.has_active_attempt;
@@ -466,25 +625,21 @@ document.addEventListener('DOMContentLoaded', function () {
             if (loadingPercentage) loadingPercentage.textContent = '80%';
 
             if (data && data.success) {
-                if (loadingTitle) loadingTitle.textContent = 'Finalizing Setup...';
-                if (loadingSubtitle) loadingSubtitle.textContent = 'Preparing secure exam environment';
-                if (loadingDetails) loadingDetails.textContent = 'Setting up question navigation';
-                if (progressBar) progressBar.style.width = '95%';
-                if (loadingPercentage) loadingPercentage.textContent = '95%';
-
-                await new Promise(resolve => setTimeout(resolve, 800));
-
+                // No artificial wait here — the preload response above is
+                // the real, final piece of work this step needed; once it
+                // resolves, resources genuinely are ready, so the label
+                // updates immediately instead of sitting behind two fake
+                // "Finalizing…"/"Exam Ready…" pauses that used to add up to
+                // ~1.8s of pure setTimeout with no work happening behind it.
                 if (progressBar) progressBar.style.width = '100%';
                 if (loadingPercentage) loadingPercentage.textContent = '100%';
                 if (loadingTitle) loadingTitle.textContent = 'Exam Ready!';
-                if (loadingSubtitle) loadingSubtitle.textContent = 'Opening secure exam window...';
+                if (loadingSubtitle) loadingSubtitle.textContent = 'Starting your exam...';
                 if (loadingDetails) loadingDetails.textContent = 'Launching exam interface';
 
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
                 if (preloadingAlert) preloadingAlert.style.display = 'none';
                 if (successAlert) successAlert.style.display = 'block';
-                
+
                 return true;
             } else {
                 throw new Error((data && data.message) || 'Failed to load exam data');
@@ -495,79 +650,129 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Manual Exam's original flow — unchanged. Scheduled Exams never call
+    // this any more (see openKioskWindow() below).
+    function launchPopupExam(data) {
+        const { features } = buildFeatures();
+        let examWindow = null;
+        try {
+            examWindow = window.open('about:blank', '_blank', features);
+            if (examWindow) examWindow.focus();
+        } catch (e) {
+            examWindow = null;
+        }
+
+        const redirectUrl = data.redirect_url || (`/exam/${examId}`);
+        if (examWindow) {
+            try {
+                examWindow.location.href = redirectUrl + '?secure=1&from_instructions=1';
+            } catch (e) {
+                try { examWindow.location.replace(redirectUrl); } catch (e2) {}
+            }
+        } else {
+            if (errorAlert) {
+                errorAlert.style.display = 'block';
+                errorAlert.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Popup blocked';
+            }
+            window.location.href = redirectUrl;
+        }
+
+        setTimeout(() => {
+            if (preloadingAlert) preloadingAlert.style.display = 'none';
+            if (successAlert) successAlert.style.display = 'block';
+        }, 400);
+
+        // ✅ Update initial state to show Resume next time
+        INITIAL_STATE.hasActiveAttempt = true;
+        INITIAL_STATE.canStart = false;
+        startInProgress = false;
+
+        setTimeout(async () => {
+            await refreshAttemptStatusAndRender();
+        }, 700);
+    }
+
+    // SECURITY: the server (not this function) decides whether the exam
+    // actually starts — re-verified independently by /start regardless of
+    // what this page believes. Manual Exam only; a Scheduled Exam never
+    // calls this (see openKioskWindow() below), so the too_early branch
+    // /start can return for a scheduled exam is simply never reachable
+    // from here any more.
+    async function attemptStartOrCountdown() {
+        let resp, data;
+        try {
+            resp = await fetch(`/api/v01/exams/${examId}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_ts: Date.now() })
+            });
+            try {
+                data = await resp.json();
+            } catch (err) {
+                const text = await resp.text().catch(() => null);
+                throw new Error(text || 'Server error');
+            }
+        } catch (err) {
+            console.error('Start error:', err);
+            showError(err.message || 'Error starting exam');
+            startInProgress = false;
+            return;
+        }
+
+        if (!resp.ok || !data || !data.success) {
+            const msg = (data && data.message) ? data.message : 'Failed to start exam';
+            showError(msg);
+            startInProgress = false;
+            return;
+        }
+
+        launchPopupExam(data);
+    }
+
+    // Scheduled Exam: opens the dedicated Kiosk window/page (see
+    // templates/exam_kiosk.html), which owns preload, the official-start
+    // wait, fullscreen, the exam itself, and the completion screen as one
+    // coherent lifecycle. This page never calls /preload or /start for a
+    // Scheduled Exam any more — the Kiosk does, and its own attempt-status
+    // polling below (unchanged) picks up the resulting state change (e.g.
+    // Start -> Resume) exactly as it always has.
+    function openKioskWindow() {
+        const { features } = buildFeatures();
+        let kioskWindow = null;
+        try {
+            kioskWindow = window.open(`/exam-kiosk/${examId}`, '_blank', features);
+            if (kioskWindow) kioskWindow.focus();
+        } catch (e) {
+            kioskWindow = null;
+        }
+        if (!kioskWindow) {
+            // Popup blocked — fall back to navigating this tab directly to
+            // the Kiosk page rather than leaving the student stuck.
+            window.location.href = `/exam-kiosk/${examId}`;
+        }
+    }
+
     async function unifiedStartHandler(event) {
         event && event.preventDefault();
         if (startInProgress) return;
         startInProgress = true;
 
-        startUiPrepare();
+        if (IS_SCHEDULED) {
+            openKioskWindow();
+            startInProgress = false;
+            return;
+        }
 
+        // Manual Exam — completely unchanged.
+        startUiPrepare();
         try {
             await startActualPreloading();
-            
-            const resp = await fetch(`/api/v01/exams/${examId}/start`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ client_ts: Date.now() })
-            });
-
-            let data;
-            try {
-                data = await resp.json();
-            } catch (err) {
-                const text = await resp.text().catch(()=>null);
-                throw new Error(text || 'Server error');
-            }
-
-            if (!resp.ok || !data || !data.success) {
-                const msg = (data && data.message) ? data.message : 'Failed to start exam';
-                showError(msg);
-                startInProgress = false;
-                return;
-            }
-
-            const { features } = buildFeatures();
-            let examWindow = null;
-            try {
-                examWindow = window.open('about:blank', '_blank', features);
-                if (examWindow) examWindow.focus();
-            } catch (e) {
-                examWindow = null;
-            }
-
-            const redirectUrl = data.redirect_url || (`/exam/${examId}`);
-            if (examWindow) {
-                try {
-                    examWindow.location.href = redirectUrl + '?secure=1&from_instructions=1';
-                } catch (e) {
-                    try { examWindow.location.replace(redirectUrl); } catch (e2) {}
-                }
-            } else {
-                if (errorAlert) {
-                    errorAlert.style.display = 'block';
-                    errorAlert.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Popup blocked';
-                }
-                window.location.href = redirectUrl;
-            }
-
-            setTimeout(() => {
-                if (preloadingAlert) preloadingAlert.style.display = 'none';
-                if (successAlert) successAlert.style.display = 'block';
-            }, 400);
-
-            // ✅ Update initial state to show Resume next time
-            INITIAL_STATE.hasActiveAttempt = true;
-            INITIAL_STATE.canStart = false;
-
-            setTimeout(async () => {
-                await refreshAttemptStatusAndRender();
-            }, 700);
-
+            await attemptStartOrCountdown();
         } catch (err) {
             console.error('Start error:', err);
             showError(err.message || 'Error starting exam');
-        } finally {
             startInProgress = false;
+        } finally {
             if (colorIndicatorSection && colorIndicatorSection.parentElement) {
                 colorIndicatorSection.parentElement.classList.remove('loading-active');
             }
@@ -576,6 +781,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function resumeHandler(e) {
         e.preventDefault();
+        if (IS_SCHEDULED) { openKioskWindow(); return; }
+        // Manual Exam — completely unchanged.
         const { features } = buildFeatures();
         let w = null;
         try {
@@ -653,6 +860,17 @@ document.addEventListener('DOMContentLoaded', function () {
             return msg;
         }
     });
+
+    // SCHEDULED EXAM — the student already clicked Prepare at some point
+    // (PREP_ALREADY_STARTED, server-computed from the session's own
+    // preload cache, so it survives a refresh/reopen/new tab exactly as
+    // before). A fresh page load carries no user gesture, so a Kiosk
+    // window can't be silently reopened here (the browser's popup blocker
+    // would reject it) — just relabel the button; clicking it reopens the
+    // Kiosk, which resumes the right state itself (see exam_kiosk.html).
+    if (IS_SCHEDULED && PREP_ALREADY_STARTED && startBtn && !startBtn.disabled) {
+        startBtn.innerHTML = '<i class="fas fa-clipboard-check"></i> Resume Preparation';
+    }
 
     // ✅ FIXED: Only fetch status on visibility change, NOT on load
     // Initial UI is already correct from server-side rendering

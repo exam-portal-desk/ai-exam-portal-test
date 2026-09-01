@@ -84,7 +84,7 @@ def admin_login():
     session["last_login_display"] = previous_login
     session.modified    = True
 
-    flash("Admin login successful!", "success")
+    flash(f'Welcome back, {user.get("full_name")}!', "success")
     return redirect(url_for("admin.dashboard"))
 
 

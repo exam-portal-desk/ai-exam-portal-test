@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Verify It's You - SmartAIExam{% endblock %}
+{% block content %}
+<style>
+.otp-boxes{display:flex;gap:.6rem;justify-content:center;margin:.25rem 0 1.1rem;}
+.otp-box{
+  width:3rem;height:3.4rem;text-align:center;font-size:1.4rem;font-weight:700;
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+  color:var(--text-1);outline:none;transition:border-color .15s,box-shadow .15s;
+  -webkit-appearance:none;
+}
+.otp-box:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-subtle);}
+.otp-box:disabled{opacity:.5;}
+.otp-meta{display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:var(--text-3);margin-top:-.4rem;margin-bottom:1rem;}
+.otp-resend{background:none;border:none;color:var(--accent);font-size:.75rem;font-weight:600;cursor:pointer;padding:0;font-family:inherit;}
+.otp-resend:disabled{color:var(--text-3);cursor:not-allowed;}
+@media (max-width:420px){ .otp-box{width:2.5rem;height:3rem;font-size:1.2rem;} .otp-boxes{gap:.4rem;} }
+</style>
+
+<div class="auth-top">
+  <a href="{{ url_for('auth.verify_session_cancel') }}" class="auth-top-btn"><i class="fas fa-arrow-left"></i> Back to Login</a>
+</div>
+
+<div class="auth-page">
+<div class="auth-card">
+  <div class="auth-logo">
+    <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:40px;width:auto"></video>
+  </div>
+  {% if stage == 'confirm' %}
+  <div class="auth-title">You're already logged in on another device</div>
+  <div class="auth-sub">You currently have an active session somewhere else.<br>Would you like to continue on this device?</div>
+  {% else %}
+  <div class="auth-title">Verify it's you</div>
+  <div class="auth-sub">Enter the {{ otp_length }}-digit code sent to<br><strong style="color:var(--text-2)">{{ email }}</strong> to continue here.</div>
+  {% endif %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat, msg in messages %}
+    <div class="auth-alert {{ 'danger' if cat == 'error' else cat }}">
+      <i class="fas fa-{{ 'exclamation-triangle' if cat in ('error','warning') else 'check-circle' if cat=='success' else 'info-circle' }}" style="flex-shrink:0;margin-top:.1rem;font-size:.75rem"></i>
+      <span>{{ msg }}</span><button class="auth-ax" onclick="this.parentElement.remove()">&times;</button>
+    </div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+
+  {% if stage == 'confirm' %}
+  <div class="auth-alert warning">
+    <i class="fas fa-triangle-exclamation" style="flex-shrink:0;margin-top:.1rem;font-size:.75rem"></i>
+    <span>Choosing to continue will email a verification code to <strong>{{ email }}</strong>. Your other session stays signed in until that code is confirmed.</span>
+  </div>
+
+  <form method="POST" action="{{ url_for('auth.verify_session_start') }}" id="startForm">
+    <button class="auth-btn" type="submit" id="startBtn">
+      <i class="fas fa-shield-halved"></i> Continue on this device
+    </button>
+  </form>
+  <a href="{{ url_for('auth.verify_session_cancel') }}" class="auth-btn auth-btn-ghost" style="text-decoration:none;margin-top:.6rem">
+    <i class="fas fa-xmark"></i> Cancel
+  </a>
+
+  <script>
+  document.getElementById('startForm').addEventListener('submit', function () {
+    var b = document.getElementById('startBtn');
+    b.disabled = true;
+    b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending code…';
+  });
+  </script>
+
+  {% else %}
+  <form method="POST" id="otpForm">
+    <input type="hidden" name="otp" id="otpValue">
+    <div class="otp-boxes" id="otpBoxes">
+      {% for i in range(otp_length) %}
+      <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
+             autocomplete="{{ 'one-time-code' if i == 0 else 'off' }}" data-idx="{{ i }}">
+      {% endfor %}
+    </div>
+    <div class="otp-meta">
+      <span id="otpExpiry"></span>
+      <button type="button" class="otp-resend" id="resendBtn" disabled>Resend code</button>
+    </div>
+    <button class="auth-btn" type="submit" id="otpSubmit" disabled>
+      <i class="fas fa-shield-halved"></i> Verify &amp; Continue
+    </button>
+  </form>
+
+  <form method="POST" action="{{ url_for('auth.verify_session_resend') }}" id="resendForm" style="display:none"></form>
+
+  <a href="{{ url_for('auth.verify_session_cancel') }}" class="auth-back"><i class="fas fa-arrow-left" style="font-size:.65rem"></i> Not you? Back to login</a>
+  {% endif %}
+</div>
+</div>
+
+{% if stage == 'otp' %}
+<script>
+(function () {
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.otp-box'));
+  var hidden = document.getElementById('otpValue');
+  var submitBtn = document.getElementById('otpSubmit');
+  var form = document.getElementById('otpForm');
+  var resendBtn = document.getElementById('resendBtn');
+  var resendForm = document.getElementById('resendForm');
+  var expiryEl = document.getElementById('otpExpiry');
+
+  var otpLength = {{ otp_length|int }};
+  var expirySeconds = {{ expiry_seconds|int }};
+  var cooldownSeconds = {{ resend_cooldown|int }};
+
+  function sync() {
+    var val = boxes.map(function (b) { return b.value; }).join('');
+    hidden.value = val;
+    submitBtn.disabled = val.length !== otpLength;
+  }
+
+  boxes.forEach(function (box, i) {
+    box.addEventListener('input', function () {
+      box.value = box.value.replace(/[^0-9]/g, '').slice(0, 1);
+      if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+      sync();
+    });
+    box.addEventListener('keydown', function (e) {
+      if (e.key === 'Backspace' && !box.value && i > 0) {
+        boxes[i - 1].focus();
+      }
+    });
+    box.addEventListener('paste', function (e) {
+      var text = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+      if (!text) return;
+      e.preventDefault();
+      text.slice(0, otpLength).split('').forEach(function (ch, idx) {
+        if (boxes[idx]) boxes[idx].value = ch;
+      });
+      sync();
+      boxes[Math.min(text.length, boxes.length - 1)].focus();
+    });
+  });
+
+  boxes[0].focus();
+
+  var submitted = false;
+  form.addEventListener('submit', function (e) {
+    if (submitted) { e.preventDefault(); return; }
+    submitted = true;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying…';
+  });
+
+  // Expiry countdown — disables submission once the code is provably stale
+  var expiryDeadline = Date.now() + expirySeconds * 1000;
+  function tickExpiry() {
+    var remaining = Math.max(0, Math.round((expiryDeadline - Date.now()) / 1000));
+    if (remaining <= 0) {
+      expiryEl.textContent = 'Code expired';
+      boxes.forEach(function (b) { b.disabled = true; });
+      submitBtn.disabled = true;
+      return;
+    }
+    var m = Math.floor(remaining / 60), s = remaining % 60;
+    expiryEl.textContent = 'Expires in ' + m + ':' + (s < 10 ? '0' : '') + s;
+    setTimeout(tickExpiry, 1000);
+  }
+  if (expirySeconds > 0) { tickExpiry(); } else { expiryEl.textContent = 'Code expired'; }
+
+  // Resend cooldown
+  var cooldownDeadline = Date.now() + cooldownSeconds * 1000;
+  function tickResend() {
+    var remaining = Math.max(0, Math.round((cooldownDeadline - Date.now()) / 1000));
+    if (remaining <= 0) {
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Resend code';
+      return;
+    }
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Resend code (' + remaining + 's)';
+    setTimeout(tickResend, 1000);
+  }
+  tickResend();
+
+  var resendClicked = false;
+  resendBtn.addEventListener('click', function () {
+    if (resendBtn.disabled || resendClicked) return;
+    resendClicked = true;
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Sending…';
+    resendForm.submit();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

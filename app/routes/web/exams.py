@@ -21,10 +21,9 @@ FIX (session bleed-through between attempts):
        race-condition resume of a just-completed attempt.
 """
 
-import json
 import logging
 from datetime import datetime
-from app.utils.datetime_service import now_utc_naive
+from app.utils.datetime_service import now_utc_naive, to_app_tz, now_app_tz
 
 from flask import (
     Blueprint, render_template, redirect, url_for,
@@ -34,13 +33,16 @@ from flask import (
 from app.middleware.session_guard import require_user_role
 from app.db.exams import get_exam_by_id
 from app.db.questions import get_questions_by_exam
-from app.db.results import create_result, create_responses_bulk
-from app.db.attempts import get_active_attempt, update_exam_attempt
+from app.db.results import get_result_by_attempt_id
+from app.db.attempts import (
+    get_active_attempt, get_attempt_by_id,
+    claim_attempt_for_finalization, update_attempt_answers_draft,
+)
 from app.db.sessions import set_exam_active
 from app.services.exam_service import (
     get_cached_exam_data, preload_exam_data,
-    check_answer, calculate_question_score,
     purge_exam_session_cache, compute_exam_action_state,
+    get_effective_deadline, finalize_exam_attempt, is_manual_submission_allowed,
 )
 from app.services.result_service import can_user_see_result
 from app.db.dashboard_events import mark_event_seen
@@ -87,13 +89,14 @@ def _purge_exam_session(exam_id: int) -> None:
 # Instructions
 # ─────────────────────────────────────────────
 
-@exam_bp.route("/exam-instructions/<int:exam_id>")
-@require_user_role
-def exam_instructions(exam_id):
+def _exam_action_context(exam_id):
+    """Shared context-building for exam_instructions() and exam_kiosk() —
+    both pages show the same Start/Resume/Prepare decision for the same
+    exam, just in different chrome, and must never be able to disagree
+    with each other about it. Returns None if the exam doesn't exist."""
     exam = get_exam_by_id(exam_id)
     if not exam:
-        flash("Exam not found.", "error")
-        return redirect(url_for("dashboard.dashboard"))
+        return None
 
     exam.setdefault("positive_marks", 1)
     exam.setdefault("negative_marks", 0)
@@ -103,14 +106,106 @@ def exam_instructions(exam_id):
 
     state = compute_exam_action_state(user_id, exam)
 
+    # SOURCE OF TRUTH for "has this student already started preparing this
+    # Scheduled Exam" — the Flask session's preload cache (get_cached_exam_data,
+    # written by preload_exam_data() when the student first clicks Prepare)
+    # already IS server-side, session-backed state that survives a refresh —
+    # unlike a JS variable, which a refresh wipes. Reusing it here means the
+    # instructions/kiosk page can tell, on every render, whether to auto-
+    # resume the countdown/launch flow instead of showing the "click
+    # Prepare" gate again, with no new storage needed. False whenever
+    # there's nothing to resume (never prepared, or an active attempt
+    # already exists — that renders the Resume Exam branch instead, which
+    # never reads this flag).
+    prep_already_started = bool(state["is_scheduled"] and get_cached_exam_data(exam_id))
+
+    return {
+        "exam": exam,
+        "active_attempt": state["active_attempt"],
+        "attempts_left": state["attempts_left"],
+        "max_attempts": state["max_attempts"],
+        "attempts_exhausted": state["attempts_exhausted"],
+        "can_start": state["can_start"],
+        "has_started": state["has_started"],
+        "has_ended": state["has_ended"],
+        "window": state["window"],
+        "is_scheduled": state["is_scheduled"],
+        "prep_open": state["prep_open"],
+        "effective_status": state["effective_status"],
+        "prep_already_started": prep_already_started,
+    }
+
+
+@exam_bp.route("/exam-instructions/<int:exam_id>")
+@require_user_role
+def exam_instructions(exam_id):
+    ctx = _exam_action_context(exam_id)
+    if ctx is None:
+        flash("Exam not found.", "error")
+        return redirect(url_for("dashboard.dashboard"))
+    return render_template("exam_instructions.html", **ctx)
+
+
+# ─────────────────────────────────────────────
+# Scheduled Exam Kiosk — dedicated fullscreen preparation/exam/completion
+# window. Manual Exams never use this: they keep the original popup-window
+# + exam_page.html's own fullscreen gate, completely unchanged. See
+# templates/exam_kiosk.html for why this exists as its own window rather
+# than reusing the (persistent, always-navigable) Instructions page as the
+# fullscreen host.
+# ─────────────────────────────────────────────
+
+@exam_bp.route("/exam-kiosk/<int:exam_id>")
+@require_user_role
+def exam_kiosk(exam_id):
+    ctx = _exam_action_context(exam_id)
+    if ctx is None:
+        flash("Exam not found.", "error")
+        return redirect(url_for("dashboard.dashboard"))
+    if not ctx["is_scheduled"]:
+        # The Kiosk only exists for Scheduled Exams — a Manual Exam
+        # reaching this URL (stale link, manual navigation) belongs on the
+        # normal instructions page instead.
+        return redirect(url_for("exam.exam_instructions", exam_id=exam_id))
+
+    # Same decision the Instructions page's action button already makes
+    # (attempts_exhausted -> active_attempt -> can_start -> cancelled ->
+    # prep_open -> ended), just resolved once here into "is there anything
+    # for the Kiosk to do" plus a plain-language reason when there isn't —
+    # actual enforcement is unchanged and still lives entirely in
+    # /api/v01/exams/<id>/start and /preload, never in this presentation
+    # logic.
+    kiosk_ready = (not ctx["attempts_exhausted"]) and (
+        ctx["active_attempt"] or ctx["can_start"] or (
+            ctx["effective_status"] != "cancelled" and not ctx["has_started"] and ctx["prep_open"]
+        )
+    )
+    terminal_icon = terminal_title = terminal_msg = None
+    if not kiosk_ready:
+        if ctx["attempts_exhausted"]:
+            terminal_icon, terminal_title = "ban", "Attempts Exhausted"
+            terminal_msg = "You have used all your allowed attempts for this exam."
+        elif ctx["effective_status"] == "cancelled":
+            terminal_icon, terminal_title = "ban", "Exam Cancelled"
+            terminal_msg = "This scheduled exam has been cancelled by the administrator."
+        elif ctx["has_ended"]:
+            terminal_icon, terminal_title = "flag-checkered", "Exam Has Ended"
+            terminal_msg = "This exam's window has closed and it can no longer be started."
+        else:
+            terminal_icon, terminal_title = "clock", "Not Open Yet"
+            win = ctx["window"] or {}
+            when = f"{ctx['exam'].get('date','')} at {win.get('start_time_ampm') or ctx['exam'].get('start_time','')}"
+            terminal_msg = f"This exam isn't open for preparation yet. Scheduled for {when}."
+
+    # standalone=True: no top nav / sidebar chrome (same mechanism
+    # base.html already uses for /exam/ pages) — the Kiosk is meant to be
+    # a clean, distraction-free window with nothing behind it once it's
+    # fullscreen.
     return render_template(
-        "exam_instructions.html",
-        exam=exam,
-        active_attempt=state["active_attempt"],
-        attempts_left=state["attempts_left"],
-        max_attempts=state["max_attempts"],
-        attempts_exhausted=state["attempts_exhausted"],
-        can_start=state["can_start"],
+        "exam_kiosk.html", standalone=True,
+        kiosk_ready=kiosk_ready,
+        terminal_icon=terminal_icon, terminal_title=terminal_title, terminal_msg=terminal_msg,
+        **ctx,
     )
 
 
@@ -179,6 +274,11 @@ def exam_page(exam_id):
     # ── Timer ───────────────────────────────────────────────────────────────
     # Source of truth: active attempt's start_time from the DB row (already
     # written to session above from the DB value — not from a stale key).
+    # get_effective_deadline() is manual-exam-identical to the old
+    # start+duration math (personal_deadline, untouched); for a Scheduled
+    # Exam it additionally caps the deadline at the official end, so a
+    # late-starting student never gains time — see its docstring for the
+    # worked examples this implements.
     duration_secs     = int(float(exam_data.get("duration", 60))) * 60
     remaining_seconds = duration_secs
     is_fresh          = False
@@ -192,15 +292,30 @@ def exam_page(exam_id):
                 )
             except Exception:
                 start_dt = datetime.strptime(str(start_time_str), "%Y-%m-%d %H:%M:%S")
-            elapsed           = (now_utc_naive() - start_dt).total_seconds()
-            remaining_seconds = max(0, duration_secs - int(elapsed))
+            deadline_dt       = get_effective_deadline(exam_data, to_app_tz(start_dt))
+            remaining_seconds = max(0, int((deadline_dt - now_app_tz()).total_seconds()))
             if remaining_seconds <= 0:
-                update_exam_attempt(db_attempt_id, {
-                    "status":   "completed",
-                    "end_time": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
-                })
+                # The student's own deadline has already passed by the time
+                # this page (re)loaded — e.g. they closed the tab and came
+                # back late, or refreshed right at zero. Finalize properly
+                # (score + persist results/responses) rather than the old
+                # behaviour of just flipping status with no result ever
+                # created. One last fold-in of whatever the session still
+                # holds happens BEFORE claiming (while status is still
+                # 'in_progress', the only state update_attempt_answers_draft
+                # writes in) — it's the freshest answer state this request
+                # can offer, in case it's newer than the last autosave.
+                # claim_attempt_for_finalization() is then atomic and
+                # idempotent: if the background auto-submit sweep already
+                # claimed/finalized this attempt in the meantime, this finds
+                # nothing to claim and skips straight to the same redirect
+                # — never double-scores.
+                update_attempt_answers_draft(db_attempt_id, session.get("exam_answers") or {})
+                claimed = claim_attempt_for_finalization(db_attempt_id)
+                if claimed:
+                    finalize_exam_attempt(db_attempt_id)
                 _purge_exam_session(exam_id)
-                flash("Your exam time has expired.", "warning")
+                flash("Your exam time has expired. Your attempt has been submitted automatically.", "warning")
                 return redirect(url_for("exam.exam_instructions", exam_id=exam_id))
         except Exception as e:
             log.warning("[exam] Timer parse error for user=%s: %s", user_id, e)
@@ -235,6 +350,7 @@ def exam_page(exam_id):
         show_start_button=False,
         attempts_left=-1,
         attempts_exhausted=False,
+        manual_submission_allowed=is_manual_submission_allowed(exam_data),
     )
 
 
@@ -245,127 +361,109 @@ def exam_page(exam_id):
 @exam_bp.route("/submit-exam/<int:exam_id>", methods=["POST"])
 @require_user_role
 def submit_exam(exam_id):
-    user_id  = session["user_id"]
-    username = session.get("username", "Student")
+    """Handles BOTH a genuine manual submit and the client-side timer's
+    auto-submit-at-zero (they hit this exact same route — see
+    templates/exam_page.html autoSubmitExam()). Either way, the real
+    work is: claim the attempt (in_progress -> finalizing, atomically —
+    see claim_attempt_for_finalization()), then score+persist via the
+    same finalize_exam_attempt() the background auto-submit sweep uses.
+    This makes a manual submit, a client-timer auto-submit, and the
+    server-side sweep all converge on one identical, idempotent code
+    path — whichever of them reaches a given attempt first is the only
+    one that actually finalizes it; every later/concurrent caller sees
+    it's no longer 'in_progress' and treats that as success, not an error.
+    """
+    user_id = session["user_id"]
 
     exam = get_exam_by_id(exam_id)
     if not exam:
         flash("Exam not found.", "error")
         return redirect(url_for("dashboard.dashboard"))
 
-    questions = get_questions_by_exam(exam_id)
-    if not questions:
-        flash("No questions found.", "error")
-        return redirect(url_for("dashboard.dashboard"))
-
-    # ── Idempotency: verify an attempt actually exists and is in-progress ────
-    # Prevents double-submit from creating a second result row.
     attempt_id = session.get("latest_attempt_id")
     if not attempt_id:
         flash("No active exam attempt found. Please start the exam first.", "warning")
         return redirect(url_for("exam.exam_instructions", exam_id=exam_id))
+    attempt_id = int(attempt_id)
 
-    answers     = session.get("exam_answers", {})
-    total_q     = len(questions)
-    correct_ans = incorrect_ans = 0
-    total_score = max_score = 0.0
-    responses   = []
+    def _respond_with_existing_result(info_message: str):
+        """Shared idempotent-exit path: this attempt is no longer
+        in_progress (already finalized by someone else — the sweep, an
+        earlier request, a duplicate submit) — show the existing result
+        rather than erroring or rescoring."""
+        existing = get_result_by_attempt_id(attempt_id)
+        set_exam_active(session.get("token", ""), is_active=False)
+        _purge_exam_session(exam_id)
+        if not existing:
+            # Claimed but not yet finalized (the claimer is mid-flight,
+            # almost certainly the sweep, milliseconds away) — nothing to
+            # show yet; sending the student to the exam page will re-run
+            # exam_page()'s own not-in_progress handling, which redirects
+            # them to instructions with an accurate state a moment later.
+            flash("Your exam is being finalized. Please check back in a moment.", "info")
+            return redirect(url_for("exam.exam_instructions", exam_id=exam_id))
+        flash(info_message, "success")
+        visible, _ = can_user_see_result(exam, existing)
+        if visible:
+            return redirect(url_for("result.result", exam_id=exam_id))
+        return redirect(url_for("result.result_pending", exam_id=exam_id, result_id=existing["id"]))
 
-    neg_raw = str(exam.get("negative_marks", "0")).strip()
+    attempt = get_attempt_by_id(attempt_id)
+    if not attempt or int(attempt.get("student_id") or 0) != int(user_id) or int(attempt.get("exam_id") or 0) != int(exam_id):
+        flash("Invalid exam attempt.", "error")
+        return redirect(url_for("exam.exam_instructions", exam_id=exam_id))
 
-    for q in questions:
-        qid   = str(q["id"])
-        qtype = q.get("question_type", "MCQ")
-        pos   = float(q.get("positive_marks", 1) or 1)
-        max_score += pos
+    if attempt.get("status") != "in_progress":
+        return _respond_with_existing_result("Exam already submitted.")
 
-        given  = answers.get(qid)
-        corr   = q.get("correct_answer")
-        is_att = given is not None and given != ""
-        is_cor = False
-        marks  = 0.0
-
-        if is_att:
-            is_cor = check_answer(given, corr, qtype, float(q.get("tolerance", 0) or 0))
-            marks  = calculate_question_score(
-                is_cor, pos,
-                neg_raw.split(",")[0] if "," in neg_raw else neg_raw
+    # SECURITY (Feature: Scheduled Exam manual-submission control) — only
+    # blocks a genuinely EARLY voluntary submit; once the deadline has
+    # actually passed this is allowed through regardless of the setting,
+    # since at that point it's no longer "early" whether it was triggered
+    # by the student's own timer or arrived with no button at all. The
+    # frontend hides the Submit button for this case, but per this app's
+    # established pattern that's a UI convenience only — this is the real
+    # enforcement, re-checked independently of what the client sent.
+    now = now_utc_naive()
+    # DB rows normalize every timestamp column to an ISO string on read
+    # (see _normalize_row() in app/db/__init__.py) — effective_deadline
+    # comes back as str, not datetime, so it must be parsed before it can
+    # be compared against `now`.
+    deadline_raw = attempt.get("effective_deadline")
+    deadline = datetime.fromisoformat(str(deadline_raw)) if deadline_raw else None
+    if exam.get("scheduled_mode") and not is_manual_submission_allowed(exam):
+        if deadline and now < deadline:
+            flash(
+                "Manual submission is not enabled for this exam — it will submit "
+                "automatically when the exam time ends.",
+                "warning",
             )
-            if is_cor:
-                correct_ans += 1
-            else:
-                incorrect_ans += 1
-        total_score += marks
+            return redirect(url_for("exam.exam_page", exam_id=exam_id))
 
-        responses.append({
-            "question_id":    int(qid),
-            "exam_id":        int(exam_id),
-            "question_type":  qtype,
-            "given_answer":   json.dumps(given) if isinstance(given, list) else str(given or ""),
-            "correct_answer": json.dumps(corr) if isinstance(corr, list) else str(corr or ""),
-            "is_correct":     is_cor,
-            "is_attempted":   is_att,
-            "marks_obtained": round(float(marks), 2),
-        })
+    # Fold in the freshest session answers one last time before claiming —
+    # this only writes while status is still 'in_progress' (true here),
+    # so it can never race the scorer that reads answers_draft afterward.
+    update_attempt_answers_draft(attempt_id, session.get("exam_answers") or {})
 
-    unanswered = total_q - correct_ans - incorrect_ans
-    percentage = (total_score / max_score * 100) if max_score > 0 else 0.0
-    grade = (
-        "A+" if percentage >= 90 else
-        "A"  if percentage >= 80 else
-        "B"  if percentage >= 70 else
-        "C"  if percentage >= 60 else
-        "D"  if percentage >= 50 else "F"
-    )
+    claimed = claim_attempt_for_finalization(attempt_id)
+    if not claimed:
+        # Someone else (almost certainly the background sweep) claimed it
+        # in the tiny window between the status check above and now.
+        return _respond_with_existing_result("Exam already submitted.")
 
-    # Time taken
-    start_str = session.get("exam_start_time", "")
-    try:
-        try:
-            start_dt = datetime.fromisoformat(
-                str(start_str).replace("Z", "").replace("+00:00", "")
-            )
-        except Exception:
-            start_dt = datetime.strptime(str(start_str), "%Y-%m-%d %H:%M:%S")
-        time_taken = max(0, int((now_utc_naive() - start_dt).total_seconds() / 60))
-    except Exception:
-        time_taken = 0
+    ok, result_id, msg = finalize_exam_attempt(attempt_id)
+    if not ok:
+        # Left in 'finalizing' — the auto-submit sweep's stale-reclaim
+        # will retry it shortly; this request still needs to tell the
+        # student something reasonable rather than silently erroring.
+        log.error("[exam] submit_exam finalize failed attempt_id=%s: %s", attempt_id, msg)
+        flash("We're still saving your exam — please check your results in a moment.", "warning")
+        set_exam_active(session.get("token", ""), is_active=False)
+        _purge_exam_session(exam_id)
+        return redirect(url_for("dashboard.dashboard"))
 
-    created = create_result({
-        "student_id":           int(user_id),
-        "exam_id":              int(exam_id),
-        "score":                int(round(total_score)),
-        "max_score":            int(round(max_score)),
-        "percentage":           round(percentage, 2),
-        "grade":                grade,
-        "completed_at":         now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
-        "time_taken_minutes":   time_taken,
-        "correct_answers":      correct_ans,
-        "incorrect_answers":    incorrect_ans,
-        "unanswered_questions": unanswered,
-        "total_questions":      total_q,
-    })
-    if not created:
-        flash("Error saving result. Please contact support.", "error")
-        return redirect(url_for("exam.exam_page", exam_id=exam_id))
-
-    result_id = int(created["id"])
-    for r in responses:
-        r["result_id"] = result_id
-
-    create_responses_bulk(responses)
-
-    # Mark attempt complete
-    update_exam_attempt(int(attempt_id), {
-        "status":   "completed",
-        "end_time": now_utc_naive().strftime("%Y-%m-%d %H:%M:%S"),
-    })
-
-    # ── Complete session purge ───────────────────────────────────────────────
-    # Preserve only the result_id for the redirect target; everything else
-    # must be wiped so the next attempt starts completely clean.
     set_exam_active(session.get("token", ""), is_active=False)
-    _purge_exam_session(exam_id)          # clears transient keys + exam_data cache
+    _purge_exam_session(exam_id)
     session["latest_result_id"] = result_id
     session.modified = True
 

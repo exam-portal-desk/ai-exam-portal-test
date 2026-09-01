@@ -7,7 +7,13 @@
 /* ── DASHBOARD LAYOUT — structure only, all colors via tokens ── */
 
 .dash-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(120% 180% at 0% 0%, var(--accent-subtle) 0%, transparent 55%),
+    var(--surface);
 }
 .dash-header h1 {
   font-size: 1.4rem;
@@ -19,13 +25,21 @@
   align-items: center;
   gap: .6rem;
 }
-.dash-header h1 i { color: var(--accent); font-size: 1.1rem; }
+.dash-header h1 i {
+  color: var(--accent-on);
+  font-size: 1rem;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  box-shadow: var(--shadow-sm);
+}
 .dash-header p {
   font-size: .83rem;
   color: var(--text-3);
 }
 
-/* ── Stat cards ── */
+/* ── Stat cards (primary KPIs) ── */
 .dash-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -35,16 +49,19 @@
 .dash-stat {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--stat-c, var(--border));
   border-radius: calc(var(--radius) + 2px);
   padding: 1.1rem 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  transition: border-color .15s, box-shadow .15s;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
 }
 .dash-stat:hover {
   border-color: var(--border-focus);
+  border-top-color: var(--stat-c, var(--border-focus));
   box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 .dash-stat-icon {
   width: 44px;
@@ -55,31 +72,23 @@
   justify-content: center;
   font-size: 1.1rem;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.02);
 }
-.dsi-blue   { background: var(--info-bg);    color: var(--info-text); }
-.dsi-green  { background: var(--success-bg); color: var(--success-text); }
-.dsi-purple { background: var(--accent-subtle); color: var(--accent); }
-.dsi-amber  { background: var(--warning-bg); color: var(--warning-text); }
+.dsi-blue   { background: linear-gradient(150deg, var(--info-bg), transparent);    color: var(--info-text); }
+.dsi-green  { background: linear-gradient(150deg, var(--success-bg), transparent); color: var(--success-text); }
+.dsi-purple { background: linear-gradient(150deg, var(--accent-subtle), transparent); color: var(--accent); }
+.dsi-amber  { background: linear-gradient(150deg, var(--warning-bg), transparent); color: var(--warning-text); }
 
 .dash-stat-body { min-width: 0; }
 .dash-stat-num {
-  font-size: 1.45rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: var(--text-1);
   line-height: 1.1;
-  letter-spacing: -.02em;
+  letter-spacing: -.03em;
 }
-.dash-stat-exact {
-  font-size: .68rem;
-  color: var(--text-3);
-  margin-top: .1rem;
-}
-.dash-stat-label {
-  font-size: .75rem;
-  color: var(--text-3);
-  font-weight: 600;
-  margin-top: .2rem;
-}
+.dash-stat-exact { font-size: .68rem; color: var(--text-3); margin-top: .1rem; }
+.dash-stat-label { font-size: .75rem; color: var(--text-3); font-weight: 600; margin-top: .2rem; }
 
 /* ── Section title ── */
 .dash-section-title {
@@ -91,21 +100,56 @@
   margin-bottom: .85rem;
   display: flex;
   align-items: center;
-  gap: .5rem;
+  gap: .55rem;
 }
-.dash-section-title::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
+.dash-section-title::before {
+  content: ''; width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+.dash-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+.dash-group-title {
+  font-size: .7rem; font-weight: 700; color: var(--text-3);
+  margin: 1.1rem 0 .6rem; text-transform: uppercase; letter-spacing: .06em;
+}
+.dash-group-title:first-child { margin-top: 0; }
+
+/* ── Charts ── */
+.dash-charts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: .5rem;
+}
+.dash-chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--chart-c, var(--accent));
+  border-radius: calc(var(--radius) + 2px);
+  padding: 1rem 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow .15s, transform .15s;
+}
+.dash-chart-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.dash-chart-card.span2 { grid-column: span 2; }
+.dash-chart-hdr { font-size: .8rem; font-weight: 700; color: var(--text-1); margin-bottom: .1rem; display: flex; align-items: center; gap: .45rem; }
+.dash-chart-hdr::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--chart-c, var(--accent));
+}
+.dash-chart-sub { font-size: .7rem; color: var(--text-3); margin-bottom: .75rem; margin-left: 1.15rem; }
+.dash-chart-body { position: relative; height: 210px; }
+.dash-chart-body.tall { height: 240px; }
+.dash-chart-empty {
+  display: flex; align-items: center; justify-content: center; height: 210px;
+  font-size: .78rem; color: var(--text-3); text-align: center; padding: 0 1rem;
 }
 
-/* ── Quick actions grid ── */
+/* ── Apps / Quick Actions ── */
 .dash-actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: .75rem;
-  margin-bottom: 2rem;
 }
 .dash-action {
   background: var(--surface);
@@ -120,17 +164,18 @@
   font-family: inherit;
   transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
 }
-.dash-action:hover {
+.dash-action:hover, .dash-action:focus-visible {
   border-color: var(--accent);
   background: var(--accent-subtle);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
+  outline: none;
 }
 .dash-action-icon {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--surface-2);
+  background: linear-gradient(150deg, var(--surface-2), var(--surface));
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -138,155 +183,47 @@
   font-size: .9rem;
   color: var(--accent);
   flex-shrink: 0;
-  transition: background .15s, border-color .15s;
+  transition: background .15s, border-color .15s, transform .15s;
 }
 .dash-action:hover .dash-action-icon {
-  background: var(--accent);
-  color: var(--accent-on);
-  border-color: var(--accent);
+  background: linear-gradient(150deg, var(--accent), var(--accent-hover));
+  color: var(--accent-on); border-color: var(--accent);
+  transform: scale(1.06);
 }
-.dash-action-label {
-  font-size: .83rem;
-  font-weight: 700;
-  color: var(--text-1);
-  margin-bottom: .15rem;
-}
-.dash-action-desc {
-  font-size: .72rem;
-  color: var(--text-3);
-}
-
-/* ── Bottom info row ── */
-.dash-bottom {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-/* Portal overview card */
-.dash-overview {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 2px);
-  overflow: hidden;
-}
-.dash-card-hdr {
-  padding: .75rem 1.1rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  font-size: .8rem;
-  font-weight: 700;
-  color: var(--text-1);
-}
-.dash-card-hdr i { color: var(--accent); font-size: .82rem; }
-
-.dash-overview-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: .6rem 1.1rem;
-  border-bottom: 1px solid var(--border);
-  font-size: .8rem;
-}
-.dash-overview-row:last-child { border-bottom: none; }
-.dash-overview-lbl { color: var(--text-3); font-weight: 500; }
-.dash-overview-val {
-  font-weight: 700;
-  color: var(--text-1);
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-}
-.dash-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-  display: inline-block;
-  animation: pulse-dot 2s infinite;
-}
-@keyframes pulse-dot {
-  0%,100% { box-shadow: 0 0 0 0 var(--success-bg); }
-  50%      { box-shadow: 0 0 0 4px transparent; }
-}
-
-/* Quick links card */
-.dash-links {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 2px);
-  overflow: hidden;
-}
-.dash-link-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: .65rem 1.1rem;
-  border-bottom: 1px solid var(--border);
-  font-size: .8rem;
-  transition: background .12s;
-}
-.dash-link-row:last-child { border-bottom: none; }
-.dash-link-row:hover { background: var(--surface-2); }
-.dash-link-lbl {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  color: var(--text-2);
-  font-weight: 500;
-}
-.dash-link-lbl i {
-  width: 16px;
-  text-align: center;
-  color: var(--text-3);
-  font-size: .75rem;
-}
-.dash-link-row:hover .dash-link-lbl i { color: var(--accent); }
-.dash-link-action {
-  font-size: .78rem;
-  font-weight: 700;
-  color: var(--accent);
-  text-decoration: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  padding: 0;
-  transition: opacity .15s;
-}
-.dash-link-action:hover { opacity: .75; }
+.dash-action-label { font-size: .83rem; font-weight: 700; color: var(--text-1); margin-bottom: .15rem; }
+.dash-action-desc { font-size: .72rem; color: var(--text-3); }
 
 /* Responsive */
 @media (max-width: 1100px) {
   .dash-stats   { grid-template-columns: repeat(2, 1fr); }
+  .dash-charts  { grid-template-columns: repeat(2, 1fr); }
+  .dash-chart-card.span2 { grid-column: span 2; }
   .dash-actions { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
   .dash-stats   { grid-template-columns: 1fr; }
+  .dash-charts  { grid-template-columns: 1fr; }
+  .dash-chart-card.span2 { grid-column: span 1; }
   .dash-actions { grid-template-columns: 1fr; }
-  .dash-bottom  { grid-template-columns: 1fr; }
 }
 </style>
 
 <!-- ── Header ── -->
 <div class="dash-header">
-  <h1><i class="fas fa-home"></i> Dashboard</h1>
-  <p>Welcome back - here's what's happening on your portal.</p>
+  <h1><i class="fas fa-home"></i> <span id="dashGreetWord">{{ greeting }}</span>, {{ session.get('full_name','').split()[0] }}</h1>
+  <p>Here's what's happening today.</p>
 </div>
 
-<!-- ── Stat Cards ── -->
+<!-- ── Primary KPIs ── -->
 <div class="dash-stats">
-  <div class="dash-stat">
+  <div class="dash-stat" style="--stat-c:var(--info-text)">
     <div class="dash-stat-icon dsi-blue"><i class="fas fa-file-alt"></i></div>
     <div class="dash-stat-body">
       <div class="dash-stat-num">{{ stats.get('total_exams', 0) }}</div>
       <div class="dash-stat-label">Total Exams</div>
     </div>
   </div>
-  <div class="dash-stat">
+  <div class="dash-stat" style="--stat-c:var(--success-text)">
     <div class="dash-stat-icon dsi-green"><i class="fas fa-users"></i></div>
     <div class="dash-stat-body">
       <div class="dash-stat-num" id="dash-users">{{ stats.get('total_users', 0) }}</div>
@@ -294,14 +231,14 @@
       <div class="dash-stat-label">Registered Users</div>
     </div>
   </div>
-  <div class="dash-stat">
+  <div class="dash-stat" style="--stat-c:var(--accent)">
     <div class="dash-stat-icon dsi-purple"><i class="fas fa-user-shield"></i></div>
     <div class="dash-stat-body">
       <div class="dash-stat-num">{{ stats.get('total_admins', 0) }}</div>
       <div class="dash-stat-label">Admin Accounts</div>
     </div>
   </div>
-  <div class="dash-stat">
+  <div class="dash-stat" style="--stat-c:var(--warning-text)">
     <div class="dash-stat-icon dsi-amber"><i class="fas fa-users-cog"></i></div>
     <div class="dash-stat-body">
       <div class="dash-stat-num" id="dash-students">{{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }}</div>
@@ -311,184 +248,92 @@
   </div>
 </div>
 
-<!-- ── Quick Actions ── -->
-<div class="dash-section-title">Quick Actions</div>
-<div class="dash-actions">
+<!-- ── Analytics ── -->
+<div class="dash-section-title">Analytics</div>
+<div class="dash-charts">
 
-  <a href="{{ url_for('admin.exams') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-file-alt"></i></div>
-    <div>
-      <div class="dash-action-label">Manage Exams</div>
-      <div class="dash-action-desc">Create, edit, delete exams</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.subjects') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-book"></i></div>
-    <div>
-      <div class="dash-action-label">Manage Subjects</div>
-      <div class="dash-action-desc">Add or remove subjects</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.questions_index') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-question-circle"></i></div>
-    <div>
-      <div class="dash-action-label">Manage Questions</div>
-      <div class="dash-action-desc">View and edit questions</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.requests_dashboard') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-user-plus"></i></div>
-    <div>
-      <div class="dash-action-label">Users &amp; Requests</div>
-      <div class="dash-action-desc">Approve access requests</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.attempts') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-list-ol"></i></div>
-    <div>
-      <div class="dash-action-label">Manage Attempts</div>
-      <div class="dash-action-desc">View exam attempts</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.users_analytics') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-chart-line"></i></div>
-    <div>
-      <div class="dash-action-label">Users Analytics</div>
-      <div class="dash-action-desc">Performance insights</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.upload_images_page') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-images"></i></div>
-    <div>
-      <div class="dash-action-label">Upload Images</div>
-      <div class="dash-action-desc">Manage question images</div>
-    </div>
-  </a>
-
-  <a href="{{ url_for('admin.ai_command_centre') }}" class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-robot"></i></div>
-    <div>
-      <div class="dash-action-label">AI Command Centre</div>
-      <div class="dash-action-desc">AI-powered tools</div>
-    </div>
-  </a>
-
-  <a href="#"
-     id="open-latex-editor-card"
-     data-url="{{ url_for('admin.latex_editor') }}"
-     class="dash-action">
-    <div class="dash-action-icon"><i class="fas fa-square-root-alt"></i></div>
-    <div>
-      <div class="dash-action-label">LaTeX Editor</div>
-      <div class="dash-action-desc">Create and edit questions using LaTeX</div>
-    </div>
-  </a>
-
-</div>
-
-<!-- ── Bottom Row ── -->
-<div class="dash-section-title">Overview &amp; Links</div>
-<div class="dash-bottom">
-
-  <!-- Portal Overview -->
-  <div class="dash-overview">
-    <div class="dash-card-hdr">
-      <i class="fas fa-info-circle"></i> Portal Overview
-    </div>
-    <div class="dash-overview-row">
-      <span class="dash-overview-lbl">System Status</span>
-      <span class="dash-overview-val">
-        <span class="dash-status-dot"></span> Online
-      </span>
-    </div>
-    <div class="dash-overview-row">
-      <span class="dash-overview-lbl">Total Exams</span>
-      <span class="dash-overview-val">{{ stats.get('total_exams', 0) }}</span>
-    </div>
-    <div class="dash-overview-row">
-      <span class="dash-overview-lbl">Total Users</span>
-      <span class="dash-overview-val" id="dash-users-2">{{ stats.get('total_users', 0) }}</span>
-    </div>
-    <div class="dash-overview-row">
-      <span class="dash-overview-lbl">Admins</span>
-      <span class="dash-overview-val">{{ stats.get('total_admins', 0) }}</span>
-    </div>
-    <div class="dash-overview-row">
-      <span class="dash-overview-lbl">Students</span>
-      <span class="dash-overview-val" id="dash-students-2">{{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }}</span>
-    </div>
+  <div class="dash-chart-card span2" style="--chart-c:var(--info-text)">
+    <div class="dash-chart-hdr">Content Library</div>
+    <div class="dash-chart-sub">Categories, subjects, exams and questions on the portal</div>
+    <div class="dash-chart-body"><canvas id="chartContentLibrary"></canvas></div>
   </div>
 
-  <!-- Quick Links -->
-  <div class="dash-links">
-    <div class="dash-card-hdr">
-      <i class="fas fa-bolt"></i> Quick Links
-    </div>
-    <div class="dash-link-row">
-      <span class="dash-link-lbl">
-        <i class="fas fa-user-plus"></i> Pending Requests
-      </span>
-      <a href="{{ url_for('admin.requests_dashboard') }}" class="dash-link-action">View &rarr;</a>
-    </div>
-    <div class="dash-link-row">
-      <span class="dash-link-lbl">
-        <i class="fas fa-chart-line"></i> Users Analytics
-      </span>
-      <a href="{{ url_for('admin.users_analytics') }}" class="dash-link-action">Open &rarr;</a>
-    </div>
-    <div class="dash-link-row">
-      <span class="dash-link-lbl">
-        <i class="fas fa-robot"></i> AI Command Centre
-      </span>
-      <a href="{{ url_for('admin.ai_command_centre') }}" class="dash-link-action">Open &rarr;</a>
-    </div>
-    <div class="dash-link-row">
-      <span class="dash-link-lbl">
-        <i class="fas fa-layer-group"></i> Manage Categories
-      </span>
-      <a href="{{ url_for('admin.categories') }}" class="dash-link-action">Open &rarr;</a>
-    </div>
-    <div class="dash-link-row">
-      <span class="dash-link-lbl">
-        <i class="fas fa-square-root-alt"></i> LaTeX Editor
-      </span>
-      <button id="dash-latex-btn" class="dash-link-action">Open &rarr;</button>
-    </div>
+  <div class="dash-chart-card" style="--chart-c:var(--accent)">
+    <div class="dash-chart-hdr">Users</div>
+    <div class="dash-chart-sub">Admins vs. students</div>
+    <div class="dash-chart-body"><canvas id="chartUserRoles"></canvas></div>
+  </div>
+
+  <div class="dash-chart-card" style="--chart-c:#7c3aed">
+    <div class="dash-chart-hdr">Questions by Type</div>
+    <div class="dash-chart-sub">Across all exams</div>
+    <div class="dash-chart-body"><canvas id="chartQuestionTypes"></canvas></div>
+  </div>
+
+  <div class="dash-chart-card" style="--chart-c:var(--success-text)">
+    <div class="dash-chart-hdr">Exam Attempts</div>
+    <div class="dash-chart-sub">By status</div>
+    <div class="dash-chart-body"><canvas id="chartAttempts"></canvas></div>
+  </div>
+
+  <div class="dash-chart-card" style="--chart-c:var(--warning-text)">
+    <div class="dash-chart-hdr">Access Requests</div>
+    <div class="dash-chart-sub">By status</div>
+    <div class="dash-chart-body"><canvas id="chartRequests"></canvas></div>
+  </div>
+
+  <div class="dash-chart-card" style="--chart-c:#0891b2">
+    <div class="dash-chart-hdr">Exams per Category</div>
+    <div class="dash-chart-sub">Where exams are concentrated</div>
+    <div class="dash-chart-body tall"><canvas id="chartExamsPerCategory"></canvas></div>
+  </div>
+
+  <div class="dash-chart-card" style="--chart-c:var(--info-text)">
+    <div class="dash-chart-hdr">Most Attempted Exams</div>
+    <div class="dash-chart-sub">Top 5 by attempt count</div>
+    <div class="dash-chart-body tall"><canvas id="chartTopAttempted"></canvas></div>
+  </div>
+
+  <div class="dash-chart-card" style="--chart-c:var(--danger-text)">
+    <div class="dash-chart-hdr">Largest Exams</div>
+    <div class="dash-chart-sub">Top 5 by question count</div>
+    <div class="dash-chart-body tall"><canvas id="chartTopQuestions"></canvas></div>
   </div>
 
 </div>
+
+<!-- ── Apps / Quick Actions ── -->
+<div class="dash-section-title" style="margin-top:2rem">Apps</div>
+{% for group in module_groups %}
+<div class="dash-group-title">{{ group.name }}</div>
+<div class="dash-actions" style="margin-bottom: {{ '.75rem' if not loop.last else '2rem' }}">
+  {% for m in group.modules %}
+  <a href="{{ m.url }}" class="dash-action" {% if m.popup %}data-popup-url="{{ m.url }}"{% endif %}>
+    <div class="dash-action-icon"><i class="fas {{ m.icon }}"></i></div>
+    <div>
+      <div class="dash-action-label">{{ m.label }}</div>
+      <div class="dash-action-desc">{{ m.desc }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endfor %}
 
 <script>
-/* ── LaTeX editor popups ── */
-document.getElementById('dash-latex-btn').addEventListener('click', function () {
-  var w = Math.max(Math.round(window.innerWidth * .6), 900);
-  var h = Math.max(Math.round(window.innerHeight * .75), 600);
-  window.open('/admin/latex_editor', 'latexEditor',
-    'width=' + w + ',height=' + h +
-    ',left=' + Math.round(window.screenX + (window.innerWidth - w) / 2) +
-    ',top='  + Math.round(window.screenY + (window.innerHeight - h) / 2) +
-    ',resizable=yes');
-});
-
+/* ── Popup modules (LaTeX Editor) ── */
 document.addEventListener('DOMContentLoaded', function () {
-  var btn = document.getElementById('open-latex-editor-card');
-  if (!btn) return;
-  btn.addEventListener('click', function (e) {
-    e.preventDefault();
-    var url = btn.dataset.url;
-    var w = Math.max(Math.round(window.innerWidth * 0.6), 900);
-    var h = Math.max(Math.round(window.innerHeight * 0.75), 600);
-    window.open(url, 'latexEditor',
-      'width=' + w + ',height=' + h +
-      ',left=' + Math.round(window.screenX + (window.innerWidth - w) / 2) +
-      ',top='  + Math.round(window.screenY + (window.innerHeight - h) / 2) +
-      ',resizable=yes');
+  document.querySelectorAll('.dash-action[data-popup-url]').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      var url = el.dataset.popupUrl;
+      var w = Math.max(Math.round(window.innerWidth * 0.6), 900);
+      var h = Math.max(Math.round(window.innerHeight * 0.75), 600);
+      window.open(url, 'latexEditor',
+        'width=' + w + ',height=' + h +
+        ',left=' + Math.round(window.screenX + (window.innerWidth - w) / 2) +
+        ',top='  + Math.round(window.screenY + (window.innerHeight - h) / 2) +
+        ',resizable=yes');
+    });
   });
 });
 
@@ -498,15 +343,12 @@ function fmtCompact(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K+';
   return String(n);
 }
-function fmtExact(n) {
-  return Number(n).toLocaleString('en-IN');
-}
+function fmtExact(n) { return Number(n).toLocaleString('en-IN'); }
 
 document.addEventListener('DOMContentLoaded', function () {
   var u = {{ stats.get('total_users', 0) }};
   var s = {{ (stats.get('total_users', 0) - stats.get('total_admins', 0)) | int }};
 
-  /* Stat cards */
   var uEl  = document.getElementById('dash-users');
   var sEl  = document.getElementById('dash-students');
   var uxEl = document.getElementById('dash-users-exact');
@@ -515,13 +357,123 @@ document.addEventListener('DOMContentLoaded', function () {
   if (sEl)  sEl.textContent  = fmtCompact(s);
   if (uxEl && u >= 1000) uxEl.textContent = fmtExact(u);
   if (sxEl && s >= 1000) sxEl.textContent = fmtExact(s);
-
-  /* Overview card */
-  var u2 = document.getElementById('dash-users-2');
-  var s2 = document.getElementById('dash-students-2');
-  if (u2) u2.textContent = fmtCompact(u) + (u >= 1000 ? ' (' + fmtExact(u) + ')' : '');
-  if (s2) s2.textContent = fmtCompact(s) + (s >= 1000 ? ' (' + fmtExact(s) + ')' : '');
 });
+
+/* ── Charts — Chart.js, loaded on demand (same pattern used on the
+   Users Analytics pages) so the dashboard itself never ships the library
+   unless charts are actually going to render. ── */
+(function () {
+  var CHART_DATA = {
+    content_library:     {{ charts.content_library | tojson }},
+    user_roles:          {{ charts.user_roles | tojson }},
+    question_types:      {{ charts.question_types | tojson }},
+    attempt_status:      {{ charts.attempt_status | tojson }},
+    request_status:      {{ charts.request_status | tojson }},
+    exams_per_category:  {{ charts.exams_per_category | tojson }},
+    top_attempted_exams: {{ charts.top_attempted_exams | tojson }},
+    top_question_exams:  {{ charts.top_question_exams | tojson }}
+  };
+  var COLORS = { blue: '#2d5be3', green: '#16a34a', amber: '#f59e0b', red: '#dc2626', purple: '#7c3aed', teal: '#0891b2' };
+  var PALETTE = [COLORS.blue, COLORS.green, COLORS.amber, COLORS.red, COLORS.purple, COLORS.teal];
+
+  function styles() {
+    var cs = getComputedStyle(document.documentElement);
+    return { text: cs.getPropertyValue('--text-2').trim() || '#666', grid: cs.getPropertyValue('--border').trim() || '#ddd' };
+  }
+
+  function renderEmpty(canvasId, message) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    var wrap = canvas.closest('.dash-chart-body');
+    if (wrap) wrap.outerHTML = '<div class="dash-chart-empty">' + message + '</div>';
+  }
+
+  function hasData(values) {
+    return values.length && values.some(function (v) { return v > 0; });
+  }
+
+  function renderDonut(canvasId, dataObj, emptyMsg) {
+    var labels = Object.keys(dataObj || {});
+    var values = labels.map(function (k) { return dataObj[k]; });
+    if (!hasData(values)) { renderEmpty(canvasId, emptyMsg); return; }
+    var s = styles();
+    new Chart(document.getElementById(canvasId).getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: PALETTE, borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: { position: 'bottom', labels: { color: s.text, boxWidth: 10, font: { size: 11 } } } }
+      }
+    });
+  }
+
+  // Vertical bar — small category counts (2-4 categories), linear scale.
+  function renderVBar(canvasId, dataObj, emptyMsg, color) {
+    var labels = Object.keys(dataObj || {});
+    var values = labels.map(function (k) { return dataObj[k]; });
+    if (!hasData(values)) { renderEmpty(canvasId, emptyMsg); return; }
+    var s = styles();
+    new Chart(document.getElementById(canvasId).getContext('2d'), {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: color, borderRadius: 5, maxBarThickness: 46 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (ctx) { return ctx.formattedValue; } } } },
+        scales: {
+          x: { ticks: { color: s.text, font: { size: 11 } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: s.text, precision: 0 }, grid: { color: s.grid } }
+        }
+      }
+    });
+  }
+
+  // Horizontal bar — ranked/named categories, optionally log-scaled when
+  // values span very different orders of magnitude (e.g. 381 questions
+  // next to 5 categories) so small bars stay visible without distorting
+  // the real numbers.
+  function renderHBar(canvasId, dataObj, emptyMsg, color, opts) {
+    opts = opts || {};
+    var labels = Object.keys(dataObj || {});
+    var values = labels.map(function (k) { return dataObj[k]; });
+    if (!hasData(values)) { renderEmpty(canvasId, emptyMsg); return; }
+    var s = styles();
+    var useLog = !!opts.log && values.every(function (v) { return v > 0; }) && Math.max.apply(null, values) / Math.min.apply(null, values) >= 10;
+    new Chart(document.getElementById(canvasId).getContext('2d'), {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: color, borderRadius: 5, maxBarThickness: 22 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { type: useLog ? 'logarithmic' : 'linear', beginAtZero: !useLog, ticks: { color: s.text, font: { size: 10 } }, grid: { color: s.grid } },
+          y: { ticks: { color: s.text, font: { size: 11 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  function initCharts() {
+    renderHBar('chartContentLibrary', CHART_DATA.content_library, 'No content yet.', COLORS.blue, { log: true });
+    renderDonut('chartUserRoles', CHART_DATA.user_roles, 'No users yet.');
+    renderHBar('chartQuestionTypes', CHART_DATA.question_types, 'No questions yet.', COLORS.purple, { log: true });
+    renderVBar('chartAttempts', CHART_DATA.attempt_status, 'No exam attempts yet.', COLORS.green);
+    renderVBar('chartRequests', CHART_DATA.request_status, 'No access requests yet.', COLORS.amber);
+    renderHBar('chartExamsPerCategory', CHART_DATA.exams_per_category, 'No categories yet.', COLORS.teal);
+    renderHBar('chartTopAttempted', CHART_DATA.top_attempted_exams, 'No exam attempts yet.', COLORS.blue);
+    renderHBar('chartTopQuestions', CHART_DATA.top_question_exams, 'No questions yet.', COLORS.red);
+  }
+
+  if (!window.Chart) {
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js';
+    script.onload = initCharts;
+    document.head.appendChild(script);
+  } else {
+    document.addEventListener('DOMContentLoaded', initCharts);
+  }
+})();
 </script>
+
+<script src="{{ url_for('static', filename='shared/greeting.js') }}"></script>
 
 {% endblock %}

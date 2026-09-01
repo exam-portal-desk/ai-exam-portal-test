@@ -17,7 +17,6 @@ from app.routes.web.admin import (  # noqa: E402, F401
     exams,
     questions,
     subjects,
-    users,
     results,
     attempts,
     requests,

@@ -263,7 +263,17 @@ setTimeout(() => {
     const active = canvas.getActiveObject();
     if (active?.type === 'activeSelection') {
       const members = active.getObjects ? active.getObjects() : [];
-      if (members.length && members.every(isInkRecolorable)) {
+      // ROOT CAUSE of "a mixed selection (shape + ink + text) makes Pen/Ink color do nothing, or
+      // wrongly recolor text": this used to require EVERY member to be ink-recolorable before
+      // touching any of them, else it fell straight through to the text-color handler — so a
+      // Shape+Ink+Text selection (never "every member" ink) always skipped ink entirely and
+      // recolored text instead, even though ink was clearly what was selected too. Filtering to
+      // just the ink-recolorable members and only falling back to text when there are NONE keeps
+      // this control's existing dual role (ink color, or text color when nothing ink-like is
+      // selected) while making it correctly ignore shape/text/image members that happen to be in
+      // the same selection rather than either seizing all of them or none of them.
+      const relevant = members.filter(isInkRecolorable);
+      if (relevant.length) {
         // ROOT CAUSE of multi-selected ink getting visually corrupted (strokes shifted/
         // duplicated-looking) on recolor: firing 'object:modified' PER MEMBER used to run
         // editor.js's handler — including constrainObjectToPage(member) — once for each still-
@@ -279,10 +289,14 @@ setTimeout(() => {
         // color-only change never actually moves anything, so constrainObjectToPage on the
         // group is a no-op, and markDirty()/autosave/undo still see exactly one modification
         // (a cleaner history entry than one per member, as a side benefit).
-        members.forEach(member => recolorInkObject(member, hex));
+        relevant.forEach(member => recolorInkObject(member, hex));
         canvas.requestRenderAll();
         canvas.fire('object:modified', { target: active });
       } else {
+        // No ink-recolorable member at all (e.g. a Shape+Text selection) — the same combined
+        // "Text / ink color" button falls back to its other role, itself now selection-aware
+        // (see applyTextColor in editor.js) so it only ever touches actual text members, never
+        // the shape.
         window.__notesApplyTextColor?.(hex);
       }
     } else if (isInkRecolorable(active)) {
@@ -368,6 +382,21 @@ setTimeout(() => {
     if (hex !== null) window.__notesStickyBgColor = hex; // a sticky note's own background never goes "no fill"
     const active = canvas.getActiveObject();
     if (!active) return;
+    // Same "filter the ActiveSelection down to just the relevant members" treatment as
+    // applyInkColor/applyTextColor above — a Shape+Ink+Text (or Shape+Sticky) selection only
+    // ever has its fillable members' fill touched here, never a freehand stroke or text color.
+    if (active.type === 'activeSelection') {
+      const members = active.getObjects ? active.getObjects() : [];
+      const relevant = members.filter(m => (m.objectType === 'shape' && !m.strokeOnly) || m.objectType === 'sticky_note');
+      if (!relevant.length) return;
+      relevant.forEach(m => {
+        if (m.objectType === 'sticky_note') { if (hex !== null) { m.set({ backgroundColor: hex }); m.customBg = true; m.initDimensions(); } }
+        else m.set({ fill: hex });
+      });
+      canvas.requestRenderAll();
+      canvas.fire('object:modified', { target: active });
+      return;
+    }
     if (active.objectType === 'sticky_note') { if (hex !== null) window.__notesApplyStickyBackground?.(hex); }
     else if (active.objectType === 'shape' && !active.strokeOnly) { active.set({ fill: hex }); canvas.requestRenderAll(); canvas.fire('object:modified', { target: active }); }
   };
@@ -408,7 +437,19 @@ setTimeout(() => {
     if (window.__notesReadOnly || hex === null) return;
     window.__notesShapeBorderColor = hex;
     const active = canvas.getActiveObject();
-    if (!active || active.objectType !== 'shape' || active.shapeTextFor) return;
+    if (!active) return;
+    // Same selection-filtering treatment as the other color controls above — only the shape
+    // members (excluding each shape's own caption label) get their stroke touched.
+    if (active.type === 'activeSelection') {
+      const members = active.getObjects ? active.getObjects() : [];
+      const relevant = members.filter(m => m.objectType === 'shape' && !m.shapeTextFor);
+      if (!relevant.length) return;
+      relevant.forEach(m => m.set({ stroke: hex }));
+      canvas.requestRenderAll();
+      canvas.fire('object:modified', { target: active });
+      return;
+    }
+    if (active.objectType !== 'shape' || active.shapeTextFor) return;
     active.set({ stroke: hex });
     canvas.requestRenderAll();
     canvas.fire('object:modified', { target: active });

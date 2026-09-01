@@ -4,7 +4,8 @@
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartAIExam</title>
+    <meta name="description" content="SmartAIExam — an ecosystem for secure examinations, AI-assisted question generation and explanations, a collaborative digital notebook, and performance analytics.">
+    <title>SmartAIExam - Exams, Insight &amp; Learning, Together</title>
     <script>(function(){var t=localStorage.getItem('landingTheme')||'sunset';document.documentElement.setAttribute('data-theme',t==='paper'?'light':t);})();</script>
     <link href="{{ url_for('static', filename='theme.css') }}" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -19,13 +20,22 @@
   --hero-bg:linear-gradient(160deg,var(--surface) 0%,var(--bg) 100%);
   --nav-bg:color-mix(in srgb,var(--bg) 88%,transparent);
   --pill-bg:var(--surface-2);--pill-c:var(--text-2);
+  /* Fixed accents per ecosystem branch — deliberately NOT theme-derived, so
+     each part of the platform stays visually distinguishable as you scroll
+     regardless of which of the 5 themes is active (proven pattern from
+     --sched-accent, verified legible against every theme's surface color). */
+  --sched-accent:#8b5cf6;
+  --ai-accent:#0ea5e9;
+  --note-accent:#d97706;
+  --chat-accent:#10b981;
 }
 
 /* ══ RESET ══ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s;overflow-x:hidden}
 a{text-decoration:none;color:var(--accent)}
+img{max-width:100%;display:block}
 
 /* ══ NAV ══ */
 .nav{position:sticky;top:0;z-index:100;background:var(--nav-bg);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;min-height:60px;gap:1.5rem;transition:background .3s;flex-wrap:wrap}
@@ -42,7 +52,7 @@ a{text-decoration:none;color:var(--accent)}
 .mobile-theme-row{display:flex;align-items:center;gap:.75rem;padding:.55rem .75rem;margin-top:.25rem}
 .mobile-theme-label{font-size:.78rem;font-weight:600;color:var(--ink3)}
 .nav-open .nav-mobile{display:flex}
-@media(max-width:768px){.nav{padding:0 1rem}.nav-links{display:none}.nav-toggle{display:flex}}
+@media(max-width:900px){.nav{padding:0 1rem}.nav-links{display:none}.nav-toggle{display:flex}}
 
 /* ══ THEME SELECTOR ══ */
 .landing-theme-selector{position:relative}
@@ -67,10 +77,6 @@ a{text-decoration:none;color:var(--accent)}
 .btn-secondary:hover{background:var(--bg2);border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
 .btn-white{display:inline-flex;align-items:center;gap:.45rem;padding:.7rem 1.4rem;background:#fff;color:#0f172a;border-radius:10px;font-size:.9rem;font-weight:700;transition:transform .1s,box-shadow .12s}
 .btn-white:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
-/* Outline button for use on a solid accent-colored section (e.g. the CTA band) —
-   dedicated class instead of inline-styling .btn-secondary, since that class's
-   own :hover sets color/border to var(--accent), which would vanish against an
-   accent-colored background. */
 .btn-outline-onaccent{display:inline-flex;align-items:center;gap:.45rem;padding:.68rem 1.35rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.45);border-radius:10px;font-size:.9rem;font-weight:600;color:#fff;transition:background .12s,border-color .12s,transform .1s}
 .btn-outline-onaccent:hover{background:rgba(255,255,255,.18);border-color:#fff;transform:translateY(-2px)}
 
@@ -78,64 +84,198 @@ a{text-decoration:none;color:var(--accent)}
 .lp-hero{background:var(--hero-bg);padding:6rem 2rem 5rem;position:relative;overflow:hidden}
 .hero-grid-bg{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;opacity:.35;pointer-events:none}
 .hero-glow{position:absolute;top:-30%;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(ellipse,var(--glow),transparent 70%);pointer-events:none}
-.hero-inner{position:relative;z-index:1;max-width:780px;margin:0 auto;text-align:center}
+.hero-inner{position:relative;z-index:1;max-width:820px;margin:0 auto;text-align:center}
 .hero-badge{display:inline-flex;align-items:center;gap:.45rem;padding:.3rem .85rem;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:.75rem;font-weight:600;color:var(--ink2);margin-bottom:1.5rem}
 .hero-badge-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 1.4s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .hero-title{font-family:'DM Serif Display',serif;font-size:clamp(2.2rem,5vw,3.5rem);font-weight:400;color:var(--ink);line-height:1.15;margin-bottom:1.25rem}
 .hero-title em{color:var(--accent);font-style:italic}
-.hero-sub{font-size:clamp(.9rem,1.8vw,1.05rem);color:var(--ink2);max-width:580px;margin:0 auto 2rem;line-height:1.7}
+.hero-sub{font-size:clamp(.9rem,1.8vw,1.05rem);color:var(--ink2);max-width:660px;margin:0 auto 2rem;line-height:1.7}
 .hero-actions{display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap;margin-bottom:3rem}
 .hero-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem 1.5rem;padding-top:2rem;border-top:1px solid var(--border)}
-.hero-stat{text-align:center}
-.hero-stat-num{font-size:1.5rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:.25rem}
-.hero-stat-label{font-size:.72rem;color:var(--ink3);font-weight:500}
+.hero-stat{text-align:center;width:104px}
+.hero-stat-num{font-size:1.35rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:.4rem}
+.hero-stat-label{font-size:.7rem;color:var(--ink3);font-weight:500;line-height:1.35}
 
-/* ══ SECTIONS ══ */
+/* ══ SECTIONS (generic) ══ */
 .section-eyebrow{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:.65rem}
+.section-eyebrow.eb-ai{color:var(--ai-accent)}
+.section-eyebrow.eb-sched{color:var(--sched-accent)}
+.section-eyebrow.eb-note{color:var(--note-accent)}
+.section-eyebrow.eb-chat{color:var(--chat-accent)}
 .section-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:400;color:var(--ink);line-height:1.2;margin-bottom:.75rem}
-.section-sub{font-size:.9rem;color:var(--ink2);max-width:500px}
+.section-sub{font-size:.9rem;color:var(--ink2);max-width:580px}
+.section-sub.centered{margin:0 auto}
+.section-block{padding:5rem 2rem}
+.section-block.narrow{max-width:1140px;margin:0 auto}
+.section-block.alt-bg{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 
-/* ══ FEATURES ══ */
-.features{padding:5rem 2rem;max-width:1100px;margin:0 auto}
-.features-header{margin-bottom:3rem}
-.features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem}
-.feat{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.5rem;backdrop-filter:blur(8px);transition:border-color .15s,transform .15s,box-shadow .15s}
-.feat:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 32px color-mix(in srgb,var(--accent) 12%,transparent)}
-.feat-icon{width:42px;height:42px;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:1rem}
-.feat-title{font-size:.92rem;font-weight:700;color:var(--ink);margin-bottom:.45rem}
-.feat-desc{font-size:.82rem;color:var(--ink2);line-height:1.6}
+/* ══ FADE-UP (section headers — small, bounded count) ══ */
+.fade-up{opacity:0;transform:translateY(24px);transition:opacity .55s ease,transform .55s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
 
-/* ══ HOW IT WORKS ══ */
-.how{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:5rem 2rem}
-.how-inner{max-width:900px;margin:0 auto}
-.how-steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.5rem;margin-top:3rem}
-.how-step{padding:1.25rem;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);backdrop-filter:blur(8px)}
-.how-step-num{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;margin-bottom:.85rem}
-.how-step-title{font-size:.88rem;font-weight:700;color:var(--ink);margin-bottom:.4rem}
-.how-step-desc{font-size:.78rem;color:var(--ink2);line-height:1.55}
+/* ══ REVEAL-ITEM (repeating items — staggered locally per .stagger-group,
+   never against the whole page's element count) ══ */
+.reveal-item{opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+.reveal-item.visible{opacity:1;transform:translateY(0)}
+
+/* ══ FLOW DIAGRAMS (reused by: AI Assistant, Notebook, Scheduled Exam,
+   Admin structure, complete-loop sections — accent color set per section
+   via a modifier class) ══ */
+.flow-track{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:.5rem .25rem 1.25rem;scrollbar-width:thin;scrollbar-color:var(--border) transparent;margin-top:2.5rem}
+.flow-track::-webkit-scrollbar{height:6px}
+.flow-track::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.flow-step{display:flex;flex-direction:column;align-items:center;text-align:center;flex:0 0 168px;padding:0 .35rem}
+.flow-step-card{width:100%;background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.1rem .9rem;backdrop-filter:blur(8px);transition:border-color .15s,transform .15s,box-shadow .15s}
+.flow-step-card:hover{transform:translateY(-4px)}
+.flow-step-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.05rem;margin:0 auto .75rem;flex-shrink:0;background:color-mix(in srgb,var(--fc) 14%,transparent);color:var(--fc)}
+.flow-step-card:hover{border-color:var(--fc);box-shadow:0 12px 28px color-mix(in srgb,var(--fc) 14%,transparent)}
+.flow-step-num{font-size:.65rem;font-weight:800;color:var(--ink3);letter-spacing:.08em;margin-bottom:.35rem}
+.flow-step-title{font-size:.83rem;font-weight:700;color:var(--ink);margin-bottom:.4rem;line-height:1.3}
+.flow-step-desc{font-size:.72rem;color:var(--ink2);line-height:1.5}
+.flow-connector{flex:0 0 34px;display:flex;align-items:center;justify-content:center;position:relative;top:-1.6rem}
+.flow-connector-line{width:100%;height:2px;background:repeating-linear-gradient(90deg,var(--fc) 0 6px,transparent 6px 12px);background-size:200% 100%;animation:flowDash 1.6s linear infinite}
+@keyframes flowDash{to{background-position:-24px 0}}
+@media(prefers-reduced-motion:reduce){.flow-connector-line{animation:none}}
+
+/* ══ PILL CLOUD (capability chips) ══ */
+.pill-cloud{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.75rem}
+.pill{display:inline-flex;align-items:center;gap:.4rem;background:var(--pill-bg);color:var(--pill-c);border-radius:20px;padding:.32rem .8rem;font-size:.75rem;font-weight:600}
+.pill i{font-size:.68rem;color:var(--fc,var(--accent))}
+
+/* ══ ECOSYSTEM HUB ══ */
+.hub-wrap{margin-top:3rem;position:relative}
+.hub-center{display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem}
+.hub-center-badge{display:inline-flex;align-items:center;gap:.5rem;background:var(--accent);color:#fff;font-weight:800;font-size:.9rem;padding:.6rem 1.3rem;border-radius:30px;box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 35%,transparent)}
+.hub-stem{width:2px;height:28px;background:linear-gradient(var(--accent),transparent)}
+.hub-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
+.hub-col{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.5rem 1.35rem;backdrop-filter:blur(8px);position:relative;transition:transform .15s,box-shadow .15s}
+.hub-col::before{content:'';position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:2px;height:16px;background:var(--border)}
+.hub-col:hover{transform:translateY(-4px)}
+.hub-col-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:.9rem;background:color-mix(in srgb,var(--fc) 14%,transparent);color:var(--fc)}
+.hub-col-title{font-size:.95rem;font-weight:700;color:var(--ink);margin-bottom:.85rem}
+.hub-col-list{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.hub-col-list li{display:flex;align-items:flex-start;gap:.5rem;font-size:.78rem;color:var(--ink2);line-height:1.45}
+.hub-col-list li i{color:var(--fc);font-size:.62rem;margin-top:.3rem;flex-shrink:0}
+
+/* ══ BRANCH DIAGRAM (trunk -> N branches — AI response review, PDF pipeline) ══ */
+.branch-wrap{margin-top:2.5rem}
+.branch-trunk{display:flex;justify-content:center;margin-bottom:.5rem}
+.branch-row{display:grid;gap:1.1rem;margin-top:1.75rem}
+.branch-row.cols-3{grid-template-columns:repeat(3,1fr)}
+.branch-card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.1rem;backdrop-filter:blur(8px);transition:transform .15s,box-shadow .15s,border-color .15s}
+.branch-card:hover{transform:translateY(-4px);border-color:var(--fc);box-shadow:0 12px 28px color-mix(in srgb,var(--fc) 14%,transparent)}
+.branch-card-icon{width:38px;height:38px;border-radius:10px;background:color-mix(in srgb,var(--fc) 14%,transparent);color:var(--fc);display:flex;align-items:center;justify-content:center;font-size:.92rem;margin-bottom:.85rem}
+.branch-card-title{font-size:.88rem;font-weight:700;color:var(--ink);margin-bottom:.4rem}
+.branch-card-desc{font-size:.78rem;color:var(--ink2);line-height:1.55}
+
+/* ══ UI MOCKUP CARDS ══ */
+.mockup-card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.4rem;backdrop-filter:blur(8px);box-shadow:0 20px 50px rgba(0,0,0,.12)}
+.mockup-chat .chat-bubble{max-width:78%;padding:.65rem .9rem;border-radius:14px;font-size:.8rem;line-height:1.5;margin-bottom:.65rem}
+.mockup-chat .bubble-user{margin-left:auto;background:var(--ai-accent);color:#fff;border-bottom-right-radius:4px}
+.mockup-chat .bubble-ai{background:var(--surface-2,var(--bg2));color:var(--ink);border:1px solid var(--border);border-bottom-left-radius:4px}
+.mockup-chat .bubble-label{font-size:.65rem;font-weight:700;color:var(--ink3);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em}
+.mockup-q-card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.5rem;backdrop-filter:blur(8px);box-shadow:0 20px 50px rgba(0,0,0,.12)}
+.mockup-q-text{font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:1rem;line-height:1.5}
+.mockup-q-diagram{height:130px;border-radius:10px;border:1.5px dashed var(--border);background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--accent) 6%,transparent) 0 10px,transparent 10px 20px);display:flex;align-items:center;justify-content:center;gap:.5rem;color:var(--ink3);font-size:.72rem;font-weight:600;margin-bottom:1.1rem}
+.mockup-q-diagram i{font-size:1.3rem;color:var(--accent)}
+.mockup-q-opts{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
+.mockup-q-opt{border:1px solid var(--border);border-radius:9px;padding:.5rem .7rem;font-size:.76rem;color:var(--ink2);display:flex;align-items:center;gap:.5rem}
+.mockup-q-opt.correct{border-color:var(--chat-accent);background:color-mix(in srgb,var(--chat-accent) 10%,transparent);color:var(--ink)}
+.mockup-q-opt .opt-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0}
+.mockup-q-opt.correct .opt-dot{background:var(--chat-accent);border-color:var(--chat-accent);position:relative}
+
+/* ══ NORMAL VS SCHEDULED COMPARE ══ */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;position:relative;margin-top:3rem}
+.compare-vs{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:var(--ink3);z-index:2;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.compare-card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:2rem 1.75rem;backdrop-filter:blur(8px);transition:transform .15s,box-shadow .15s}
+.compare-card:hover{transform:translateY(-4px);border-color:var(--fc);box-shadow:0 14px 34px color-mix(in srgb,var(--fc) 12%,transparent)}
+.compare-label{display:inline-flex;align-items:center;gap:.4rem;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;padding:.3rem .7rem;border-radius:20px;margin-bottom:1rem;background:color-mix(in srgb,var(--fc) 14%,transparent);color:var(--fc)}
+.compare-title{font-size:1.15rem;font-weight:700;color:var(--ink);margin-bottom:.5rem}
+.compare-tag{font-size:.8rem;color:var(--ink2);margin-bottom:1.4rem;line-height:1.5}
+.compare-list{list-style:none;display:flex;flex-direction:column;gap:.75rem}
+.compare-list li{display:flex;align-items:flex-start;gap:.6rem;font-size:.82rem;color:var(--ink2);line-height:1.5}
+.compare-list li i{margin-top:.2rem;flex-shrink:0;font-size:.75rem;color:var(--fc)}
+
+/* ══ SPLIT PANEL (two-column section layouts — AI Assistant, Question
+   Experience — a real CSS class, never inline styles, so it can actually
+   collapse to one column at a breakpoint) ══ */
+.split-panel{display:grid;gap:3rem;align-items:start}
+/* Grid items default to min-width:auto — without this, a child containing
+   a horizontally-scrollable .flow-track (whose intrinsic content width can
+   be 700px+) forces the WHOLE grid column that wide instead of actually
+   shrinking to the viewport and letting the flow-track's own
+   overflow-x:auto handle the rest. */
+.split-panel>*{min-width:0}
+.split-panel.split-wide-left{grid-template-columns:1.3fr .9fr}
+.split-panel.split-wide-right{grid-template-columns:.95fr 1.05fr;align-items:center}
+@media(max-width:1000px){
+  .split-panel.split-wide-left,.split-panel.split-wide-right{grid-template-columns:1fr}
+  .split-panel.split-wide-right{order:0}
+}
+
+/* ══ RESULTS COMPARISON BARS ══ */
+.results-panel{display:grid;grid-template-columns:1.15fr .85fr;gap:2rem;margin-top:2.75rem;align-items:start}
+.bar-card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.75rem;backdrop-filter:blur(8px)}
+.bar-row{margin-bottom:1.3rem}
+.bar-row:last-child{margin-bottom:0}
+.bar-row-label{display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--ink);margin-bottom:.45rem}
+.bar-row-label span:last-child{color:var(--ink3);font-weight:600}
+.bar-track{height:14px;border-radius:20px;background:var(--surface-2,var(--bg2));border:1px solid var(--border);overflow:hidden}
+.bar-fill{height:100%;width:0;border-radius:20px;transition:width 1.3s cubic-bezier(.16,1,.3,1)}
+/* Reveal is observed on .bar-track (real, non-zero size) rather than
+   .bar-fill itself — a to-be-revealed element that starts at width:0 has
+   zero area, so IntersectionObserver's threshold-based ratio never
+   reliably fires against it. */
+.bar-track.visible .bar-fill{width:var(--pct)}
+.bar-fill.fill-you{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.bar-fill.fill-top{background:linear-gradient(90deg,#f59e0b,#f97316)}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.stat-chip{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:.9rem 1rem;backdrop-filter:blur(8px)}
+.stat-chip-num{font-size:1.15rem;font-weight:800;color:var(--accent)}
+.stat-chip-label{font-size:.68rem;color:var(--ink3);font-weight:600;margin-top:.2rem}
+@media(max-width:820px){.results-panel{grid-template-columns:1fr}}
 
 /* ══ EXAM TYPES ══ */
-.exam-types{padding:5rem 2rem;max-width:1100px;margin:0 auto}
-.types-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-top:3rem}
+.types-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-top:2.5rem}
 .type-card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.4rem;backdrop-filter:blur(8px);transition:border-color .15s,transform .15s}
 .type-card:hover{border-color:var(--accent);transform:translateY(-2px)}
 .type-label{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:.5rem}
 .type-title{font-size:.92rem;font-weight:700;color:var(--ink);margin-bottom:.5rem}
 .type-desc{font-size:.78rem;color:var(--ink2);line-height:1.55;margin-bottom:.85rem}
 .type-pills{display:flex;flex-wrap:wrap;gap:.35rem}
-.pill{background:var(--pill-bg);color:var(--pill-c);border-radius:20px;padding:.18rem .55rem;font-size:.68rem;font-weight:600}
+
+/* ══ CHAT ECOSYSTEM DIAGRAM ══ */
+.chat-nodes{display:flex;align-items:center;justify-content:center;gap:1.25rem;margin-top:2.75rem;flex-wrap:wrap}
+.chat-node{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.5rem 1.75rem;text-align:center;backdrop-filter:blur(8px);min-width:150px}
+.chat-node-icon{width:46px;height:46px;border-radius:50%;background:color-mix(in srgb,var(--chat-accent) 14%,transparent);color:var(--chat-accent);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto .7rem}
+.chat-node-title{font-size:.85rem;font-weight:700;color:var(--ink)}
+.chat-node-arrow{font-size:1.2rem;color:var(--chat-accent);opacity:.6}
 
 /* ══ PROOF ══ */
-.proof{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:4rem 2rem}
-.proof-inner{max-width:760px;margin:0 auto}
 .proof-quote{font-family:'DM Serif Display',serif;font-size:clamp(1.3rem,2.5vw,1.65rem);color:var(--ink);line-height:1.4;margin-bottom:2.5rem;text-align:center}
 .proof-quote em{color:var(--accent)}
-.proof-list{display:flex;flex-direction:column;gap:1.25rem}
+.proof-list{display:flex;flex-direction:column;gap:1.25rem;max-width:760px;margin:0 auto}
 .proof-item{display:flex;align-items:flex-start;gap:1rem}
 .proof-item-icon{width:38px;height:38px;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
 .proof-item-title{font-size:.88rem;font-weight:700;color:var(--ink);margin-bottom:.25rem}
 .proof-item-desc{font-size:.78rem;color:var(--ink2);line-height:1.5}
+
+/* ══ FOUNDER / CEO ══ */
+.founder-card{display:grid;grid-template-columns:220px 1fr;gap:2.5rem;align-items:center;background:var(--card-bg);border:1px solid var(--border);border-radius:20px;padding:2.5rem;backdrop-filter:blur(8px);position:relative;overflow:hidden;max-width:1000px;margin:0 auto}
+.founder-card::before{content:'';position:absolute;top:-40%;right:-10%;width:300px;height:300px;background:radial-gradient(ellipse,var(--glow),transparent 70%);pointer-events:none}
+.founder-photo-wrap{position:relative;z-index:1}
+.founder-photo,.founder-photo-placeholder{width:180px;height:180px;border-radius:50%;object-fit:cover;border:3px solid var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent),0 16px 40px rgba(0,0,0,.25);margin:0 auto}
+.founder-photo-placeholder{display:flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--ink3);font-size:3rem}
+.founder-body{position:relative;z-index:1}
+.founder-quote-mark{font-family:'DM Serif Display',serif;font-size:3rem;color:var(--accent);line-height:.5;margin-bottom:.75rem;opacity:.55}
+.founder-message{font-family:'DM Serif Display',serif;font-size:clamp(1.05rem,2vw,1.3rem);font-style:italic;color:var(--ink);line-height:1.55;margin-bottom:1.5rem}
+.founder-name{font-size:.95rem;font-weight:700;color:var(--ink)}
+.founder-title{font-size:.78rem;color:var(--ink3);margin-top:.15rem}
+@media(max-width:700px){
+  .founder-card{grid-template-columns:1fr;text-align:center;padding:2rem 1.5rem;gap:1.5rem}
+  .founder-photo,.founder-photo-placeholder{width:140px;height:140px}
+}
 
 /* ══ CTA ══ */
 .cta-section{background:var(--accent);position:relative;overflow:hidden;padding:5rem 2rem;text-align:center}
@@ -146,37 +286,93 @@ a{text-decoration:none;color:var(--accent)}
 .cta-sub{font-size:.92rem;color:rgba(255,255,255,.7);margin-bottom:2rem;line-height:1.6}
 
 /* ══ FOOTER ══ */
-.lp-footer{background:var(--bg2);border-top:1px solid var(--border);padding:1.25rem 2rem}
-.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;max-width:1100px;margin:0 auto}
+.lp-footer{background:var(--bg2);border-top:1px solid var(--border);padding:2.5rem 2rem 1.5rem;position:relative}
+.lp-footer::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.footer-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;max-width:1100px;margin:0 auto 1.5rem}
+.footer-brand{display:flex;flex-direction:column;gap:.5rem}
 .footer-logo{display:flex;align-items:center}
-.footer-links-row{display:flex;gap:1.25rem;flex-wrap:wrap}
-.footer-link{font-size:.78rem;color:var(--ink3);transition:color .12s}
-.footer-link:hover{color:var(--ink)}
+.footer-tagline{font-size:.78rem;color:var(--ink3);max-width:260px;line-height:1.5}
+.footer-links-row{display:flex;gap:1.5rem 2rem;flex-wrap:wrap}
+.footer-link-group{display:flex;flex-direction:column;gap:.55rem}
+.footer-link-group-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)}
+.footer-link{font-size:.8rem;color:var(--ink2);transition:color .12s}
+.footer-link:hover{color:var(--accent)}
+.footer-social-row{display:flex;gap:.5rem}
+.footer-social-link{width:32px;height:32px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--ink2);display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:border-color .12s,color .12s,transform .12s}
+.footer-social-link:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+.footer-bottom{max-width:1100px;margin:0 auto;padding-top:1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem}
 .footer-copy{font-size:.75rem;color:var(--ink3)}
 
-/* ══ FADE-UP ANIMATION ══ */
-.fade-up{opacity:0;transform:translateY(24px);transition:opacity .55s ease,transform .55s ease}
-.fade-up.visible{opacity:1;transform:translateY(0)}
-
 /* ══ RESPONSIVE ══ */
+@media(max-width:900px){
+  .hub-columns{grid-template-columns:1fr}
+  .hub-col::before{display:none}
+  .branch-row.cols-3{grid-template-columns:1fr}
+  .results-panel{grid-template-columns:1fr}
+}
 @media(max-width:768px){
   .lp-hero{padding:4rem 1.25rem 3rem}
-  .features,.exam-types{padding:3.5rem 1.25rem}
-  .how,.proof,.cta-section{padding:3.5rem 1.25rem}
-  .features-grid,.types-grid{grid-template-columns:1fr}
-  .how-steps{grid-template-columns:1fr 1fr}
+  .section-block{padding:3.5rem 1.25rem}
+  .types-grid{grid-template-columns:1fr}
   .hero-stats{gap:.5rem 1rem}
-  .lp-footer{padding:1rem 1.25rem}
-  .footer-inner{flex-direction:column;align-items:center;text-align:center}
-  .footer-links-row{justify-content:center}
+  .compare-grid{grid-template-columns:1fr;gap:2.5rem}
+  .compare-vs{top:0;transform:translate(-50%,-50%)}
+  .mockup-q-opts{grid-template-columns:1fr}
+  .lp-footer{padding:2rem 1.25rem 1.25rem}
+  .footer-top{flex-direction:column;align-items:center;text-align:center}
+  .footer-brand{align-items:center}
+  .footer-links-row{justify-content:center;text-align:center}
+  .footer-bottom{flex-direction:column;text-align:center}
 }
 @media(max-width:480px){
-  .how-steps{grid-template-columns:1fr}
   .hero-actions{flex-direction:column;align-items:stretch}
   .btn-primary,.btn-secondary{justify-content:center}
 }
     </style>
 <body>
+
+{# ── Shared flow-step data, looped per section below — keeps the many
+   repeated diagram cards DRY instead of hand-duplicating markup. Content
+   is Product/Landing-page copy, cross-checked against the real implementation
+   (see this session's Notebook/AI/PDF-generation/Results/Chat research) — not
+   invented. #}
+{% set ai_assistant_steps = [
+  ('fa-circle-question','Ask a Question','Type any academic question — physics, chemistry, math, engineering, exam prep and more.'),
+  ('fa-robot','AI Assistant','A dedicated study assistant, not tied to any single exam — always focused on the subject at hand.'),
+  ('fa-comment-dots','Contextual Response','A clear, subject-focused answer, kept inside a named, searchable conversation.'),
+  ('fa-lightbulb','Better Understanding','Ask a follow-up, save the thread, and come back to it whenever you need to.'),
+] %}
+{% set notebook_steps = [
+  ('fa-plus','Create','Start a new notebook — a hybrid canvas and rich-text workspace, not just a document.'),
+  ('fa-pen-nib','Write / Draw','Type formatted notes or draw freehand with pen, pencil and highlighter tools.'),
+  ('fa-layer-group','Organize','Multiple pages per notebook, shapes, images and sticky notes laid out however you like.'),
+  ('fa-highlighter','Annotate','Highlight, color-code and mark up your own content directly on the canvas.'),
+  ('fa-share-nodes','Share / Publish','Share with specific people as Viewer or Editor, or publish to the Public Library.'),
+  ('fa-people-group','Learn / Collaborate','Others can browse and import a copy of what you publish — a shared library of notes.'),
+] %}
+{% set sched_steps = [
+  ('fa-calendar-check','Scheduled','A fixed date, start time and duration — set once by the admin.'),
+  ('fa-hourglass-start','Upcoming','Status updates on its own as the exam approaches — always accurate.'),
+  ('fa-clock','Preparation / Buffer','An optional window opens early, giving students time to get ready.'),
+  ('fa-desktop','Kiosk Preparation','A dedicated fullscreen kiosk shows instructions and counts down.'),
+  ('fa-bolt','Automatic Start','Opens the instant the scheduled time arrives — nothing to click.'),
+  ('fa-stopwatch','Timed Examination','A strict, server-enforced timer — a closed browser can\'t buy extra time.'),
+  ('fa-lock','Automatic Submission','Submits itself the moment time is up, whether the student is there or not.'),
+  ('fa-chart-simple','Results','Scored and ready to review, the same results experience as any exam.'),
+] %}
+{% set admin_structure_steps = [
+  ('fa-sitemap','Category','The top-level grouping students browse by.'),
+  ('fa-diagram-project','Subcategory','A finer split inside each category.'),
+  ('fa-file-alt','Exam','Belongs to one category and subcategory — where timing, marking and attempts live.'),
+  ('fa-question-circle','Questions','Belong to exactly one exam — added manually, by CSV, or generated with AI.'),
+] %}
+{% set complete_loop_steps = [
+  ('fa-user-shield','Admin Builds the Exam','Structure, questions, marking scheme — assisted by AI wherever it helps.'),
+  ('fa-wand-magic-sparkles','AI Assists Along the Way','Question generation, per-answer explanations, a study assistant.'),
+  ('fa-play','The Exam Runs','Normal or Scheduled — server-timed, auto-saving, auto-submitting.'),
+  ('fa-user-graduate','Student Experiences It','A focused, secure exam — then results, discussion and review.'),
+  ('fa-chart-line','Results Flow Back','Scores, rankings and analytics — for the student, and for the admin.'),
+] %}
 
 <!-- NAV -->
 <header class="nav" id="navWrap">
@@ -184,8 +380,10 @@ a{text-decoration:none;color:var(--accent)}
         <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:34px;width:auto;"></video>
     </a>
     <nav class="nav-links" id="desktopNav">
-        <a href="#features" class="nav-link">Features</a>
-        <a href="#how" class="nav-link">How it works</a>
+        <a href="#ecosystem" class="nav-link">Platform</a>
+        <a href="#ai-assistant" class="nav-link">AI</a>
+        <a href="#notebook" class="nav-link">Notebook</a>
+        <a href="#exams" class="nav-link">Exams</a>
         <a href="{{ url_for('misc.api_docs') }}" class="nav-link">API Docs</a>
         <a href="{{ url_for('misc.support') }}" class="nav-link">Support</a>
         <a href="{{ url_for('auth.login') }}" class="nav-link">Sign in</a>
@@ -195,21 +393,11 @@ a{text-decoration:none;color:var(--accent)}
                 <i class="fas fa-palette"></i>
             </button>
             <div class="landing-theme-dropdown" id="landingThemeDropdown">
-                <button class="landing-theme-option" data-theme="sunset">
-                    <span class="theme-dot dot-sunset"></span> Sunset
-                </button>
-                <button class="landing-theme-option" data-theme="paper">
-                    <span class="theme-dot dot-paper"></span> Paper
-                </button>
-                <button class="landing-theme-option" data-theme="dark">
-                    <span class="theme-dot dot-dark"></span> Dark
-                </button>
-                <button class="landing-theme-option" data-theme="midnight">
-                    <span class="theme-dot dot-midnight"></span> Midnight
-                </button>
-                <button class="landing-theme-option" data-theme="emerald">
-                    <span class="theme-dot dot-emerald"></span> Emerald
-                </button>
+                <button class="landing-theme-option" data-theme="sunset"><span class="theme-dot dot-sunset"></span> Sunset</button>
+                <button class="landing-theme-option" data-theme="paper"><span class="theme-dot dot-paper"></span> Paper</button>
+                <button class="landing-theme-option" data-theme="dark"><span class="theme-dot dot-dark"></span> Dark</button>
+                <button class="landing-theme-option" data-theme="midnight"><span class="theme-dot dot-midnight"></span> Midnight</button>
+                <button class="landing-theme-option" data-theme="emerald"><span class="theme-dot dot-emerald"></span> Emerald</button>
             </div>
         </div>
     </nav>
@@ -217,8 +405,10 @@ a{text-decoration:none;color:var(--accent)}
         <i class="fas fa-bars"></i>
     </button>
     <div class="nav-mobile" id="mobileNav">
-        <a href="#features">Features</a>
-        <a href="#how">How it works</a>
+        <a href="#ecosystem">Platform</a>
+        <a href="#ai-assistant">AI</a>
+        <a href="#notebook">Notebook</a>
+        <a href="#exams">Exams</a>
         <a href="{{ url_for('misc.api_docs') }}" class="nav-link">API Docs</a>
         <a href="{{ url_for('misc.support') }}">Support</a>
         <a href="{{ url_for('auth.login') }}">Sign in</a>
@@ -230,41 +420,31 @@ a{text-decoration:none;color:var(--accent)}
                     <i class="fas fa-palette"></i>
                 </button>
                 <div class="landing-theme-dropdown" id="landingThemeDropdownMobile">
-                    <button class="landing-theme-option" data-theme="sunset">
-                        <span class="theme-dot dot-sunset"></span> Sunset
-                    </button>
-                    <button class="landing-theme-option" data-theme="paper">
-                        <span class="theme-dot dot-paper"></span> Paper
-                    </button>
-                    <button class="landing-theme-option" data-theme="dark">
-                        <span class="theme-dot dot-dark"></span> Dark
-                    </button>
-                    <button class="landing-theme-option" data-theme="midnight">
-                        <span class="theme-dot dot-midnight"></span> Midnight
-                    </button>
-                    <button class="landing-theme-option" data-theme="emerald">
-                        <span class="theme-dot dot-emerald"></span> Emerald
-                    </button>
+                    <button class="landing-theme-option" data-theme="sunset"><span class="theme-dot dot-sunset"></span> Sunset</button>
+                    <button class="landing-theme-option" data-theme="paper"><span class="theme-dot dot-paper"></span> Paper</button>
+                    <button class="landing-theme-option" data-theme="dark"><span class="theme-dot dot-dark"></span> Dark</button>
+                    <button class="landing-theme-option" data-theme="midnight"><span class="theme-dot dot-midnight"></span> Midnight</button>
+                    <button class="landing-theme-option" data-theme="emerald"><span class="theme-dot dot-emerald"></span> Emerald</button>
                 </div>
             </div>
         </div>
     </div>
 </header>
 
-<!-- HERO -->
+<!-- HERO — broad ecosystem positioning, not exam-mode-specific -->
 <section class="lp-hero">
     <div class="hero-grid-bg"></div>
     <div class="hero-glow"></div>
     <div class="hero-inner">
         <div class="hero-badge">
             <div class="hero-badge-dot"></div>
-            Online Examination Platform
+            AI-Powered Examination &amp; Learning Platform
         </div>
         <h1 class="hero-title">
-            Conduct exams with<br><em>confidence and clarity</em>
+            An ecosystem for exams,<br><em>insight, and learning</em>
         </h1>
         <p class="hero-sub">
-            SmartAIExam is a complete examination system for institutions — create timed MCQ, MSQ, and numerical exams, manage students, analyse results, generate question banks with AI, and let students discuss doubts with an integrated AI study assistant.
+            SmartAIExam brings secure examinations, AI-assisted question generation and explanations, a collaborative digital notebook, and real performance analytics into one connected platform — for how institutions run exams, and how students actually learn.
         </p>
         <div class="hero-actions">
             <a href="{{ url_for('auth.create_account') }}" class="btn-primary">
@@ -275,188 +455,473 @@ a{text-decoration:none;color:var(--accent)}
             </a>
         </div>
         <div class="hero-stats">
-            <div class="hero-stat">
-                <div class="hero-stat-num">MCQ</div>
-                <div class="hero-stat-label">Multiple choice questions</div>
-            </div>
-            <div class="hero-stat">
-                <div class="hero-stat-num">MSQ</div>
-                <div class="hero-stat-label">Multiple selection questions</div>
-            </div>            
-            <div class="hero-stat">
-                <div class="hero-stat-num">NIT</div>
-                <div class="hero-stat-label">Numerical input questions</div>
-            </div>
-            <div class="hero-stat">
-                <div class="hero-stat-num">±</div>
-                <div class="hero-stat-label">Marking scheme with negatives</div>
-            </div>
-            <div class="hero-stat">
-                <div class="hero-stat-num"><i class="fas fa-wand-magic-sparkles" style="font-size:1.5rem;color:var(--ink)"></i></div>
-                <div class="hero-stat-label">AI question generation</div>
-            </div>
-            <div class="hero-stat">
-                <div class="hero-stat-num"><i class="fas fa-comments" style="font-size:1.5rem;color:var(--ink)"></i></div>
-                <div class="hero-stat-label">AI study assistant</div>
-            </div>           
+            <div class="hero-stat"><div class="hero-stat-num"><i class="fas fa-shield-halved"></i></div><div class="hero-stat-label">Secure Exams</div></div>
+            <div class="hero-stat"><div class="hero-stat-num"><i class="fas fa-wand-magic-sparkles"></i></div><div class="hero-stat-label">AI Question Generation</div></div>
+            <div class="hero-stat"><div class="hero-stat-num"><i class="fas fa-comments"></i></div><div class="hero-stat-label">AI Study Assistant</div></div>
+            <div class="hero-stat"><div class="hero-stat-num"><i class="fas fa-note-sticky"></i></div><div class="hero-stat-label">Smart Notebook</div></div>
+            <div class="hero-stat"><div class="hero-stat-num"><i class="fas fa-chart-line"></i></div><div class="hero-stat-label">Performance Insights</div></div>
+            <div class="hero-stat"><div class="hero-stat-num"><i class="fas fa-message"></i></div><div class="hero-stat-label">Chat &amp; Collaboration</div></div>
         </div>
     </div>
 </section>
 
-<!-- FEATURES -->
-<section class="features" id="features">
-    <div class="features-header fade-up">
-        <div class="section-eyebrow">Platform capabilities</div>
-        <h2 class="section-title">Everything you need<br>to run an exam</h2>
-        <p class="section-sub">Built around real workflows — from publishing exams to reviewing every student's response.</p>
+<!-- ECOSYSTEM OVERVIEW -->
+<section class="section-block narrow" id="ecosystem">
+    <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+        <div class="section-eyebrow">The Complete Platform</div>
+        <h2 class="section-title">One ecosystem,<br>three ways it works together</h2>
+        <p class="section-sub centered">SmartAIExam connects what admins build, what students experience, and the intelligence layer that supports both.</p>
     </div>
-    <div class="features-grid fade-up">
-        <div class="feat">
-            <div class="feat-icon"><i class="fas fa-file-alt"></i></div>
-            <div class="feat-title">Exam builder</div>
-            <div class="feat-desc">Create exams with custom duration, date, marking scheme (positive/negative marks), max attempts, and per-question configuration.</div>
+    <div class="hub-wrap fade-up">
+        <div class="hub-center">
+            <div class="hub-center-badge"><i class="fas fa-atom"></i> SmartAIExam</div>
+            <div class="hub-stem"></div>
         </div>
-        <div class="feat">
-            <div class="feat-icon"><i class="fas fa-question-circle"></i></div>
-            <div class="feat-title">Question bank</div>
-            <div class="feat-desc">Organise questions by subject. Supports MCQ, MSQ, numerical input, and image-based questions with individual mark weightage.</div>
-        </div>
-        <div class="feat">
-            <div class="feat-icon"><i class="fas fa-robot"></i></div>
-            <div class="feat-title">AI question generation</div>
-            <div class="feat-desc">Generate MCQ, MSQ and numerical questions automatically using our AI command centre. Review, edit, and publish to any exam instantly.</div>
-        </div>
-        <div class="feat">
-            <div class="feat-icon"><i class="fas fa-chart-bar"></i></div>
-            <div class="feat-title">Detailed analytics</div>
-            <div class="feat-desc">Per-exam and per-student analytics — score trends, accuracy by subject, time taken, attempt history, and grade distribution.</div>
-        </div>
-        <div class="feat">
-            <div class="feat-icon"><i class="fas fa-comments"></i></div>
-            <div class="feat-title">Question discussions</div>
-            <div class="feat-desc">Students can discuss any question after the exam. Threaded replies, live updates, pinned explanations, and best answer marking by admin.</div>
-        </div>
-        <div class="feat">
-            <div class="feat-icon"><i class="fas fa-lock"></i></div>
-            <div class="feat-title">Session & access control</div>
-            <div class="feat-desc">Single-device session enforcement, rate-limited login, admin role requests, and secure password setup via email link.</div>
-        </div>
-    </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section class="how" id="how">
-    <div class="how-inner">
-        <div class="fade-up">
-            <div class="section-eyebrow">How it works</div>
-            <h2 class="section-title">From setup to results<br>in minutes</h2>
-            <p class="section-sub">A straightforward workflow for admins and a distraction-free experience for students.</p>
-        </div>
-        <div class="how-steps fade-up">
-            <div class="how-step">
-                <div class="how-step-num">1</div>
-                <div class="how-step-title">Admin creates exam</div>
-                <div class="how-step-desc">Set title, date, duration, marking scheme, and add questions from the bank or via CSV upload.</div>
+        <div class="hub-columns">
+            <div class="hub-col" style="--fc:var(--accent)">
+                <div class="hub-col-icon"><i class="fas fa-user-shield"></i></div>
+                <div class="hub-col-title">Admin</div>
+                <ul class="hub-col-list">
+                    <li><i class="fas fa-circle"></i> Exam &amp; question structure</li>
+                    <li><i class="fas fa-circle"></i> Bulk import &amp; AI generation</li>
+                    <li><i class="fas fa-circle"></i> Analytics &amp; attempt records</li>
+                </ul>
             </div>
-            <div class="how-step">
-                <div class="how-step-num">2</div>
-                <div class="how-step-title">Students register</div>
-                <div class="how-step-desc">Students create an account, receive a setup email, and access their dashboard with assigned exams.</div>
+            <div class="hub-col" style="--fc:var(--sched-accent)">
+                <div class="hub-col-icon"><i class="fas fa-user-graduate"></i></div>
+                <div class="hub-col-title">Student</div>
+                <ul class="hub-col-list">
+                    <li><i class="fas fa-circle"></i> Normal &amp; Scheduled exams</li>
+                    <li><i class="fas fa-circle"></i> Results, responses &amp; discussion</li>
+                    <li><i class="fas fa-circle"></i> Notebook &amp; Chat</li>
+                </ul>
             </div>
-            <div class="how-step">
-                <div class="how-step-num">3</div>
-                <div class="how-step-title">Exam is attempted</div>
-                <div class="how-step-desc">Timed, locked session. MCQ, MSQ or numerical answers. Auto-submit on time expiry. One device at a time.</div>
-            </div>
-            <div class="how-step">
-                <div class="how-step-num">4</div>
-                <div class="how-step-title">Results & review</div>
-                <div class="how-step-desc">Instant score, grade, and detailed response page. Discuss each question. Admin views all analytics.</div>
+            <div class="hub-col" style="--fc:var(--ai-accent)">
+                <div class="hub-col-icon"><i class="fas fa-brain"></i></div>
+                <div class="hub-col-title">Intelligence</div>
+                <ul class="hub-col-list">
+                    <li><i class="fas fa-circle"></i> AI study assistant</li>
+                    <li><i class="fas fa-circle"></i> AI answer explanations</li>
+                    <li><i class="fas fa-circle"></i> AI question generation</li>
+                </ul>
             </div>
         </div>
     </div>
 </section>
 
-<!-- EXAM TYPES -->
-<section class="exam-types">
-    <div class="fade-up">
-        <div class="section-eyebrow">Question types</div>
-        <h2 class="section-title">Built for technical<br>and competitive exams</h2>
-        <p class="section-sub">Handles the formats used in JEE, NEET, university papers, and institutional tests.</p>
+<!-- AI ASSISTANT -->
+<section class="section-block alt-bg" id="ai-assistant">
+    <div class="narrow split-panel split-wide-left">
+        <div>
+            <div class="fade-up">
+                <div class="section-eyebrow eb-ai">Intelligence · AI Study Assistant</div>
+                <h2 class="section-title">An AI that actually<br>helps you study</h2>
+                <p class="section-sub">A dedicated academic assistant, always available — not locked to a single exam, and focused on the subject you actually need help with.</p>
+            </div>
+            <div class="flow-track stagger-group" style="--fc:var(--ai-accent)" aria-label="AI Assistant flow">
+                {% for icon, title, desc in ai_assistant_steps %}
+                <div class="flow-step reveal-item">
+                    <div class="flow-step-card">
+                        <div class="flow-step-icon"><i class="fas {{ icon }}"></i></div>
+                        <div class="flow-step-num">STEP {{ loop.index }}</div>
+                        <div class="flow-step-title">{{ title }}</div>
+                        <div class="flow-step-desc">{{ desc }}</div>
+                    </div>
+                </div>
+                {% if not loop.last %}<div class="flow-connector" style="--fc:var(--ai-accent)" aria-hidden="true"><div class="flow-connector-line"></div></div>{% endif %}
+                {% endfor %}
+            </div>
+            <div class="pill-cloud" style="--fc:var(--ai-accent)">
+                <span class="pill"><i class="fas fa-check"></i> Multiple named conversations</span>
+                <span class="pill"><i class="fas fa-check"></i> Conversation history kept</span>
+                <span class="pill"><i class="fas fa-check"></i> Physics, chemistry, math, engineering &amp; more</span>
+                <span class="pill"><i class="fas fa-check"></i> Focused strictly on academics</span>
+            </div>
+        </div>
+        <div class="mockup-card mockup-chat fade-up">
+            <div class="bubble-label">You</div>
+            <div class="chat-bubble bubble-user">Why is my numerical answer marked wrong if it's close to correct?</div>
+            <div class="bubble-label" style="margin-top:.9rem">AI Assistant</div>
+            <div class="chat-bubble bubble-ai">Numerical questions use a small tolerance range set by your instructor — your answer likely fell just outside it. Want me to walk through how tolerance works?</div>
+        </div>
     </div>
-    <div class="types-grid fade-up">
-        <div class="type-card">
+</section>
+
+<!-- AI-POWERED RESPONSES & EXPLANATIONS -->
+<section class="section-block narrow" id="ai-responses">
+    <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+        <div class="section-eyebrow eb-ai">Intelligence · Beyond the Score</div>
+        <h2 class="section-title">Understand every answer,<br>not just see it</h2>
+        <p class="section-sub centered">After an exam, SmartAIExam does more than record what you answered.</p>
+    </div>
+    <div class="branch-wrap fade-up">
+        <div class="branch-trunk">
+            <div class="flow-step-card" style="--fc:var(--ai-accent);max-width:280px">
+                <div class="flow-step-icon"><i class="fas fa-file-circle-check"></i></div>
+                <div class="flow-step-title">Question → Your Response → Review</div>
+                <div class="flow-step-desc">Every submitted response opens up for review after the exam.</div>
+            </div>
+        </div>
+        <div class="branch-row cols-3 stagger-group">
+            <div class="branch-card reveal-item" style="--fc:var(--sched-accent)">
+                <div class="branch-card-icon"><i class="fas fa-comments"></i></div>
+                <div class="branch-card-title">Discussion</div>
+                <div class="branch-card-desc">Threaded, student-to-student discussion on any question — with admin-pinned comments and a marked best answer.</div>
+            </div>
+            <div class="branch-card reveal-item" style="--fc:var(--ai-accent)">
+                <div class="branch-card-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                <div class="branch-card-title">AI Explanation</div>
+                <div class="branch-card-desc">A step-by-step, AI-generated explanation of the correct answer — including questions that carry an image or diagram.</div>
+            </div>
+            <div class="branch-card reveal-item" style="--fc:var(--accent)">
+                <div class="branch-card-icon"><i class="fas fa-brain"></i></div>
+                <div class="branch-card-title">Understanding &amp; Analysis</div>
+                <div class="branch-card-desc">Discussion, explanation and your own response sit side by side — so review actually builds understanding.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- POWERFUL QUESTION EXPERIENCE -->
+<section class="section-block alt-bg">
+    <div class="narrow split-panel split-wide-right">
+        <div class="mockup-q-card fade-up">
+            <div class="mockup-q-text">Q7. In the circuit shown, determine the equivalent resistance across A–B.</div>
+            <div class="mockup-q-diagram"><i class="fas fa-diagram-project"></i> Question diagram</div>
+            <div class="mockup-q-opts">
+                <div class="mockup-q-opt"><span class="opt-dot"></span> 2Ω</div>
+                <div class="mockup-q-opt correct"><span class="opt-dot"></span> 4Ω</div>
+                <div class="mockup-q-opt"><span class="opt-dot"></span> 6Ω</div>
+                <div class="mockup-q-opt"><span class="opt-dot"></span> 8Ω</div>
+            </div>
+        </div>
+        <div>
+            <div class="fade-up">
+                <div class="section-eyebrow">Question Bank</div>
+                <h2 class="section-title">Built for questions<br>that need a diagram</h2>
+                <p class="section-sub">Engineering, science and technical exams often need more than plain text — SmartAIExam questions can carry an image or diagram directly, with a click-to-enlarge view during the exam.</p>
+            </div>
+        </div>
+    </div>
+    <div class="types-grid stagger-group narrow" style="margin-top:3.5rem">
+        <div class="type-card reveal-item">
             <div class="type-label">MCQ/MSQ</div>
             <div class="type-title">Multiple Choice/Select Questions</div>
-            <div class="type-desc">Single or multi correct answers from four options. Supports image-based questions. Full positive/negative marking per question.</div>
-            <div class="type-pills">
-                <span class="pill">4 options</span>
-                <span class="pill">Image support</span>
-                <span class="pill">Negative marking</span>
-                <span class="pill">Per-question marks</span>
-            </div>
+            <div class="type-desc">Single or multi correct answers from four options, with image support and full positive/negative marking per question.</div>
         </div>
-        <div class="type-card">
+        <div class="type-card reveal-item">
             <div class="type-label">NIT</div>
             <div class="type-title">Numerical Input Type</div>
-            <div class="type-desc">Student types the exact numerical answer. Configurable tolerance range for decimal answers. Used in papers like JEE Advanced.</div>
-            <div class="type-pills">
-                <span class="pill">Decimal tolerance</span>
-                <span class="pill">Exact match</span>
-                <span class="pill">Range validation</span>
-            </div>
+            <div class="type-desc">Student types the exact numerical answer, with a configurable decimal tolerance — the format used in papers like JEE Advanced.</div>
         </div>
-        <div class="type-card">
+        <div class="type-card reveal-item">
             <div class="type-label">Marking</div>
             <div class="type-title">Flexible Marking Scheme</div>
-            <div class="type-desc">Set positive marks, negative marks, and unattempted penalty per exam or per question. Total score and percentage calculated instantly.</div>
-            <div class="type-pills">
-                <span class="pill">+/- marks</span>
-                <span class="pill">Unattempted = 0</span>
-                <span class="pill">Grade assignment</span>
-            </div>
+            <div class="type-desc">Positive marks, negative marks and unattempted penalty, per exam or per question — score and grade calculated instantly.</div>
         </div>
-        <div class="type-card">
+        <div class="type-card reveal-item">
             <div class="type-label">Attempts</div>
             <div class="type-title">Attempt Control</div>
-            <div class="type-desc">Limit how many times a student can attempt an exam. View full attempt history, time taken, and score for each attempt.</div>
-            <div class="type-pills">
-                <span class="pill">Max attempts</span>
-                <span class="pill">Attempt history</span>
-                <span class="pill">Time tracking</span>
+            <div class="type-desc">Limit how many times a student can attempt an exam, with full attempt history, time taken and score for each try.</div>
+        </div>
+    </div>
+</section>
+
+<!-- SMART NOTEBOOK -->
+<section class="section-block narrow" id="notebook">
+    <div class="fade-up">
+        <div class="section-eyebrow eb-note">Learning Workspace</div>
+        <h2 class="section-title">A notebook that's part canvas,<br>part document</h2>
+        <p class="section-sub">Write, draw and organize your understanding — then share it, or publish it for others to learn from.</p>
+    </div>
+    <div class="flow-track stagger-group" style="--fc:var(--note-accent)" aria-label="Notebook flow">
+        {% for icon, title, desc in notebook_steps %}
+        <div class="flow-step reveal-item">
+            <div class="flow-step-card">
+                <div class="flow-step-icon"><i class="fas {{ icon }}"></i></div>
+                <div class="flow-step-num">STEP {{ loop.index }}</div>
+                <div class="flow-step-title">{{ title }}</div>
+                <div class="flow-step-desc">{{ desc }}</div>
             </div>
         </div>
+        {% if not loop.last %}<div class="flow-connector" style="--fc:var(--note-accent)" aria-hidden="true"><div class="flow-connector-line"></div></div>{% endif %}
+        {% endfor %}
+    </div>
+    <div class="pill-cloud" style="--fc:var(--note-accent)">
+        <span class="pill"><i class="fas fa-check"></i> Rich text formatting</span>
+        <span class="pill"><i class="fas fa-check"></i> Freehand pen, pencil &amp; highlighter</span>
+        <span class="pill"><i class="fas fa-check"></i> Sticky notes</span>
+        <span class="pill"><i class="fas fa-check"></i> Shapes &amp; images</span>
+        <span class="pill"><i class="fas fa-check"></i> Multi-page notebooks</span>
+        <span class="pill"><i class="fas fa-check"></i> Public Library — browse &amp; import</span>
+        <span class="pill"><i class="fas fa-check"></i> Viewer/Editor sharing</span>
+        <span class="pill"><i class="fas fa-check"></i> Trash &amp; recovery</span>
+        <span class="pill"><i class="fas fa-check"></i> Export to PDF/JSON</span>
+    </div>
+</section>
+
+<!-- EXAMS: NORMAL + SCHEDULED -->
+<section class="section-block alt-bg" id="exams">
+    <div class="narrow">
+        <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+            <div class="section-eyebrow">Exams · Two Ways To Run Them</div>
+            <h2 class="section-title">Run exams your way</h2>
+            <p class="section-sub centered">Pick the workflow that fits — run exams on your own terms, or let the platform handle timing end to end.</p>
+        </div>
+        <div class="compare-grid stagger-group">
+            <div class="compare-card reveal-item" style="--fc:var(--accent)">
+                <div class="compare-label"><i class="fas fa-sliders"></i> Normal Exam</div>
+                <div class="compare-title">Admin-controlled availability</div>
+                <div class="compare-tag">You decide when it's live — flexible enough to reuse for makeup sessions and practice rounds.</div>
+                <ul class="compare-list">
+                    <li><i class="fas fa-check"></i> Flexible, admin-controlled Live status</li>
+                    <li><i class="fas fa-check"></i> Start any time while the exam is Live</li>
+                    <li><i class="fas fa-check"></i> Attempts governed by a configured limit</li>
+                    <li><i class="fas fa-check"></i> Can be made reusable without re-scheduling</li>
+                </ul>
+            </div>
+            <div class="compare-vs">VS</div>
+            <div class="compare-card reveal-item" style="--fc:var(--sched-accent)">
+                <div class="compare-label"><i class="fas fa-calendar-check"></i> Scheduled Exam</div>
+                <div class="compare-title">Fixed, automated timeline</div>
+                <div class="compare-tag">Set it once — the platform opens, times and closes it for you, to the second.</div>
+                <ul class="compare-list">
+                    <li><i class="fas fa-check"></i> Fixed scheduled window, start to finish</li>
+                    <li><i class="fas fa-check"></i> Preparation / buffer period before it opens</li>
+                    <li><i class="fas fa-check"></i> Secure preparation kiosk with countdown</li>
+                    <li><i class="fas fa-check"></i> Automatic start, timing and submission</li>
+                </ul>
+            </div>
+        </div>
+        <div class="fade-up" style="margin-top:4rem">
+            <div class="section-eyebrow eb-sched">Scheduled Exam · Student Journey</div>
+            <h3 class="section-title" style="font-size:clamp(1.3rem,2.8vw,1.7rem)">Opens itself. Ends itself.</h3>
+        </div>
+        <div class="flow-track stagger-group" style="--fc:var(--sched-accent)" aria-label="Scheduled Exam flow">
+            {% for icon, title, desc in sched_steps %}
+            <div class="flow-step reveal-item">
+                <div class="flow-step-card">
+                    <div class="flow-step-icon"><i class="fas {{ icon }}"></i></div>
+                    <div class="flow-step-num">STEP {{ loop.index }}</div>
+                    <div class="flow-step-title">{{ title }}</div>
+                    <div class="flow-step-desc">{{ desc }}</div>
+                </div>
+            </div>
+            {% if not loop.last %}<div class="flow-connector" style="--fc:var(--sched-accent)" aria-hidden="true"><div class="flow-connector-line"></div></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- RESULTS & PERFORMANCE COMPARISON -->
+<section class="section-block narrow" id="results">
+    <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+        <div class="section-eyebrow">Results · Where Do You Stand?</div>
+        <h2 class="section-title">More than a score</h2>
+        <p class="section-sub centered">See exactly how you performed — and how that compares to the rest of the class.</p>
+    </div>
+    <div class="results-panel">
+        <div class="bar-card fade-up stagger-group" style="--fc:var(--accent)">
+            <div class="bar-row">
+                <div class="bar-row-label"><span>Your Score</span><span>74%</span></div>
+                <div class="bar-track reveal-item"><div class="bar-fill fill-you" style="--pct:74%"></div></div>
+            </div>
+            <div class="bar-row">
+                <div class="bar-row-label"><span>Top Performer</span><span>96%</span></div>
+                <div class="bar-track reveal-item"><div class="bar-fill fill-top" style="--pct:96%"></div></div>
+            </div>
+            <div class="bar-row">
+                <div class="bar-row-label"><span>Class Average</span><span>61%</span></div>
+                <div class="bar-track reveal-item"><div class="bar-fill fill-you" style="--pct:61%;opacity:.55"></div></div>
+            </div>
+        </div>
+        <div class="stat-grid stagger-group">
+            <div class="stat-chip reveal-item"><div class="stat-chip-num">#12</div><div class="stat-chip-label">Your Rank</div></div>
+            <div class="stat-chip reveal-item"><div class="stat-chip-num">Top 15%</div><div class="stat-chip-label">Percentile</div></div>
+            <div class="stat-chip reveal-item"><div class="stat-chip-num">Live</div><div class="stat-chip-label">Full Leaderboard</div></div>
+            <div class="stat-chip reveal-item"><div class="stat-chip-num">5-Band</div><div class="stat-chip-label">Score Distribution</div></div>
+        </div>
+    </div>
+    <p class="section-sub" style="margin-top:2rem;max-width:680px">Every result comes with rank, percentile and a direct comparison against the class average, median and top score — plus a personal score trend across every exam you've taken.</p>
+</section>
+
+<!-- ADMIN INTELLIGENCE: QUESTION MANAGEMENT -->
+<section class="section-block alt-bg">
+    <div class="narrow">
+        <div class="fade-up">
+            <div class="section-eyebrow">Admin · Organize The Whole Structure</div>
+            <h2 class="section-title">From category to question,<br>fully organized</h2>
+            <p class="section-sub">A clear hierarchy for everything an exam is built from — with Subjects running alongside it purely to organize question images.</p>
+        </div>
+        <div class="flow-track stagger-group" style="--fc:var(--accent)" aria-label="Admin question management structure">
+            {% for icon, title, desc in admin_structure_steps %}
+            <div class="flow-step reveal-item">
+                <div class="flow-step-card">
+                    <div class="flow-step-icon"><i class="fas {{ icon }}"></i></div>
+                    <div class="flow-step-num">{{ loop.index }}</div>
+                    <div class="flow-step-title">{{ title }}</div>
+                    <div class="flow-step-desc">{{ desc }}</div>
+                </div>
+            </div>
+            {% if not loop.last %}<div class="flow-connector" style="--fc:var(--accent)" aria-hidden="true"><div class="flow-connector-line"></div></div>{% endif %}
+            {% endfor %}
+        </div>
+        <div class="pill-cloud">
+            <span class="pill"><i class="fas fa-check"></i> Manual entry</span>
+            <span class="pill"><i class="fas fa-check"></i> CSV import &amp; export</span>
+            <span class="pill"><i class="fas fa-check"></i> Subjects as image folders</span>
+            <span class="pill"><i class="fas fa-check"></i> AI generation</span>
+        </div>
+    </div>
+</section>
+
+<!-- ADMIN INTELLIGENCE: PDF / AI GENERATION PIPELINE -->
+<section class="section-block narrow">
+    <div class="fade-up" style="text-align:center;max-width:680px;margin:0 auto">
+        <div class="section-eyebrow eb-ai">Admin · AI Question Generation</div>
+        <h2 class="section-title">From a PDF to a<br>ready exam</h2>
+        <p class="section-sub centered">Upload study material once — choose how questions come out of it.</p>
+    </div>
+    <div class="branch-wrap fade-up">
+        <div class="branch-trunk">
+            <div class="flow-step-card" style="--fc:var(--ai-accent);max-width:280px">
+                <div class="flow-step-icon"><i class="fas fa-file-pdf"></i></div>
+                <div class="flow-step-title">PDF / Study Material</div>
+                <div class="flow-step-desc">Uploaded once — including scanned or image-only pages, read visually.</div>
+            </div>
+        </div>
+        <div class="branch-row cols-3 stagger-group">
+            <div class="branch-card reveal-item" style="--fc:var(--ai-accent)">
+                <div class="branch-card-icon"><i class="fas fa-file-export"></i></div>
+                <div class="branch-card-title">Direct Extraction</div>
+                <div class="branch-card-desc">Pulls existing questions straight out of the PDF, exactly as written.</div>
+            </div>
+            <div class="branch-card reveal-item" style="--fc:var(--ai-accent)">
+                <div class="branch-card-icon"><i class="fas fa-diagram-project"></i></div>
+                <div class="branch-card-title">Concept Mining</div>
+                <div class="branch-card-desc">Reads the material's underlying content and generates brand-new questions from it.</div>
+            </div>
+            <div class="branch-card reveal-item" style="--fc:var(--ai-accent)">
+                <div class="branch-card-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                <div class="branch-card-title">Pure Generation</div>
+                <div class="branch-card-desc">No file needed — generate fresh questions straight from a typed topic.</div>
+            </div>
+        </div>
+        <div class="branch-trunk" style="margin-top:1.75rem">
+            <div class="flow-step-card" style="--fc:var(--accent);max-width:320px">
+                <div class="flow-step-icon"><i class="fas fa-list-check"></i></div>
+                <div class="flow-step-title">Review, Edit &amp; Add to Exam</div>
+                <div class="flow-step-desc">Every method lands in the same editor — check, adjust, then save directly into the target exam.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- COMPLETE ADMIN -> EXAM -> STUDENT LOOP -->
+<section class="section-block alt-bg">
+    <div class="narrow">
+        <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+            <div class="section-eyebrow">The Full Loop</div>
+            <h2 class="section-title">How it all connects</h2>
+        </div>
+        <div class="flow-track stagger-group" style="--fc:var(--accent)" aria-label="Complete platform loop">
+            {% for icon, title, desc in complete_loop_steps %}
+            <div class="flow-step reveal-item">
+                <div class="flow-step-card">
+                    <div class="flow-step-icon"><i class="fas {{ icon }}"></i></div>
+                    <div class="flow-step-num">{{ loop.index }}</div>
+                    <div class="flow-step-title">{{ title }}</div>
+                    <div class="flow-step-desc">{{ desc }}</div>
+                </div>
+            </div>
+            {% if not loop.last %}<div class="flow-connector" style="--fc:var(--accent)" aria-hidden="true"><div class="flow-connector-line"></div></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- CHAT & COLLABORATION -->
+<section class="section-block narrow">
+    <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+        <div class="section-eyebrow eb-chat">Stay Connected</div>
+        <h2 class="section-title">Talk it through</h2>
+        <p class="section-sub centered">Direct messages, group chats and connection requests — built into the same platform, not bolted on.</p>
+    </div>
+    <div class="chat-nodes fade-up">
+        <div class="chat-node">
+            <div class="chat-node-icon"><i class="fas fa-users"></i></div>
+            <div class="chat-node-title">Users</div>
+        </div>
+        <div class="chat-node-arrow"><i class="fas fa-arrow-right-arrow-left"></i></div>
+        <div class="chat-node">
+            <div class="chat-node-icon"><i class="fas fa-message"></i></div>
+            <div class="chat-node-title">Chat</div>
+        </div>
+        <div class="chat-node-arrow"><i class="fas fa-arrow-right-arrow-left"></i></div>
+        <div class="chat-node">
+            <div class="chat-node-icon"><i class="fas fa-comments"></i></div>
+            <div class="chat-node-title">Conversations</div>
+        </div>
+    </div>
+    <div class="pill-cloud" style="--fc:var(--chat-accent);justify-content:center" id="chat">
+        <span class="pill"><i class="fas fa-check"></i> 1:1 &amp; group chat</span>
+        <span class="pill"><i class="fas fa-check"></i> Connection requests</span>
+        <span class="pill"><i class="fas fa-check"></i> Real-time delivery</span>
+        <span class="pill"><i class="fas fa-check"></i> Unread badges &amp; presence</span>
+        <span class="pill"><i class="fas fa-check"></i> Custom chat backgrounds</span>
     </div>
 </section>
 
 <!-- PROOF STRIP -->
-<section class="proof">
-    <div class="proof-inner fade-up">
-        <div class="proof-quote">
-            "A complete system — <em>exams, analytics, discussions,</em> and AI tools, all in one place."
+<section class="section-block alt-bg">
+    <div class="proof-quote fade-up">
+        "A complete ecosystem — <em>exams, AI, notebooks, and insight,</em> all in one place."
+    </div>
+    <div class="proof-list stagger-group">
+        <div class="proof-item reveal-item">
+            <div class="proof-item-icon"><i class="fas fa-chart-line"></i></div>
+            <div>
+                <div class="proof-item-title">Performance tracking &amp; leaderboards</div>
+                <div class="proof-item-desc">Rank, percentile, and score trends across every exam a student takes.</div>
+            </div>
         </div>
-        <div class="proof-list">
-            <div class="proof-item">
-                <div class="proof-item-icon"><i class="fas fa-chart-line"></i></div>
-                <div>
-                    <div class="proof-item-title">Performance tracking per student</div>
-                    <div class="proof-item-desc">Score trends, subject accuracy, grade history across all exams.</div>
-                </div>
+        <div class="proof-item reveal-item">
+            <div class="proof-item-icon"><i class="fas fa-shield-alt"></i></div>
+            <div>
+                <div class="proof-item-title">Single-device session lock</div>
+                <div class="proof-item-desc">Auto logout if the same account logs in from another device.</div>
             </div>
-            <div class="proof-item">
-                <div class="proof-item-icon"><i class="fas fa-shield-alt"></i></div>
-                <div>
-                    <div class="proof-item-title">Single-device session lock</div>
-                    <div class="proof-item-desc">Auto logout if the same account logs in from another device.</div>
-                </div>
+        </div>
+        <div class="proof-item reveal-item">
+            <div class="proof-item-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <div>
+                <div class="proof-item-title">AI-assisted question generation</div>
+                <div class="proof-item-desc">From a topic, or straight from a PDF — reviewed before it ever reaches an exam.</div>
             </div>
-            <div class="proof-item">
-                <div class="proof-item-icon"><i class="fas fa-upload"></i></div>
-                <div>
-                    <div class="proof-item-title">Bulk CSV question upload</div>
-                    <div class="proof-item-desc">Import hundreds of questions at once. Supports images and all question types.</div>
-                </div>
-            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FOUNDER / CEO -->
+<section class="section-block">
+    <div class="founder-card fade-up">
+        <div class="founder-photo-wrap">
+            {% if ceo_image_url %}
+            <img src="{{ ceo_image_url }}" alt="{{ ceo_name or 'Founder' }}" class="founder-photo" loading="lazy">
+            {% else %}
+            <div class="founder-photo-placeholder"><i class="fas fa-user"></i></div>
+            {% endif %}
+        </div>
+        <div class="founder-body">
+            <div class="section-eyebrow">From the Founder</div>
+            <div class="founder-quote-mark">&ldquo;</div>
+            <p class="founder-message">SmartAIExam started from a simple frustration: exam tools that were either too rigid for real institutional workflows, or too loose to be trusted — and none of them treated learning as part of the same story as testing. We built one platform where exams, AI, and a real workspace for notes all live together: a flexible exam your team runs on its own schedule, or a fully automated kiosk-secured one; an AI that explains a wrong answer instead of just marking it; a notebook worth keeping long after the exam is over. My goal is simple: give students a calm, focused place to learn and be tested, and give admins a system they can actually trust.</p>
+            {% if ceo_name %}
+            <div class="founder-name">{{ ceo_name }}</div>
+            {% endif %}
+            {% if ceo_title %}
+            <div class="founder-title">{{ ceo_title }}</div>
+            {% endif %}
         </div>
     </div>
 </section>
@@ -466,8 +931,8 @@ a{text-decoration:none;color:var(--accent)}
     <div class="cta-bg"></div>
     <div class="cta-glow"></div>
     <div class="cta-inner fade-up">
-        <h2 class="cta-title">Ready to run your first exam?</h2>
-        <p class="cta-sub">Create an account in under a minute. No setup fees, no complexity — just a clean, capable examination platform.</p>
+        <h2 class="cta-title">Ready to see it in action?</h2>
+        <p class="cta-sub">Create an account in under a minute. No setup fees, no complexity — one connected platform for exams, AI, and learning.</p>
         <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap">
             <a href="{{ url_for('auth.create_account') }}" class="btn-white">
                 <i class="fas fa-user-plus"></i> Create account
@@ -481,19 +946,42 @@ a{text-decoration:none;color:var(--accent)}
 
 <!-- FOOTER -->
 <footer class="lp-footer">
-    <div class="footer-inner">
-        <a href="/" class="footer-logo">
-            <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:26px;width:auto;"></video>
-        </a>
-        <div class="footer-links-row">
-            <a href="{{ url_for('misc.privacy_policy') }}" class="footer-link">Privacy</a>
-            <a href="{{ url_for('misc.terms_of_service') }}" class="footer-link">Terms</a>
-            <a href="{{ url_for('misc.account_deletion_policy') }}" class="footer-link">Account &amp; Data Deletion</a>
-            <a href="{{ url_for('misc.support') }}" class="footer-link">Support</a>
-            <a href="{{ url_for('misc.contact') }}" class="footer-link">Contact</a>
-            <a href="{{ url_for('misc.about') }}" class="footer-link">About</a>
+    <div class="footer-top">
+        <div class="footer-brand">
+            <a href="/" class="footer-logo">
+                <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:28px;width:auto;"></video>
+            </a>
+            <p class="footer-tagline">An ecosystem for exams, insight, and learning.</p>
+            {% if PUBLIC_SOCIAL_TWITTER or PUBLIC_SOCIAL_LINKEDIN or PUBLIC_SOCIAL_GITHUB or PUBLIC_SOCIAL_INSTAGRAM %}
+            <div class="footer-social-row">
+                {# fa-x-twitter isn't in the pinned Font Awesome 6.4.0 build
+                   (added in a later 6.4.x point release) — fa-twitter is
+                   safely present and still universally recognized. #}
+                {% if PUBLIC_SOCIAL_TWITTER %}<a href="{{ PUBLIC_SOCIAL_TWITTER }}" class="footer-social-link" target="_blank" rel="noopener" aria-label="Twitter / X"><i class="fa-brands fa-twitter"></i></a>{% endif %}
+                {% if PUBLIC_SOCIAL_LINKEDIN %}<a href="{{ PUBLIC_SOCIAL_LINKEDIN }}" class="footer-social-link" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>{% endif %}
+                {% if PUBLIC_SOCIAL_GITHUB %}<a href="{{ PUBLIC_SOCIAL_GITHUB }}" class="footer-social-link" target="_blank" rel="noopener" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>{% endif %}
+                {% if PUBLIC_SOCIAL_INSTAGRAM %}<a href="{{ PUBLIC_SOCIAL_INSTAGRAM }}" class="footer-social-link" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>{% endif %}
+            </div>
+            {% endif %}
         </div>
+        <div class="footer-links-row">
+            <div class="footer-link-group">
+                <span class="footer-link-group-title">Platform</span>
+                <a href="{{ url_for('misc.about') }}" class="footer-link">About</a>
+                <a href="{{ url_for('misc.support') }}" class="footer-link">Support</a>
+                <a href="{{ url_for('misc.contact') }}" class="footer-link">Contact</a>
+            </div>
+            <div class="footer-link-group">
+                <span class="footer-link-group-title">Legal</span>
+                <a href="{{ url_for('misc.privacy_policy') }}" class="footer-link">Privacy</a>
+                <a href="{{ url_for('misc.terms_of_service') }}" class="footer-link">Terms</a>
+                <a href="{{ url_for('misc.account_deletion_policy') }}" class="footer-link">Account &amp; Data Deletion</a>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom">
         <div class="footer-copy">© {{ CURRENT_YEAR }} SmartAIExam. All rights reserved.</div>
+        {% if PUBLIC_SUPPORT_EMAIL %}<a href="mailto:{{ PUBLIC_SUPPORT_EMAIL }}" class="footer-link">{{ PUBLIC_SUPPORT_EMAIL }}</a>{% endif %}
     </div>
 </footer>
 
@@ -516,12 +1004,28 @@ a{text-decoration:none;color:var(--accent)}
         if (window.innerWidth > 640) navWrap.classList.remove('nav-open');
     });
 
-    const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+    /* ── Scroll-reveal — one shared observer, two staggering strategies:
+       .fade-up = section headers (rare, page-order stagger is fine).
+       .reveal-item = repeating items inside a .stagger-group (flow steps,
+       branch/compare/stat cards, comparison bars) — staggered LOCALLY per
+       group so a long page never accumulates an ever-growing delay by the
+       time you scroll to a later section. Also drives the results bar-chart
+       width animation via the same .visible class (see .bar-fill.visible
+       in CSS) — no separate JS needed for that. ── */
+    const revealObserver = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
     }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
     document.querySelectorAll('.fade-up').forEach((el, i) => {
         el.style.transitionDelay = (i * 0.05) + 's';
-        observer.observe(el);
+        revealObserver.observe(el);
+    });
+
+    document.querySelectorAll('.stagger-group').forEach(group => {
+        group.querySelectorAll('.reveal-item').forEach((el, i) => {
+            el.style.transitionDelay = (Math.min(i, 8) * 0.07) + 's';
+            revealObserver.observe(el);
+        });
     });
 </script>
 
@@ -546,10 +1050,8 @@ a{text-decoration:none;color:var(--accent)}
         });
     }
 
-    /* Init: theme was already applied in <head>; just sync the active state */
     syncActive(localStorage.getItem(KEY) || 'sunset');
 
-    /* Toggle dropdown open/close */
     btn.addEventListener('click', function(e) {
         e.stopPropagation();
         dropdown.classList.toggle('open');
@@ -577,7 +1079,6 @@ a{text-decoration:none;color:var(--accent)}
         });
     }
 
-    /* Select a theme */
     options.forEach(function(opt) {
         opt.addEventListener('click', function() {
             applyTheme(this.getAttribute('data-theme'));
@@ -585,7 +1086,6 @@ a{text-decoration:none;color:var(--accent)}
         });
     });
 
-    /* Close dropdown on outside click */
     document.addEventListener('click', function(e) {
         var selector = document.getElementById('landingThemeSelector');
         if (selector && !selector.contains(e.target)) {
@@ -593,7 +1093,6 @@ a{text-decoration:none;color:var(--accent)}
         }
     });
 
-    /* Close on Escape */
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') dropdown.classList.remove('open');
     });

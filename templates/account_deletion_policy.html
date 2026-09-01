@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Account & Data Deletion Policy - SmartAIExam{% endblock %}
-{% set org_name     = "SmartAIExam" %}
-{% set org_email    = "examportaldesk@gmail.com" %}
-{% set last_updated = "August 2026" %}
+{% set org_name = "SmartAIExam" %}
 {% block content %}
 <style>
 .adp-wrap {
@@ -349,7 +347,7 @@
     <div class="adp-phdr-left">
       <h1><i class="fas fa-user-slash"></i> Account &amp; Data Deletion Policy</h1>
       <p>What happens to your account, your data, and your public contributions when you permanently delete your {{ org_name }} account</p>
-      <span class="adp-upd"><i class="fas fa-clock"></i> Last updated: {{ last_updated }}</span>
+      {% if LEGAL_ACCOUNT_DELETION_LAST_UPDATED %}<span class="adp-upd"><i class="fas fa-clock"></i> Last updated: {{ LEGAL_ACCOUNT_DELETION_LAST_UPDATED }}</span>{% endif %}
     </div>
     <div style="display:flex;gap:.5rem;">
       <a href="{{ url_for('misc.home') }}" class="adp-back"><i class="fas fa-home"></i> Home</a>
@@ -568,7 +566,7 @@
             <div class="adp-example-row before">
               <div class="adp-example-avatar"><i class="fas fa-user"></i></div>
               <div>
-                <div class="adp-example-name">Jainarayan Singh</div>
+                <div class="adp-example-name">Alex Kumar</div>
                 <div class="adp-example-sub">Stress &amp; Strains Notes</div>
               </div>
             </div>
@@ -576,7 +574,7 @@
             <div class="adp-example-row after">
               <div class="adp-example-avatar"><i class="fas fa-user-slash"></i></div>
               <div>
-                <div class="adp-example-name">Jainarayan Singh <span class="adp-example-tag">(Deleted User)</span></div>
+                <div class="adp-example-name">Alex Kumar <span class="adp-example-tag">(Deleted User)</span></div>
                 <div class="adp-example-sub">Stress &amp; Strains Notes</div>
               </div>
             </div>
@@ -653,7 +651,7 @@
           <p>If you have questions about this policy, what happens to a specific piece of your content, or need help with account deletion, reach out to us:</p>
           <div class="adp-contact-box">
             <strong>{{ org_name }} — Support</strong>
-            <div><i class="fas fa-at" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ org_email }}</div>
+            {% if PUBLIC_SUPPORT_EMAIL %}<div><i class="fas fa-at" style="color:var(--text-3);margin-right:.45rem;width:13px;text-align:center;"></i>{{ PUBLIC_SUPPORT_EMAIL }}</div>{% endif %}
           </div>
           <p style="margin-top:.85rem;">This policy works alongside our <a href="{{ url_for('misc.privacy_policy') }}" style="color:var(--accent)">Privacy Policy</a> — please review it for how we handle your data while your account is active.</p>
         </div>

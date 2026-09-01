@@ -149,3 +149,31 @@ def send_password_reset_email(
     )
 
     return _send(email, full_name, "Reset Your SmartAIExam Password", html, text)
+
+
+# ─────────────────────────────────────────────
+# OTP Verification Email ("Existing Active Session" login)
+# ─────────────────────────────────────────────
+
+def send_otp_verification_email(
+    email: str, full_name: str, otp_code: str, expiry_minutes: int
+) -> Tuple[bool, str]:
+    sent_at    = _now_display()
+    first_name = full_name.split()[0] if full_name else "there"
+
+    html = render_template(
+        "emails/otp_verification.html",
+        logo_src=_logo_src(config.BASE_URL), first_name=first_name,
+        email=email, otp_code=otp_code, expiry_minutes=expiry_minutes, sent_at=sent_at,
+    )
+
+    text = (
+        f"Your SmartAIExam Verification Code\n\n"
+        f"Hi {first_name},\n\n"
+        f"Your verification code is: {otp_code}\n\n"
+        f"This code expires in {expiry_minutes} minutes and can only be used once.\n"
+        f"If you didn't request this, you can safely ignore this email — no changes will be made.\n\n"
+        f"- SmartAIExam | {sent_at}"
+    )
+
+    return _send(email, full_name, "SmartAIExam – Your Verification Code", html, text)

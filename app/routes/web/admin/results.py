@@ -54,7 +54,7 @@ def users_analytics():
     sid_set = {str(r.get("student_id")) for r in page_data}
     eid_set = {str(r.get("exam_id")) for r in page_data}
     um = get_users_by_ids([int(x) for x in sid_set if x])
-    em = {str(e["id"]): e for e in fetch_all("SELECT id,name FROM exams WHERE id = ANY(%s)", ([int(x) for x in eid_set if x],))}
+    em = {str(e["id"]): e for e in fetch_all("SELECT id,name,scheduled_mode FROM exams WHERE id = ANY(%s)", ([int(x) for x in eid_set if x],))}
 
     results_page = []
     for r in page_data:
@@ -65,6 +65,7 @@ def users_analytics():
             "full_name":  _display_full_name(u),
             "exam_id":    int(r.get("exam_id",0)),
             "exam_name":  e.get("name","Unknown"),
+            "is_scheduled": bool(e.get("scheduled_mode")),
             "score":      r.get("score",0),
             "max_score":  r.get("max_score",0),
             "percentage": float(r.get("percentage",0)),
@@ -142,7 +143,7 @@ def users_analytics_results():
 
         if eid_set:
             er = fetch_all(
-                "SELECT id, name FROM exams WHERE id = ANY(%s)",
+                "SELECT id, name, scheduled_mode FROM exams WHERE id = ANY(%s)",
                 ([int(x) for x in eid_set if x],),
             )
             exams_map = {str(e["id"]): e for e in er}
@@ -161,6 +162,7 @@ def users_analytics_results():
                 "full_name":   _display_full_name(u),
                 "exam_id":     int(r.get("exam_id", 0)),
                 "exam_name":   e.get("name",      "Unknown Exam"),
+                "is_scheduled": bool(e.get("scheduled_mode")),
                 "score":       r.get("score",     0),
                 "max_score":   r.get("max_score", 0),
                 "percentage":  float(r.get("percentage") or 0),

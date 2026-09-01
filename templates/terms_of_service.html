@@ -1,10 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Terms of Service - SmartAIExam{% endblock %}
-{% set org_name    = "SmartAIExam" %}
-{% set org_email   = "examportaldesk@gmail.com" %}
-{% set org_phone   = "+91-755-123-4567" %}
-{% set org_address = "Tech Park, Noida, UP" %}
-{% set last_updated = "May 2026" %}
+{% set org_name = "SmartAIExam" %}
 {% block content %}
 <style>
 .tos-wrap {
@@ -272,7 +268,7 @@
     <div class="tos-phdr-left">
       <h1><i class="fas fa-file-contract"></i> Terms of Service</h1>
       <p>Please read carefully before using the platform</p>
-      <span class="tos-upd"><i class="fas fa-clock"></i> Last updated: {{ last_updated }}</span>
+      {% if LEGAL_TERMS_LAST_UPDATED %}<span class="tos-upd"><i class="fas fa-clock"></i> Last updated: {{ LEGAL_TERMS_LAST_UPDATED }}</span>{% endif %}
     </div>
       <div style="display:flex;gap:.5rem;">
         <a href="{{ url_for('misc.home') }}" class="tos-back"><i class="fas fa-home"></i> Home</a>
@@ -321,7 +317,7 @@
           <p>If you do not agree to any part of these terms, please discontinue use of the platform immediately. Continued use after any updates to these terms constitutes your acceptance of the revised version.</p>
           <div class="tos-info">
             <i class="fas fa-info-circle"></i>
-            <div>These terms were last updated in {{ last_updated }}. We recommend reviewing them periodically. Significant changes will be communicated via your registered email.</div>
+            <div>{% if LEGAL_TERMS_LAST_UPDATED %}These terms were last updated in {{ LEGAL_TERMS_LAST_UPDATED }}. {% endif %}We recommend reviewing them periodically. Significant changes will be communicated via your registered email.</div>
           </div>
         </div>
       </div>
@@ -421,7 +417,7 @@
             <li>Unauthorized access to your account resulting from compromised credentials on your end</li>
             <li>Decisions made by educational institutions based on exam results or session logs</li>
           </ul>
-          <p>We maintain 99.9% uptime and take platform reliability seriously, but we cannot guarantee uninterrupted service under all circumstances. Always ensure your device and connection meet our technical requirements before beginning an exam.</p>
+          <p>We take platform reliability seriously, but we do not guarantee uninterrupted service under all circumstances. Always ensure your device and connection meet our technical requirements before beginning an exam.</p>
         </div>
       </div>
 
@@ -435,9 +431,9 @@
           <p>Upon termination, your access to the platform and all associated data — including exam history, results, and chat records — may be permanently deleted. You may also request voluntary account deletion from the Settings page at any time.</p>
           <div class="tos-contact-box">
             <div><strong>Questions about these terms?</strong></div>
-            <div><i class="fas fa-at" style="color:var(--text-3);margin-right:.4rem;"></i>{{ org_email }}</div>
-            <div><i class="fas fa-phone" style="color:var(--text-3);margin-right:.4rem;"></i>{{ org_phone }}</div>
-            <div><i class="fas fa-map-marker-alt" style="color:var(--text-3);margin-right:.4rem;"></i>{{ org_address }}</div>
+            {% if PUBLIC_SUPPORT_EMAIL %}<div><i class="fas fa-at" style="color:var(--text-3);margin-right:.4rem;"></i>{{ PUBLIC_SUPPORT_EMAIL }}</div>{% endif %}
+            {% if PUBLIC_CONTACT_PHONE %}<div><i class="fas fa-phone" style="color:var(--text-3);margin-right:.4rem;"></i>{{ PUBLIC_CONTACT_PHONE }}</div>{% endif %}
+            <div><i class="fas fa-globe" style="color:var(--text-3);margin-right:.4rem;"></i>{{ PUBLIC_ADDRESS or "Online platform" }}</div>
           </div>
         </div>
       </div>

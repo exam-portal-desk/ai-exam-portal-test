@@ -276,7 +276,7 @@
         <i class="fas fa-home"></i>
         Back to Platform
       </a>
-      <button onclick="history.back()" class="err-btn err-btn-ghost">
+      <button onclick="errorGoBack()" class="err-btn err-btn-ghost">
         <i class="fas fa-arrow-left"></i>
         Go Back
       </button>
@@ -288,6 +288,27 @@
 
 {% block scripts %}
 <script>
+// "Go Back" via history.back() silently does nothing when this page has no
+// history of its own to go back to — e.g. it was opened in a fresh tab
+// (any target="_blank" link that happens to 404). "Go Back" means return to
+// wherever the visitor actually came from, so the fallback is the referrer
+// (same-origin only, so this can't be sent off to some other site) — never
+// the login page, which would wrongly gate an anonymous visitor who was
+// only ever on public pages. The public landing page is the last resort.
+function errorGoBack() {
+  if (window.history.length > 1) {
+    history.back();
+    return;
+  }
+  try {
+    if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+      window.location.href = document.referrer;
+      return;
+    }
+  } catch (e) {}
+  window.location.href = {{ url_for('misc.home') | tojson }};
+}
+
 // Spawn floating particles
 (function() {
   const container = document.getElementById('particles');

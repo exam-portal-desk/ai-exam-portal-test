@@ -34,6 +34,74 @@ from app.services import ai_provider
 
 
 # ========================
+# ERROR CLASSIFICATION
+# ========================
+# Turns a raised exception into (error_type, message) so the admin sees WHY
+# a batch/job failed instead of a single generic string, without leaking
+# secrets (API keys/tokens never appear in these messages — Gemini error
+# bodies don't echo the request's Authorization header/key back, and the
+# messages built here never include header/config values).
+
+_ERROR_TYPE_PATTERNS = [
+    # (error_type, message, [substrings to match in the raw error, any-of])
+    ("rate_limit", "The AI provider is rate-limiting requests (HTTP 429). This is temporary — it retries automatically; if it keeps happening, reduce questions-per-run or wait a minute before the next run.",
+     ('429', 'RESOURCE_EXHAUSTED', 'rate limit', 'Too Many Requests')),
+    ("provider_overloaded", "The AI provider is temporarily overloaded (503/UNAVAILABLE). This usually clears within a minute — it retries automatically.",
+     ('503', 'UNAVAILABLE', 'overloaded', 'Resource has been exhausted')),
+    ("timeout", "The AI provider did not respond in time (request timed out). Large PDFs or big batches are more likely to time out — try a smaller batch size.",
+     ('timeout', 'timed out', 'ReadTimeout', 'ConnectTimeout')),
+    ("network_error", "Could not reach the AI provider (network/connection error). Check connectivity and try again.",
+     ('ConnectionError', 'Connection refused', 'Failed to establish a new connection', 'Name or service not known')),
+    ("truncated_response", "The AI response was cut off mid-output before it finished. Reduce the question count per batch (try 15 or fewer) to avoid hitting the output limit.",
+     ('TRUNCATED',)),
+    ("malformed_response", "The AI returned output that wasn't valid JSON. This is usually transient — retrying the batch typically resolves it.",
+     ('MALFORMED',)),
+    ("no_valid_questions", "The AI's output didn't contain any question that passed validation (wrong field types, invalid question_type, or missing required fields).",
+     ('No valid questions were generated',)),
+    ("upload_failed", "Uploading the PDF to the AI provider failed.",
+     ('file upload', 'upload init', 'upload_endpoint')),
+    ("provider_error", "The AI provider returned an error response.",
+     ('Gemini API error', 'Gemini Vision PDF error', 'no candidates')),
+    ("pdf_extraction_failed", "The PDF could not be read/parsed.",
+     ('PDF extraction failed',)),
+]
+
+
+_SECRET_PATTERNS = [
+    re.compile(r'AIza[0-9A-Za-z_\-]{20,}'),          # Gemini/Google API keys
+    re.compile(r'gsk_[0-9A-Za-z]{16,}'),              # Groq API keys
+    re.compile(r'sk-[0-9A-Za-z]{16,}'),               # OpenAI-style keys (defensive — not used here)
+    re.compile(r'(?i)(api[_-]?key|authorization|bearer|x-goog-api-key)\s*[:=]\s*\S+'),
+]
+
+
+def _redact_secrets(text: str) -> str:
+    """Defense-in-depth for req #1 ("never expose API keys/tokens"): this
+    codebase sends the key via a request HEADER (see ai_provider.build_headers),
+    never in the endpoint URL or echoed by the provider's own error body, so a
+    real key should never actually reach an exception message here — this
+    exists purely as a second layer in case a future provider/error path ever
+    does echo one back."""
+    if not text:
+        return text
+    for pattern in _SECRET_PATTERNS:
+        text = pattern.sub('[redacted]', text)
+    return text
+
+
+def classify_error(exc: Exception) -> tuple:
+    """Returns (error_type, friendly_message, raw_detail). raw_detail is the
+    original exception text (truncated + secret-redacted), kept separate so
+    callers can choose to show it alongside the friendly message for full
+    transparency — it is never suppressed, just classified."""
+    raw = _redact_secrets(str(exc))
+    for error_type, friendly, needles in _ERROR_TYPE_PATTERNS:
+        if any(n.lower() in raw.lower() for n in needles):
+            return error_type, friendly, raw[:400]
+    return "unknown_error", "Generation failed for an unclassified reason — see detail below.", raw[:400]
+
+
+# ========================
 # LATEX SANITIZER
 # ========================
 
@@ -91,7 +159,15 @@ def sanitize_latex(text: str) -> str:
 # ========================
 
 class QuestionModel(BaseModel):
-    """Strict validation model for generated questions"""
+    """Strict validation model for generated questions.
+
+    exam_id here is whatever the model echoes back in its own JSON output
+    (it's given the value and asked to repeat it — see _schema_example())
+    — trustworthy for shape validation, but not something calling code
+    should treat as authoritative for where a question actually gets
+    saved. The job's own admin-selected exam_id (stored on the job dict in
+    app/routes/api/v01/admin/ai_centre.py:ai_generate_questions(), not
+    derived from any question) is the real source of truth for that."""
     exam_id: int
     question_text: str
     option_a: str = ""
@@ -160,6 +236,11 @@ _OUTPUT_RULES = r"""
 - NUMERIC: options A,B,C,D MUST be empty strings ""
 - MSQ: correct_answer can be "A,C" or "A,B,D"
 - MCQ: correct_answer must be single letter
+- question_type MUST be exactly one of: MCQ, MSQ, NUMERIC — never any other
+  value, and never omitted. Source papers often include "Match List-I with
+  List-II" questions or "Assertion (A) / Reason (R)" questions — these still
+  have a single lettered correct option (a/b/c/d), so classify them as MCQ.
+  Do NOT invent a new type like "MATCHING" or "ASSERTION_REASON" for them.
 """
 
 
@@ -367,13 +448,18 @@ class AIQuestionGenerator:
 
     @staticmethod
     def _retry_call(fn: Callable, max_retries: int = 3, base_delay: float = 5.0):
-        """Retry a Gemini API call on transient errors (503/UNAVAILABLE) with exponential backoff."""
+        """Retry a Gemini API call on transient errors (503/UNAVAILABLE/429 rate-limit)
+        with exponential backoff. 429 previously fell through as non-retryable, which
+        meant a routine rate-limit bump always failed the whole batch immediately."""
         for attempt in range(max_retries + 1):
             try:
                 return fn()
             except Exception as e:
                 err = str(e)
-                is_transient = any(x in err for x in ('503', 'UNAVAILABLE', 'Resource has been exhausted', 'overloaded'))
+                is_transient = any(x in err for x in (
+                    '503', 'UNAVAILABLE', 'Resource has been exhausted', 'overloaded',
+                    '429', 'RESOURCE_EXHAUSTED', 'rate limit', 'Too Many Requests',
+                ))
                 if is_transient and attempt < max_retries:
                     wait = base_delay * (2 ** attempt)  # 5s → 10s → 20s
                     print(f"Gemini transient error (attempt {attempt + 1}/{max_retries}) — retrying in {wait:.0f}s...")
@@ -499,47 +585,76 @@ class AIQuestionGenerator:
     # Generation modes
     # ------------------------------------------------------------------
 
-    def extract_from_pdf(self, pdf_path: str, config: Dict, progress_callback=None) -> List[Dict]:
-        """Card A: Extract existing questions from PDF. Progress callback, per-batch error recovery."""
+    def extract_from_pdf(self, pdf_path: Optional[str], config: Dict, progress_callback=None,
+                          preloaded_context: Optional[str] = None,
+                          preloaded_file_uri: Optional[str] = None,
+                          preloaded_is_vision: Optional[bool] = None) -> List[Dict]:
+        """Card A: Extract existing questions from PDF. Progress callback, per-batch error recovery.
+
+        preloaded_* lets a caller (namely: a "retry failed batches" request) skip
+        re-parsing/re-uploading the PDF entirely by reusing what a prior run of
+        this same job already extracted/uploaded — pdf_path can be None in that
+        case since the temp file was already cleaned up after the first run."""
         def _cb(event: dict):
             if progress_callback:
                 progress_callback(event)
 
         batches = self._split_batches(config)
-        is_vision = self.is_image_pdf(pdf_path)
 
-        file_uri = None
-        context = None
-        if is_vision:
-            _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
-            file_size = os.path.getsize(pdf_path)
-            if file_size > _MAX_INLINE_PDF_BYTES:
-                _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
-                file_uri = self._upload_pdf(pdf_path)
-                _cb({"type": "uploaded", "message": "PDF uploaded. Starting batch extraction..."})
+        if preloaded_is_vision is not None:
+            is_vision, file_uri, context = preloaded_is_vision, preloaded_file_uri, preloaded_context
         else:
-            context = self.extract_pdf_text(pdf_path)
+            is_vision = self.is_image_pdf(pdf_path)
+            file_uri = None
+            context = None
+            if is_vision:
+                _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
+                file_size = os.path.getsize(pdf_path)
+                if file_size > _MAX_INLINE_PDF_BYTES:
+                    _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
+                    file_uri = self._upload_pdf(pdf_path)
+                    _cb({"type": "uploaded", "message": "PDF uploaded. Starting batch extraction..."})
+            else:
+                context = self.extract_pdf_text(pdf_path)
+            _cb({"type": "context_ready", "is_vision": is_vision, "file_uri": file_uri,
+                 "context": context, "message": ""})
 
         _cb({"type": "batches_ready", "total_batches": len(batches),
              "message": f"Starting {len(batches)} batch(es)..."})
+
+        # Direct-Extraction-only toggle (admin UI: "Duplicate Question
+        # Handling"). Default False preserves the original always-dedup
+        # behavior. Deliberately read only here — mine_concepts/
+        # generate_from_topic never look at this key, so it has zero effect
+        # on Concept Mining, Pure Generation, or Vision generation.
+        keep_duplicates = bool(config.get("keep_duplicates", False))
 
         # Track how many questions have been extracted so far for sequential offset
         total_extracted_so_far = len(config.get("excluded_texts", []))
 
         # Build a dedup set from EXISTING excluded_texts so AI-generated duplicates of DB
         # questions get caught in post-generation dedup even if AI ignores the ban block.
+        # This set is always respected, even in keep-duplicates mode — it represents
+        # questions already saved to the exam (the separate "Exclude Already
+        # Generated" CSV feature), not repeats within this PDF.
         existing_excluded_keys: set = {
             _dedup_key(t) for t in config.get("excluded_texts", []) if t
         }
 
         all_questions = []
-        # seen_keys tracks fingerprints of everything generated THIS session + pre-existing
+        # seen_keys tracks fingerprints of everything generated THIS session + pre-existing.
+        # In keep-duplicates mode this is intentionally never grown beyond the
+        # pre-existing set below, so a repeat WITHIN this extraction run is
+        # never treated as "already seen" — only genuinely pre-existing DB
+        # questions still get filtered.
         seen_keys: set = set(existing_excluded_keys)
         batch_errors = []
         for i, batch_config in enumerate(batches):
             n = i + 1
-            # Rolling dedup: add THIS session's already-generated stubs into each batch's exclude list
-            session_stubs = [q["question_text"][:_EXCLUDE_STUB_LEN] for q in all_questions]
+            # Rolling dedup: add THIS session's already-generated stubs into each batch's
+            # exclude list — skipped entirely in keep-duplicates mode, since banning them
+            # from the prompt would actively fight the "extract every occurrence" request.
+            session_stubs = [] if keep_duplicates else [q["question_text"][:_EXCLUDE_STUB_LEN] for q in all_questions]
             existing_stubs = batch_config.get("excluded_texts", [])
             batch_config = dict(batch_config)
             batch_config["excluded_texts"] = existing_stubs + session_stubs
@@ -593,52 +708,78 @@ class AIQuestionGenerator:
                     )
                     raw = self.generate_text(full_prompt)
                 batch_result = self._parse_and_validate(raw, batch_config)
-                # Post-generation dedup: use normalised fingerprint against ALL seen keys
-                # (includes DB-existing questions from excluded_texts + this session's output)
+                # Post-generation dedup: use normalised fingerprint against seen keys.
+                # keep_duplicates=True: only drop a match against a PRE-EXISTING DB
+                # question (existing_excluded_keys, frozen — never grown below), so a
+                # question that legitimately repeats within this PDF is kept every
+                # time it's extracted, exactly as it appears in the source.
                 deduped = []
+                dropped = 0
                 for q in batch_result:
                     key = _dedup_key(q["question_text"])
-                    if key not in seen_keys:
+                    if keep_duplicates:
+                        if key in existing_excluded_keys:
+                            dropped += 1
+                            print(f"[DEDUP] Dropped duplicate of an existing exam question: {q['question_text'][:60]}...")
+                            continue
+                        deduped.append(q)
+                    elif key not in seen_keys:
                         deduped.append(q)
                         seen_keys.add(key)
                     else:
+                        dropped += 1
                         print(f"[DEDUP] Dropped duplicate: {q['question_text'][:60]}...")
                 all_questions.extend(deduped)
                 _cb({"type": "batch_done", "batch": n, "total_batches": len(batches),
                      "batch_count": len(deduped), "questions_so_far": len(all_questions),
-                     "message": f"Batch {n} done — {len(deduped)} questions extracted ({len(batch_result)-len(deduped)} duplicates dropped)."})
+                     "questions": deduped,
+                     "message": f"Batch {n} done — {len(deduped)} questions extracted ({dropped} duplicates dropped)."})
             except Exception as e:
-                msg = f"Batch {n} failed: {str(e)}"
+                msg = _redact_secrets(f"Batch {n} failed: {str(e)}")
                 print(msg)
                 batch_errors.append(msg)
+                error_type, friendly, _raw = classify_error(e)
                 _cb({"type": "batch_error", "batch": n, "total_batches": len(batches),
-                     "questions_so_far": len(all_questions), "message": msg})
+                     "questions_so_far": len(all_questions), "message": msg,
+                     "error_type": error_type, "error_friendly": friendly})
 
         if not all_questions:
             raise Exception(f"All {len(batches)} batch(es) failed. "
                             f"Last error: {batch_errors[-1] if batch_errors else 'unknown'}")
         return all_questions
 
-    def mine_concepts(self, pdf_path: str, config: Dict, progress_callback=None) -> List[Dict]:
-        """Card B: Generate new questions from theory/concepts. Progress callback, per-batch error recovery."""
+    def mine_concepts(self, pdf_path: Optional[str], config: Dict, progress_callback=None,
+                       preloaded_context: Optional[str] = None,
+                       preloaded_file_uri: Optional[str] = None,
+                       preloaded_is_vision: Optional[bool] = None) -> List[Dict]:
+        """Card B: Generate new questions from theory/concepts. Progress callback, per-batch error recovery.
+
+        preloaded_* lets a "retry failed batches" request reuse a prior run's
+        already-extracted text / already-uploaded file URI — see extract_from_pdf's
+        docstring for the full rationale."""
         def _cb(event: dict):
             if progress_callback:
                 progress_callback(event)
 
         batches = self._split_batches(config)
-        is_vision = self.is_image_pdf(pdf_path)
 
-        file_uri = None
-        context = None
-        if is_vision:
-            _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
-            file_size = os.path.getsize(pdf_path)
-            if file_size > _MAX_INLINE_PDF_BYTES:
-                _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
-                file_uri = self._upload_pdf(pdf_path)
-                _cb({"type": "uploaded", "message": "PDF uploaded. Starting concept mining..."})
+        if preloaded_is_vision is not None:
+            is_vision, file_uri, context = preloaded_is_vision, preloaded_file_uri, preloaded_context
         else:
-            context = self.extract_pdf_text(pdf_path)
+            is_vision = self.is_image_pdf(pdf_path)
+            file_uri = None
+            context = None
+            if is_vision:
+                _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
+                file_size = os.path.getsize(pdf_path)
+                if file_size > _MAX_INLINE_PDF_BYTES:
+                    _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
+                    file_uri = self._upload_pdf(pdf_path)
+                    _cb({"type": "uploaded", "message": "PDF uploaded. Starting concept mining..."})
+            else:
+                context = self.extract_pdf_text(pdf_path)
+            _cb({"type": "context_ready", "is_vision": is_vision, "file_uri": file_uri,
+                 "context": context, "message": ""})
 
         _cb({"type": "batches_ready", "total_batches": len(batches),
              "message": f"Starting {len(batches)} batch(es)..."})
@@ -703,14 +844,17 @@ class AIQuestionGenerator:
                         print(f"[DEDUP] Dropped duplicate: {q['question_text'][:60]}...")
                 all_questions.extend(deduped)
                 _cb({"type": "batch_done", "batch": n, "total_batches": len(batches),
-                     "questions_so_far": len(all_questions),
+                     "batch_count": len(deduped), "questions_so_far": len(all_questions),
+                     "questions": deduped,
                      "message": f"Batch {n} done — {len(deduped)} questions mined ({len(batch_result)-len(deduped)} duplicates dropped)."})
             except Exception as e:
-                msg = f"Batch {n} failed: {str(e)}"
+                msg = _redact_secrets(f"Batch {n} failed: {str(e)}")
                 print(msg)
                 batch_errors.append(msg)
+                error_type, friendly, _raw = classify_error(e)
                 _cb({"type": "batch_error", "batch": n, "total_batches": len(batches),
-                     "questions_so_far": len(all_questions), "message": msg})
+                     "questions_so_far": len(all_questions), "message": msg,
+                     "error_type": error_type, "error_friendly": friendly})
 
         if not all_questions:
             raise Exception(f"All {len(batches)} batch(es) failed. "
@@ -749,13 +893,16 @@ class AIQuestionGenerator:
                 all_questions.extend(batch_result)
                 _cb({"type": "batch_done", "batch": n, "total_batches": len(batches),
                      "batch_count": len(batch_result), "questions_so_far": len(all_questions),
+                     "questions": batch_result,
                      "message": f"Batch {n} done — {len(batch_result)} questions generated."})
             except Exception as e:
-                msg = f"Batch {n} failed: {str(e)}"
+                msg = _redact_secrets(f"Batch {n} failed: {str(e)}")
                 print(msg)
                 batch_errors.append(msg)
+                error_type, friendly, _raw = classify_error(e)
                 _cb({"type": "batch_error", "batch": n, "total_batches": len(batches),
-                     "questions_so_far": len(all_questions), "message": msg})
+                     "questions_so_far": len(all_questions), "message": msg,
+                     "error_type": error_type, "error_friendly": friendly})
 
         if not all_questions:
             raise Exception(f"All {len(batches)} batch(es) failed. "
@@ -876,14 +1023,39 @@ class AIQuestionGenerator:
                 raise ValueError("Output must be a JSON array")
 
             validated = []
+            rejection_reasons = []
             for q in questions:
                 try:
                     validated.append(QuestionModel(**q).dict())
                 except Exception as e:
                     print(f"Skipping invalid question: {e}")
+                    # Pydantic v1's str(e) LEADS with a useless generic header
+                    # ("1 validation error for QuestionModel") and puts the
+                    # actual field + reason on later lines — .errors() gives
+                    # that structured detail directly instead of just the header.
+                    if hasattr(e, "errors"):
+                        try:
+                            errs = e.errors()
+                            reason = "; ".join(
+                                f"{'.'.join(str(p) for p in err.get('loc', [])) or 'value'}: {err.get('msg', '')}"
+                                for err in errs[:3]
+                            )
+                        except Exception:
+                            reason = str(e)
+                    else:
+                        reason = str(e)
+                    rejection_reasons.append(reason[:220])
 
             if not validated:
-                raise ValueError("No valid questions were generated")
+                # Surface WHY, not just that it happened — the first distinct
+                # rejection reason is almost always the same root cause repeated
+                # across every question in the batch (e.g. AI used a bad
+                # question_type or omitted a required field for all of them).
+                reason = rejection_reasons[0] if rejection_reasons else "AI returned an empty result"
+                raise ValueError(
+                    f"No valid questions were generated — {len(questions)} question(s) were returned "
+                    f"but all failed validation. First rejection reason: {reason}"
+                )
             return validated
 
         except json.JSONDecodeError as e:
@@ -923,26 +1095,41 @@ def generate_questions(
     pdf_path: Optional[str] = None,
     topic: Optional[str] = None,
     progress_callback=None,
+    preloaded_context: Optional[str] = None,
+    preloaded_file_uri: Optional[str] = None,
+    preloaded_is_vision: Optional[bool] = None,
 ) -> List[Dict]:
     """
     Generate questions via AI.
     mode: 'extract' | 'mine' | 'pure'
     progress_callback: optional callable(event: dict) for live progress updates.
+    preloaded_*: reuse a prior run's already-extracted PDF text / already-uploaded
+    file URI instead of re-processing the PDF — used by "retry failed batches"
+    so pdf_path can be omitted once the original temp upload is gone.
     Raises a clean Exception on failure — never crashes the caller.
     """
     generator = AIQuestionGenerator()
 
     if mode == 'extract':
-        if not pdf_path:
+        if not pdf_path and preloaded_is_vision is None:
             raise ValueError("PDF path required for extraction mode")
-        return generator.extract_from_pdf(pdf_path, config, progress_callback)
+        return generator.extract_from_pdf(pdf_path, config, progress_callback,
+                                           preloaded_context, preloaded_file_uri, preloaded_is_vision)
     elif mode == 'mine':
-        if not pdf_path:
+        if not pdf_path and preloaded_is_vision is None:
             raise ValueError("PDF path required for concept mining mode")
-        return generator.mine_concepts(pdf_path, config, progress_callback)
+        return generator.mine_concepts(pdf_path, config, progress_callback,
+                                        preloaded_context, preloaded_file_uri, preloaded_is_vision)
     elif mode == 'pure':
         if not topic:
             raise ValueError("Topic required for pure generation mode")
         return generator.generate_from_topic(topic, config, progress_callback)
     else:
         raise ValueError(f"Invalid mode: {mode}")
+
+
+def split_batches_public(config: Dict) -> List[Dict]:
+    """Public wrapper for AIQuestionGenerator._split_batches — lets the route
+    layer precompute/store the per-batch config list without instantiating
+    a full generator (which requires a configured API key)."""
+    return AIQuestionGenerator._split_batches(config)

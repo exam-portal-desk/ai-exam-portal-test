@@ -1,11 +1,27 @@
 """
 app/db/ai.py
-PostgreSQL queries for ai_conversations, ai_chat_history and ai_usage_tracking tables.
+PostgreSQL queries for ai_conversations, ai_chat_history, ai_usage_tracking
+and ai_generation_jobs tables.
 """
 
 from typing import Optional, List, Dict
-from app.db import fetch_one, fetch_all, execute, execute_returning, insert_returning
+from psycopg2.extras import Json
+from app.db import fetch_one, fetch_all, execute, execute_returning, insert_returning, set_clause
 from app.utils.datetime_service import now_utc_naive, today_app_date
+
+# app/db/__init__.py registers an adapter for plain dict -> Json, but NOT for
+# list — a bare Python list passed as a query param would otherwise be sent
+# as a Postgres ARRAY literal, not JSONB, and fail against a jsonb column.
+# Wrap list-typed JSONB values explicitly; dicts pass through unchanged
+# (the registered adapter already handles them) but wrapping is harmless.
+_JSONB_JOB_FIELDS = ("config", "batch_configs", "batches", "questions")
+
+
+def _wrap_jsonb(fields: dict) -> dict:
+    return {
+        k: (Json(v) if k in _JSONB_JOB_FIELDS and v is not None else v)
+        for k, v in fields.items()
+    }
 
 
 # ─────────────────────────────────────────────
@@ -177,3 +193,67 @@ def increment_usage(user_id: int) -> bool:
     except Exception as e:
         print(f"[db.ai] increment_usage error: {e}")
         return False
+
+
+# ─────────────────────────────────────────────
+# AI Generation Jobs (AI Command Centre — durable write-through layer
+# under the in-memory _jobs dict in app/routes/api/v01/admin/ai_centre.py;
+# see migrations/20260831_ai_generation_jobs.sql for why this table exists)
+# ─────────────────────────────────────────────
+
+def create_generation_job(job_id: str, admin_id: int, exam_id: int, exam_name: str,
+                           mode: str, config: dict, batch_configs: list) -> bool:
+    try:
+        insert_returning("ai_generation_jobs", _wrap_jsonb({
+            "id": job_id,
+            "admin_id": admin_id,
+            "exam_id": exam_id,
+            "exam_name": exam_name,
+            "mode": mode,
+            "status": "queued",
+            "config": config,
+            "batch_configs": batch_configs,
+        }))
+        return True
+    except Exception as e:
+        print(f"[db.ai] create_generation_job error: {e}")
+        return False
+
+
+def update_generation_job(job_id: str, **fields) -> bool:
+    """Partial update of a job row — pass any subset of its columns as kwargs."""
+    if not fields:
+        return True
+    try:
+        fields = _wrap_jsonb(fields)
+        fields["updated_at"] = now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")
+        clause, params = set_clause(fields)
+        execute(f"UPDATE ai_generation_jobs SET {clause} WHERE id=%s", params + [job_id])
+        return True
+    except Exception as e:
+        print(f"[db.ai] update_generation_job error: {e}")
+        return False
+
+
+def delete_old_generation_jobs(older_than_hours: int = 48) -> int:
+    """TTL sweep — generation jobs have no natural end-of-life action (unlike
+    e.g. an exam attempt), so without this the table/temp-PDF references would
+    grow forever. Called opportunistically at the start of a new generation
+    request rather than via a separate scheduler."""
+    try:
+        rows = execute_returning(
+            "DELETE FROM ai_generation_jobs WHERE created_at < (now() AT TIME ZONE 'utc') - (%s || ' hours')::interval RETURNING id",
+            (older_than_hours,),
+        )
+        return len(rows)
+    except Exception as e:
+        print(f"[db.ai] delete_old_generation_jobs error: {e}")
+        return 0
+
+
+def get_generation_job(job_id: str) -> Optional[Dict]:
+    try:
+        return fetch_one("SELECT * FROM ai_generation_jobs WHERE id=%s", (job_id,))
+    except Exception as e:
+        print(f"[db.ai] get_generation_job error: {e}")
+        return None

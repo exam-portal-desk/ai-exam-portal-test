@@ -4,7 +4,7 @@
 
 {% macro render_subject_row(subject) %}
 <tr>
-  <td style="color:var(--text-muted);font-size:0.8rem;font-weight:600">{{ subject.id }}</td>
+  <td style="color:var(--text-muted);font-size:0.8rem;font-weight:600">{{ subject.row_no if subject.row_no is not none else subject.id }}</td>
   <td>
     <div style="display:flex;align-items:center;gap:0.6rem">
       <div class="subject-avatar">{{ subject.subject_name[0].upper() }}</div>

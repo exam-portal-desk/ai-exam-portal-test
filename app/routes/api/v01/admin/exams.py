@@ -11,10 +11,11 @@ from flask import jsonify, flash, request, render_template_string
 
 from app.routes.api.v01.admin import admin_api_bp
 from app.middleware.session_guard import require_admin_role
-from app.db.exams import get_exam_by_id, release_exam_results, get_exams_page
+from app.db.exams import get_exam_by_id, release_exam_results, get_exams_page, set_scheduled_exam_cancelled
 from app.db.categories import get_all_categories
 from app.db import fetch_all, execute
 from app.utils.datetime_service import format_calendar_date
+from app.utils.instructions_formatter import render_exam_instructions
 
 _ROWS_TPL = (
     '{% from "admin/_exam_rows.html" import render_exam_row, render_exam_card, render_exam_edit_modal %}'
@@ -52,6 +53,16 @@ def api_exams_list():
         del result["exams"]
 
     return jsonify(result)
+
+
+@admin_api_bp.route("/exams/preview-instructions", methods=["POST"])
+@require_admin_role
+def preview_instructions():
+    """Renders the same HTML the student-facing pages will show — the one
+    renderer (app/utils/instructions_formatter.py) is reused verbatim here
+    so the admin's live preview can never drift from the real thing."""
+    text = (request.get_json(silent=True) or {}).get("instructions", "")
+    return jsonify({"html": str(render_exam_instructions(text))})
 
 
 @admin_api_bp.route("/exams/<int:exam_id>", methods=["DELETE"])
@@ -93,3 +104,24 @@ def release_results(exam_id):
                + ("released." if new_state else "unreleased."))
         return jsonify({"success": True, "message": msg, "released": new_state})
     return jsonify({"success": False, "message": "Failed to update results."}), 500
+
+
+@admin_api_bp.route("/exams/<int:exam_id>/cancel", methods=["POST"])
+@require_admin_role
+def cancel_scheduled_exam(exam_id):
+    """Toggle a Scheduled Exam's explicit 'cancelled' override — the only
+    other writer of exams.status for a scheduled exam besides the create/
+    edit routes' automatic 'scheduled' marker (app/db/exams.py:
+    set_scheduled_exam_cancelled). Never applicable to a Manual Exam, which
+    already has its own Upcoming/Ongoing/Completed status control."""
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return jsonify({"success": False, "message": "Exam not found"}), 404
+    if not exam.get("scheduled_mode"):
+        return jsonify({"success": False, "message": "Only a Scheduled Exam can be cancelled this way."}), 400
+
+    new_state = str(exam.get("status", "")).lower().strip() != "cancelled"
+    if set_scheduled_exam_cancelled(exam_id, cancelled=new_state):
+        msg = f"'{exam['name']}' has been " + ("cancelled." if new_state else "restored to Scheduled.")
+        return jsonify({"success": True, "message": msg, "cancelled": new_state})
+    return jsonify({"success": False, "message": "Failed to update exam."}), 500

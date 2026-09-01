@@ -170,6 +170,31 @@ def delete_profile_photo(key: str) -> None:
 
 
 # ─────────────────────────────────────────────
+# Group profile photos — same Profile/-style convention, keyed per-group.
+# ─────────────────────────────────────────────
+
+def upload_group_photo(conv_id: int, content: bytes, filename: str, content_type: str) -> Tuple[str, str]:
+    """Upload bytes to Group/<conv_id>_<filename>. Returns (key, url) — key
+    is the value to persist in chat_conversations.group_photo_key."""
+    storage = get_storage()
+    key = f"Group/{conv_id}_{filename}"
+    storage.upload(key, content, content_type)
+    return key, _url_for_key(key)
+
+
+def group_photo_url_from_key(group_photo_key: Optional[str]) -> Optional[str]:
+    """Cheap, non-existence-checked URL construction — used for chat
+    header/sidebar/notification rendering, no storage round-trip."""
+    if not group_photo_key:
+        return None
+    return _url_for_key(group_photo_key)
+
+
+def delete_group_photo(key: str) -> None:
+    delete_image(key)
+
+
+# ─────────────────────────────────────────────
 # Chat backgrounds — same Profile/-style convention, keyed per-account.
 # Only used when users.chat_background holds a real storage key (not a
 # "preset:<id>" sentinel, which needs no storage at all).

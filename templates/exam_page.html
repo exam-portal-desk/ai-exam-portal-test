@@ -13,27 +13,51 @@ html, body { overflow:hidden !important; height:100% !important; }
 .exam-topbar {
   display:flex; align-items:center; justify-content:space-between;
   padding:.6rem 1.25rem; border-bottom:1px solid var(--border);
-  background:var(--surface); flex-shrink:0; gap:1rem; flex-wrap:wrap;
+  background:var(--surface); flex-shrink:0; gap:.75rem; flex-wrap:wrap;
 }
-.exam-name { font-size:.92rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:.45rem; }
-.exam-name i { color:var(--accent); }
+.exam-name { font-size:.92rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:.45rem; min-width:0; flex:1 1 auto; }
+.exam-name i { color:var(--accent); flex-shrink:0; }
+.exam-name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .exam-qcounter {
-  display:inline-flex; align-items:center;
+  display:inline-flex; align-items:center; flex-shrink:0;
   background:var(--accent-subtle); color:var(--accent);
   border:1px solid var(--border); border-radius:20px;
   padding:.2rem .65rem; font-size:.75rem; font-weight:700;
 }
-.exam-timer {
-  display:flex; align-items:center; gap:.5rem;
-  background:var(--surface-2); border:1px solid var(--border);
-  border-radius:var(--radius); padding:.35rem .85rem;
-  font-size:.88rem; font-weight:700; color:var(--text-1);
-  transition:background .3s, color .3s;
+.exam-topbar-right { display:flex; align-items:center; gap:.5rem; flex-shrink:0; }
+.exam-secure-badge {
+  display:inline-flex; align-items:center; gap:.3rem; flex-shrink:0;
+  padding:.3rem .6rem; border-radius:20px; font-size:.72rem; font-weight:700;
+  white-space:nowrap; pointer-events:none; transition:background .2s,color .2s;
 }
-.exam-timer i { color:var(--accent); }
+.exam-secure-badge:empty { display:none; }
+.exam-timer {
+  display:flex; align-items:center; gap:.4rem; flex-shrink:0;
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.35rem .75rem;
+  font-size:.88rem; font-weight:700; color:var(--text-1);
+  transition:background .3s, color .3s; white-space:nowrap;
+}
+.exam-timer i { color:var(--accent); flex-shrink:0; }
 .exam-timer.warn   { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning-text); }
 .exam-timer.danger { background:var(--danger-bg);  border-color:var(--danger-border);  color:var(--danger-text); animation:timerPulse 1s infinite; }
 @keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media (max-width:560px) {
+  .exam-topbar { padding:.5rem .75rem; gap:.5rem; }
+  .exam-name { font-size:.82rem; }
+  .exam-timer-label, .exam-secure-badge .badge-text { display:none; }
+  .exam-timer { padding:.3rem .55rem; font-size:.82rem; }
+  .exam-qcounter { padding:.15rem .5rem; font-size:.68rem; }
+}
+
+/* Question source/previous-year metadata badge */
+.question-source-tag {
+  display:inline-flex; align-items:center; gap:.35rem;
+  background:var(--accent-subtle); color:var(--accent);
+  border:1px solid var(--accent); border-radius:20px;
+  padding:.2rem .65rem; font-size:.7rem; font-weight:700;
+  letter-spacing:.01em; margin:0 0 .75rem;
+}
 
 /* Body split */
 .exam-body { display:flex; width:100%; align-items:flex-start; }
@@ -118,15 +142,17 @@ html, body { overflow:hidden !important; height:100% !important; }
 
 /* Nav buttons */
 .exam-navigation-btn {
-  padding:.45rem .9rem; border-radius:var(--radius); font-size:.8rem;
-  font-weight:600; font-family:inherit; cursor:pointer; transition:all .12s;
-  display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--border);
+  padding:.55rem 1rem; min-height:44px; border-radius:var(--radius); font-size:.82rem;
+  font-weight:700; font-family:inherit; cursor:pointer; transition:all .12s;
+  display:inline-flex; align-items:center; gap:.4rem; border:1.5px solid var(--border);
 }
-.btn-outline-secondary.exam-navigation-btn { background:var(--surface-2); color:var(--text-2); }
-.btn-outline-secondary.exam-navigation-btn:hover { border-color:var(--accent); color:var(--accent); }
-.btn-outline-secondary.exam-navigation-btn:disabled { opacity:.35; cursor:not-allowed; }
+.btn-outline-secondary.exam-navigation-btn { background:var(--info-bg); color:var(--info-text); border-color:var(--info-border); }
+.btn-outline-secondary.exam-navigation-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+.btn-outline-secondary.exam-navigation-btn:disabled { opacity:.4; cursor:not-allowed; background:var(--surface-2); color:var(--text-3); border-color:var(--border); }
 .btn-warning.exam-navigation-btn  { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
 .btn-warning.exam-navigation-btn:hover { background:var(--warning); color:#fff; }
+.btn-warning.exam-navigation-btn.marked { background:var(--success); color:#fff; border-color:var(--success); }
+.btn-warning.exam-navigation-btn.marked:hover { opacity:.88; }
 .btn-primary.exam-navigation-btn  { background:var(--accent); color:var(--accent-on); border-color:var(--accent); }
 .btn-primary.exam-navigation-btn:hover { background:var(--accent-hover); }
 .btn-success.exam-navigation-btn  { background:var(--success); color:#fff; border-color:var(--success); }
@@ -203,6 +229,7 @@ html, body { overflow:hidden !important; height:100% !important; }
 .sidebar-toggle-btn:active {
   transform:scale(0.95);
 }
+.sidebar-backdrop { display:none; }
 .exam-sidebar .card {
   background:var(--surface-2); border:1px solid var(--border);
   border-radius:var(--radius); overflow:hidden;
@@ -269,6 +296,10 @@ html, body { overflow:hidden !important; height:100% !important; }
   margin:0 auto 1.1rem; font-size:1.4rem; color:var(--accent);
 }
 .exam-gate-icon.warn { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning); }
+.exam-gate-icon.success { background:var(--success-bg); border-color:var(--success-border); color:var(--success); }
+.exam-gate-btn.success { background:var(--success); color:#fff; }
+.exam-gate-btn[disabled] { opacity:.6; cursor:not-allowed; }
+.exam-gate-btn[disabled]:hover { transform:none; box-shadow:0 8px 24px rgba(0,0,0,.15); }
 .exam-gate-title { font-size:1.15rem; font-weight:700; margin-bottom:.5rem; letter-spacing:-.01em; }
 .exam-gate-desc  { font-size:.86rem; line-height:1.6; color:var(--text-2); margin-bottom:1.4rem; }
 .exam-gate-features {
@@ -388,6 +419,19 @@ html, body { overflow:hidden !important; height:100% !important; }
   .sco-btn { width:100%; justify-content:center; }
 }
 
+.exam-nav-bar {
+  position:fixed; bottom:0; left:0; right:0; padding:.85rem 1.5rem;
+  background:var(--surface-2); border-top:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:.6rem; z-index:50; box-shadow:0 -2px 8px rgba(0,0,0,.1);
+}
+.no-manual-submit-notice {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-size:.78rem; font-weight:600; color:var(--text-3);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:.5rem .85rem;
+}
+
 /* Image modal */
 .modal-content { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); }
 .modal-header  { border-bottom:1px solid var(--border); padding:.85rem 1.1rem; }
@@ -420,13 +464,40 @@ html, body { overflow:hidden !important; height:100% !important; }
 @media(max-width:992px){
   .col-lg-8{flex:0 0 100%;max-width:100%;}
   .col-lg-4{flex:0 0 100%;max-width:100%;}
-  .exam-sidebar{width:100%;border-left:none;border-top:1px solid var(--border);}
   .exam-body{flex-direction:column;}
+
+  /* Question navigator becomes a slide-in drawer instead of stacked
+     inline content — otherwise it sat below the full question list,
+     requiring a long scroll past every question to reach it. */
+  .exam-sidebar{
+    position:fixed; top:0; right:0; height:100%; max-height:100%;
+    width:88%; max-width:340px; z-index:300;
+    border-left:1px solid var(--border); border-top:none;
+    box-shadow:-10px 0 30px rgba(0,0,0,.3);
+    transform:translateX(100%); transition:transform .25s ease;
+    padding:.85rem;
+  }
+  .exam-sidebar.sidebar-collapsed{
+    transform:translateX(100%); width:88%; max-width:340px; padding:.85rem;
+    border-left:1px solid var(--border); overflow:hidden;
+  }
+  .exam-sidebar:not(.sidebar-collapsed){ transform:translateX(0); overflow-y:auto; }
+  .sidebar-toggle-btn{ top:auto; bottom:96px; }
+  .sidebar-backdrop{
+    display:block; position:fixed; inset:0; background:rgba(0,0,0,.5);
+    z-index:290; opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .sidebar-backdrop.show{ opacity:1; pointer-events:auto; }
 }
 @media(max-width:768px){
-  .exam-content{padding:.85rem;}
+  .exam-content{padding:.85rem .85rem 140px;}
+  .question-card{padding:1.1rem;}
   .col-md-8,.col-md-4{flex:0 0 100%;max-width:100%;}
   .text-md-end{text-align:left;}
+}
+@media(max-width:600px){
+  .exam-nav-bar{padding:.6rem .75rem;gap:.4rem;}
+  .exam-navigation-btn{padding:.5rem .75rem;font-size:.78rem;}
 }
 </style>
 
@@ -434,13 +505,23 @@ html, body { overflow:hidden !important; height:100% !important; }
 <div class="exam-topbar">
   <div class="exam-name">
     <i class="fas fa-file-alt"></i>
-    {{ exam.name }}
+    <span class="exam-name-text">{{ exam.name }}</span>
     <span class="exam-qcounter">Q <span id="questionCounter">{{ current_index + 1 }}</span> / {{ total_questions }}</span>
   </div>
-  <div class="exam-timer" id="timerBox">
-    <i class="fas fa-clock"></i>
-    <span>Time Left:</span>
-    <strong id="timer">{{ exam.duration }}:00</strong>
+  <div class="exam-topbar-right">
+    <span id="fullscreenStatus" class="exam-secure-badge"></span>
+    <div class="exam-timer" id="timerBox">
+      <i class="fas fa-clock"></i>
+      <span class="exam-timer-label">Time Left:</span>
+      {# Static pre-fullscreen-gate display — JS overwrites this the instant
+         startTimer() runs (after "Enter Secure Mode"), but until then this
+         must show the actual remaining_seconds (already correctly
+         resume-aware and, for a Scheduled Exam, capped at the official end
+         via get_effective_deadline()) rather than the exam's raw nominal
+         duration, or a resumed/late-started attempt would flash a
+         too-generous time on this screen. #}
+      <strong id="timer">{{ '%d:%02d' % (remaining_seconds // 60, remaining_seconds % 60) }}</strong>
+    </div>
   </div>
 </div>
 
@@ -457,6 +538,9 @@ html, body { overflow:hidden !important; height:100% !important; }
   <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Collapse sidebar">
     <i class="fas fa-chevron-right"></i>
   </button>
+
+  {# Backdrop — mobile only (CSS), closes the drawer on tap #}
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   {# Sidebar #}
   <div class="exam-sidebar">
@@ -501,7 +585,7 @@ html, body { overflow:hidden !important; height:100% !important; }
 </div>
 
 {# Fixed Navigation Bar #}
-<div id="examNavBar" style="position:fixed;bottom:0;left:0;right:0;padding:1rem 1.5rem;background:var(--surface-2);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem;z-index:50;box-shadow:0 -2px 8px rgba(0,0,0,.1)"></div>
+<div id="examNavBar" class="exam-nav-bar"></div>
 
 {# Submit Confirmation Overlay — kept dark always for focus #}
 <div id="submitConfirmationOverlay" class="sco-overlay">
@@ -561,6 +645,24 @@ html, body { overflow:hidden !important; height:100% !important; }
   </div>
 </div>
 
+{# Auto-submit / forced-submit notice — replaces the previous
+   alert('Time is up! Auto-submitting exam...') and the confirm() shown on
+   a security violation. Reused for both (see showAutoSubmitNotice() in
+   the script below): the exam-time-expired case and the security-
+   violation forced-submit case are the same underlying event from the
+   student's point of view — "your exam is being submitted automatically,
+   right now, without further action from you" — just with different
+   wording. Not user-dismissible: it's showing while the actual submit
+   request is in flight and the page is about to navigate away regardless. #}
+<div id="autoSubmitNoticeOverlay" class="exam-gate-overlay" style="display:none;z-index:20010">
+  <div class="exam-gate-card">
+    <div class="exam-gate-icon success" id="autoSubmitNoticeIcon"><i class="fas fa-check-circle"></i></div>
+    <div class="exam-gate-title" id="autoSubmitNoticeTitle">Time's Up</div>
+    <div class="exam-gate-desc" id="autoSubmitNoticeDesc">Your exam time has ended. Your attempt is being submitted automatically and your responses will be saved.</div>
+    <div class="exam-gate-meta" id="autoSubmitNoticeStatus"><i class="fas fa-spinner fa-spin me-1"></i> Finalizing your submission…</div>
+  </div>
+</div>
+
 {# Image Modal #}
 <div id="imageModal" style="display:none;position:fixed;inset:0;z-index:19999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;" onclick="if(event.target===this)document.getElementById('imageModal').style.display='none'">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:calc(var(--radius)+4px);max-width:90vw;max-height:90vh;overflow:auto;display:flex;flex-direction:column;">
@@ -602,6 +704,22 @@ class ExamPortal {
     this.fullscreenCheckInterval = null;
     this.isSubmitting = false;
     this.submissionInProgress = false;
+    // Feature: Scheduled Exam manual-submission control — server-computed,
+    // never inferred client-side (see is_manual_submission_allowed() in
+    // app/services/exam_service.py). Only ever false for a Scheduled Exam
+    // whose admin explicitly disabled early submission; always true for
+    // every Manual Exam.
+    this.manualSubmissionAllowed = {{ 'true' if manual_submission_allowed else 'false' }};
+    this.autoSyncInterval = null;
+    // Scheduled Exam, launched in-place inside the still-fullscreen
+    // preparation page (see templates/exam_instructions.html) instead of a
+    // separate popup window — this frame never owns the real fullscreen
+    // session itself (the PARENT document does), so every fullscreen check/
+    // request below is redirected accordingly. See initializeFullscreen(),
+    // isTopFullscreen(), and notifyParentFullscreenNeeded(). Manual Exams
+    // never set this — they keep the original popup-window + own-fullscreen
+    // flow completely unchanged.
+    this.isEmbedded = new URLSearchParams(location.search).get('embedded') === '1';
     this.init();
   }
 
@@ -621,22 +739,27 @@ init() {
 setupSidebarToggle() {
   const sidebar = document.querySelector('.exam-sidebar');
   const toggleBtn = document.getElementById('sidebarToggleBtn');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const isMobile = () => window.innerWidth <= 992;
 
   if (!sidebar || !toggleBtn) return;
 
   const updateIcon = () => {
     if (this.sidebarCollapsed) {
-      toggleBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-      toggleBtn.title = 'Expand sidebar';
+      toggleBtn.innerHTML = isMobile() ? '<i class="fas fa-list-ol"></i>' : '<i class="fas fa-chevron-right"></i>';
+      toggleBtn.title = isMobile() ? 'Open question navigator' : 'Expand sidebar';
     } else {
-      toggleBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
-      toggleBtn.title = 'Collapse sidebar';
+      toggleBtn.innerHTML = isMobile() ? '<i class="fas fa-xmark"></i>' : '<i class="fas fa-chevron-left"></i>';
+      toggleBtn.title = isMobile() ? 'Close question navigator' : 'Collapse sidebar';
     }
+    if (backdrop) backdrop.classList.toggle('show', !this.sidebarCollapsed);
   };
 
-  // Restore saved state from localStorage
+  // Restore saved state from localStorage — default closed on mobile
+  // (a drawer covering the question on load would be worse than useless)
+  // and open on desktop, matching the original default.
   const saved = localStorage.getItem('exam_sidebar_collapsed');
-  this.sidebarCollapsed = saved === 'true';
+  this.sidebarCollapsed = saved !== null ? saved === 'true' : isMobile();
   if (this.sidebarCollapsed) {
     sidebar.classList.add('sidebar-collapsed');
   }
@@ -648,6 +771,8 @@ setupSidebarToggle() {
     updateIcon();
     localStorage.setItem('exam_sidebar_collapsed', this.sidebarCollapsed);
   });
+
+  if (backdrop) backdrop.addEventListener('click', () => { if (!this.sidebarCollapsed) toggleBtn.click(); });
 }
 
 preloadAllImages() {
@@ -667,7 +792,46 @@ preloadAllImages() {
   });
 }
 
-async initializeFullscreen() { this.showFullscreenInitModal(); }
+async initializeFullscreen() {
+  // Scheduled Exam embedded launch: fullscreen was already established on
+  // the PARENT document during preparation, and a fresh requestFullscreen()
+  // call from THIS frame would need a user gesture this frame never
+  // received (and would just reintroduce the gate/popup the embedded path
+  // exists to remove) — reuse the parent's fullscreen state instead of
+  // asking for our own. Every other exam entry point (Manual, or a
+  // Scheduled Exam that lost fullscreen before launch and fell back to the
+  // popup path — see launchExamWindow() in exam_instructions.html) is
+  // unaffected and keeps showing this gate exactly as before.
+  if (this.isEmbedded) { this.startEmbeddedSecurity(); return; }
+  this.showFullscreenInitModal();
+}
+
+// Only the top (parent) document actually owns the real fullscreen
+// session — a click inside this iframe cannot itself re-request
+// fullscreen on an ancestor document, so ask the parent to do it instead
+// of showing a same-frame prompt that could never succeed.
+notifyParentFullscreenNeeded() {
+  try { window.parent.postMessage({ type: 'exam-fullscreen-restore-needed' }, window.location.origin); } catch (e) {}
+}
+
+isTopFullscreen() {
+  try {
+    const d = window.top.document;
+    return !!(d.fullscreenElement || d.webkitFullscreenElement || d.mozFullScreenElement || d.msFullscreenElement);
+  } catch (e) {
+    return false;
+  }
+}
+
+startEmbeddedSecurity() {
+  this.isFullscreenEnabled = this.isTopFullscreen();
+  this.showFullscreenStatus(this.isFullscreenEnabled);
+  this.setupFullscreenMonitoring();
+  this.setupVisibilityMonitoring();
+  this.preventTabSwitching();
+  this.startFullscreenMonitoring();
+  this.startExamAfterFullscreen();
+}
 
 showFullscreenInitModal() {
   const modal = document.createElement('div');
@@ -713,6 +877,7 @@ async actuallyEnterFullscreen() {
 }
 
 async enterFullscreen() {
+  if (this.isEmbedded) { this.notifyParentFullscreenNeeded(); return; }
   try {
     const e = document.documentElement;
     await (e.requestFullscreen||e.webkitRequestFullscreen||e.msRequestFullscreen||e.mozRequestFullScreen).call(e);
@@ -721,7 +886,8 @@ async enterFullscreen() {
 }
 
 checkFullscreenStatus() {
-  const isFs = !!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement);
+  const isFs = this.isEmbedded ? this.isTopFullscreen()
+    : !!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement);
   this.isFullscreenEnabled = isFs;
   this.showFullscreenStatus(isFs);
   if (!isFs && !this.isSubmitting) this.handleFullscreenExit();
@@ -732,8 +898,14 @@ startFullscreenMonitoring() {
 }
 
 setupFullscreenMonitoring() {
+  // Embedded (Scheduled Exam): the real fullscreenchange events fire on
+  // the PARENT document, not this iframe's own — see isEmbedded above.
+  let target = document;
+  if (this.isEmbedded) {
+    try { target = window.top.document; } catch (e) { target = document; }
+  }
   ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(ev => {
-    document.addEventListener(ev, () => setTimeout(() => this.checkFullscreenStatus(), 100));
+    target.addEventListener(ev, () => setTimeout(() => this.checkFullscreenStatus(), 100));
   });
 }
 
@@ -772,22 +944,28 @@ handleSecurityViolation(reason) {
   this.saveCurrentAnswer(); this.isSubmitting = true;
   if (this.fullscreenCheckInterval) clearInterval(this.fullscreenCheckInterval);
   if (this.timerInterval) clearInterval(this.timerInterval);
-  confirm(`Security violation: ${reason}\n\nYour exam will be submitted automatically.`);
+  if (this.autoSyncInterval) { clearInterval(this.autoSyncInterval); this.autoSyncInterval = null; }
+  this.showAutoSubmitNotice('Security Violation Detected',
+    `${reason}. Your exam is being submitted automatically and your responses will be saved.`);
   this.forceSubmitExam(reason);
 }
 
 showFullscreenStatus(isFs) {
-  let el = document.getElementById('fullscreenStatus');
-  if (!el) {
-    el = document.createElement('div'); el.id='fullscreenStatus';
-    el.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:10000;padding:7px 12px;border-radius:6px;font-size:.82rem;font-weight:600;pointer-events:none;transition:all .3s';
-    document.body.appendChild(el);
-  }
-  if (isFs) { el.innerHTML='<i class="fas fa-shield-halved"></i> Secure Mode Active'; el.style.background='linear-gradient(90deg,#10b981,#059669)'; el.style.color='#fff'; }
-  else       { el.innerHTML='<i class="fas fa-exclamation-triangle"></i> Security Alert'; el.style.background='linear-gradient(90deg,#ef4444,#dc2626)'; el.style.color='#fff'; }
+  // Lives inside .exam-topbar (see HTML) as a normal flex child — never an
+  // independent fixed-position overlay, so it can never cover the exam
+  // name/timer/other topbar content regardless of viewport width.
+  const el = document.getElementById('fullscreenStatus');
+  if (!el) return;
+  if (isFs) { el.innerHTML='<i class="fas fa-shield-halved"></i><span class="badge-text"> Secure Mode</span>'; el.style.background='linear-gradient(90deg,#10b981,#059669)'; el.style.color='#fff'; }
+  else       { el.innerHTML='<i class="fas fa-exclamation-triangle"></i><span class="badge-text"> Alert</span>'; el.style.background='linear-gradient(90deg,#ef4444,#dc2626)'; el.style.color='#fff'; }
 }
 
 showFullscreenRestorePrompt() {
+  // Embedded: a click in this iframe can't itself re-request fullscreen on
+  // the parent document — ask the parent to show its own restore prompt
+  // instead (see notifyParentFullscreenNeeded()). Warning-counting and the
+  // eventual auto-submit via handleSecurityViolation() are unchanged.
+  if (this.isEmbedded) { this.notifyParentFullscreenNeeded(); return; }
   this.closeSecurityModal();
   this.createSecurityModal('Security Alert — Return to Fullscreen',
     `<div class="text-center"><i class="fas fa-expand-arrows-alt fa-3x" style="color:#fbbf24;margin-bottom:.75rem"></i><h5 style="color:#fff">Fullscreen Mode Required</h5><p style="color:rgba(255,255,255,.6)">You must return to fullscreen to continue securely.</p><p style="font-size:.8rem;color:#fb7185">Warning ${this.fullscreenWarnings} of ${this.maxWarnings} — exam auto-submits after ${this.maxWarnings}!</p></div>`,
@@ -819,7 +997,14 @@ forceSubmitExam(reason) {
   this.saveCurrentAnswer(); this.isSubmitting = true; this.isNavigating = true;
   if (this.fullscreenCheckInterval) clearInterval(this.fullscreenCheckInterval);
   if (this.timerInterval) clearInterval(this.timerInterval);
-  this.syncAnswersToServer().then(()=>this.performActualSubmission()).catch(()=>this.performActualSubmission());
+  if (this.autoSyncInterval) { clearInterval(this.autoSyncInterval); this.autoSyncInterval = null; }
+  this.syncAnswersToServer()
+    .then(()=>this.performActualSubmission())
+    .catch(()=>this.performActualSubmission())
+    .catch((e)=>{
+      console.error('Forced submit failed:',e);
+      this.setAutoSubmitNoticeStatus('<i class="fas fa-triangle-exclamation me-1"></i> We could not confirm your submission — your answers are saved on our server and will be finalized automatically shortly. You may safely close this page.', true);
+    });
 }
 
 addAnimationStyles() {
@@ -846,21 +1031,35 @@ saveSessionData() {
   } catch(e) {}
 }
 
+// this.palette tracks ONLY "has this question been opened" (visited /
+// not-visited) — answered/review are never stored redundantly here, they
+// are derived below from this.answers / this.markedForReview (the actual
+// source of truth) so a question's displayed status can never drift out
+// of sync with its real answer/review state, and so it can be BOTH
+// answered AND marked for review without one silently overwriting the other.
+isAnswered(qid) {
+  const v = this.answers[qid];
+  if (v===undefined||v===null||v==='') return false;
+  return Array.isArray(v) ? v.length>0 : true;
+}
+
+getStatus(index) {
+  const qid = String(this.questions[index].id);
+  if (this.markedForReview.includes(qid)) return 'review';
+  if (this.isAnswered(qid)) return 'answered';
+  return this.palette[index]==='visited' ? 'visited' : 'not-visited';
+}
+
 initializePalette() {
-  for (let i=0;i<this.totalQuestions;i++) {
-    const qid=String(this.questions[i].id);
-    if (this.markedForReview.includes(qid)) this.palette[i]='review';
-    else if (this.answers[qid]) this.palette[i]='answered';
-    else this.palette[i]='not-visited';
-  }
-  if (this.palette[this.currentIndex]==='not-visited') this.palette[this.currentIndex]='visited';
+  for (let i=0;i<this.totalQuestions;i++) this.palette[i]='not-visited';
+  this.palette[this.currentIndex]='visited';
   this.renderPalette();
 }
 
 renderPalette() {
   const c=document.getElementById('questionPalette'); c.innerHTML='';
   for (let i=0;i<this.totalQuestions;i++) {
-    const q=this.questions[i], status=this.palette[i]||'not-visited', qtype=q.question_type||'MCQ';
+    const q=this.questions[i], status=this.getStatus(i), qtype=q.question_type||'MCQ';
     const link=document.createElement('div');
     link.className=`palette-link ${status}${i===this.currentIndex?' current':''}`;
     link.setAttribute('data-question-index',i);
@@ -871,7 +1070,13 @@ renderPalette() {
     const ti=document.createElement('div'); ti.style.cssText='position:absolute;bottom:1px;left:50%;transform:translateX(-50%);font-size:6px;line-height:1';
     const sym={'MCQ':['●','#28a745'],'MSQ':['■','#007bff'],'NUMERIC':['▲','#ffc107']}[qtype]||['?','#6c757d'];
     ti.innerHTML=`<span style="color:${sym[1]};font-weight:900">${sym[0]}</span>`; link.appendChild(ti);
-    link.addEventListener('click',()=>this.navigateToQuestion(i)); c.appendChild(link);
+    link.addEventListener('click',()=>{
+      this.navigateToQuestion(i);
+      // Mobile drawer: return smoothly to the question instead of leaving
+      // the navigator open over it.
+      if (window.innerWidth<=992 && !this.sidebarCollapsed) document.getElementById('sidebarToggleBtn')?.click();
+    });
+    c.appendChild(link);
   }
 }
 
@@ -945,7 +1150,11 @@ renderQuestion(question) {
     r=r.replace(/\x00L(\d+)\x00/g,(_,idx)=>lz[+idx]);
     return r;
   };
-  let html=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:1rem">
+  // Optional per-question source/previous-year tag (question.metadata.source_tag,
+  // e.g. "ESE 2021") — shown only when present, never a hardcoded value.
+  const sourceTag = question.metadata && question.metadata.source_tag ? String(question.metadata.source_tag).trim() : '';
+  let html = sourceTag ? `<div class="question-source-tag"><i class="fas fa-bookmark"></i> ${sourceTag.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : '';
+  html+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:1rem">
     <div style="flex:1"><h5 style="margin:0;font-size:.95rem;color:var(--text-1);line-height:1.5"><span class="badge bg-primary me-2">Q${this.currentIndex+1}</span>${p(question.question_text)||''}</h5></div>
     <div style="text-align:right;flex-shrink:0">
       <span class="badge ${this.getQTypeBadge(question.question_type)} fs-6">${this.getQTypeDisplay(question.question_type)}</span>
@@ -1042,13 +1251,35 @@ renderNavButtons() {
 renderNavButtonsExternal() {
   const container = document.getElementById('examNavBar');
   if (!container) return;
+  // Feature: Scheduled Exam manual-submission control — when disabled,
+  // the student has no way to voluntarily end the attempt (see
+  // is_manual_submission_allowed() in app/services/exam_service.py); the
+  // exam only ends when the timer reaches zero or the server's own
+  // deadline sweep finalizes it. This is a UX nicety only — submit_exam()
+  // independently re-enforces the same rule server-side regardless of
+  // whether this button exists.
+  const submitBtnHtml = this.manualSubmissionAllowed
+    ? '<button type="button" class="btn-success exam-navigation-btn" onclick="examPortal.submitExam()"><i class="fas fa-paper-plane"></i> Submit Exam</button>'
+    : '<span class="no-manual-submit-notice"><i class="fas fa-lock"></i> Ends automatically at time up</span>';
   const html = `<button type="button" class="btn-outline-secondary exam-navigation-btn" onclick="examPortal.navigatePrevious()" ${this.currentIndex===0?'disabled':''}><i class="fas fa-chevron-left"></i> Previous</button>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">
-      <button type="button" class="btn-warning exam-navigation-btn" onclick="examPortal.markForReview()"><i class="fas fa-flag"></i> Mark for Review</button>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;align-items:center">
+      <button type="button" id="markReviewBtn" class="btn-warning exam-navigation-btn" onclick="examPortal.markForReview()"><i class="fas fa-flag"></i> Mark for Review</button>
       ${this.currentIndex<this.totalQuestions-1?'<button type="button" class="btn-primary exam-navigation-btn" onclick="examPortal.navigateNext()">Save &amp; Next <i class="fas fa-chevron-right"></i></button>':''}
-      <button type="button" class="btn-success exam-navigation-btn" onclick="examPortal.submitExam()"><i class="fas fa-paper-plane"></i> Submit Exam</button>
+      ${submitBtnHtml}
     </div>`;
   container.innerHTML = html;
+  this.updateMarkReviewButton();
+}
+
+updateMarkReviewButton() {
+  const btn = document.getElementById('markReviewBtn');
+  if (!btn) return;
+  const qid = String(this.questions[this.currentIndex].id);
+  const marked = this.markedForReview.includes(qid);
+  btn.classList.toggle('marked', marked);
+  btn.innerHTML = marked
+    ? '<i class="fas fa-flag-checkered"></i> Marked — Unmark'
+    : '<i class="fas fa-flag"></i> Mark for Review';
 }
 
 attachQListeners(question) {
@@ -1114,13 +1345,25 @@ saveCurrentAnswer(){
   this.saveSessionData();
 }
 
-markForReview(){ const qid=String(this.questions[this.currentIndex].id);if(!this.markedForReview.includes(qid))this.markedForReview.push(qid);this.saveSessionData();this.updatePaletteStatus('review');if(this.currentIndex<this.totalQuestions-1)this.navigateNext(); }
+markForReview(){
+  const qid=String(this.questions[this.currentIndex].id);
+  const idx=this.markedForReview.indexOf(qid);
+  const wasMarked = idx>-1;
+  if (wasMarked) this.markedForReview.splice(idx,1);
+  else this.markedForReview.push(qid);
+  this.saveSessionData();
+  this.updatePaletteStatus();
+  this.updateMarkReviewButton();
+  // Only auto-advance on mark (matches the original "mark and move on"
+  // flow) — unmarking keeps the user on the question so they can act on it.
+  if (!wasMarked && this.currentIndex<this.totalQuestions-1) this.navigateNext();
+}
 
 clearSelection(){
   const qid=String(this.questions[this.currentIndex].id);
   delete this.answers[qid];
   const ri=this.markedForReview.indexOf(qid);if(ri>-1)this.markedForReview.splice(ri,1);
-  this.saveSessionData();this.updatePaletteStatus('visited');
+  this.saveSessionData();this.updatePaletteStatus();this.updateMarkReviewButton();
   document.querySelectorAll('input[name="answer"]').forEach(i=>i.checked=false);
   document.querySelectorAll('.option-container').forEach(c=>c.classList.remove('selected','selected-msq'));
   if(this.questions[this.currentIndex].question_type==='NUMERIC'){this.currentValue='';this.hasDecimal=false;this.updateDisplay();}
@@ -1128,13 +1371,28 @@ clearSelection(){
   if(btn){btn.innerHTML='<i class="fas fa-check me-1"></i>Cleared!';btn.style.background='var(--success)';btn.style.color='#fff';btn.style.borderColor='var(--success)';setTimeout(()=>{btn.innerHTML='<i class="fas fa-times-circle me-1"></i>Clear Selection';btn.style.background='';btn.style.color='';btn.style.borderColor='';},1500);}
 }
 
-updatePaletteStatus(s){ this.palette[this.currentIndex]=s;this.renderPalette();this.updateMetricsCounts(); }
+// Status (answered/review/visited/not-visited) is derived, not stored, so
+// this only needs to mark the current question visited and re-render —
+// there is no longer a status string to overwrite.
+updatePaletteStatus(){
+  if (this.palette[this.currentIndex]!=='visited') this.palette[this.currentIndex]='visited';
+  this.renderPalette();
+  this.updateMetricsCounts();
+}
 
+// Always recomputed from this.answers / this.markedForReview / this.palette
+// (visited) across every question index — never incrementally patched —
+// so the four counts are mutually exclusive, always sum to totalQuestions,
+// and can never drift or "reset" from a stale partial update.
 updateMetricsCounts(){
+  const c=this.getStatusCounts();
+  Object.entries({answeredCount:c.answered,reviewCount:c.review,visitedCount:c.visited,notVisitedCount:c['not-visited']}).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v;});
+}
+
+getStatusCounts(){
   const c={answered:0,review:0,visited:0,'not-visited':0};
-  Object.values(this.palette).forEach(s=>{c[s]=(c[s]||0)+1;});
-  const visitedCount = this.totalQuestions - c['not-visited'];
-  Object.entries({answeredCount:c.answered,reviewCount:c.review,visitedCount:visitedCount,notVisitedCount:c['not-visited']}).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v;});
+  for (let i=0;i<this.totalQuestions;i++) { const s=this.getStatus(i); c[s]=(c[s]||0)+1; }
+  return c;
 }
 
 handleImageLoad(i){ document.getElementById(`imageLoading${i}`)?.style.setProperty('display','none');document.getElementById(`imageError${i}`)?.style.setProperty('display','none');const co=document.getElementById(`imageContainer${i}`);if(co){co.style.display='block';const img=document.getElementById(`questionImage${i}`);if(img&&this.imageCache)this.imageCache[img.src]={status:'loaded',element:img};} }
@@ -1146,6 +1404,27 @@ startTimer(){
   if(this.timerInterval) clearInterval(this.timerInterval);
   this.updateTimer();
   this.timerInterval=setInterval(()=>{this.duration--;this.updateTimer();if(this.duration<=0){clearInterval(this.timerInterval);this.autoSubmitExam();}},1000);
+  this.startAutoSync();
+}
+
+// Durable, server-side answer persistence during the exam — previously
+// the server only ever learned the student's answers at the very final
+// submit request (saveCurrentAnswer()/saveSessionData() are purely
+// client-side, sessionStorage only). This periodic sync is what makes
+// the server-side auto-submit deadline sweep (and a crashed/closed
+// browser) able to score from real, recent answers instead of nothing —
+// see sync_exam_answers() in app/routes/api/v01/exams.py, which now also
+// writes exam_attempts.answers_draft on every call. Errors are swallowed
+// deliberately: this is a best-effort background safety net, not the
+// only thing standing between the student and a lost answer — the final
+// submit (manual or auto) always syncs once more before finalizing.
+startAutoSync(){
+  if(this.autoSyncInterval) clearInterval(this.autoSyncInterval);
+  this.autoSyncInterval=setInterval(()=>{
+    if(this.isSubmitting) return;
+    this.saveCurrentAnswer();
+    this.syncAnswersToServer().catch(()=>{});
+  },20000);
 }
 
 updateTimer(){
@@ -1159,8 +1438,7 @@ updateTimer(){
 submitExam(){ if(this.submissionInProgress)return;this.saveCurrentAnswer();this.showSubmissionConfirmation(); }
 
 showSubmissionConfirmation(){
-  const c={answered:0,review:0,visited:0,'not-visited':0};
-  Object.values(this.palette).forEach(s=>{c[s]=(c[s]||0)+1;});
+  const c=this.getStatusCounts();
   document.getElementById('confirmAnsweredCount').textContent=c.answered;
   document.getElementById('confirmReviewCount').textContent=c.review;
   document.getElementById('confirmVisitedCount').textContent=c.visited;
@@ -1184,13 +1462,39 @@ setSubmitStep(n){
   });
 }
 
+// Best-effort final sync fired from beforeunload/unload — the URL used to
+// point at a route that was never actually implemented server-side
+// (a 404, silently swallowed), so a tab close never actually persisted
+// anything beyond whatever the last real autosave (syncAnswersToServer /
+// the periodic this.autoSyncInterval) had already saved. Now points at
+// the real, DB-durable answers endpoint (see sync_exam_answers() in
+// app/routes/api/v01/exams.py, which writes exam_attempts.answers_draft)
+// — this is genuine defense-in-depth on top of the periodic sync, not
+// the only thing standing between a closed tab and lost answers.
 emergencySyncAnswers(){
-  try{const d=JSON.stringify({answers:this.answers,markedForReview:this.markedForReview,currentIndex:this.currentIndex,timeRemaining:this.duration});if(navigator.sendBeacon)navigator.sendBeacon(`/api/emergency-sync-exam/${this.examId}`,d);else{const x=new XMLHttpRequest();x.open('POST',`/api/emergency-sync-exam/${this.examId}`,false);x.setRequestHeader('Content-Type','application/json');x.send(d);}}catch(e){}
+  try{
+    const url=`/api/v01/exams/${this.examId}/answers`;
+    const body=JSON.stringify({answers:this.answers,markedForReview:this.markedForReview});
+    if(navigator.sendBeacon){
+      // sendBeacon sets Content-Type from the Blob's own type — a plain
+      // string defaults to text/plain, which the server's JSON parser
+      // would reject; an explicit application/json Blob is required.
+      navigator.sendBeacon(url,new Blob([body],{type:'application/json'}));
+    }else{
+      const x=new XMLHttpRequest();
+      x.open('POST',url,false);
+      x.setRequestHeader('Content-Type','application/json');
+      x.send(body);
+    }
+  }catch(e){}
 }
 
 handlePageVisibilityChange(){ if(!this.isFullscreenEnabled&&!this.isSubmitting) this.showResumeModal(); }
 
 showResumeModal(){
+  // Embedded: same reasoning as showFullscreenRestorePrompt() — only the
+  // parent document can actually restore fullscreen here.
+  if (this.isEmbedded) { this.notifyParentFullscreenNeeded(); return; }
   const m=document.createElement('div');
   m.id='resumeExamModal';
   m.className='exam-gate-overlay';
@@ -1210,6 +1514,7 @@ async confirmSubmission(){
   if(this.submissionInProgress)return;
   this.submissionInProgress=true;this.isSubmitting=true;this.isNavigating=true;
   if(this.fullscreenCheckInterval)clearInterval(this.fullscreenCheckInterval);
+  if(this.autoSyncInterval){clearInterval(this.autoSyncInterval);this.autoSyncInterval=null;}
   document.getElementById('submitConfirmationButtons').style.display='none';
   document.getElementById('submitProgressSection').style.display='block';
   const icon0=document.getElementById('submitProgressIcon');
@@ -1263,19 +1568,75 @@ showSubmissionError(msg){
   },3000);
 }
 
+// Embedded (Scheduled Exam Kiosk): the exam owning the completion UI is
+// the KIOSK window (it's the one holding real fullscreen, and the one
+// that must stop enforcing it now that the attempt is over) — this frame
+// hands off the result URL via postMessage instead of navigating itself.
+// See exam_kiosk.html's 'exam-completed' listener, which exits
+// fullscreen, tears down every guard, and shows the completion screen.
+notifyParentExamCompleted(redirectUrl){
+  try { window.parent.postMessage({ type: 'exam-completed', redirect: redirectUrl }, window.location.origin); } catch (e) {}
+}
+
 async performActualSubmission(){
   try{
     const r=await fetch(`/submit-exam/${this.examId}`,{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams()});
-    if(r.redirected){window.location.href=r.url;return;}
-    if(r.ok){const ct=r.headers.get('content-type')||'';if(ct.includes('application/json')){const j=await r.json();if(j&&j.success&&j.redirect){window.location.href=j.redirect;return;}}window.location.href=`/result/${this.examId}`;}
-    else throw new Error(`Server ${r.status}`);
+    let redirectUrl;
+    if(r.redirected){ redirectUrl = r.url; }
+    else if(r.ok){
+      const ct=r.headers.get('content-type')||'';
+      if(ct.includes('application/json')){
+        const j=await r.json();
+        redirectUrl = (j && j.success && j.redirect) ? j.redirect : `/result/${this.examId}`;
+      } else {
+        redirectUrl = `/result/${this.examId}`;
+      }
+    } else {
+      throw new Error(`Server ${r.status}`);
+    }
+    if (this.isEmbedded) { this.notifyParentExamCompleted(redirectUrl); return; }
+    window.location.href = redirectUrl;
   }catch(e){console.error('Submission failed:',e);throw e;}
+}
+
+// ── Feature: HTML/CSS auto-submit notice (replaces alert()/confirm()) ──
+// Shown for BOTH the timer-expiry auto-submit and a security-violation
+// forced submit — from the student's point of view these are the same
+// event ("your exam is ending automatically, right now"), just with
+// different copy. Not dismissible by the student: the real submit
+// request is in flight underneath it and the page is about to navigate
+// away on success regardless.
+showAutoSubmitNotice(title, desc){
+  const overlay=document.getElementById('autoSubmitNoticeOverlay');
+  if(!overlay) return;
+  const t=document.getElementById('autoSubmitNoticeTitle'), d=document.getElementById('autoSubmitNoticeDesc');
+  if(t) t.textContent=title;
+  if(d) d.textContent=desc;
+  this.setAutoSubmitNoticeStatus('<i class="fas fa-spinner fa-spin me-1"></i> Finalizing your submission…', false);
+  overlay.style.display='flex';
+}
+
+setAutoSubmitNoticeStatus(html, isError){
+  const el=document.getElementById('autoSubmitNoticeStatus');
+  if(!el) return;
+  el.innerHTML=html;
+  el.style.color=isError?'var(--danger-text)':'';
+  el.style.background=isError?'var(--danger-bg)':'';
+  el.style.borderColor=isError?'var(--danger-border)':'';
 }
 
 autoSubmitExam(){
   this.saveCurrentAnswer();this.isSubmitting=true;this.isNavigating=true;
-  alert('Time is up! Auto-submitting exam...');
-  this.syncAnswersToServer().then(()=>this.performActualSubmission()).catch(()=>this.performActualSubmission());
+  if(this.autoSyncInterval){clearInterval(this.autoSyncInterval);this.autoSyncInterval=null;}
+  this.showAutoSubmitNotice('Time\'s Up — Exam Submitted',
+    'Your exam time has ended. Your attempt is being submitted automatically and your responses will be saved.');
+  this.syncAnswersToServer()
+    .then(()=>this.performActualSubmission())
+    .catch(()=>this.performActualSubmission())
+    .catch((e)=>{
+      console.error('Auto-submit failed:',e);
+      this.setAutoSubmitNoticeStatus('<i class="fas fa-triangle-exclamation me-1"></i> We could not confirm your submission — your answers are saved on our server and will be finalized automatically shortly. You may safely close this page.', true);
+    });
 }
 
 async syncAnswersToServer(){
@@ -1286,10 +1647,24 @@ async syncAnswersToServer(){
 }
 
 let examPortal;
-document.addEventListener('DOMContentLoaded',()=>{try{examPortal=new ExamPortal();}catch(e){console.error('Init failed:',e);alert('Failed to initialize. Please refresh.');}});
+document.addEventListener('DOMContentLoaded',()=>{
+  try{
+    examPortal=new ExamPortal();
+  }catch(e){
+    console.error('Init failed:',e);
+    // No JS alert() — ExamPortal itself failed to construct, so this
+    // can't rely on any of its own modal helpers; a small self-contained
+    // banner (same visual language as the rest of the app, just inlined
+    // since the exam UI never finished initializing) instead.
+    const el=document.createElement('div');
+    el.style.cssText='position:fixed;inset:0;z-index:20002;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+    el.innerHTML='<div style="background:#1f2937;border-radius:16px;padding:2rem;max-width:420px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.45)"><i class="fas fa-triangle-exclamation" style="font-size:1.6rem;color:#fbbf24;margin-bottom:.75rem;display:block"></i><div style="font-weight:700;margin-bottom:.5rem">Unable to load the exam</div><div style="font-size:.85rem;opacity:.85;margin-bottom:1.25rem">Something went wrong while preparing this page. Please refresh to try again — your progress so far has not been affected.</div><button onclick="window.location.reload()" style="background:#f97316;border:none;color:#fff;font-weight:700;border-radius:10px;padding:.7rem 1.5rem;cursor:pointer">Refresh Page</button></div>';
+    document.body.appendChild(el);
+  }
+});
 
 window.addEventListener('beforeunload',(e)=>{if(examPortal&&!examPortal.isSubmitting&&!examPortal.isNavigating){examPortal.saveCurrentAnswer();examPortal.emergencySyncAnswers();e.preventDefault();e.returnValue='Your exam progress will be saved. Are you sure you want to leave?';}});
-window.addEventListener('unload',()=>{if(examPortal){examPortal.isSubmitting=true;examPortal.saveCurrentAnswer();examPortal.emergencySyncAnswers();if(examPortal.timerInterval)clearInterval(examPortal.timerInterval);if(examPortal.fullscreenCheckInterval)clearInterval(examPortal.fullscreenCheckInterval);}});
+window.addEventListener('unload',()=>{if(examPortal){examPortal.isSubmitting=true;examPortal.saveCurrentAnswer();examPortal.emergencySyncAnswers();if(examPortal.timerInterval)clearInterval(examPortal.timerInterval);if(examPortal.fullscreenCheckInterval)clearInterval(examPortal.fullscreenCheckInterval);if(examPortal.autoSyncInterval)clearInterval(examPortal.autoSyncInterval);}});
 document.addEventListener('visibilitychange',()=>{if(examPortal&&!document.hidden&&!examPortal.isSubmitting)examPortal.handlePageVisibilityChange();});
 </script>
 {% endblock %}

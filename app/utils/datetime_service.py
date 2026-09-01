@@ -86,6 +86,21 @@ def format_calendar_date(value) -> str:
         return str(value)
 
 
+def format_calendar_time(value) -> str:
+    """Format a plain 24-hour 'HH:MM' clock value (e.g. exams.start_time,
+    which carries no date/timezone meaning) as 12-hour AM/PM for display —
+    same reasoning as format_calendar_date(): a bare wall-clock value should
+    never be routed through to_app_tz()."""
+    if not value:
+        return ""
+    try:
+        dt = datetime.strptime(str(value)[:5], "%H:%M")
+        h12 = dt.strftime("%I").lstrip("0") or "12"
+        return f"{h12}:{dt.strftime('%M %p')}"
+    except Exception:
+        return str(value)
+
+
 def daily_reset_message() -> str:
     """Human-readable string for when a daily-limit counter resets
     (local midnight in APP_TIMEZONE), e.g. "Resets in 3h 12m at 12:00 AM IST"."""

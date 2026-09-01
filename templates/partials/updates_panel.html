@@ -12,8 +12,32 @@
 <div class="ntf-section-label">Today's Exams</div>
 {% for entry in dash.today_exams %}
 {% set live_now = entry.status == 'ongoing' or entry.is_startable %}
-{% set pending_countdown = entry.status == 'upcoming' and not entry.is_startable and not entry.is_window_ended and entry.start_iso %}
-<div class="ntf-row" {% if pending_countdown %}data-exam-row data-target="{{ entry.start_iso }}" data-start-href="{{ url_for('exam.exam_instructions', exam_id=entry.exam.id) }}" data-can-start="{{ 'true' if entry.can_start else 'false' }}" data-active-attempt="{{ 'true' if entry.active_attempt else 'false' }}"{% endif %}>
+{# A Scheduled Exam has two distinct "upcoming" phases: before its
+   preparation window opens (nothing to do yet but wait), and once it's
+   open (the student can already reach the instructions page, preload,
+   and wait out the official start there) — these used to look and count
+   down identically, always toward the official start, with no link at
+   all, so the preparation window had no visible effect and nothing to
+   click until the exact start second. A Manual Exam has no prep-window
+   concept (entry.is_scheduled is False, entry.prep_open always False),
+   so prep_pending is always False for it and start_pending reduces to
+   exactly its old pending_countdown condition — unchanged. #}
+{% set prep_pending = entry.is_scheduled and entry.status == 'upcoming' and not entry.prep_open and entry.prep_start_iso %}
+{# start_pending now also requires "not yet started" — without that, a
+   Manual Exam whose scheduled time has already passed but which the
+   admin hasn't set to Ongoing kept re-evaluating true forever (its
+   is_startable never becomes true on its own), so every fresh render
+   (each popup reopen) painted a countdown aimed at a moment already in
+   the past and the "Prepare" button, which the client-side countdown
+   then immediately overwrote with "Not started yet" on the very next
+   tick — a visible flicker on every open, not an actual status change.
+   awaiting_admin now owns that "time's up, still waiting on the admin"
+   state explicitly, rendered the same way the client JS would already
+   settle on it, so first paint and the JS's own re-check agree and
+   nothing visibly flips. #}
+{% set start_pending = entry.status == 'upcoming' and not entry.is_startable and not entry.is_window_ended and entry.start_iso and (not entry.is_scheduled or entry.prep_open) and not entry.has_started %}
+{% set awaiting_admin = entry.status == 'upcoming' and not entry.is_startable and not entry.is_window_ended and not entry.is_scheduled and entry.has_started %}
+<div class="ntf-row" {% if prep_pending or start_pending or awaiting_admin %}data-exam-row data-exam-id="{{ entry.exam.id }}" data-phase="{{ 'prep' if prep_pending else 'live' }}" data-prep-target="{{ entry.prep_start_iso or '' }}" data-live-target="{{ entry.start_iso or '' }}" data-start-href="{{ url_for('exam.exam_instructions', exam_id=entry.exam.id) }}" data-can-start="{{ 'true' if entry.can_start else 'false' }}" data-active-attempt="{{ 'true' if entry.active_attempt else 'false' }}"{% endif %}>
   <div class="ntf-icon {{ 'ntf-icon-success' if live_now else ('ntf-icon-muted' if entry.is_window_ended else 'ntf-icon-warning') }}">
     <i class="fas {{ 'fa-play' if live_now else ('fa-clock' if entry.is_window_ended else 'fa-calendar-day') }}"></i>
   </div>
@@ -21,12 +45,17 @@
     <div class="ntf-title">
       {{ entry.exam.name }}
       {% if entry.category_name %}<span class="ntf-tag">{{ entry.category_name }}</span>{% endif %}
+      {% if entry.exam.scheduled_mode %}<span class="ntf-tag ntf-tag-sched" title="Scheduled Exam — opens automatically at its scheduled time, no admin action needed"><i class="fas fa-calendar-check" style="font-size:.55rem"></i>Scheduled</span>{% endif %}
       {% if live_now %}<span class="ntf-live"><span class="ntf-live-dot"></span>Live</span>{% endif %}
     </div>
     <div class="ntf-meta">
       {{ entry.start_time_ampm or entry.exam.start_time }} &ndash; {{ entry.end_time_ampm }}
-      {% if pending_countdown %}
+      {% if prep_pending %}
+      &middot; Prepare in <span class="countdown">&ndash;&ndash;</span>
+      {% elif start_pending %}
       &middot; Starts in <span class="countdown">&ndash;&ndash;</span>
+      {% elif awaiting_admin %}
+      &middot; Awaiting admin start
       {% elif entry.is_window_ended %}
       &middot; Window closed
       {% endif %}
@@ -41,6 +70,10 @@
     <span class="ntf-btn ghost">Exhausted</span>
     {% elif entry.is_window_ended %}
     <span class="ntf-btn ghost">Ended</span>
+    {% elif start_pending %}
+    <a href="{{ url_for('exam.exam_instructions', exam_id=entry.exam.id) }}" class="ntf-btn success">Prepare</a>
+    {% elif awaiting_admin %}
+    <span class="ntf-btn ghost">Not started yet</span>
     {% elif entry.status == 'upcoming' %}
     <span class="ntf-btn ghost">Upcoming</span>
     {% else %}
@@ -93,12 +126,69 @@
 <div class="ntf-section-label">New Messages</div>
 {% for c in dash.new_messages %}
 <a href="{{ url_for('chat.chat_page') }}" class="ntf-row ntf-row-link">
-  <div class="ntf-icon ntf-avatar">{% if c.photo_url %}<img src="{{ c.photo_url }}" alt="">{% else %}{{ (c.name or '?')[0]|upper }}{% endif %}</div>
+  <div class="ntf-icon {{ 'ntf-avatar' if c.photo_url else ('ntf-icon-info' if c.is_group else 'ntf-avatar') }}">
+    {% if c.photo_url %}<img src="{{ c.photo_url }}" alt="">
+    {% elif c.is_group %}<i class="fas fa-users"></i>
+    {% else %}{{ (c.name or '?')[0]|upper }}{% endif %}
+  </div>
   <div class="ntf-body">
-    <div class="ntf-title">{{ c.name }}</div>
-    {% if c.last_message %}<div class="ntf-meta">{{ c.last_message.message[:70] }}</div>{% endif %}
+    <div class="ntf-title">{{ c.name }}{% if c.is_group %} <span class="ntf-tag">Group</span>{% endif %}</div>
+    {% if c.last_message %}
+    <div class="ntf-meta">{% if c.is_group %}{{ c.last_message.sender_name }}: {% endif %}{{ c.last_message.message[:60] }}</div>
+    {% endif %}
   </div>
   <div class="ntf-action"><span class="ntf-count">{{ c.unread }}</span></div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if dash.connection_requests %}
+<div class="ntf-section-label">Connection Requests</div>
+{% for r in dash.connection_requests %}
+<a href="{{ url_for('chat.chat_page') }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon ntf-avatar">{% if r.photo_url %}<img src="{{ r.photo_url }}" alt="">{% else %}{{ (r.requester_name or '?')[0]|upper }}{% endif %}</div>
+  <div class="ntf-body">
+    <div class="ntf-title">{{ r.requester_name }}</div>
+    <div class="ntf-meta">Sent you a connection request</div>
+  </div>
+  <div class="ntf-action"><i class="fas fa-chevron-right ntf-chevron"></i></div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if dash.connection_responses %}
+<div class="ntf-section-label">Connection Updates</div>
+{% for r in dash.connection_responses %}
+<div class="ntf-row" data-dismiss-type="connection_response" data-dismiss-key="{{ r.connection_id }}">
+  <div class="ntf-icon {{ 'ntf-icon-success' if r.status == 'accepted' else 'ntf-icon-danger' }}">
+    <i class="fas {{ 'fa-user-check' if r.status == 'accepted' else 'fa-user-xmark' }}"></i>
+  </div>
+  <div class="ntf-body">
+    <div class="ntf-title">{{ r.other_name }}</div>
+    <div class="ntf-meta">{% if r.status == 'accepted' %}Accepted your connection request{% else %}Declined your connection request{% endif %}</div>
+  </div>
+  <div class="ntf-action">
+    {% if r.status == 'accepted' %}
+    <a href="{{ url_for('chat.chat_page') }}" class="ntf-btn primary ntf-dismiss-on-click" data-dismiss-type="connection_response" data-dismiss-key="{{ r.connection_id }}">Open</a>
+    {% endif %}
+    <button type="button" class="ntf-dismiss" title="Dismiss"><i class="fas fa-times"></i></button>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if dash.group_additions %}
+<div class="ntf-section-label">Added To Groups</div>
+{% for g in dash.group_additions %}
+<a href="{{ url_for('chat.chat_page') }}" class="ntf-row ntf-row-link">
+  <div class="ntf-icon {{ 'ntf-avatar' if g.photo_url else 'ntf-icon-info' }}">
+    {% if g.photo_url %}<img src="{{ g.photo_url }}" alt="">{% else %}<i class="fas fa-users"></i>{% endif %}
+  </div>
+  <div class="ntf-body">
+    <div class="ntf-title">{{ g.group_name }}</div>
+    <div class="ntf-meta">Added by {{ g.added_by_name }}</div>
+  </div>
+  <div class="ntf-action"><i class="fas fa-chevron-right ntf-chevron"></i></div>
 </a>
 {% endfor %}
 {% endif %}

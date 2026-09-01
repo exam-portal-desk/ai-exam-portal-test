@@ -115,6 +115,9 @@ def results_history():
             "unanswered_questions": int(r.get("unanswered_questions", 0)),
             "result_visible":     is_visible,
             "pending_reason":     pending_reason,
+            # UI-only — already on exam_data from the same get_all_exams()
+            # call above, just not previously surfaced to the template.
+            "is_scheduled":       bool(exam_data.get("scheduled_mode")),
         })
 
     result_list.sort(key=lambda x: x["completed_at"], reverse=True)

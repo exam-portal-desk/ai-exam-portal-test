@@ -51,42 +51,88 @@
   margin-bottom: 1.25rem;
   box-shadow: var(--shadow-md);
 }
-
-/* ── Section Title ── */
-.upload-card .section-title {
-  font-size: .72rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .08em;
-  color: var(--text-3);
-  display: flex; align-items: center; gap: .45rem;
-  margin-bottom: 1rem;
+.upload-card.uploader-locked {
+  border-style: dashed;
+  box-shadow: none;
+  background: var(--surface-2);
 }
-.upload-card .section-title i { color: var(--accent); }
+
+/* ── Step header: label + icon badge + title/subtitle ── */
+.step-label {
+  font-size: .68rem; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: .7rem;
+}
+.step-label.muted { color: var(--text-3); }
+.step-card-hdr { display: flex; align-items: flex-start; gap: .85rem; margin-bottom: 1.25rem; }
+.step-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: var(--accent-subtle); color: var(--accent);
+  display: flex; align-items: center; justify-content: center; font-size: 1rem;
+}
+.step-icon.muted { background: var(--surface); color: var(--text-3); border: 1px solid var(--border); }
+.step-title-wrap { flex: 1; min-width: 0; padding-top: .05rem; }
+.step-title { font-size: .95rem; font-weight: 700; color: var(--text-1); }
+.step-title.muted { color: var(--text-3); }
+.step-sub { font-size: .78rem; color: var(--text-3); margin-top: .15rem; line-height: 1.5; }
+.step-sub span#uploader-subject-name { color: var(--accent); font-weight: 700; }
+
+/* ── Connector between the two workflow cards ── */
+.step-connector {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-3); font-size: .75rem;
+  margin: -.75rem auto .75rem;
+}
 
 /* ── Form ── */
 .form-label {
   font-size: .78rem; font-weight: 600;
-  color: var(--text-2); margin-bottom: .35rem;
+  color: var(--text-2); margin-bottom: .4rem;
   display: block;
 }
-.form-select {
-  background: var(--bg) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  color: var(--text-1) !important;
-  font-family: inherit; font-size: .855rem;
-  min-height: 42px;
+.field-col { max-width: 480px; }
+.field-wrap { position: relative; }
+.field-wrap .field-icon-l {
+  position: absolute; left: .95rem; top: 50%; transform: translateY(-50%);
+  color: var(--text-3); font-size: .85rem; pointer-events: none; transition: color .15s;
 }
-.form-select:focus {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px var(--accent-subtle) !important;
-  outline: none;
+.field-select {
+  width: 100%;
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding: .75rem 2.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-family: inherit; font-size: .875rem; font-weight: 400;
+  min-height: 46px; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, background .15s;
 }
-.form-select option { background: var(--surface); color: var(--text-1); }
-.form-hint {
-  font-size: .7rem; color: var(--text-3);
-  margin-top: .3rem; display: flex; align-items: center; gap: .3rem;
+.field-select:required:invalid { color: var(--text-3); }
+.field-select:valid { color: var(--text-1); font-weight: 600; }
+.field-select option { background: var(--surface); color: var(--text-1); }
+.field-select:hover { border-color: var(--border-focus); }
+.field-select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-raised);
 }
-.form-hint i { color: var(--accent); }
+.field-wrap:focus-within .field-icon-l { color: var(--accent); }
+.select-chevron {
+  position: absolute; right: 1rem; top: 50%; transform: translateY(-50%);
+  color: var(--text-3); font-size: .7rem; pointer-events: none;
+}
+
+/* ── Helper callout (replaces the old plain hint line) ── */
+.hint-callout {
+  display: flex; align-items: flex-start; gap: .55rem;
+  background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-text);
+  border-radius: var(--radius); padding: .65rem .85rem;
+  font-size: .78rem; line-height: 1.55; margin-top: .9rem;
+}
+.hint-callout i { flex-shrink: 0; margin-top: .15rem; font-size: .8rem; }
+.hint-callout strong { color: var(--info-text); }
 
 /* ── Uploader Section visibility ── */
 .uploader-section { display: none; }
@@ -107,10 +153,13 @@
   border-color: var(--accent);
   background: var(--accent-subtle);
 }
-.drop-icon {
-  font-size: 2rem; color: var(--text-3);
-  opacity: .5; display: block; margin-bottom: .75rem;
+.drop-icon-wrap {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: var(--accent-subtle);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto .9rem;
 }
+.drop-icon { font-size: 1.5rem; color: var(--accent); }
 .drop-title {
   font-size: .95rem; font-weight: 700;
   color: var(--text-1); margin-bottom: .25rem;
@@ -118,6 +167,11 @@
 .drop-subtitle {
   font-size: .8rem; color: var(--text-3); margin-bottom: 1rem;
 }
+.form-hint {
+  font-size: .7rem; color: var(--text-3);
+  margin-top: .3rem; display: flex; align-items: center; justify-content: center; gap: .3rem;
+}
+.form-hint i { color: var(--accent); }
 
 /* ── File List ── */
 .file-list-wrap {
@@ -152,6 +206,12 @@
   line-height: 1; flex-shrink: 0;
 }
 .remove-file-btn:hover { color: var(--danger-text); background: var(--danger-bg); }
+
+@media (max-width: 600px) {
+  .upload-card { padding: 1.1rem; }
+  .step-icon { width: 34px; height: 34px; font-size: .9rem; }
+  .drop-zone { padding: 1.75rem .85rem; }
+}
 </style>
 
 <div class="page-top">
@@ -169,39 +229,71 @@
 </div>
 {% endif %}
 
-<!-- Subject Selector -->
+<!-- Step 1 — Subject Selector -->
 <div class="upload-card">
-  <div class="section-title"><i class="fas fa-folder"></i>Choose Subject Folder</div>
-  <div class="row g-3 align-items-end">
-    <div class="col-md-7">
-      <label class="form-label">Subject Folder</label>
-      <select class="form-select" id="subject_folder_id" name="subject_folder_id" required>
-        <option value="" disabled selected>-- Select a subject folder --</option>
+  <div class="step-label">Step 1 of 2</div>
+  <div class="step-card-hdr">
+    <div class="step-icon"><i class="fas fa-folder"></i></div>
+    <div class="step-title-wrap">
+      <div class="step-title">Choose Subject Folder</div>
+      <div class="step-sub">Pick where these images will be stored in Object Storage</div>
+    </div>
+  </div>
+
+  <div class="field-col">
+    <label class="form-label" for="subject_folder_id">Subject Folder</label>
+    <div class="field-wrap">
+      <i class="fas fa-folder-open field-icon-l"></i>
+      <select class="field-select" id="subject_folder_id" name="subject_folder_id" required>
+        <option value="" disabled selected>Choose a subject folder…</option>
         {% for subj in subjects %}
           <option value="{{ subj.folder_id }}">{{ subj.name }}</option>
         {% endfor %}
       </select>
-      <div class="form-hint">
-        <i class="fas fa-info-circle"></i>
-        If subject isn't listed, add it in <strong>Subjects</strong> then click <strong>Publish</strong>.
-      </div>
+      <i class="fas fa-chevron-down select-chevron"></i>
+    </div>
+
+    <div class="hint-callout">
+      <i class="fas fa-circle-info"></i>
+      <span>If a subject isn't listed here, add it on the <strong>Subjects</strong> page, then come back and reload this page.</span>
     </div>
   </div>
 </div>
 
-<!-- Upload Section -->
+<div class="step-connector"><i class="fas fa-arrow-down"></i></div>
+
+<!-- Step 2 — locked placeholder, shown until a subject is picked -->
+<div class="upload-card uploader-locked" id="uploader-locked">
+  <div class="step-label muted">Step 2 of 2</div>
+  <div class="step-card-hdr">
+    <div class="step-icon muted"><i class="fas fa-lock"></i></div>
+    <div class="step-title-wrap">
+      <div class="step-title muted">Upload Images</div>
+      <div class="step-sub">Select a subject folder above to continue</div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2 — Upload Section -->
 <div class="upload-card uploader-section" id="uploader-section">
-  <div class="section-title"><i class="fas fa-cloud-upload-alt"></i>Upload Images</div>
+  <div class="step-label">Step 2 of 2</div>
+  <div class="step-card-hdr">
+    <div class="step-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+    <div class="step-title-wrap">
+      <div class="step-title">Upload Images</div>
+      <div class="step-sub">Uploading to "<span id="uploader-subject-name">—</span>" — drag &amp; drop or browse files below</div>
+    </div>
+  </div>
 
   <div id="drop-zone" class="drop-zone">
-    <i class="fas fa-cloud-upload-alt drop-icon"></i>
+    <div class="drop-icon-wrap"><i class="fas fa-cloud-upload-alt drop-icon"></i></div>
     <div class="drop-title">Drag &amp; Drop Images Here</div>
     <div class="drop-subtitle">or click to browse files</div>
     <button type="button" id="pick-files" class="btn-flat primary">
       <i class="fas fa-folder-open me-1"></i>Choose Files
     </button>
     <input type="file" id="file-input" accept="image/*" multiple hidden>
-    <div class="form-hint mt-3">Supported: JPG, PNG, GIF, SVG &nbsp;•&nbsp; Max {{ max_image_size_kb }} KB per file</div>
+    <div class="form-hint mt-3"><i class="fas fa-info-circle"></i>Supported: JPG, PNG, GIF, SVG &nbsp;•&nbsp; Max {{ max_image_size_kb }} KB per file</div>
   </div>
 
   <div id="file-list" class="d-none"></div>
@@ -218,6 +310,8 @@
   const MAX_IMAGE_SIZE_BYTES = {{ max_image_size_kb }} * 1024;
   const selectEl   = document.getElementById('subject_folder_id');
   const section    = document.getElementById('uploader-section');
+  const lockedCard = document.getElementById('uploader-locked');
+  const subjectNameEl = document.getElementById('uploader-subject-name');
   const dropZone   = document.getElementById('drop-zone');
   const pickBtn    = document.getElementById('pick-files');
   const fileInput  = document.getElementById('file-input');
@@ -264,7 +358,13 @@
     render();
   }
 
-  selectEl.addEventListener('change', () => { if (selectEl.value) section.classList.add('show'); });
+  selectEl.addEventListener('change', () => {
+    if (selectEl.value) {
+      section.classList.add('show');
+      if (lockedCard) lockedCard.style.display = 'none';
+      if (subjectNameEl) subjectNameEl.textContent = selectEl.options[selectEl.selectedIndex].textContent;
+    }
+  });
   pickBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', e => addFiles(e.target.files));
 
@@ -299,4 +399,3 @@
 })();
 </script>
 {% endblock %}
-

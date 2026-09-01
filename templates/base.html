@@ -217,7 +217,13 @@
   .sb-toggle:hover { background:var(--bg); color:var(--text-1); }
 
   /* Nav scroll area */
-  .sb-nav { flex:1; overflow-y:auto; overflow-x:hidden; padding:.3rem; scrollbar-width:none; }
+  /* min-height:0 is required here — a flex child defaults to min-height:auto,
+     which refuses to shrink below its natural content height, so with
+     enough nav items this list silently grows past .sb's fixed height
+     instead of scrolling, and .sb's overflow:hidden then clips whatever
+     didn't fit — including .sb-foot (Profile & Logout) below it. Same fix
+     as templates/admin_base.html's .sb-nav-wrap. */
+  .sb-nav { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:.3rem; scrollbar-width:none; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
   .sb-nav::-webkit-scrollbar { display:none; }
 
   /* Section label */
@@ -387,6 +393,9 @@
     font-size:.58rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em;
     color:var(--text-3); background:var(--surface-2); padding:.08rem .4rem; border-radius:20px;
   }
+  .ntf-tag-sched {
+    color:var(--accent); background:var(--accent-subtle); display:inline-flex; align-items:center; gap:.2rem;
+  }
   .ntf-live { display:inline-flex; align-items:center; gap:.28rem; font-size:.6rem; font-weight:700; text-transform:uppercase; color:var(--success-text); }
   .ntf-live-dot { width:6px; height:6px; border-radius:50%; background:var(--success-text); animation:livepulse2 1.6s infinite; }
   @keyframes livepulse2 { 0%,100%{opacity:1} 50%{opacity:.35} }
@@ -410,6 +419,13 @@
     background:var(--accent); color:var(--accent-on); font-size:.62rem; font-weight:700;
   }
   .ntf-chevron { color:var(--text-3); font-size:.68rem; }
+  .ntf-action { display:flex; align-items:center; gap:.4rem; }
+  .ntf-dismiss {
+    width:22px; height:22px; border-radius:50%; border:none; background:var(--surface-2);
+    color:var(--text-3); font-size:.62rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; transition:background .1s,color .1s;
+  }
+  .ntf-dismiss:hover { background:var(--danger-bg); color:var(--danger-text); }
 
   .dash-empty { text-align:center; padding:2.25rem 1.5rem; }
   .dash-empty-icon { width:42px; height:42px; border-radius:12px; background:var(--surface-2); color:var(--text-3); display:flex; align-items:center; justify-content:center; font-size:1.05rem; margin:0 auto .7rem; }
@@ -582,6 +598,15 @@
   .app-toast.warning .app-toast-icon { color:var(--warning-text); }
   .app-toast-msg { font-size:.82rem; font-weight:600; color:var(--text-1); }
   .app-toast-sub { font-size:.72rem; color:var(--text-3); margin-top:.08rem; }
+
+  /* ══ APP FOOTER (user portal) ══ */
+  .app-footer { background:var(--surface); border-top:1px solid var(--border); padding:.75rem 1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.6rem 1.25rem; font-size:.73rem; }
+  .app-footer-brand { display:flex; align-items:center; gap:.45rem; font-weight:700; color:var(--text-1); }
+  .app-footer-links { display:flex; gap:1.1rem; flex-wrap:wrap; row-gap:.35rem; }
+  .app-footer-link { color:var(--text-3); text-decoration:none; transition:color .12s; }
+  .app-footer-link:hover { color:var(--accent); }
+  .app-footer-copy { color:var(--text-3); }
+  @media(max-width:640px){ .app-footer{ justify-content:center; text-align:center; } }
   </style>
 </head>
 <body>
@@ -770,17 +795,17 @@
 
   {# Footer — hidden on exam/result/response pages #}
   {% if not (request.path.startswith('/exam/') or request.path.startswith('/submit-exam') or request.path == '/result' or request.path.startswith('/response')) %}
-  <footer style="background:var(--surface);border-top:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem;font-size:.73rem">
-    <div style="display:flex;align-items:center;gap:.45rem">
+  <footer class="app-footer">
+    <div class="app-footer-brand">
       <video src="{{ url_for('static', filename='logo.mp4') }}" autoplay loop muted playsinline style="height:18px;width:auto"></video>
-      <span style="font-weight:700;color:var(--text-1)">SmartAIExam</span>
+      SmartAIExam
     </div>
-    <div style="display:flex;gap:1.1rem;flex-wrap:wrap">
+    <div class="app-footer-links">
       {% for n,e in [('Privacy','misc.privacy_policy'),('Terms','misc.terms_of_service'),('Data Deletion','misc.account_deletion_policy'),('Support','misc.support'),('Contact','misc.contact'),('About','misc.about')] %}
-      <a href="{{ url_for(e) }}" style="color:var(--text-3);text-decoration:none" onmouseover="this.style.color='var(--text-1)'" onmouseout="this.style.color='var(--text-3)'">{{ n }}</a>
+      <a href="{{ url_for(e) }}" class="app-footer-link">{{ n }}</a>
       {% endfor %}
     </div>
-    <span style="color:var(--text-3)">&copy; {{ CURRENT_YEAR }} SmartAIExam</span>
+    <span class="app-footer-copy">&copy; {{ CURRENT_YEAR }} SmartAIExam</span>
   </footer>
   {% endif %}
 
@@ -968,14 +993,22 @@ document.addEventListener('click',function(e){
 function openMobileSb(){
   var sb=document.getElementById('mainSb');
   var ov=document.getElementById('sbOverlay');
-  if(sb) sb.classList.add('mobile-open');
+  // Desktop's collapsed (icon-only) state is a separate, persisted
+  // preference — its centered/no-gap/icon-boxed styling must not leak
+  // into the mobile drawer, which always shows the full expanded layout.
+  if(sb){ sb.classList.remove('collapsed'); sb.classList.add('mobile-open'); }
   if(ov) ov.classList.add('open');
+  document.body.style.overflow='hidden';
 }
 function closeMobileSb(){
   var sb=document.getElementById('mainSb');
   var ov=document.getElementById('sbOverlay');
-  if(sb) sb.classList.remove('mobile-open');
+  if(sb){
+    sb.classList.remove('mobile-open');
+    if(localStorage.getItem('sbCollapsed')==='1') sb.classList.add('collapsed');
+  }
   if(ov) ov.classList.remove('open');
+  document.body.style.overflow='';
 }
 var mt=document.getElementById('mobToggle');
 if(mt) mt.addEventListener('click', function(){ var sb=document.getElementById('mainSb'); if(sb&&sb.classList.contains('mobile-open')) closeMobileSb(); else openMobileSb(); });
@@ -1097,49 +1130,149 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   window.__updatesFetch = fetchUpdates;
 
-  /* Swaps one "upcoming" row's ghost action into a real Start/Resume link
-     once its actual scheduled start time arrives — no re-fetch needed, the
-     can-start/active-attempt facts were already fetched with the row, just
-     not shown as a button until now. */
+  /* Fires once the countdown to an "upcoming" row's scheduled start time
+     hits zero — but that's only "the scheduled time arrived", not "the
+     exam is open": a Scheduled Exam's window opens purely by time, but a
+     Manual Exam only opens once the admin explicitly sets it Ongoing (see
+     is_exam_window_open() in exam_service.py), so reaching this moment
+     for one can mean nothing at all happened yet. The row's can-start/
+     active-attempt facts were fetched whenever the popup was last opened
+     — for a Scheduled Exam that can be minutes-to-hours stale by the time
+     the countdown reaches zero. Re-fetch fresh state right at zero rather
+     than trusting either the stale snapshot or the countdown itself, and
+     keep polling every 15s for as long as the exam still isn't actually
+     open — that's the normal, expected state for a Manual Exam sitting
+     past its scheduled time with the admin not having started it yet, not
+     a one-off transition to catch. Falls back to the stale snapshot only
+     if a fetch itself fails, so the row still resolves to something
+     rather than hanging. */
   function promoteRowToLive(row){
-    row.querySelector('.ntf-icon').className = 'ntf-icon ntf-icon-success';
-    row.querySelector('.ntf-icon i').className = 'fas fa-play';
-    var liveTag = document.createElement('span');
-    liveTag.className = 'ntf-live';
-    liveTag.innerHTML = '<span class="ntf-live-dot"></span>Live';
-    row.querySelector('.ntf-title').appendChild(liveTag);
-    var meta = row.querySelector('.ntf-meta');
-    var cd = meta.querySelector('.countdown');
-    if (cd && cd.parentNode === meta) { /* strip the "· Starts in …" tail */
-      meta.innerHTML = meta.innerHTML.split('&middot;')[0].split('·')[0];
-    }
-    var href = row.dataset.startHref, canStart = row.dataset.canStart === 'true', active = row.dataset.activeAttempt === 'true';
+    var href = row.dataset.startHref;
     var action = row.querySelector('.ntf-action');
-    if (active) {
-      action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Resume</a>';
-    } else if (canStart) {
-      action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Start</a>';
-    } else {
-      action.innerHTML = '<span class="ntf-btn ghost">Exhausted</span>';
+    var examId = row.dataset.examId;
+
+    // Reaching the scheduled start time does NOT mean the exam is
+    // actually open — a Manual Exam only opens once the admin explicitly
+    // sets it to Ongoing (see is_exam_window_open() in exam_service.py);
+    // a Scheduled Exam opens purely by time, so windowOpen tracks that
+    // automatically. Only flip the row to the "Live" look when the
+    // server confirms the window is genuinely open (or there's already
+    // an active attempt to resume) — otherwise leave it looking like an
+    // upcoming exam that's simply still waiting on the admin, matching
+    // the dashboard's own "Not started yet" state for this case.
+    function render(active, canStart, windowOpen){
+      var isLive = active || windowOpen;
+      if (isLive) {
+        if (!row.querySelector('.ntf-live')) {
+          row.querySelector('.ntf-icon').className = 'ntf-icon ntf-icon-success';
+          row.querySelector('.ntf-icon i').className = 'fas fa-play';
+          var liveTag = document.createElement('span');
+          liveTag.className = 'ntf-live';
+          liveTag.innerHTML = '<span class="ntf-live-dot"></span>Live';
+          row.querySelector('.ntf-title').appendChild(liveTag);
+          var meta = row.querySelector('.ntf-meta');
+          var cd = meta.querySelector('.countdown');
+          if (cd && cd.parentNode === meta) { /* strip the "· Starts in …" tail */
+            meta.innerHTML = meta.innerHTML.split('&middot;')[0].split('·')[0];
+          }
+        }
+      } else {
+        // The countdown stopped ticking (it hit zero and handed off here)
+        // but the exam still isn't open — leaving "Starts in 0m 0s" frozen
+        // on screen would be as misleading as the wrong "Live" badge this
+        // whole fix is for, so replace it with an honest waiting label.
+        var metaEl = row.querySelector('.ntf-meta');
+        var cdEl = metaEl && metaEl.querySelector('.countdown');
+        if (cdEl && cdEl.parentNode === metaEl) {
+          metaEl.innerHTML = metaEl.innerHTML.split('&middot;')[0].split('·')[0] + '&middot; Awaiting admin start';
+        }
+      }
+      if (active) {
+        action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Resume</a>';
+      } else if (canStart) {
+        action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Start</a>';
+      } else if (windowOpen) {
+        action.innerHTML = '<span class="ntf-btn ghost">Exhausted</span>';
+      } else {
+        action.innerHTML = '<span class="ntf-btn ghost">Not started yet</span>';
+      }
+      return isLive;
     }
+
+    if (!examId) {
+      render(row.dataset.activeAttempt === 'true', row.dataset.canStart === 'true', row.dataset.canStart === 'true');
+      return;
+    }
+
+    // Re-poll while still waiting on the admin, so the row picks up the
+    // real Live state on its own once they act — without this, a student
+    // who leaves the popup open would be stuck reading "Not started yet"
+    // even after the admin starts the exam, until they reopen the popup.
+    function poll(){
+      fetch('/api/v01/exams/' + examId + '/attempt-status', { cache: 'no-store' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var isLive = render(!!d.has_active_attempt, !!d.can_start_new, !!d.window_open);
+          if (!isLive && document.body.contains(row)) {
+            setTimeout(poll, 15000);
+          }
+        })
+        .catch(function(){
+          render(row.dataset.activeAttempt === 'true', row.dataset.canStart === 'true', row.dataset.canStart === 'true');
+        });
+    }
+    poll();
+  }
+
+  // Swaps a still-waiting row's ghost "Upcoming" action into a real
+  // "Prepare" link the instant the exam's preparation window opens, and
+  // re-arms the countdown toward the official start (phase 'live') —
+  // purely time-based (is_prep_window_open never depends on attempts/
+  // eligibility the way starting does), so no re-fetch is needed here
+  // the way promoteRowToLive() needs one.
+  function promoteRowToPrepAvailable(row){
+    var href = row.dataset.startHref;
+    var action = row.querySelector('.ntf-action');
+    if (action) action.innerHTML = '<a href="'+href+'" class="ntf-btn success">Prepare</a>';
+    var meta = row.querySelector('.ntf-meta');
+    if (meta) meta.innerHTML = meta.innerHTML.replace('Prepare in', 'Starts in');
+    armCountdown(row, 'live');
+  }
+
+  // One absolute-target countdown, re-armed for the next phase (prep ->
+  // live) instead of assuming "prep ending" means "now live" — a
+  // Scheduled Exam's row starts in phase 'prep' (data-prep-target) if its
+  // preparation window hasn't opened yet, or straight into phase 'live'
+  // (data-live-target) once it has (or for a Manual Exam, which has no
+  // prep phase at all — data-phase is always 'live' for it, see
+  // partials/updates_panel.html).
+  function armCountdown(row, phase){
+    var targetIso = phase === 'prep' ? row.dataset.prepTarget : row.dataset.liveTarget;
+    if (!targetIso) { if (phase === 'live') promoteRowToLive(row); return; }
+    var target = new Date(targetIso).getTime();
+    var el = row.querySelector('.countdown');
+    if (isNaN(target)) return;
+    (function tick(){
+      // Always recomputed from the absolute target vs. the current real
+      // clock — never a stored/decremented counter — so this stays
+      // accurate no matter when it runs: on open, on refresh, or on any
+      // later reopen from a cached fetch.
+      var remaining = Math.round((target - Date.now()) / 1000);
+      if (remaining <= 0) {
+        if (phase === 'prep') promoteRowToPrepAvailable(row); else promoteRowToLive(row);
+        return;
+      }
+      if (el) {
+        var h = Math.floor(remaining/3600), mi = Math.floor((remaining%3600)/60), s = remaining%60;
+        el.textContent = (h>0 ? h+'h ' : '') + (h>0 && mi<10 ? '0' : '') + mi + 'm ' + (s<10?'0':'') + s + 's';
+      }
+      setTimeout(tick, 1000);
+    })();
   }
 
   function startCountdowns(body){
-    body.querySelectorAll('[data-exam-row][data-target]').forEach(function(row){
-      var target = new Date(row.dataset.target).getTime();
-      var el = row.querySelector('.countdown');
-      if (!el || isNaN(target)) return;
-      (function tick(){
-        // Always recomputed from the absolute target vs. the current real
-        // clock — never a stored/decremented counter — so this stays
-        // accurate no matter when it runs: on open, on refresh, or on any
-        // later reopen from a cached fetch.
-        var remaining = Math.round((target - Date.now()) / 1000);
-        if (remaining <= 0) { promoteRowToLive(row); return; }
-        var h = Math.floor(remaining/3600), mi = Math.floor((remaining%3600)/60), s = remaining%60;
-        el.textContent = (h>0 ? h+'h ' : '') + (h>0 && mi<10 ? '0' : '') + mi + 'm ' + (s<10?'0':'') + s + 's';
-        setTimeout(tick, 1000);
-      })();
+    body.querySelectorAll('[data-exam-row]').forEach(function(row){
+      armCountdown(row, row.dataset.phase || 'live');
     });
   }
 
@@ -1166,6 +1299,56 @@ document.addEventListener('DOMContentLoaded',function(){
   };
   var um = document.getElementById('updatesModal');
   if (um) um.addEventListener('click', function(e){ if (e.target === this) closeUpdatesModal(); });
+
+  /* Explicit dismiss for items with no natural "view" page (e.g. a
+     declined connection request never opens a conversation) — this IS a
+     deliberate mark-seen action, unlike closing the popup itself. Removes
+     the row locally (and the section label if it was the last one) so the
+     user gets instant feedback without a full re-fetch; the badge count
+     from the cached response is also decremented to match. */
+  document.getElementById('updatesModalBody').addEventListener('click', function(e){
+    // "Open"-style links that resolve a one-time event (e.g. an accepted
+    // connection request) mark it seen too, not just the explicit dismiss
+    // button — fire-and-forget with keepalive so the request survives the
+    // page navigation the click is about to trigger.
+    var onClickLink = e.target.closest('.ntf-dismiss-on-click');
+    if (onClickLink) {
+      fetch('/api/v01/student/updates/dismiss', {
+        method: 'POST', keepalive: true,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({event_type: onClickLink.dataset.dismissType, event_key: onClickLink.dataset.dismissKey})
+      }).catch(function(){});
+      return;
+    }
+    var btn = e.target.closest('.ntf-dismiss');
+    if (!btn) return;
+    var row = btn.closest('.ntf-row');
+    var type = row.dataset.dismissType, key = row.dataset.dismissKey;
+    if (!type || !key) return;
+    btn.disabled = true;
+    fetch('/api/v01/student/updates/dismiss', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({event_type: type, event_key: key})
+    }).then(function(){
+      var label = row.previousElementSibling;
+      var isOnlyRowInSection = label && label.classList.contains('ntf-section-label')
+        && (!row.nextElementSibling || row.nextElementSibling.classList.contains('ntf-section-label'));
+      if (isOnlyRowInSection) label.remove();
+      row.remove();
+      var badge = document.getElementById('updatesBadge');
+      if (badge && badge.textContent) {
+        var n = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
+        badge.textContent = n; badge.style.display = n ? 'inline' : 'none';
+      }
+      // Unlike every other mark-seen path (which navigates to a whole new
+      // page, naturally discarding this page's JS state), dismiss acts via
+      // AJAX while staying put — so the cached response's .html would still
+      // contain this now-dismissed row if reused. Drop the cache entirely;
+      // the next open (or badge refresh) just fetches fresh.
+      cache = null;
+    }).catch(function(){ btn.disabled = false; });
+  });
 
   fetchUpdates(function(d){
     var badge = document.getElementById('updatesBadge');

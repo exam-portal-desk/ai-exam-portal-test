@@ -310,6 +310,26 @@
 .msg-row.own .msg-meta { text-align:right; }
 .edited-tag { font-size:.6rem; color:var(--text-3); margin-left:.3rem; font-style:italic; }
 
+.msg-system-row { align-self:center; max-width:90%; display:flex; justify-content:center; animation:msgIn .18s ease-out; }
+.msg-system-text {
+  background:var(--surface-2); color:var(--text-3); font-size:.72rem;
+  padding:.35rem .8rem; border-radius:999px; text-align:center; line-height:1.4;
+}
+
+.group-photo-picker {
+  width:64px; height:64px; border-radius:50%; margin:0 auto .75rem; position:relative;
+  background:var(--surface-2); border:1px dashed var(--border); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; color:var(--text-3);
+  overflow:hidden; font-size:1.1rem; transition:border-color .12s;
+}
+.group-photo-picker:hover { border-color:var(--accent); color:var(--accent); }
+.group-photo-picker img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.group-photo-picker .gp-badge {
+  position:absolute; bottom:-2px; right:-2px; width:20px; height:20px; border-radius:50%;
+  background:var(--accent); color:var(--accent-on); display:flex; align-items:center;
+  justify-content:center; font-size:.6rem; border:2px solid var(--surface);
+}
+
 /* Msg dots menu */
 .msg-dots-wrap { position:relative; align-self:center; flex-shrink:0; }
 .msg-dots-btn {
@@ -482,9 +502,28 @@
 
 /* Mobile */
 @media(max-width:640px){
+  /* .sidebar below is position:absolute; without a positioned ancestor,
+     its top:0 resolves against the viewport (behind the sticky top-nav)
+     instead of .chat-wrap's own box, which already starts below the nav. */
+  .chat-wrap { position:relative; }
   .chat-wrap .sidebar { width:100%; position:absolute; top:0; left:0; height:100%; z-index:10; transition:transform .2s; }
   .chat-wrap .sidebar.hidden-mobile { transform:translateX(-100%); }
   .chat-main.show-mobile { display:flex; }
+  /* .msg-dots-btn (Reply/Edit/Delete trigger) is opacity:0, shown only via
+     :hover — touch has no hover state, so it's otherwise invisible and
+     untappable. Make it always visible on mobile, with a slightly larger
+     touch target. */
+  .msg-dots-btn { opacity:1; width:28px; height:28px; }
+  /* Prevent a tall modal (e.g. many search results) from exceeding a short
+     mobile viewport instead of scrolling. */
+  .modal-overlay .modal-box { max-height:85vh; overflow-y:auto; }
+  /* .bg-editor-pane's height is set (via JS) to match #chatMain's own live
+     aspect ratio, so the preview matches reality — but on mobile #chatMain
+     is nearly the full portrait screen, so the same ratio applied to this
+     narrow popup produced a ~600px-tall box that pushed the zoom/overlay/
+     apply controls off-screen. The drag/zoom math reads the pane's actual
+     rendered size on every interaction, so capping the height here is safe. */
+  .bg-editor-pane { max-height:40vh; }
 }
 
 /* Without this, an element that both has [hidden] and a class-based
@@ -534,6 +573,10 @@
       <p class="modal-title" style="margin:0"><i class="fas fa-users me-2" style="color:var(--accent)"></i> Create Group </p>
       <button class="btn-ghost-sm" style="padding:0.3rem 0.6rem" onclick="closeGroupModal()"><i class="fas fa-times"></i></button>
     </div>
+    <div class="group-photo-picker" id="groupPhotoPreview" onclick="pickGroupPhoto()" title="Set group photo">
+      <i class="fas fa-camera"></i><span class="gp-badge"><i class="fas fa-plus"></i></span>
+    </div>
+    <input type="file" id="groupPhotoCreateInput" accept="image/*" style="display:none" onchange="onGroupPhotoCreateSelected(event)">
     <input type="text" class="modal-input" id="groupName" placeholder="Group name (required)">
     <div style="position:relative;margin-bottom:0.75rem">
       <i class="fas fa-user-plus input-icon"></i>
@@ -547,6 +590,8 @@
     </div>
   </div>
 </div>
+
+<input type="file" id="groupPhotoChangeInput" accept="image/*" style="display:none" onchange="onGroupPhotoChangeSelected(event)">
 
 <!-- Add Member Modal -->
 <div class="modal-overlay" id="addMemberModal">
@@ -701,6 +746,17 @@ const _sentMsgIds = new Set();
 let activeConvId = null, activeOtherId = null, activeIsGroup = false, activeConvCreatedBy = null;
 let oldestMsgTime = null, typingTimer = null, selectedGroupMembers = {}, confirmCallback = null;
 let editingMsgId = null, replyTo = null;
+
+// Highest message id seen so far, per conversation — the cursor a Socket.IO
+// reconnect uses to ask "what did I miss" (see socket.on('connect') below).
+// Kept for every conversation we've touched this session, not just the
+// active one, so switching back into a conversation later still has an
+// accurate cursor without needing a fresh full fetchMessages().
+const _lastMsgId = {};
+function _bumpLastMsgId(convId, id){
+  if(!convId || !id) return;
+  if(!_lastMsgId[convId] || id > _lastMsgId[convId]) _lastMsgId[convId] = id;
+}
 
 function showToast(msg, type='info', duration=4000){
   const icons={success:'fa-check-circle',error:'fa-times-circle',info:'fa-info-circle',warning:'fa-exclamation-triangle'};
@@ -1129,6 +1185,8 @@ async function openConversation(convId,name,otherId,isGroup=false,createdBy=null
   let menuItems=`<div class="dropdown-item" onclick="clearChat()"><i class="fas fa-broom" style="width:14px"></i>Clear Chat</div>`;
   if(isGroup){
     menuItems+=`<div class="dropdown-item" onclick="openAddMemberModal()"><i class="fas fa-user-plus" style="width:14px"></i>Add Member</div>`;
+    menuItems+=`<div class="dropdown-item" onclick="changeGroupPhoto()"><i class="fas fa-camera" style="width:14px"></i>Change Group Photo</div>`;
+    if(conv&&conv.photo_url)menuItems+=`<div class="dropdown-item" onclick="removeGroupPhoto()"><i class="fas fa-image" style="width:14px"></i>Remove Group Photo</div>`;
     menuItems+=`<div class="dropdown-divider"></div>`;
     menuItems+=isCreator
       ?`<div class="dropdown-item danger" onclick="deleteGroup()"><i class="fas fa-trash" style="width:14px"></i>Delete Group</div>`
@@ -1164,6 +1222,10 @@ async function fetchMessages(convId,before=null){
   const area=document.getElementById('messagesArea'),loadBtn=document.getElementById('loadMoreBtn');
   if(data.messages.length===40)loadBtn.style.display='block';else loadBtn.style.display='none';
   if(data.messages.length>0)oldestMsgTime=data.messages[0].created_at;
+  // Newest message in this batch becomes (or raises) this conversation's
+  // resync cursor — safe to call for the "before=" older-page batch too,
+  // since _bumpLastMsgId only ever moves the cursor forward.
+  data.messages.forEach(m=>_bumpLastMsgId(convId,m.id));
   if(before){const anchor=loadBtn.nextSibling;data.messages.forEach(m=>area.insertBefore(buildMsgEl(m),anchor));}
   else{data.messages.forEach(m=>area.appendChild(buildMsgEl(m)));scrollBottom();}
 }
@@ -1171,8 +1233,13 @@ function loadMoreMessages(){if(oldestMsgTime&&activeConvId)fetchMessages(activeC
 
 function buildMsgEl(m){
   const div=document.createElement('div');
-  div.className='msg-row'+(m.is_own?' own':'');
   div.dataset.msgId=m.id;
+  if(m.is_system){
+    div.className='msg-system-row';
+    div.innerHTML=`<span class="msg-system-text"><i class="fas fa-image me-1"></i>${m.message}</span>`;
+    return div;
+  }
+  div.className='msg-row'+(m.is_own?' own':'');
   const replyHtml=m.reply_to_id?`<div class="reply-bar" onclick="scrollToMsg(${m.reply_to_id})"><strong>${m.reply_to_name||''}</strong>${(m.reply_to_text||'').substring(0,60)}</div>`:'';
   const editedTag=m.is_edited?'<span class="edited-tag">(edited)</span>':'';
   const mid=`menu-${m.id}`;
@@ -1283,6 +1350,25 @@ async function removeFriend(){
   });
 }
 
+function changeGroupPhoto(){
+  document.getElementById('headerMenu').classList.remove('show');
+  document.getElementById('groupPhotoChangeInput').click();
+}
+async function onGroupPhotoChangeSelected(e){
+  const f=e.target.files[0];e.target.value='';
+  if(!f||!activeConvId)return;
+  const data=await uploadGroupPhotoFile(activeConvId,f);
+  if(data.success)showToast('Group photo updated.','success');
+}
+function removeGroupPhoto(){
+  document.getElementById('headerMenu').classList.remove('show');
+  showConfirm('Remove Group Photo','This will reset the group to the default avatar.',async()=>{
+    const res=await fetch(`/api/v01/chat/groups/${activeConvId}/photo`,{method:'DELETE'});
+    const data=await res.json();
+    if(!data.success)showToast(data.message||'Failed to remove group photo.','error');
+  },false);
+}
+
 async function exitGroup(){
   document.getElementById('headerMenu').classList.remove('show');
   showConfirm('Exit Group','You will leave this group and lose access to messages.',async()=>{
@@ -1371,6 +1457,7 @@ async function sendMessage(){
     if(data.message.id)_sentMsgIds.add(data.message.id);
     document.getElementById('messagesArea').appendChild(buildMsgEl(data.message));
     scrollBottom();updateConvPreview(activeConvId,msg);
+    _bumpLastMsgId(activeConvId,data.message.id);
   } else showToast(data.message||'Failed to send message','error');
 }
 
@@ -1455,7 +1542,11 @@ async function respondRequest(connId,action,btn){
 }
 
 function openGroupModal(){selectedGroupMembers={};document.getElementById('groupModal').classList.add('show');}
-function closeGroupModal(){document.getElementById('groupModal').classList.remove('show');document.getElementById('groupName').value='';document.getElementById('groupMemberSearch').value='';document.getElementById('groupMemberResults').innerHTML='';document.getElementById('selectedMembers').innerHTML='';selectedGroupMembers={};}
+function closeGroupModal(){
+  document.getElementById('groupModal').classList.remove('show');document.getElementById('groupName').value='';document.getElementById('groupMemberSearch').value='';document.getElementById('groupMemberResults').innerHTML='';document.getElementById('selectedMembers').innerHTML='';selectedGroupMembers={};
+  _pendingGroupPhotoFile=null;document.getElementById('groupPhotoCreateInput').value='';
+  document.getElementById('groupPhotoPreview').innerHTML=`<i class="fas fa-camera"></i><span class="gp-badge"><i class="fas fa-plus"></i></span>`;
+}
 
 let groupSearchDebounce=null;
 async function searchGroupMembers(){
@@ -1483,13 +1574,38 @@ function addGroupMember(u){
   tag.innerHTML=`${u.full_name||u.username} <i class="fas fa-times" style="font-size:.65rem"></i>`;
   tag.onclick=()=>{delete selectedGroupMembers[u.id];tag.remove();};container.appendChild(tag);
 }
+let _pendingGroupPhotoFile=null;
+function pickGroupPhoto(){document.getElementById('groupPhotoCreateInput').click();}
+function onGroupPhotoCreateSelected(e){
+  const f=e.target.files[0];if(!f)return;
+  _pendingGroupPhotoFile=f;
+  const reader=new FileReader();
+  reader.onload=ev=>{document.getElementById('groupPhotoPreview').innerHTML=`<img src="${ev.target.result}" alt="">`;};
+  reader.readAsDataURL(f);
+}
+
+async function uploadGroupPhotoFile(convId,file){
+  const fd=new FormData();fd.append('photo',file);
+  try{
+    const res=await fetch(`/api/v01/chat/groups/${convId}/photo`,{method:'POST',body:fd});
+    const data=await res.json();
+    if(!data.success)showToast(data.message||'Failed to set group photo.','error');
+    return data;
+  }catch(e){showToast('Failed to set group photo.','error');return{success:false};}
+}
+
 async function createGroup(){
   const name=document.getElementById('groupName').value.trim();const ids=Object.keys(selectedGroupMembers).map(Number);
   if(!name){showToast('Please enter a group name.','warning');return;}
   if(!ids.length){showToast('Add at least one member.','warning');return;}
   const res=await fetch('/api/v01/chat/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,member_ids:ids})});
   const data=await res.json();
-  if(data.success){closeGroupModal();showToast(`Group "${name}" created!`,'success');await loadConversations();openConversation(data.conv_id,name,null,true,{{ session.get('user_id',0) }});}
+  if(data.success){
+    const convId=data.conv_id,photoFile=_pendingGroupPhotoFile;
+    closeGroupModal();showToast(`Group "${name}" created!`,'success');
+    if(photoFile)await uploadGroupPhotoFile(convId,photoFile);
+    await loadConversations();openConversation(convId,name,null,true,{{ session.get('user_id',0) }});
+  }
   else showToast(data.message||'Failed to create group.','error');
 }
 
@@ -1503,8 +1619,48 @@ async function loadUnreadCount(){
   }catch(e){}
 }
 
-socket.on('connect',()=>{});
+// Fires on the FIRST connection and on every silent auto-reconnect
+// (network blip, backgrounded tab hitting the ping timeout, etc).
+// Socket.IO room membership lives only in the server's in-memory state for
+// THIS socket id — a reconnect gets a brand new id and is not a member of
+// any conversation room until it explicitly re-joins. Without this, a tab
+// that silently reconnects keeps "working" (still shows connected, still
+// sends fine over HTTP) but permanently stops receiving the other side's
+// messages in real time. See the chat reliability investigation for the
+// full trace of why this reproduced as an asymmetric one-user-only bug.
+socket.on('connect',()=>{
+  if(activeConvId){
+    socket.emit('join_conv',{conv_id:activeConvId});
+    _resyncActiveConv();
+  }
+});
+
+// Reconnect resync: ask for every message with id > our last-known cursor
+// for the active conversation. Cheap (id-indexed, capped) and safe to call
+// on every reconnect — an empty result just means nothing was missed.
+async function _resyncActiveConv(){
+  const convId=activeConvId;
+  const lastId=_lastMsgId[convId];
+  if(!convId||!lastId)return; // nothing to compare against yet — the normal fetchMessages() load covers this case
+  try{
+    const res=await fetch(`/api/v01/chat/conversations/${convId}/messages?after=${lastId}`);
+    const data=await res.json();
+    if(!data.success||!data.messages||!data.messages.length)return;
+    if(convId!==activeConvId)return; // user switched conversations while this was in flight
+    const area=document.getElementById('messagesArea');
+    data.messages.forEach(m=>{
+      _bumpLastMsgId(convId,m.id);
+      if(document.querySelector(`[data-msg-id="${m.id}"]`))return;      // already on screen
+      if(m.id&&_sentMsgIds.has(m.id)){_sentMsgIds.delete(m.id);return;} // our own send already rendered it
+      area.appendChild(buildMsgEl(m));
+      updateConvPreview(convId,m.message);
+    });
+    scrollBottom();
+  }catch(e){ /* transient — the next connect/reconnect will retry */ }
+}
+
 socket.on('chat_message',msg=>{
+  _bumpLastMsgId(msg.conv_id,msg.id);
   if(msg.conv_id===activeConvId){
     if(msg.id&&_sentMsgIds.has(msg.id)){_sentMsgIds.delete(msg.id);return;}
     document.getElementById('messagesArea').appendChild(buildMsgEl(msg));scrollBottom();
@@ -1519,6 +1675,18 @@ socket.on('msg_edited',d=>{
   if(row){const meta=row.querySelector('.msg-meta');if(meta&&!meta.querySelector('.edited-tag'))meta.insertAdjacentHTML('beforeend','<span class="edited-tag">(edited)</span>');}
 });
 socket.on('msg_deleted',d=>{document.querySelector(`[data-msg-id="${d.msg_id}"]`)?.remove();});
+socket.on('group_photo_updated',d=>{
+  if(window._convCache&&window._convCache[d.conv_id]){
+    window._convCache[d.conv_id].photo_url=d.photo_url;
+    renderConvItem(window._convCache[d.conv_id],document.getElementById('convList'));
+  }
+  if(activeConvId===d.conv_id){
+    const nameEl=document.querySelector('#chatHeader .chat-header-name');
+    const name=nameEl?nameEl.textContent:'';
+    const oldAv=document.querySelector('#chatHeader .conv-avatar');
+    if(oldAv)oldAv.outerHTML=avatarHtml(name,d.photo_url,'width:36px;height:36px;font-size:0.82rem');
+  }
+});
 socket.on('conversation_removed',d=>{
   document.querySelector(`.conv-item[data-conv-id="${d.conv_id}"]`)?.remove();
   if(activeConvId===d.conv_id){activeConvId=null;document.getElementById('activeChat').style.display='none';document.getElementById('emptyState').style.display='flex';showToast('This conversation has been removed.','info');}

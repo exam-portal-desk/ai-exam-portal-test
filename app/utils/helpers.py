@@ -159,3 +159,33 @@ def parse_exam_date(raw) -> str:
     if not _EXAM_DATE_RE.match(s):
         raise ValueError("Date must be a valid YYYY-MM-DD value")
     return s
+
+
+def parse_scheduled_minutes_field(raw, field_label: str) -> int:
+    """
+    Parse a Scheduled Exam minutes field (preparation window / completion
+    buffer): a non-negative integer, blank treated as 0. Raises ValueError
+    (same convention as the other exam-form parsers above) on invalid
+    input — field_label is used verbatim in the error message so both
+    callers get a field-specific message from one implementation.
+    """
+    s = str(raw or "").strip()
+    if s == "":
+        return 0
+    if not s.isdigit():
+        raise ValueError(f"{field_label} must be a non-negative whole number of minutes")
+    return int(s)
+
+
+def parse_instructions_field(raw) -> str:
+    """
+    Parse the exam Instructions field: required, non-blank text. Raises
+    ValueError (same convention as the other exam-form parsers above) on
+    missing/whitespace-only input — enforced here so a request that
+    bypasses the frontend's `required` attribute (e.g. a direct POST)
+    still can't create/save an exam without instructions.
+    """
+    s = str(raw or "").strip()
+    if not s:
+        raise ValueError("Exam instructions are required.")
+    return s

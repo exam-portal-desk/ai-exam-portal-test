@@ -1,0 +1,903 @@
+{% extends "admin_base.html" %}
+{% block title %}Scheduled Exam Guide{% endblock %}
+
+{% block content %}
+<style>
+/* ── Shared with admin/guide.html's design language (same tokens, same
+   component shapes) — kept in this page's own scoped <style> block since
+   the two guide pages never render together and the project has no
+   shared docs stylesheet yet. Class names below are prefixed sg- to stay
+   independent of guide.html's gd- classes. ── */
+
+.sg-crumb { display:flex; align-items:center; gap:.4rem; font-size:.78rem; color:var(--text-3); margin-bottom:.85rem; }
+.sg-crumb a { color:var(--text-3); text-decoration:none; font-weight:600; }
+.sg-crumb a:hover { color:var(--accent); }
+.sg-crumb i { font-size:.65rem; }
+
+.sg-header {
+  margin-bottom: 1.5rem; padding: 1.35rem 1.6rem; border-radius: calc(var(--radius) + 4px);
+  border: 1px solid var(--border);
+  background: radial-gradient(120% 180% at 0% 0%, var(--accent-subtle) 0%, transparent 55%), var(--surface);
+}
+.sg-header h1 {
+  font-size: 1.5rem; font-weight: 800; color: var(--text-1); letter-spacing: -.02em;
+  margin-bottom: .4rem; display: flex; align-items: center; gap: .65rem;
+}
+.sg-header h1 i {
+  color: var(--accent-on); font-size: 1.05rem; width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover)); box-shadow: var(--shadow-sm);
+}
+.sg-header p { font-size: .85rem; color: var(--text-3); max-width: 720px; line-height: 1.6; }
+
+.sg-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.75rem; align-items: start; }
+@media (max-width: 980px) { .sg-layout { grid-template-columns: 1fr; } }
+
+.sg-sidebar { position: sticky; top: 1rem; }
+@media (max-width: 980px) { .sg-sidebar { position: static; } }
+.sg-search { position: relative; margin-bottom: .85rem; }
+.sg-search input {
+  width: 100%; font-size: .78rem; padding: .55rem .7rem .55rem 2rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-1);
+}
+.sg-search input:focus { outline: none; border-color: var(--border-focus); }
+.sg-search i { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: .75rem; }
+.sg-toc-box { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: .6rem; max-height: 76vh; overflow-y: auto; }
+.sg-toc-group-title { font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); padding: .5rem .55rem .3rem; }
+.sg-toc-box a {
+  display: block; font-size: .77rem; font-weight: 600; color: var(--text-2); text-decoration: none;
+  padding: .4rem .55rem; border-radius: 6px; line-height: 1.35;
+}
+.sg-toc-box a:hover { background: var(--surface-2); color: var(--text-1); }
+.sg-toc-box a.sg-active { background: var(--accent-subtle); color: var(--accent); }
+@media (max-width: 980px) {
+  .sg-toc-box { display: flex; flex-wrap: wrap; gap: .3rem; max-height: none; }
+  .sg-toc-group-title { display: none; }
+  .sg-toc-box a { border: 1px solid var(--border); border-radius: 20px; }
+}
+
+.sg-main { min-width: 0; }
+.sg-section { margin-bottom: 2.5rem; scroll-margin-top: 1rem; }
+.sg-section-num {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border-radius: 50%; background: var(--accent-subtle); color: var(--accent); font-size: .72rem; font-weight: 800;
+  flex-shrink: 0;
+}
+.sg-section-hdr { display: flex; align-items: center; gap: .65rem; margin-bottom: .3rem; }
+.sg-section-hdr h2 { font-size: 1.12rem; font-weight: 800; color: var(--text-1); letter-spacing: -.01em; }
+.sg-section-sub { font-size: .8rem; color: var(--text-3); margin: 0 0 1rem 2.35rem; }
+.sg-card {
+  border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); background: var(--surface);
+  padding: 1.15rem 1.3rem; margin-bottom: 1rem;
+}
+.sg-card p { font-size: .85rem; color: var(--text-2); line-height: 1.7; margin: 0 0 .6rem; }
+.sg-card p:last-child { margin-bottom: 0; }
+.sg-card strong { color: var(--text-1); }
+.sg-card code {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px;
+  padding: .05rem .35rem; font-size: .78rem; color: var(--accent);
+}
+
+/* Manual vs Scheduled comparison */
+.sg-vs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+@media (max-width: 700px) { .sg-vs { grid-template-columns: 1fr; } }
+.sg-vs-card { border-radius: var(--radius); padding: 1.1rem 1.2rem; border: 1px solid var(--border); background: var(--surface); }
+.sg-vs-card.manual { border-top: 3px solid #64748b; }
+.sg-vs-card.sched { border-top: 3px solid var(--accent); }
+.sg-vs-hdr { display: flex; align-items: center; gap: .5rem; font-size: .92rem; font-weight: 800; color: var(--text-1); margin-bottom: .5rem; }
+.sg-vs-hdr i { font-size: .85rem; }
+.sg-vs-card.manual .sg-vs-hdr i { color: #64748b; }
+.sg-vs-card.sched .sg-vs-hdr i { color: var(--accent); }
+.sg-vs-quote { font-size: .8rem; font-style: italic; color: var(--text-3); border-left: 3px solid var(--border); padding-left: .65rem; margin: .5rem 0 .75rem; line-height: 1.5; }
+.sg-vs-card ul { margin: 0; padding-left: 1.1rem; }
+.sg-vs-card li { font-size: .8rem; color: var(--text-2); margin-bottom: .35rem; line-height: 1.5; }
+
+/* Field reference cards */
+.sg-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin: 1rem 0; }
+@media (max-width: 820px) { .sg-fields { grid-template-columns: 1fr; } }
+.sg-field-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.sg-field-hdr {
+  display: flex; align-items: center; gap: .5rem; padding: .7rem .9rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: .82rem; font-weight: 800; color: var(--text-1);
+}
+.sg-field-hdr i { color: var(--accent); font-size: .8rem; }
+.sg-field-body { padding: .8rem .9rem; font-size: .78rem; color: var(--text-2); line-height: 1.6; }
+.sg-field-row { margin-bottom: .55rem; }
+.sg-field-row:last-child { margin-bottom: 0; }
+.sg-field-label { font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); margin-bottom: .15rem; }
+.sg-field-ex { background: var(--surface-2); border-radius: 6px; padding: .4rem .6rem; font-size: .76rem; margin-top: .3rem; }
+.sg-onoff { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .3rem; }
+.sg-onoff div { border-radius: 7px; padding: .4rem .55rem; font-size: .74rem; line-height: 1.45; }
+.sg-onoff .on { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+.sg-onoff .off { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+@media (max-width: 520px) { .sg-onoff { grid-template-columns: 1fr; } }
+
+/* Steps (numbered) */
+.sg-steps { counter-reset: sg-step; list-style: none; padding-left: 0; margin: 0; }
+.sg-steps li { counter-increment: sg-step; position: relative; padding-left: 2.5rem; margin-bottom: 1rem; }
+.sg-steps li::before {
+  content: counter(sg-step); position: absolute; left: 0; top: -.05rem; width: 1.8rem; height: 1.8rem;
+  border-radius: 50%; background: var(--accent-subtle); color: var(--accent); font-size: .76rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.sg-steps li strong { display: block; color: var(--text-1); font-size: .87rem; margin-bottom: .15rem; }
+.sg-steps li span { color: var(--text-3); font-size: .81rem; line-height: 1.55; }
+
+/* Vertical timeline */
+.sg-timeline { position: relative; margin: 1.1rem 0; padding-left: 2rem; }
+.sg-timeline::before { content:""; position:absolute; left:.62rem; top:.4rem; bottom:.4rem; width:2px; background: var(--border); }
+.sg-tl-item { position: relative; padding-bottom: 1.3rem; }
+.sg-tl-item:last-child { padding-bottom: 0; }
+.sg-tl-dot {
+  position: absolute; left: -2rem; top: .05rem; width: 1.3rem; height: 1.3rem; border-radius: 50%;
+  background: var(--tc-bg, var(--accent-subtle)); color: var(--tc, var(--accent)); border: 2px solid var(--bg);
+  display: flex; align-items: center; justify-content: center; font-size: .62rem;
+}
+.sg-tl-time { font-size: .68rem; font-weight: 800; color: var(--tc, var(--accent)); text-transform: uppercase; letter-spacing: .04em; }
+.sg-tl-title { font-size: .87rem; font-weight: 700; color: var(--text-1); margin: .1rem 0 .2rem; }
+.sg-tl-desc { font-size: .8rem; color: var(--text-3); line-height: 1.55; }
+
+/* Horizontal flow (desktop) / vertical (mobile) */
+.sg-flow { display: flex; align-items: stretch; gap: .4rem; flex-wrap: wrap; margin: 1rem 0; }
+.sg-flow-step {
+  flex: 1 1 110px; min-width: 110px; background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--fc, var(--accent)); border-radius: var(--radius);
+  padding: .8rem .6rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: .3rem;
+}
+.sg-flow-icon {
+  width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; background: var(--fc-bg, var(--accent-subtle)); color: var(--fc, var(--accent));
+}
+.sg-flow-label { font-size: .72rem; font-weight: 800; color: var(--text-1); }
+.sg-flow-desc { font-size: .63rem; color: var(--text-3); line-height: 1.3; }
+.sg-flow-arrow { display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: .75rem; flex-shrink:0; }
+.sg-flow-tag { font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: .12rem .4rem; border-radius: 10px; margin-top: .15rem; }
+.sg-flow-tag.cancel { background: var(--danger-bg); color: var(--danger-text); }
+.sg-flow-tag.edit { background: var(--info-bg); color: var(--info-text); }
+
+/* Callouts */
+.sg-callout { display: flex; gap: .65rem; padding: .8rem 1rem; border-radius: var(--radius); margin: 1rem 0; font-size: .81rem; line-height: 1.6; }
+.sg-callout i { flex-shrink: 0; margin-top: .15rem; }
+.sg-callout.tip { background: var(--info-bg); color: var(--info-text); border: 1px solid var(--info-border); }
+.sg-callout.warn { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
+.sg-callout.danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+.sg-callout.note { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+
+/* Allowed / not-allowed decision cards */
+.sg-decision { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin: 1rem 0; }
+@media (max-width: 700px) { .sg-decision { grid-template-columns: 1fr; } }
+.sg-dec-card { border-radius: var(--radius); padding: .9rem 1.05rem; border: 1px solid; }
+.sg-dec-card.yes { background: var(--success-bg); border-color: var(--success-border); }
+.sg-dec-card.no { background: var(--danger-bg); border-color: var(--danger-border); }
+.sg-dec-hdr { display: flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 800; margin-bottom: .3rem; }
+.sg-dec-card.yes .sg-dec-hdr { color: var(--success-text); }
+.sg-dec-card.no .sg-dec-hdr { color: var(--danger-text); }
+.sg-dec-card p { font-size: .79rem; color: var(--text-2); line-height: 1.55; margin: 0; }
+
+/* Tables */
+.sg-table-wrap { overflow-x: auto; }
+.sg-table { width: 100%; border-collapse: collapse; font-size: .79rem; margin: .5rem 0 1rem; min-width: 560px; }
+.sg-table th, .sg-table td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.sg-table th { color: var(--text-3); font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 800; white-space: nowrap; }
+.sg-table td { color: var(--text-2); line-height: 1.55; }
+.sg-pill { display: inline-flex; align-items: center; gap: .3rem; font-size: .68rem; font-weight: 800; padding: .18rem .55rem; border-radius: 20px; border: 1px solid; white-space: nowrap; }
+.sg-pill.yes { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.sg-pill.no { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+.sg-pill.partial { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+
+/* Quick decision guide (When should I use...) */
+.sg-guide-list { display: flex; flex-direction: column; gap: .6rem; margin: 1rem 0; }
+.sg-guide-row { display: flex; align-items: flex-start; gap: .8rem; border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem .95rem; background: var(--surface); }
+.sg-guide-q { flex: 1; font-size: .82rem; color: var(--text-2); font-style: italic; }
+.sg-guide-arrow { color: var(--text-3); font-size: .8rem; padding-top: .1rem; }
+.sg-guide-a { flex: 1; font-size: .82rem; font-weight: 700; color: var(--accent); }
+@media (max-width: 640px) { .sg-guide-row { flex-direction: column; } }
+
+/* Example scenario cards */
+.sg-example { border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); margin-bottom: 1.1rem; overflow: hidden; }
+.sg-example-hdr { background: var(--surface-2); padding: .8rem 1.05rem; border-bottom: 1px solid var(--border); display:flex; align-items:center; gap:.6rem; }
+.sg-example-hdr i { color: var(--accent); }
+.sg-example-title { font-size: .87rem; font-weight: 800; color: var(--text-1); }
+.sg-example-body { padding: 1rem 1.05rem; }
+.sg-cfg-grid { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: .8rem; }
+.sg-cfg-chip { font-size: .72rem; font-weight: 700; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: .3rem .55rem; color: var(--text-2); }
+.sg-cfg-chip b { color: var(--text-1); }
+
+/* FAQ accordion (reuses details/summary like guide.html) */
+.sg-faq { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin-bottom: .55rem; overflow: hidden; }
+.sg-faq summary { list-style: none; cursor: pointer; padding: .8rem 1rem; font-size: .84rem; font-weight: 700; color: var(--text-1); display: flex; justify-content: space-between; align-items: center; gap: .8rem; }
+.sg-faq summary::-webkit-details-marker { display: none; }
+.sg-faq summary .sg-chev { color: var(--text-3); font-size: .72rem; transition: transform .15s; flex-shrink: 0; }
+.sg-faq[open] summary .sg-chev { transform: rotate(180deg); }
+.sg-faq-body { padding: 0 1rem 1rem; font-size: .81rem; color: var(--text-2); line-height: 1.65; }
+
+.sg-link-row { display: flex; align-items: center; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+.sg-link-row a {
+  display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; font-weight: 700;
+  color: var(--accent); text-decoration: none; background: var(--accent-subtle);
+  border: 1px solid var(--accent); border-radius: 20px; padding: .35rem .85rem;
+}
+.sg-link-row a:hover { opacity: .85; }
+
+.sg-back-top {
+  position: fixed; right: 1.6rem; bottom: 1.6rem; width: 42px; height: 42px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-on); display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-md); text-decoration: none; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+  z-index: 40;
+}
+.sg-back-top.show { opacity: 1; pointer-events: auto; }
+.sg-back-top:hover { transform: translateY(-2px); }
+
+@media (max-width: 700px) {
+  .sg-header { padding: 1.1rem 1.15rem; }
+  .sg-card { padding: 1rem; }
+}
+</style>
+
+<div id="sg-top"></div>
+<div class="sg-crumb">
+  <a href="{{ url_for('admin.guide') }}"><i class="fas fa-book-open"></i> Admin Guide</a>
+  <i class="fas fa-chevron-right"></i>
+  <span>Scheduled Exams</span>
+</div>
+
+<div class="sg-header">
+  <h1><i class="fas fa-calendar-check"></i> Scheduled Exam — Complete Admin Guide</h1>
+  <p>Everything a Scheduled Exam actually does in this portal — every setting, the preparation window, how the deadline is calculated, how auto-submit works, cancel/restore, and exactly what you can and can't edit once an exam is live. This guide describes the current implementation only.</p>
+</div>
+
+<div class="sg-layout">
+  <!-- ══ SIDEBAR TOC ══ -->
+  <aside class="sg-sidebar">
+    <div class="sg-search">
+      <i class="fas fa-magnifying-glass"></i>
+      <input type="text" id="sgSearchBox" placeholder="Search this guide…" autocomplete="off">
+    </div>
+    <div class="sg-toc-box" id="sgToc">
+      <div class="sg-toc-group-title">Guide</div>
+      <a href="#sg-concept" data-sg-label="What is a Scheduled Exam, Manual vs Scheduled">1. What Is It?</a>
+      <a href="#sg-create" data-sg-label="How to create a Scheduled Exam, form fields">2. Creating One</a>
+      <a href="#sg-prep" data-sg-label="Preparation preload window">3. Preparation Window</a>
+      <a href="#sg-deadline" data-sg-label="Start time duration end time deadline late start">4. Start + Duration + Deadline</a>
+      <a href="#sg-buffer" data-sg-label="Buffer completion window">5. Buffer / Completion Window</a>
+      <a href="#sg-manualsubmit" data-sg-label="Manual submission auto-submit">6. Manual Submission</a>
+      <a href="#sg-lifecycle" data-sg-label="Complete lifecycle diagram states">7. Full Lifecycle</a>
+      <a href="#sg-cancel" data-sg-label="Cancel restore">8. Cancel / Restore</a>
+      <a href="#sg-editing" data-sg-label="Editing rules what can be edited">9. Editing Rules</a>
+      <a href="#sg-decision" data-sg-label="Can I do it decision table">10. Can I Do It?</a>
+      <a href="#sg-when" data-sg-label="When should I use which feature">11. Which Feature When?</a>
+      <a href="#sg-examples" data-sg-label="Real world examples scenarios">12. Real-World Examples</a>
+      <a href="#sg-faq" data-sg-label="Frequently asked questions">13. FAQ</a>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN CONTENT ══ -->
+  <main class="sg-main">
+
+    <!-- 1. CONCEPT -->
+    <section class="sg-section" id="sg-concept">
+      <div class="sg-section-hdr"><span class="sg-section-num">1</span><h2>What Is a Scheduled Exam?</h2></div>
+      <p class="sg-section-sub">The core difference between Manual and Scheduled, in plain terms</p>
+
+      <div class="sg-card">
+        <p>Every exam in this portal runs in one of two modes, chosen with the <strong>Scheduled Exam</strong> toggle when you create or edit it:</p>
+        <p><strong>Manual Exam</strong> — you control when it opens by changing its <strong>Status</strong> yourself (Upcoming → Ongoing → Completed) on Manage Exams. Nothing happens automatically; a Manual Exam only becomes startable the moment you set it to <strong>Ongoing</strong>, no matter what date/time is stored on it.</p>
+        <p><strong>Scheduled Exam</strong> — you set a date, a start time and a duration once, and the portal computes everything else on its own. There is no Status dropdown to manage: the exam automatically becomes <strong>Live</strong> at the exact configured second and automatically becomes <strong>Completed</strong> once its time is up. You never touch it again after creating it.</p>
+      </div>
+
+      <div class="sg-vs">
+        <div class="sg-vs-card manual">
+          <div class="sg-vs-hdr"><i class="fas fa-hand-pointer"></i> Manual Exam</div>
+          <div class="sg-vs-quote">"I want to open this exam myself, whenever I decide the moment is right."</div>
+          <ul>
+            <li>You flip the <strong>Status</strong> field to Ongoing yourself</li>
+            <li>Students can never start it until you do — even past its stored date/time</li>
+            <li>You flip it to Completed yourself too, whenever you choose</li>
+            <li>No preparation window, no auto-submit deadline enforcement, no buffer</li>
+          </ul>
+        </div>
+        <div class="sg-vs-card sched">
+          <div class="sg-vs-hdr"><i class="fas fa-calendar-check"></i> Scheduled Exam</div>
+          <div class="sg-vs-quote">"I want the exam to become available automatically at a specific date/time, with no manual step from me."</div>
+          <ul>
+            <li>Status is computed from the clock — Upcoming / Ongoing / Completed, always in sync with real time</li>
+            <li>Optional preparation window lets students preload before the exact start second</li>
+            <li>Deadline is enforced by the server itself, even if the student's browser is closed</li>
+            <li>Optional completion buffer absorbs slow/late submissions right at the deadline</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="sg-callout tip">
+        <i class="fas fa-lightbulb"></i>
+        <span><strong>Rule of thumb:</strong> if you plan to personally watch the clock and click a button to open the exam, use <strong>Manual</strong>. If you want to set a date/time once and walk away, use <strong>Scheduled</strong>.</span>
+      </div>
+    </section>
+
+    <!-- 2. CREATING ONE -->
+    <section class="sg-section" id="sg-create">
+      <div class="sg-section-hdr"><span class="sg-section-num">2</span><h2>How to Create a Scheduled Exam</h2></div>
+      <p class="sg-section-sub">Step by step, using the exact fields on Manage Exams → Add Exam</p>
+
+      <ol class="sg-steps">
+        <li><strong>Fill in the standard fields</strong><span>Exam Name, Date, Start Time, Duration (min), Total Questions, Category and Subcategory — the same fields every exam needs, Manual or Scheduled.</span></li>
+        <li><strong>Turn on "Scheduled Exam"</strong><span>This single toggle switches the form: the <strong>Status</strong> dropdown disappears (it's computed automatically from here on) and three new fields appear — Preparation Window, Completion Buffer, and Allow Manual Submission.</span></li>
+        <li><strong>Set Preparation Window and Completion Buffer</strong><span>Both are optional minute values, blank meaning 0. See sections 3 and 5 below for exactly what each one does.</span></li>
+        <li><strong>Decide Allow Manual Submission</strong><span>On (the default) lets students submit early; off hides the Submit button and relies entirely on the deadline. See section 6.</span></li>
+        <li><strong>Fill in the rest as usual</strong><span>Instructions, Positive/Negative Marks, Max Attempts, Passing Percentage, and Result Mode — unchanged from a Manual Exam.</span></li>
+        <li><strong>Add questions afterward</strong><span>Same as any exam — Manage Questions, using whichever method you'd normally use.</span></li>
+      </ol>
+
+      <div class="sg-callout warn">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span>The form does <strong>not</strong> stop you from picking a date/time that's already in the past — nothing validates that Date/Start Time is in the future. If you save one by mistake, the exam will immediately compute as Ongoing or even Completed the moment you save it, since its effective status is derived purely from the clock. Double-check the date and time before saving.</span>
+      </div>
+
+      <h3 style="font-size:.9rem;font-weight:800;color:var(--text-1);margin:1.4rem 0 .3rem;">Field-by-field reference</h3>
+      <div class="sg-fields">
+
+        <div class="sg-field-card">
+          <div class="sg-field-hdr"><i class="fas fa-toggle-on"></i> Scheduled Exam (toggle)</div>
+          <div class="sg-field-body">
+            <div class="sg-field-row"><div class="sg-field-label">What it does</div>Switches the exam from admin-controlled status to a fully time-computed one.</div>
+            <div class="sg-onoff">
+              <div class="on"><strong>On:</strong> date/time drive everything; Status field hidden.</div>
+              <div class="off"><strong>Off:</strong> normal Manual Exam; you set Status yourself.</div>
+            </div>
+            <div class="sg-field-ex"><strong>Restriction:</strong> once any attempt exists on this exam, this toggle can no longer be changed either way — see section 9.</div>
+          </div>
+        </div>
+
+        <div class="sg-field-card">
+          <div class="sg-field-hdr"><i class="fas fa-calendar-days"></i> Date &amp; Start Time</div>
+          <div class="sg-field-body">
+            <div class="sg-field-row"><div class="sg-field-label">What it does</div>The exact moment the exam goes Live. Together with Duration, this also defines the deadline.</div>
+            <div class="sg-field-row"><div class="sg-field-label">Validation</div>Must be a valid date and a valid 24-hour time. <strong>Not</strong> checked against "today" — a past date/time is accepted.</div>
+            <div class="sg-field-ex">Example: Date <code>2026-09-01</code>, Start Time <code>14:00</code> → the exam goes Live at 2:00 PM on 1 September 2026.</div>
+          </div>
+        </div>
+
+        <div class="sg-field-card">
+          <div class="sg-field-hdr"><i class="fas fa-hourglass-half"></i> Duration (min)</div>
+          <div class="sg-field-body">
+            <div class="sg-field-row"><div class="sg-field-label">What it does</div>How long each attempt's personal timer runs for, and (combined with Start Time) the exam's official end.</div>
+            <div class="sg-field-row"><div class="sg-field-label">Validation</div>Must be a whole number greater than 0.</div>
+            <div class="sg-field-ex">Example: Start 2:00 PM + Duration 30 → official end 2:30 PM. See section 4.</div>
+          </div>
+        </div>
+
+        <div class="sg-field-card">
+          <div class="sg-field-hdr"><i class="fas fa-clipboard-check"></i> Preparation Window (min)</div>
+          <div class="sg-field-body">
+            <div class="sg-field-row"><div class="sg-field-label">What it does</div>How many minutes before the official start a student may open the instructions page and begin preloading (Start Time − this value).</div>
+            <div class="sg-onoff">
+              <div class="on"><strong>Set (e.g. 10):</strong> students can preload from 10 min before start.</div>
+              <div class="off"><strong>Blank / 0:</strong> nothing to preload early — the Prepare/Start button only enables right at the official start second.</div>
+            </div>
+            <div class="sg-field-ex"><strong>Validation:</strong> non-negative whole number, blank = 0. No maximum enforced.</div>
+          </div>
+        </div>
+
+        <div class="sg-field-card">
+          <div class="sg-field-hdr"><i class="fas fa-shield-halved"></i> Completion Buffer (min)</div>
+          <div class="sg-field-body">
+            <div class="sg-field-row"><div class="sg-field-label">What it does</div>Extra system time, after the official end, during which a submission already in flight is still accepted.</div>
+            <div class="sg-field-row"><div class="sg-field-label">Not</div>Extra time for students to keep answering — see section 5.</div>
+            <div class="sg-field-ex"><strong>Validation:</strong> non-negative whole number, blank = 0. No maximum enforced.</div>
+          </div>
+        </div>
+
+        <div class="sg-field-card">
+          <div class="sg-field-hdr"><i class="fas fa-paper-plane"></i> Allow Manual Submission</div>
+          <div class="sg-field-body">
+            <div class="sg-field-row"><div class="sg-field-label">What it does</div>Controls whether the student sees a Submit button at all — see section 6 for the full behaviour.</div>
+            <div class="sg-onoff">
+              <div class="on"><strong>On (default):</strong> student can submit early.</div>
+              <div class="off"><strong>Off:</strong> no Submit button; only the deadline ends the exam.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sg-link-row">
+        <a href="{{ url_for('admin.exams') }}"><i class="fas fa-file-alt"></i> Manage Exams</a>
+      </div>
+    </section>
+
+    <!-- 3. PREPARATION WINDOW -->
+    <section class="sg-section" id="sg-prep">
+      <div class="sg-section-hdr"><span class="sg-section-num">3</span><h2>Preparation / Preload Window</h2></div>
+      <p class="sg-section-sub">Why it exists, and exactly what a student can and can't do during it</p>
+
+      <div class="sg-card">
+        <p><strong>Why it exists:</strong> when a student clicks Start, the portal has to fetch every question and resolve every question image before the exam can open — for an image-heavy exam this takes real time (each image is a lookup against object storage). Doing that fetch <em>before</em> the official start, while the student waits anyway, means the exam opens instantly the moment it actually goes live instead of showing a loading screen at the worst possible moment.</p>
+      </div>
+
+      <div class="sg-flow">
+        <div class="sg-flow-step" style="--fc:#0891b2"><div class="sg-flow-icon"><i class="fas fa-calendar-check"></i></div><div class="sg-flow-label">Scheduled start time</div></div>
+        <div class="sg-flow-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="sg-flow-step" style="--fc:#7c3aed"><div class="sg-flow-icon"><i class="fas fa-door-open"></i></div><div class="sg-flow-label">Prep window opens</div><div class="sg-flow-desc">Start − Prep minutes</div></div>
+        <div class="sg-flow-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="sg-flow-step" style="--fc:#f59e0b"><div class="sg-flow-icon"><i class="fas fa-hand-pointer"></i></div><div class="sg-flow-label">Student clicks Prepare</div></div>
+        <div class="sg-flow-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="sg-flow-step" style="--fc:#16a34a"><div class="sg-flow-icon"><i class="fas fa-download"></i></div><div class="sg-flow-label">Questions &amp; images preloaded</div><div class="sg-flow-desc">No answer key cached</div></div>
+        <div class="sg-flow-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="sg-flow-step" style="--fc:#dc2626"><div class="sg-flow-icon"><i class="fas fa-hourglass-half"></i></div><div class="sg-flow-label">Live countdown screen</div><div class="sg-flow-desc">Seconds to official start</div></div>
+        <div class="sg-flow-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="sg-flow-step" style="--fc:#2d5be3"><div class="sg-flow-icon"><i class="fas fa-play"></i></div><div class="sg-flow-label">Official start</div><div class="sg-flow-desc">Server re-verifies, attempt created</div></div>
+        <div class="sg-flow-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="sg-flow-step" style="--fc:#16a34a"><div class="sg-flow-icon"><i class="fas fa-lock"></i></div><div class="sg-flow-label">Exam launches</div><div class="sg-flow-desc">Secure window opens</div></div>
+      </div>
+
+      <div class="sg-card">
+        <p><strong>Practical example</strong> — exam starts at 2:00 PM with a 3-minute Preparation Window:</p>
+        <div class="sg-timeline">
+          <div class="sg-tl-item">
+            <div class="sg-tl-dot" style="--tc:#7c3aed"><i class="fas fa-door-open"></i></div>
+            <div class="sg-tl-time">1:57 PM</div>
+            <div class="sg-tl-title">Preparation window opens</div>
+            <div class="sg-tl-desc">The instructions page's Start button (labelled "Prepare Exam" at this stage) becomes clickable. Before this moment it's visible but disabled.</div>
+          </div>
+          <div class="sg-tl-item">
+            <div class="sg-tl-dot" style="--tc:#f59e0b"><i class="fas fa-hand-pointer"></i></div>
+            <div class="sg-tl-time">1:57–2:00 PM</div>
+            <div class="sg-tl-title">Student clicks Prepare</div>
+            <div class="sg-tl-desc">The portal fetches the question set and images into that student's own session (never the correct answers) and shows a live seconds-precision countdown to 2:00 PM. The student cannot answer any question yet — no attempt exists.</div>
+          </div>
+          <div class="sg-tl-item">
+            <div class="sg-tl-dot" style="--tc:#2d5be3"><i class="fas fa-play"></i></div>
+            <div class="sg-tl-time">2:00:00 PM</div>
+            <div class="sg-tl-title">Official start</div>
+            <div class="sg-tl-desc">The moment the countdown hits zero, the browser automatically retries the start request. The server independently re-checks the real time before creating the attempt — the countdown itself never decides anything.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sg-decision">
+        <div class="sg-dec-card yes">
+          <div class="sg-dec-hdr"><i class="fas fa-check"></i> During the 3 minutes, a student CAN</div>
+          <p>Open the instructions page, click Prepare, have their questions/images loaded in the background, and watch the live countdown to the official start.</p>
+        </div>
+        <div class="sg-dec-card no">
+          <div class="sg-dec-hdr"><i class="fas fa-xmark"></i> During the 3 minutes, a student CANNOT</div>
+          <p>See any question content, answer anything, or have an attempt recorded — the attempt itself is only created once the official start second is confirmed by the server.</p>
+        </div>
+      </div>
+
+      <div class="sg-callout tip">
+        <i class="fas fa-lightbulb"></i>
+        <span><strong>Refresh / reopen during preparation:</strong> completely safe. The portal remembers server-side (in that student's own session) that they already clicked Prepare — reopening or refreshing the instructions page skips straight back into the same countdown (or launches immediately, if the official start already passed while they were away) instead of making them click Prepare again.</span>
+      </div>
+    </section>
+
+    <!-- 4. START + DURATION + DEADLINE -->
+    <section class="sg-section" id="sg-deadline">
+      <div class="sg-section-hdr"><span class="sg-section-num">4</span><h2>Start Time + Duration + End Time</h2></div>
+      <p class="sg-section-sub">There is no separate "end time" field — it's always derived</p>
+
+      <div class="sg-card">
+        <p style="text-align:center;font-size:.95rem;font-weight:800;color:var(--text-1);">Start Time + Duration = Official End (the deadline)</p>
+        <p>You never configure an end time directly. <code>2:00 PM + 30 minutes = 2:30 PM</code> — that instant is both when the exam's official window closes (no new attempt can start after it) and the latest possible moment any attempt's personal timer can run to.</p>
+      </div>
+
+      <div class="sg-callout warn">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span><strong>A late start never extends the exam.</strong> Every attempt's real deadline is <code>min(attempt start + Duration, official end)</code> — whichever comes first. A student who starts late loses time; they never gain any.</span>
+      </div>
+
+      <div class="sg-card">
+        <p><strong>Example — on-time start:</strong> exam starts 2:00 PM, Duration 30 min. A student who starts right at 2:00 PM gets the full 30 minutes, deadline 2:30 PM.</p>
+        <p><strong>Example — late start:</strong> same exam, but a student only clicks Start at 2:10 PM (10 minutes late — still within the official window, which stays open until 2:30 PM). Their personal timer would normally run 30 minutes to 2:40 PM, but the deadline is capped at the official end — so their real deadline is still <strong>2:30 PM</strong>. They effectively get 20 minutes, not 30.</p>
+        <p><strong>Example — too late:</strong> a student who doesn't click Start until 2:31 PM can't start at all — the official window (start → official end) has already closed. The Start button on their instructions page is no longer enabled.</p>
+      </div>
+    </section>
+
+    <!-- 5. BUFFER -->
+    <section class="sg-section" id="sg-buffer">
+      <div class="sg-section-hdr"><span class="sg-section-num">5</span><h2>Buffer / Completion Window</h2></div>
+      <p class="sg-section-sub">A safety margin for the server, not extra time for the student</p>
+
+      <div class="sg-card">
+        <p><strong>Why it exists:</strong> right at the deadline, some students' submissions are already "in flight" — a slow connection, a throttled background browser tab, a moment of lag. Without any buffer, that submission could arrive a few seconds after the deadline and be rejected outright. The Completion Buffer gives the <em>server</em> a short grace period to still accept and score submissions that were already underway.</p>
+        <p><strong>What it does not do:</strong> it does not add time to any student's timer. A student's own countdown still reaches zero exactly at the official end (Start + Duration) — the buffer only affects whether the server is still willing to accept the resulting submission, not how long they're allowed to keep answering.</p>
+      </div>
+
+      <div class="sg-timeline">
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#2d5be3"><i class="fas fa-play"></i></div>
+          <div class="sg-tl-time">2:00 PM</div>
+          <div class="sg-tl-title">Official Start</div>
+          <div class="sg-tl-desc">Exam duration begins.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#f59e0b"><i class="fas fa-hourglass-half"></i></div>
+          <div class="sg-tl-time">2:00–2:30 PM</div>
+          <div class="sg-tl-title">Exam Duration</div>
+          <div class="sg-tl-desc">Every attempt's personal timer runs inside this window.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#dc2626"><i class="fas fa-flag-checkered"></i></div>
+          <div class="sg-tl-time">2:30 PM</div>
+          <div class="sg-tl-title">Nominal Deadline (official end)</div>
+          <div class="sg-tl-desc">No new attempt can start after this. Every remaining timer reaches zero here.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#7c3aed"><i class="fas fa-shield-halved"></i></div>
+          <div class="sg-tl-time">2:30–2:35 PM</div>
+          <div class="sg-tl-title">Completion Buffer (5 min, in this example)</div>
+          <div class="sg-tl-desc">Already-active attempts can still sync/finalize their submission. The exam still shows as Live/Ongoing during this stretch.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#16a34a"><i class="fas fa-circle-check"></i></div>
+          <div class="sg-tl-time">2:35 PM</div>
+          <div class="sg-tl-title">Completed</div>
+          <div class="sg-tl-desc">Buffer over — the exam's effective status becomes Completed.</div>
+        </div>
+      </div>
+
+      <div class="sg-callout note">
+        <i class="fas fa-circle-info"></i>
+        <span>There's no separate "closing" badge — the exam still displays as <strong>Ongoing/Live</strong> throughout the buffer period, even though no new attempt can start during it. It only flips to <strong>Completed</strong> once the buffer itself ends.</span>
+      </div>
+    </section>
+
+    <!-- 6. MANUAL SUBMISSION -->
+    <section class="sg-section" id="sg-manualsubmit">
+      <div class="sg-section-hdr"><span class="sg-section-num">6</span><h2>Manual Submission Setting</h2></div>
+      <p class="sg-section-sub">Controls whether a student can voluntarily end their attempt early</p>
+
+      <div class="sg-vs">
+        <div class="sg-vs-card sched">
+          <div class="sg-vs-hdr"><i class="fas fa-toggle-on"></i> Allowed (On — default)</div>
+          <div class="sg-flow" style="margin:0;">
+            <div class="sg-flow-step" style="--fc:#2d5be3;flex-basis:100%"><div class="sg-flow-label">Start Exam</div></div>
+          </div>
+          <div style="text-align:center;color:var(--text-3);font-size:.8rem;margin:.2rem 0;"><i class="fas fa-arrow-down"></i></div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#f59e0b;flex-basis:100%"><div class="sg-flow-label">Answer Questions</div></div></div>
+          <div style="text-align:center;color:var(--text-3);font-size:.8rem;margin:.2rem 0;"><i class="fas fa-arrow-down"></i></div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#16a34a"><div class="sg-flow-label">Can Submit Early</div></div></div>
+          <div style="text-align:center;color:var(--text-3);font-size:.8rem;margin:.2rem 0;"><i class="fas fa-arrow-down"></i></div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#16a34a"><div class="sg-flow-label">Attempt Finalized</div></div></div>
+        </div>
+        <div class="sg-vs-card manual">
+          <div class="sg-vs-hdr"><i class="fas fa-toggle-off"></i> Disabled (Off)</div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#2d5be3;flex-basis:100%"><div class="sg-flow-label">Start Exam</div></div></div>
+          <div style="text-align:center;color:var(--text-3);font-size:.8rem;margin:.2rem 0;"><i class="fas fa-arrow-down"></i></div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#f59e0b;flex-basis:100%"><div class="sg-flow-label">Answer Questions</div></div></div>
+          <div style="text-align:center;color:var(--text-3);font-size:.8rem;margin:.2rem 0;"><i class="fas fa-arrow-down"></i></div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#dc2626"><div class="sg-flow-label">No Submit button — exam continues until deadline</div></div></div>
+          <div style="text-align:center;color:var(--text-3);font-size:.8rem;margin:.2rem 0;"><i class="fas fa-arrow-down"></i></div>
+          <div class="sg-flow" style="margin:0;"><div class="sg-flow-step" style="--fc:#16a34a"><div class="sg-flow-label">Server auto-finalizes at deadline</div></div></div>
+        </div>
+      </div>
+
+      <div class="sg-card">
+        <p><strong>When to use each:</strong> leave it <strong>On</strong> for practice tests or anything where finishing early is a convenience worth offering. Turn it <strong>Off</strong> for exams where every student must use exactly the same amount of time — nobody can "bank" extra time by submitting early and comparing notes.</p>
+      </div>
+
+      <div class="sg-callout tip">
+        <i class="fas fa-server"></i>
+        <span><strong>What actually happens at the deadline is not a browser timer.</strong> The server runs its own background process that continuously scans for attempts whose deadline has passed, claims each one exactly once (so it's never scored twice even under heavy concurrent load), and finalizes it from the student's answers — which are saved to the database periodically while they work, not just at the end. This means an attempt is still correctly finalized even if the student's browser crashes, loses connection, or is closed outright; nothing needs to be "open" for the deadline to be enforced.</span>
+      </div>
+
+      <div class="sg-callout note">
+        <i class="fas fa-circle-info"></i>
+        <span>Even when submission is <strong>Allowed</strong>, the same server-side deadline enforcement still runs underneath — if a student simply lets the timer run out instead of clicking Submit, they're finalized exactly the same way. And if submission is <strong>Disabled</strong>, the server also actively rejects a manual submit request sent before the deadline (not just hides the button) — bypassing the UI doesn't bypass the rule.</span>
+      </div>
+    </section>
+
+    <!-- 7. LIFECYCLE -->
+    <section class="sg-section" id="sg-lifecycle">
+      <div class="sg-section-hdr"><span class="sg-section-num">7</span><h2>Complete Scheduled Exam Lifecycle</h2></div>
+      <p class="sg-section-sub">Every state a Scheduled Exam passes through, and where you can still act</p>
+
+      <div class="sg-timeline">
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#2d5be3"><i class="fas fa-plus"></i></div>
+          <div class="sg-tl-time">Create</div>
+          <div class="sg-tl-title">Admin creates the exam</div>
+          <div class="sg-tl-desc">Date, Start Time, Duration, Prep, Buffer and Allow Manual Submission are all set here. <span class="sg-flow-tag edit">Fully editable</span></div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#0891b2"><i class="fas fa-clock"></i></div>
+          <div class="sg-tl-time">Upcoming</div>
+          <div class="sg-tl-title">Waiting for the preparation window (or start)</div>
+          <div class="sg-tl-desc">Shows as Upcoming everywhere. <span class="sg-flow-tag edit">Fully editable</span> <span class="sg-flow-tag cancel">Cancel available</span></div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#7c3aed"><i class="fas fa-door-open"></i></div>
+          <div class="sg-tl-time">Preparation Available</div>
+          <div class="sg-tl-title">Students may preload</div>
+          <div class="sg-tl-desc">Still bucketed as Upcoming, but the dashboard shows "Preparation Available" and the Prepare button is enabled. <span class="sg-flow-tag edit">Still fully editable</span> <span class="sg-flow-tag cancel">Cancel available</span></div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#7c3aed"><i class="fas fa-download"></i></div>
+          <div class="sg-tl-time">Resources Preloaded</div>
+          <div class="sg-tl-title">A student's questions/images are cached, live countdown running</div>
+          <div class="sg-tl-desc">Per-student — different students may be at different points here.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#dc2626"><i class="fas fa-play"></i></div>
+          <div class="sg-tl-time">Official Start Time</div>
+          <div class="sg-tl-title">The configured instant arrives</div>
+          <div class="sg-tl-desc">Server re-verifies and starts accepting fresh attempts.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#16a34a"><i class="fas fa-signal"></i></div>
+          <div class="sg-tl-time">Live</div>
+          <div class="sg-tl-title">Exam is Ongoing</div>
+          <div class="sg-tl-desc">Effective status is Ongoing everywhere (dashboard, notifications, admin list). <span class="sg-flow-tag cancel">Cancel still available</span> — timing fields are now locked (see section 9), but name/instructions/marks/questions/result mode stay editable.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#16a34a"><i class="fas fa-hourglass-half"></i></div>
+          <div class="sg-tl-time">Exam Duration</div>
+          <div class="sg-tl-title">Each attempt's personal timer runs</div>
+          <div class="sg-tl-desc">Capped by the official end for anyone who started late.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#f59e0b"><i class="fas fa-flag-checkered"></i></div>
+          <div class="sg-tl-time">Deadline</div>
+          <div class="sg-tl-title">Official end reached</div>
+          <div class="sg-tl-desc">No new attempt can start. Server begins auto-finalizing anything still open.</div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#f59e0b"><i class="fas fa-shield-halved"></i></div>
+          <div class="sg-tl-time">Completion / Buffer Window</div>
+          <div class="sg-tl-title">Grace period for in-flight submissions</div>
+          <div class="sg-tl-desc">Still shows as Ongoing. <span class="sg-flow-tag cancel">Cancel still available</span></div>
+        </div>
+        <div class="sg-tl-item">
+          <div class="sg-tl-dot" style="--tc:#64748b"><i class="fas fa-circle-check"></i></div>
+          <div class="sg-tl-time">Completed</div>
+          <div class="sg-tl-title">Buffer has elapsed</div>
+          <div class="sg-tl-desc">No further attempts possible. Non-timing details remain editable (name, instructions, marks, result mode, questions). <span class="sg-flow-tag cancel">Cancel still available</span> (removes it from student view entirely).</div>
+        </div>
+      </div>
+
+      <div class="sg-callout warn">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span><strong>Cancel has no state restriction in the current implementation</strong> — it can be used at any point in this lifecycle, including on an exam that's already Live or already Completed. See section 8 for exactly what Cancel does and doesn't affect.</span>
+      </div>
+    </section>
+
+    <!-- 8. CANCEL / RESTORE -->
+    <section class="sg-section" id="sg-cancel">
+      <div class="sg-section-hdr"><span class="sg-section-num">8</span><h2>Cancel / Restore</h2></div>
+      <p class="sg-section-sub">The Cancel button on Manage Exams, and what it actually toggles</p>
+
+      <div class="sg-card">
+        <p><strong>What Cancel does:</strong> marks the exam with an explicit Cancelled status. From that moment:</p>
+        <ul style="margin:0 0 .5rem 1.1rem;padding:0;font-size:.83rem;color:var(--text-2);line-height:1.8;">
+          <li>The exam disappears entirely from every student's dashboard (all three tabs) and from the notification popup — it isn't shown as "cancelled" to students, it simply isn't shown.</li>
+          <li>No new attempt can be started by anyone, effective immediately.</li>
+          <li>On Manage Exams it shows a <strong>Cancelled</strong> badge so you can find it again.</li>
+        </ul>
+        <p><strong>What Cancel does <em>not</em> do:</strong> a student who is already mid-attempt when you cancel is <em>not</em> interrupted — their attempt keeps running against its own stored deadline exactly as before, and is still auto-finalized normally when that deadline arrives. Cancelling only blocks new attempts; it does not reach into one already in progress.</p>
+      </div>
+
+      <div class="sg-callout warn">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span><strong>Restoring a cancelled exam does not pause its clock.</strong> Restore simply removes the Cancelled marker — the original date/time/duration are untouched, so the exam's effective status is immediately recomputed from real time. If you cancel an exam and restore it a day later, and its original scheduled window has already passed, it will come back as <strong>Ongoing</strong> (if still inside its buffer) or straight to <strong>Completed</strong> — not back to Upcoming.</span>
+      </div>
+
+      <div class="sg-card">
+        <p><strong>Practical example</strong> — "This exam is scheduled for tomorrow, but I've just realized two of the questions are wrong."</p>
+        <p><strong>Recommended action:</strong> Cancel it now (safe — it's still Upcoming, no attempts exist yet). Fix the questions on Manage Questions. Then Restore it once you're satisfied — since tomorrow hasn't happened yet, it comes back exactly as Upcoming with its original schedule intact.</p>
+      </div>
+
+      <div class="sg-link-row">
+        <a href="{{ url_for('admin.exams') }}"><i class="fas fa-file-alt"></i> Manage Exams</a>
+      </div>
+    </section>
+
+    <!-- 9. EDITING -->
+    <section class="sg-section" id="sg-editing">
+      <div class="sg-section-hdr"><span class="sg-section-num">9</span><h2>Editing a Scheduled Exam</h2></div>
+      <p class="sg-section-sub">What you can change, per state — and why</p>
+
+      <div class="sg-table-wrap">
+        <table class="sg-table">
+          <tr><th>State</th><th>Timing fields<br><span style="font-weight:400;text-transform:none;">(Date, Start Time, Duration, Prep, Buffer, Allow Manual Submission)</span></th><th>Everything else<br><span style="font-weight:400;text-transform:none;">(Name, Instructions, Marks, Category, Result Mode, Questions…)</span></th></tr>
+          <tr><td><strong>Upcoming</strong> (incl. Preparation Available)</td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
+          <tr><td><strong>Ongoing / Live</strong> (incl. buffer)</td><td><span class="sg-pill no"><i class="fas fa-xmark"></i> Locked</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
+          <tr><td><strong>Completed</strong></td><td><span class="sg-pill no"><i class="fas fa-xmark"></i> Locked</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
+        </table>
+      </div>
+
+      <div class="sg-callout tip">
+        <i class="fas fa-lightbulb"></i>
+        <span><strong>Why timing locks once it's no longer Upcoming:</strong> once the exam has gone live, some students may already have started — or completed — an attempt built entirely around the original date/time/duration. Silently rewriting that schedule underneath them would make their attempt inconsistent with what they actually experienced. Saving a timing change here is rejected with a message naming the exam's current state; non-timing details save normally.</span>
+      </div>
+
+      <div class="sg-card">
+        <p><strong>Manual ⇄ Scheduled mode switch:</strong> blocked outright the moment <em>any</em> attempt exists on the exam — Upcoming, Live or Completed, it doesn't matter. This check runs on attempt count, not on the exam's current state, so it applies even to a Scheduled Exam that's still technically Upcoming if a student somehow already has an attempt on it.</p>
+      </div>
+
+      <div class="sg-callout warn">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span><strong>Questions are not covered by any of the locks above.</strong> Nothing in the current implementation stops you from adding, editing or deleting questions on Manage Questions after students have already attempted the exam — this guide describes what exists today, and that particular guard doesn't exist yet. Changing questions after attempts exist will affect what remaining/future attempts see, while past results stay based on whatever the student actually answered at the time. Use with caution.</span>
+      </div>
+    </section>
+
+    <!-- 10. DECISION TABLE -->
+    <section class="sg-section" id="sg-decision">
+      <div class="sg-section-hdr"><span class="sg-section-num">10</span><h2>What Can I Do? / What Can't I Do?</h2></div>
+      <p class="sg-section-sub">Quick reference for the most common questions</p>
+
+      <div class="sg-table-wrap">
+        <table class="sg-table">
+          <tr><th>Situation</th><th>Allowed?</th><th>Reason</th></tr>
+          <tr><td>No-attempt Manual Exam → switch to Scheduled</td><td><span class="sg-pill yes">Yes</span></td><td>No attempts exist yet, so nothing depends on the old mode.</td></tr>
+          <tr><td>No-attempt Scheduled Exam → switch to Manual</td><td><span class="sg-pill yes">Yes</span></td><td>Same reason — nothing to make inconsistent.</td></tr>
+          <tr><td>Scheduled, still Upcoming → change the schedule</td><td><span class="sg-pill yes">Yes</span></td><td>No one has experienced the old timing yet.</td></tr>
+          <tr><td>Scheduled, Live → change the schedule</td><td><span class="sg-pill no">No</span></td><td>Students may already be mid-attempt under the current timing.</td></tr>
+          <tr><td>Scheduled, Completed → change the schedule</td><td><span class="sg-pill no">No</span></td><td>Attempts already happened against the recorded timing — changing it would rewrite history.</td></tr>
+          <tr><td>Exam with any attempts → change Manual/Scheduled mode</td><td><span class="sg-pill no">No</span></td><td>Attempts exist based on the current mode's rules — switching would make them inconsistent.</td></tr>
+          <tr><td>Cancel an Upcoming exam</td><td><span class="sg-pill yes">Yes</span></td><td>No attempts to disrupt; it simply disappears from student view.</td></tr>
+          <tr><td>Cancel a Live or Completed exam</td><td><span class="sg-pill partial">Yes, but</span></td><td>Allowed with no restriction — but won't stop attempts already in progress, and hides it from view either way.</td></tr>
+          <tr><td>Restore a cancelled exam</td><td><span class="sg-pill partial">Yes, but</span></td><td>Restores it, but the clock was never paused — it re-evaluates against real time immediately, which may not be "Upcoming" anymore.</td></tr>
+          <tr><td>Edit questions after attempts exist</td><td><span class="sg-pill partial">Currently yes</span></td><td>Not blocked by the application today — treat as a manual precaution, not an enforced rule.</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- 11. WHEN SHOULD I USE WHICH -->
+    <section class="sg-section" id="sg-when">
+      <div class="sg-section-hdr"><span class="sg-section-num">11</span><h2>When Should I Use Which Feature?</h2></div>
+      <p class="sg-section-sub">A practical decision guide</p>
+
+      <div class="sg-guide-list">
+        <div class="sg-guide-row"><div class="sg-guide-q">"I want the exam to automatically open at 2 PM."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Use a Scheduled Exam.</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I want students to be able to preload before 2 PM."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Configure a Preparation Window.</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I don't want students to submit early."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Turn Allow Manual Submission Off.</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I want students to be able to finish early."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Leave Allow Manual Submission On.</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I need a small safety window right after the deadline for slow connections."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Configure a Completion Buffer.</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I made a mistake and need to temporarily pull the exam."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Cancel it.</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I fixed the issue and want it available again."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Restore it — but check the schedule still makes sense first (see section 8).</div></div>
+        <div class="sg-guide-row"><div class="sg-guide-q">"I want to open the exam myself, on demand."</div><div class="sg-guide-arrow"><i class="fas fa-arrow-right"></i></div><div class="sg-guide-a">Use a Manual Exam instead.</div></div>
+      </div>
+    </section>
+
+    <!-- 12. EXAMPLES -->
+    <section class="sg-section" id="sg-examples">
+      <div class="sg-section-hdr"><span class="sg-section-num">12</span><h2>Real-World Examples</h2></div>
+      <p class="sg-section-sub">Five complete scenarios showing how the pieces combine</p>
+
+      <div class="sg-example">
+        <div class="sg-example-hdr"><i class="fas fa-graduation-cap"></i><span class="sg-example-title">Example 1 — A strict timed test</span></div>
+        <div class="sg-example-body">
+          <div class="sg-cfg-grid">
+            <div class="sg-cfg-chip">Start: <b>2:00 PM</b></div>
+            <div class="sg-cfg-chip">Duration: <b>60 min</b></div>
+            <div class="sg-cfg-chip">Prep: <b>3 min</b></div>
+            <div class="sg-cfg-chip">Buffer: <b>2 min</b></div>
+            <div class="sg-cfg-chip">Manual Submission: <b>Off</b></div>
+          </div>
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.6;margin:0;">Students can preload from 1:57 PM. The exam is Live from 2:00–3:00 PM. Nobody can submit early — the exam only ends when their own timer reaches zero. Anything already in flight at 3:00 PM is still accepted until 3:02 PM, after which the exam shows Completed.</p>
+        </div>
+      </div>
+
+      <div class="sg-example">
+        <div class="sg-example-hdr"><i class="fas fa-pen-to-square"></i><span class="sg-example-title">Example 2 — A relaxed practice exam</span></div>
+        <div class="sg-example-body">
+          <div class="sg-cfg-grid">
+            <div class="sg-cfg-chip">Start: <b>6:00 PM</b></div>
+            <div class="sg-cfg-chip">Duration: <b>45 min</b></div>
+            <div class="sg-cfg-chip">Prep: <b>0 min</b></div>
+            <div class="sg-cfg-chip">Manual Submission: <b>On</b></div>
+          </div>
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.6;margin:0;">No preparation window, so the Start button only enables right at 6:00 PM. Students who finish answering early can submit right away instead of waiting out the full 45 minutes — their attempt is finalized the moment they click Submit.</p>
+        </div>
+      </div>
+
+      <div class="sg-example">
+        <div class="sg-example-hdr"><i class="fas fa-ban"></i><span class="sg-example-title">Example 3 — Cancelling an upcoming exam</span></div>
+        <div class="sg-example-body">
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.6;margin:0;">An exam is scheduled for tomorrow. The admin spots a wrong answer key on Manage Questions today. They click Cancel — the exam vanishes from every student's dashboard immediately, with zero risk since it's still Upcoming and nobody has attempted it. They fix the question, then Restore, and it reappears as Upcoming with the original schedule untouched.</p>
+        </div>
+      </div>
+
+      <div class="sg-example">
+        <div class="sg-example-hdr"><i class="fas fa-triangle-exclamation"></i><span class="sg-example-title">Example 4 — A problem discovered after the exam already started</span></div>
+        <div class="sg-example-body">
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.6;margin:0;">The exam went Live 10 minutes ago and students are already answering. The admin notices an issue. The exam's timing fields are now locked (see section 9) — the schedule itself can't be changed. Cancel is still available and will stop any <em>new</em> student from starting, but will not interrupt students already answering; they keep going and are auto-finalized at their own deadline as normal.</p>
+        </div>
+      </div>
+
+      <div class="sg-example">
+        <div class="sg-example-hdr"><i class="fas fa-clock"></i><span class="sg-example-title">Example 5 — A student starts late</span></div>
+        <div class="sg-example-body">
+          <div class="sg-cfg-grid">
+            <div class="sg-cfg-chip">Start: <b>2:00 PM</b></div>
+            <div class="sg-cfg-chip">Duration: <b>30 min</b></div>
+          </div>
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.6;margin:0;">A student opens the instructions page at 2:10 PM and clicks Start. The exam is still within its official window (which stays open until 2:30 PM), so the attempt is created. Their deadline, however, is still 2:30 PM — not 2:40 PM — so they effectively have 20 minutes, not the full 30. See section 4 for the exact rule.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 13. FAQ -->
+    <section class="sg-section" id="sg-faq">
+      <div class="sg-section-hdr"><span class="sg-section-num">13</span><h2>Frequently Asked Questions</h2></div>
+      <p class="sg-section-sub">Straight answers, grounded in the current implementation</p>
+
+      <details class="sg-faq"><summary>What is the difference between a Manual and a Scheduled Exam?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">A Manual Exam is opened and closed by you changing its Status yourself. A Scheduled Exam computes its own status (Upcoming/Ongoing/Completed) purely from the date/time/duration you configured — no manual status changes, ever.</div></details>
+
+      <details class="sg-faq"><summary>Can I change a Manual Exam into a Scheduled Exam?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Yes, as long as no attempts have been recorded against it yet. Once any attempt exists, the mode is locked either direction.</div></details>
+
+      <details class="sg-faq"><summary>Can I reschedule an exam after students have attempted it?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">No. Once its effective status is no longer Upcoming, its timing fields (date, time, duration, prep window, buffer, manual submission) are locked, whether or not attempts actually exist yet — the lock is based on state, not attempt count.</div></details>
+
+      <details class="sg-faq"><summary>What happens when the scheduled start time arrives?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">The exam's effective status flips to Ongoing across the whole portal (dashboard, notifications, admin list) and the server starts accepting fresh attempts. Nothing needs to be clicked by an admin.</div></details>
+
+      <details class="sg-faq"><summary>What is Preparation Time?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">A window before the official start during which a student can open the instructions page and have their questions/images preloaded, so the exam opens instantly the moment it actually goes live.</div></details>
+
+      <details class="sg-faq"><summary>Is Preparation Time added to the exam duration?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">No. It only affects when a student can start preloading — it has no effect on how long their attempt timer runs once the exam actually starts.</div></details>
+
+      <details class="sg-faq"><summary>What is the Buffer / Completion Window?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">A short grace period after the official end during which a submission already in progress is still accepted by the server, so a moment of network lag right at the deadline doesn't cost a student their attempt.</div></details>
+
+      <details class="sg-faq"><summary>Does the Buffer increase a student's exam duration?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">No. Every student's own timer still reaches zero exactly at the official end. The buffer only changes whether the server keeps accepting the resulting submission after that.</div></details>
+
+      <details class="sg-faq"><summary>Can students start before the scheduled time?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">No — clicking Prepare before the official start only preloads resources and shows a countdown. The actual attempt is only created once the server independently confirms the official start time has arrived.</div></details>
+
+      <details class="sg-faq"><summary>Can students submit early?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Only if Allow Manual Submission is On for that exam. If it's Off, there is no Submit button, and the server also rejects a manual submit request sent before the deadline.</div></details>
+
+      <details class="sg-faq"><summary>What happens if a student starts late?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">They can start as long as the official window (start → official end) hasn't closed yet, but their deadline is still the official end — they get whatever time is left, never the full duration. See section 4.</div></details>
+
+      <details class="sg-faq"><summary>What happens if the browser is refreshed during preparation?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Nothing is lost. The server remembers that student already started preparing and resumes them straight back into the countdown (or launches immediately if the start time already passed) instead of making them click Prepare again.</div></details>
+
+      <details class="sg-faq"><summary>What happens if the student disconnects?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Their answers are saved to the database periodically while they work, not only at final submission. If the deadline arrives while they're disconnected, the server's own background process still finds and finalizes their attempt from those saved answers — it does not require their browser to be present.</div></details>
+
+      <details class="sg-faq"><summary>What happens when the exam reaches its deadline?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">No further attempts can start. Any still-open attempt is automatically finalized by the server, either right away (if the student's browser is present and its timer reaches zero) or shortly after by the background process either way.</div></details>
+
+      <details class="sg-faq"><summary>What does Cancel do?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Hides the exam entirely from every student (dashboard and notifications) and blocks any new attempt, at any point in its lifecycle. It does not interrupt a student already mid-attempt.</div></details>
+
+      <details class="sg-faq"><summary>What does Restore do?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Removes the Cancelled marker and lets the exam's status be computed from the clock again, immediately — it does not "un-pause" or shift the original schedule, so if time has already moved on, it may come back as Ongoing or Completed rather than Upcoming.</div></details>
+
+      <details class="sg-faq"><summary>Can I edit questions after students have attempted the exam?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Yes — the application does not currently block this. It's worth being deliberate about it, since it will affect what remaining or future attempts see while past results stay based on what was actually shown at the time.</div></details>
+
+      <details class="sg-faq"><summary>Why are some fields locked after the exam is no longer Upcoming?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">Because students may already have an attempt built entirely around the original timing — changing the schedule underneath them would make their attempt inconsistent with what they actually experienced.</div></details>
+
+      <details class="sg-faq"><summary>Can a Completed Scheduled Exam be rescheduled?<i class="fas fa-chevron-down sg-chev"></i></summary><div class="sg-faq-body">No — its timing fields are locked once it's no longer Upcoming, Completed included. If you genuinely need to re-run it, create a new exam.</div></details>
+    </section>
+
+    <div class="sg-link-row">
+      <a href="{{ url_for('admin.guide') }}"><i class="fas fa-arrow-left"></i> Back to Admin Guide</a>
+      <a href="{{ url_for('admin.exams') }}"><i class="fas fa-file-alt"></i> Manage Exams</a>
+    </div>
+
+  </main>
+</div>
+
+<a href="#sg-top" class="sg-back-top" id="sgBackTop"><i class="fas fa-arrow-up"></i></a>
+
+<script>
+(function(){
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.sg-section'));
+  var tocLinks = Array.prototype.slice.call(document.querySelectorAll('#sgToc a'));
+  var backTop = document.getElementById('sgBackTop');
+
+  function onScroll(){
+    var pos = window.scrollY + 120;
+    var current = null;
+    sections.forEach(function(s){ if (s.offsetTop <= pos) current = s; });
+    tocLinks.forEach(function(a){
+      a.classList.toggle('sg-active', !!current && a.getAttribute('href') === '#' + current.id);
+    });
+    if (backTop) backTop.classList.toggle('show', window.scrollY > 400);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var searchBox = document.getElementById('sgSearchBox');
+  if (searchBox) {
+    searchBox.addEventListener('input', function(){
+      var q = searchBox.value.trim().toLowerCase();
+      tocLinks.forEach(function(a){
+        var haystack = (a.textContent + ' ' + (a.dataset.sgLabel || '')).toLowerCase();
+        a.style.display = (!q || haystack.indexOf(q) !== -1) ? '' : 'none';
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -148,26 +148,6 @@
     font-size: .75rem;
     color: var(--text-3);
   }
-  .footer-social {
-    display: flex;
-    gap: .6rem;
-  }
-  .footer-social a {
-    width: 26px; height: 26px;
-    border-radius: 6px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-3);
-    display: flex; align-items: center; justify-content: center;
-    font-size: .68rem;
-    text-decoration: none;
-    transition: background .15s, color .15s, border-color .15s;
-  }
-  .footer-social a:hover {
-    background: var(--accent-subtle);
-    color: var(--accent);
-    border-color: var(--accent);
-  }
 
   .admin-wrapper { display: flex; min-height: 100vh; position: relative; }
 
@@ -272,7 +252,14 @@
   .is-collapsed .sb-toggle { transform: rotate(180deg); margin-left: 0; }
 
   /* Nav scroll area */
-  .sb-nav-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px; scrollbar-width: none; }
+  /* min-height:0 is required here — a flex child defaults to min-height:auto,
+     which refuses to shrink below its natural content height, so with enough
+     nav items this wrapper silently grows past the sidebar's 100vh instead of
+     scrolling; the parent's overflow:hidden (needed for the width-collapse
+     transition) then clips whatever didn't fit. This was always latent and
+     only became visible once mobile's shorter viewport + more nav items
+     pushed content past the fold. */
+  .sb-nav-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .sb-nav-wrap::-webkit-scrollbar { display: none; }
   .is-collapsed .sb-nav-wrap { padding: 6px; }
 
@@ -333,8 +320,7 @@
 
   /* Focus */
   .sb-nav .nav-link:focus-visible,
-  .sb-toggle:focus-visible,
-  .sb-mobile-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sb-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Logout */
   .sb-nav .nav-link.nav-logout { color: var(--danger-text); opacity: 0.7; }
@@ -381,11 +367,9 @@
     backdrop-filter: blur(2px);
   }
   .mobile-overlay.active { display: block; }
-  .sb-mobile-close { display: none; }
 
   @media (max-width: 768px) {
     .mobile-menu-toggle { display: flex; }
-    .sb-toggle { display: none; }
     .admin-wrapper { flex-direction: column; }
     .sidebar {
       position: fixed !important; top: 0; left: -100%;
@@ -404,20 +388,14 @@
       margin: 0 !important; display: block !important;
     }
     .sidebar.mobile-open .sb-header { justify-content: flex-start !important; gap: 8px !important; }
-    .sidebar.mobile-open .sb-toggle { display: none !important; }
-    .sb-mobile-close {
-      display: flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px; margin-left: auto; flex-shrink: 0;
-      border-radius: 8px; background: var(--sb-toggle-bg);
-      border: 1px solid var(--sb-border); color: var(--sb-toggle-c);
-      cursor: pointer; font-size: 0.75rem;
-    }
-    .sb-mobile-close:hover { background: var(--sb-hover-bg); color: var(--sb-text-hover); }
+    /* .sb-toggle stays visible on mobile — reused as the single close
+       control for the drawer (same pattern as the User Portal's sidebar,
+       whose desktop collapse chevron doubles as its mobile close button)
+       instead of introducing a second, separate close button. */
     .sidebar.mobile-open .sb-nav .nav-link { justify-content: flex-start !important; padding: 6px 8px !important; gap: 10px !important; }
     .content-wrap { padding: 4.5rem 1rem 1.5rem; }
   }
   @media (max-width: 576px) {
-    .sidebar { width: 100% !important; border-radius: 0; }
     .content-wrap { padding: 4rem 0.75rem 1rem; }
   }
 
@@ -498,9 +476,6 @@
       <button class="sb-toggle" id="sidebarToggleBtn" aria-label="Collapse sidebar">
         <i class="fas fa-chevron-left" aria-hidden="true"></i>
       </button>
-      <button class="sb-mobile-close" id="sidebarMobileClose" aria-label="Close navigation">
-        <i class="fas fa-times" aria-hidden="true"></i>
-      </button>
     </div>
 
     <div class="sb-nav-wrap">
@@ -564,6 +539,13 @@
             <span class="nav-label">Object Storage</span>
           </a>
         </li>
+        <li>
+          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
+             href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre" aria-label="AI Command Centre">
+            <span class="nav-icon"><i class="fas fa-robot"></i></span>
+            <span class="nav-label">AI Command Centre</span>
+          </a>
+        </li>
 
         <li><span class="section-label">Management</span></li>
 
@@ -592,14 +574,16 @@
             <span class="nav-label">Users Analytics</span>
           </a>
         </li>
+
+        <li><span class="section-label">Account</span></li>
+
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
-             href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre" aria-label="AI Command Centre">
-            <span class="nav-icon"><i class="fas fa-robot"></i></span>
-            <span class="nav-label">AI Command Centre</span>
+          <a class="nav-link {% if request.endpoint == 'admin.guide' %}active{% endif %}"
+             href="{{ url_for('admin.guide') }}" data-tooltip="Admin Guide" aria-label="Admin Guide">
+            <span class="nav-icon"><i class="fas fa-book-open"></i></span>
+            <span class="nav-label">Admin Guide</span>
           </a>
         </li>
-
         <li>
           <a class="nav-link {% if request.endpoint == 'admin.profile' %}active{% endif %}"
              href="{{ url_for('admin.profile') }}" data-tooltip="Profile &amp; Account" aria-label="Profile &amp; Account">
@@ -652,14 +636,7 @@
         <a href="{{ url_for('misc.contact') }}">Contact</a>
         <a href="{{ url_for('misc.about') }}">About</a>
       </div>
-      <div style="display:flex;align-items:center;gap:1rem">
-        <span class="footer-copy">&copy; {{ CURRENT_YEAR }} SmartAIExam Admin</span>
-        <div class="footer-social">
-          <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
-          <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
-          <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
-        </div>
-      </div>
+      <span class="footer-copy">&copy; {{ CURRENT_YEAR }} SmartAIExam Admin</span>
     </div>
   </div>
 </footer>
@@ -767,7 +744,13 @@
   if (collapsed) applyCollapsed(false);
   else document.documentElement.removeAttribute('data-sidebar');
 
-  btn.addEventListener('click', function(){ applyState(!collapsed, true); });
+  btn.addEventListener('click', function(){
+    // On mobile this button is the drawer's sole close control instead of
+    // the desktop collapse toggle (mirrors the User Portal sidebar, whose
+    // own header button is reused the same way).
+    if (window.innerWidth <= 768) { if (window._adminCloseMobileSb) window._adminCloseMobileSb(); }
+    else { applyState(!collapsed, true); }
+  });
   window._adminSidebarApplyState = applyState;
 })();
 </script>
@@ -789,15 +772,23 @@
     document.body.appendChild(ov);
 
     var sb = document.getElementById('adminSidebar');
-    function openM(){ sb.classList.add('mobile-open'); ov.classList.add('active'); btn.innerHTML='<i class="fas fa-times"></i>'; document.body.style.overflow='hidden'; }
-    function closeM(){ sb.classList.remove('mobile-open'); ov.classList.remove('active'); btn.innerHTML='<i class="fas fa-bars"></i>'; document.body.style.overflow=''; }
+    // Single toggle icon throughout (never swaps to an "x") — the sidebar's
+    // own header button (#sidebarToggleBtn, wired up in the collapse script
+    // below) is the one and only close control while the drawer is open,
+    // same division of labor as the User Portal's mobile sidebar.
+    // The drawer covers the full viewport height (unlike the User Portal's,
+    // which starts below its top nav bar), so this floating button sits in
+    // the same top-left corner the open drawer's own header occupies —
+    // hide it while open, since the drawer's own header button is now the
+    // single close control (overlay click / Escape also close it).
+    function openM(){ sb.classList.add('mobile-open'); ov.classList.add('active'); document.body.style.overflow='hidden'; btn.style.display='none'; }
+    function closeM(){ sb.classList.remove('mobile-open'); ov.classList.remove('active'); document.body.style.overflow=''; if(window.innerWidth<=768) btn.style.display='flex'; }
     btn.addEventListener('click', function(){ sb.classList.contains('mobile-open')?closeM():openM(); });
     ov.addEventListener('click', closeM);
     document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeM(); });
-    var mc = document.getElementById('sidebarMobileClose');
-    if (mc) mc.addEventListener('click', closeM);
+    window._adminCloseMobileSb = closeM;
     document.querySelectorAll('.sidebar .nav-link').forEach(function(l){ l.addEventListener('click', function(){ setTimeout(closeM,150); }); });
-    function resize(){ if(window.innerWidth>768){ closeM(); btn.style.display='none'; } else btn.style.display='flex'; }
+    function resize(){ if(window.innerWidth>768){ closeM(); btn.style.display='none'; } else if(!sb.classList.contains('mobile-open')) btn.style.display='flex'; }
     window.addEventListener('resize', resize);
     resize();
   }

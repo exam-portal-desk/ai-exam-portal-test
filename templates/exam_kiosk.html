@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+{% block title %}{{ exam.name }} — Exam Kiosk - SmartAIExam{% endblock %}
+
+{% block content %}
+{#
+  Scheduled Exam Kiosk — a dedicated window for the whole
+  preparation -> exam -> completion lifecycle of a Scheduled Exam.
+
+  WHY THIS EXISTS AS ITS OWN PAGE (not the normal, persistently-navigable
+  Exam Instructions page): fullscreen must be requested from a genuine
+  user gesture and, once granted, can only be carried forward by NOT
+  navigating the top-level document away from it — a new window/tab can
+  never inherit it. Making the always-reachable Instructions page the
+  fullscreen host meant its own fullscreen-restore logic could linger and
+  resurface there even after an exam had already ended. This page is
+  ephemeral instead: opened fresh for exactly one exam attempt's
+  lifecycle (see openKioskWindow() in exam_instructions.html) and closed
+  by the student when done — so there is no shared, long-lived document
+  for fullscreen state to leak into.
+
+  Screens (exactly one visible at a time, see showScreen() below):
+    kioskTerminal — nothing to do right now (exhausted/cancelled/ended/
+                    not open yet) — no fullscreen involved.
+    kioskLanding  — the ONE gesture-capturing screen: a single button
+                    that both requests fullscreen and begins/resumes.
+    kioskPrep     — fullscreen: exam instructions + either a live
+                    countdown to the official start, or a brief
+                    "starting…" status if the window is already live.
+    kioskExamWrap — the real exam (templates/exam_page.html), embedded
+                    same-document via <iframe embedded=1> so the
+                    fullscreen granted on kioskLanding's click carries
+                    straight through with no second fullscreen request.
+    kioskComplete — shown once exam_page.html reports completion via
+                    postMessage; fullscreen is explicitly exited here.
+#}
+<style>
+html, body { overflow:hidden !important; height:100% !important; }
+
+.kiosk-screen {
+  position:fixed; inset:0; z-index:100; background:var(--bg);
+  display:none; align-items:center; justify-content:center;
+  padding:1.5rem; overflow-y:auto;
+}
+.kiosk-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:2.25rem 2.25rem 2rem; max-width:480px; width:100%;
+  color:var(--text-1); text-align:center; box-shadow:var(--shadow-lg);
+}
+.kiosk-card.small { max-width:380px; padding:1.75rem 2rem; }
+.kiosk-card-icon {
+  width:56px; height:56px; border-radius:50%;
+  background:var(--accent-subtle); border:1px solid var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto 1.1rem; font-size:1.4rem; color:var(--accent);
+}
+.kiosk-card-icon.warn { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning); }
+.kiosk-card-icon.success { background:var(--success-bg); border-color:var(--success-border); color:var(--success); }
+.kiosk-card-title { font-size:1.15rem; font-weight:700; margin-bottom:.5rem; letter-spacing:-.01em; }
+.kiosk-card-desc { font-size:.86rem; line-height:1.6; color:var(--text-2); margin-bottom:1.2rem; }
+.kiosk-card-meta {
+  display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin-bottom:1.3rem;
+}
+.kiosk-card-meta div {
+  display:inline-flex; align-items:center; gap:.35rem; padding:.28rem .7rem; border-radius:20px;
+  font-size:.75rem; font-weight:600; background:var(--surface-2); border:1px solid var(--border); color:var(--text-2);
+}
+.kiosk-card-meta i { color:var(--accent); font-size:.68rem; }
+.kiosk-live-strip {
+  display:inline-flex; align-items:center; gap:.5rem;
+  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
+  border-radius:var(--radius); padding:.5rem .85rem; font-size:.8rem; font-weight:700; margin-bottom:1.2rem;
+}
+.kiosk-btn {
+  background:var(--accent); border:none; color:var(--accent-on); font-weight:700;
+  border-radius:10px; padding:.85rem 1.75rem; font-size:.92rem; cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease; font-family:inherit;
+  box-shadow:0 8px 24px rgba(0,0,0,.15); display:inline-flex; align-items:center; gap:.55rem;
+  text-decoration:none;
+}
+.kiosk-btn:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(0,0,0,.22); }
+.kiosk-btn:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+.kiosk-btn.secondary { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border); box-shadow:none; }
+.kiosk-btn.secondary:hover { border-color:var(--accent); color:var(--accent); }
+.kiosk-card-actions { display:flex; gap:.65rem; justify-content:center; flex-wrap:wrap; margin-bottom:.9rem; }
+.kiosk-card-hint { margin-top:1rem; font-size:.75rem; color:var(--text-3); }
+
+/* Preparation screen */
+.kiosk-prep-scroll { width:100%; max-width:720px; max-height:100%; overflow-y:auto; }
+.kiosk-prep-inner { padding:1rem 0 2rem; }
+.kiosk-prep-header { text-align:center; margin-bottom:1.4rem; }
+.kiosk-prep-exam-name { font-size:1.15rem; font-weight:800; color:var(--text-1); display:flex; align-items:center; justify-content:center; gap:.5rem; margin-bottom:.5rem; }
+.kiosk-prep-exam-name i { color:var(--accent); }
+.kiosk-prep-status { font-size:.85rem; font-weight:700; color:var(--accent); display:flex; align-items:center; justify-content:center; gap:.4rem; }
+.kiosk-countdown-block {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:1.5rem; text-align:center; margin-bottom:1.2rem; box-shadow:var(--shadow-lg);
+}
+.kiosk-countdown-label { font-size:.78rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.4rem; }
+.kiosk-countdown-big { font-size:2.8rem; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; line-height:1; margin-bottom:.5rem; }
+.kiosk-countdown-hint { font-size:.75rem; color:var(--text-3); }
+.kiosk-instr-warning-banner {
+  display:flex; align-items:flex-start; gap:.6rem; text-align:left;
+  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
+  border-radius:var(--radius); padding:.75rem .9rem; font-size:.8rem; font-weight:600; line-height:1.55;
+  margin-bottom:1.2rem;
+}
+.kiosk-instr-warning-banner i { margin-top:.15rem; flex-shrink:0; }
+.kiosk-instr-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:1.4rem 1.5rem; box-shadow:var(--shadow-lg);
+}
+.kiosk-instr-title { font-size:.92rem; font-weight:700; color:var(--text-1); margin-bottom:.85rem; display:flex; align-items:center; gap:.45rem; }
+.kiosk-instr-title i { color:var(--accent); }
+.ei-instr { font-size:.85rem; color:var(--text-2); line-height:1.65; text-align:left; }
+.ei-instr p { margin:0 0 .8rem; }
+.instr-list { margin:0 0 .8rem 1.1rem; padding:0; text-align:left; }
+.instr-list li { margin-bottom:.4rem; }
+.ei-instr .instr-warning {
+  display:flex; align-items:flex-start; gap:.5rem;
+  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
+  border-radius:var(--radius); padding:.65rem .85rem; font-size:.82rem; font-weight:600; margin-bottom:.8rem;
+}
+.ei-instr .instr-warning i { margin-top:.15rem; flex-shrink:0; }
+.kiosk-prep-error {
+  margin-top:1rem; background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger-text);
+  border-radius:var(--radius); padding:.65rem .9rem; font-size:.83rem; font-weight:600; display:none;
+}
+
+/* Exam frame */
+#kioskExamWrap { padding:0; }
+.kiosk-exam-frame { position:fixed; inset:0; width:100%; height:100%; border:none; background:var(--bg); }
+
+/* Fullscreen-restore overlay — sits above whichever screen is active */
+.kiosk-fs-restore {
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:7000;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  display:none; align-items:center; justify-content:center; padding:1rem;
+}
+.kiosk-fs-restore.open { display:flex; }
+
+.spin { display:inline-block; animation:kspin .7s linear infinite; }
+@keyframes kspin { to { transform:rotate(360deg); } }
+
+@media (max-width:480px) {
+  .kiosk-card { padding:1.5rem 1.25rem; }
+  .kiosk-card-actions { flex-direction:column-reverse; }
+  .kiosk-btn { width:100%; justify-content:center; }
+  .kiosk-countdown-big { font-size:2.1rem; }
+}
+</style>
+
+<div id="kioskTerminal" class="kiosk-screen">
+  <div class="kiosk-card">
+    <div class="kiosk-card-icon warn"><i class="fas fa-{{ terminal_icon or 'info-circle' }}"></i></div>
+    <div class="kiosk-card-title">{{ terminal_title or 'Not Available' }}</div>
+    <div class="kiosk-card-desc">{{ terminal_msg or 'This exam is not currently available.' }}</div>
+    <button class="kiosk-btn secondary" type="button" onclick="kioskGoBack()"><i class="fas fa-arrow-left"></i> Back to Dashboard</button>
+  </div>
+</div>
+
+<div id="kioskLanding" class="kiosk-screen">
+  <div class="kiosk-card">
+    <div class="kiosk-card-icon"><i class="fas fa-shield-halved"></i></div>
+    <div class="kiosk-card-title" id="kioskLandingTitle">Ready to Begin</div>
+    <div class="kiosk-card-desc">{{ exam.name }}</div>
+    <div class="kiosk-card-meta">
+      <div><i class="fas fa-calendar"></i> {{ exam.date | calendar_date }}</div>
+      <div><i class="fas fa-clock"></i> {{ exam.start_time }}</div>
+      <div><i class="fas fa-stopwatch"></i> {{ exam.duration }} mins</div>
+    </div>
+    {% if is_scheduled and effective_status == 'upcoming' and window and window.start_iso and not active_attempt %}
+    <div class="kiosk-live-strip" id="kioskLiveStrip"><i class="fas fa-hourglass-half"></i> Exam goes live in <span id="kioskLiveStripText">--:--:--</span></div>
+    {% endif %}
+    <div>
+      <button id="kioskEnterBtn" class="kiosk-btn" type="button">
+        <i class="fas fa-expand-arrows-alt"></i> <span id="kioskEnterBtnText">Enter Fullscreen &amp; Begin</span>
+      </button>
+    </div>
+    <div class="kiosk-card-hint">This exam runs in a secure, fullscreen environment. Clicking above will enter fullscreen and continue.</div>
+  </div>
+</div>
+
+<div id="kioskPrep" class="kiosk-screen">
+  <div class="kiosk-prep-scroll"><div class="kiosk-prep-inner">
+    <div class="kiosk-prep-header">
+      <div class="kiosk-prep-exam-name"><i class="fas fa-shield-halved"></i> {{ exam.name }}</div>
+      <div class="kiosk-prep-status"><i class="fas fa-spinner fa-spin"></i> <span id="kioskPrepStatusText">Preparing your exam…</span></div>
+    </div>
+    <div id="kioskCountdownBlock" class="kiosk-countdown-block" style="display:none">
+      <div class="kiosk-countdown-label">Exam begins in</div>
+      <div id="kioskCountdownBig" class="kiosk-countdown-big">--:--</div>
+      <div class="kiosk-countdown-hint">This wait does not add to or take away from your exam duration once it begins.</div>
+    </div>
+    <div class="kiosk-instr-warning-banner">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>Please read the following exam instructions carefully. The exam will begin automatically when the timer reaches zero. Do not close or leave this window during the preparation period.</span>
+    </div>
+    <div class="kiosk-instr-card">
+      <div class="kiosk-instr-title"><i class="fas fa-info-circle"></i> Exam Instructions</div>
+      <div class="ei-instr">{{ exam.instructions | format_instructions }}</div>
+    </div>
+    <div id="kioskPrepError" class="kiosk-prep-error"></div>
+  </div></div>
+</div>
+
+<div id="kioskExamWrap" class="kiosk-screen">
+  <iframe id="kioskExamFrame" class="kiosk-exam-frame" title="Exam"></iframe>
+</div>
+
+<div id="kioskComplete" class="kiosk-screen">
+  <div class="kiosk-card">
+    <div class="kiosk-card-icon success"><i class="fas fa-check-circle"></i></div>
+    <div class="kiosk-card-title">Exam Submitted Successfully</div>
+    <div class="kiosk-card-desc">Your exam has been submitted and your responses have been saved.</div>
+    <div class="kiosk-card-actions">
+      <a id="kioskViewResultBtn" class="kiosk-btn" href="{{ url_for('dashboard.dashboard') }}"><i class="fas fa-chart-bar"></i> View My Result</a>
+      <button id="kioskCloseBtn" class="kiosk-btn secondary" type="button"><i class="fas fa-times"></i> Close Window</button>
+    </div>
+    <div class="kiosk-card-hint">You may now close this window.</div>
+  </div>
+</div>
+
+<div id="kioskFsRestore" class="kiosk-fs-restore">
+  <div class="kiosk-card small">
+    <div class="kiosk-card-icon warn"><i class="fas fa-expand"></i></div>
+    <div class="kiosk-card-title">Fullscreen Required</div>
+    <div class="kiosk-card-desc">This exam must stay in fullscreen mode to continue securely.</div>
+    <button id="kioskFsRestoreBtn" class="kiosk-btn" type="button"><i class="fas fa-expand-arrows-alt"></i> Return to Fullscreen</button>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const examId = {{ exam.id | tojson }};
+    const ACTIVE_ATTEMPT = {{ 'true' if active_attempt else 'false' }};
+    const KIOSK_READY = {{ 'true' if kiosk_ready else 'false' }};
+    const SCHEDULED_START_ISO = {{ (window.start_iso if window else None) | tojson }};
+
+    const screens = {
+        terminal: document.getElementById('kioskTerminal'),
+        landing:  document.getElementById('kioskLanding'),
+        prep:     document.getElementById('kioskPrep'),
+        exam:     document.getElementById('kioskExamWrap'),
+        complete: document.getElementById('kioskComplete'),
+    };
+    let kioskState = 'terminal';
+    function showScreen(name) {
+        kioskState = name;
+        Object.entries(screens).forEach(([k, el]) => { if (el) el.style.display = (k === name) ? 'flex' : 'none'; });
+    }
+
+    // ── Fullscreen: requested exactly once, from the Landing button's own
+    // click (a genuine user gesture) — reused all the way through
+    // preparation and into the exam itself via same-document iframe
+    // embedding (embedExam() below), never requested a second time. ──
+    function isDocFullscreen() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    }
+    async function requestKioskFullscreen() {
+        if (isDocFullscreen()) return;
+        try {
+            const el = document.documentElement;
+            await (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || el.mozRequestFullScreen).call(el);
+        } catch (err) {
+            // Denied/unsupported — degrade gracefully rather than blocking
+            // the student with a retry loop; the rest of the flow works
+            // identically, just without fullscreen.
+            console.warn('[kiosk] fullscreen request failed:', err);
+        }
+    }
+    async function exitKioskFullscreen() {
+        if (!isDocFullscreen()) return;
+        try {
+            await (document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen || document.mozCancelFullScreen).call(document);
+        } catch (err) { /* nothing more to do */ }
+    }
+
+    // App-level shortcut guard — identical policy to exam_page.html's own
+    // preventTabSwitching(), active from the moment fullscreen is
+    // requested through to exam completion. Native browser-owned actions
+    // (ESC natively exiting fullscreen chief among them) cannot be
+    // preventDefault()'d by any web page — the fullscreenchange handler
+    // below is what actually reacts to a real exit.
+    function kioskKeyGuard(e) {
+        const blocked = ['F11', 'Escape'];
+        const combos = [(e.altKey && e.key === 'Tab'), (e.ctrlKey && e.key === 'Tab'), (e.altKey && e.key === 'F4'), (e.ctrlKey && ['w', 'n', 't'].includes(e.key))];
+        if (blocked.includes(e.key) || combos.some(c => c)) { e.preventDefault(); e.stopPropagation(); return false; }
+    }
+    function kioskContextGuard(e) { e.preventDefault(); return false; }
+    let guardsActive = false;
+    function setKioskGuards(active) {
+        if (active === guardsActive) return;
+        guardsActive = active;
+        if (active) {
+            document.addEventListener('keydown', kioskKeyGuard, true);
+            document.addEventListener('contextmenu', kioskContextGuard, true);
+        } else {
+            document.removeEventListener('keydown', kioskKeyGuard, true);
+            document.removeEventListener('contextmenu', kioskContextGuard, true);
+        }
+    }
+
+    // Shown if fullscreen is exited during preparation, or (via postMessage
+    // from the embedded exam_page.html — this document IS its window.top/
+    // window.parent) during the exam itself. A fresh click is unavoidable
+    // (browsers require a real gesture to re-grant fullscreen); once the
+    // embedded exam is open, ITS OWN existing violation-counting/auto-submit
+    // logic is what's actually protecting the attempt, not this prompt.
+    const fsRestoreOverlay = document.getElementById('kioskFsRestore');
+    function showFsRestorePrompt() { if (fsRestoreOverlay) fsRestoreOverlay.classList.add('open'); }
+    function hideFsRestorePrompt() { if (fsRestoreOverlay) fsRestoreOverlay.classList.remove('open'); }
+    const fsRestoreBtn = document.getElementById('kioskFsRestoreBtn');
+    if (fsRestoreBtn) fsRestoreBtn.addEventListener('click', async () => {
+        await requestKioskFullscreen();
+        if (isDocFullscreen()) hideFsRestorePrompt();
+    });
+    function fsChangeHandler() {
+        if (isDocFullscreen()) { hideFsRestorePrompt(); return; }
+        if (kioskState === 'prep' || kioskState === 'exam') showFsRestorePrompt();
+    }
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
+        document.addEventListener(ev, fsChangeHandler);
+    });
+
+    window.addEventListener('message', (ev) => {
+        if (ev.origin !== window.location.origin) return;
+        if (!ev.data) return;
+        if (ev.data.type === 'exam-fullscreen-restore-needed') showFsRestorePrompt();
+        if (ev.data.type === 'exam-completed') handleExamCompleted(ev.data.redirect);
+    });
+
+    function formatHMS(totalSeconds) {
+        totalSeconds = Math.max(0, Math.floor(totalSeconds));
+        const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60), s = totalSeconds % 60;
+        const pad = n => String(n).padStart(2, '0');
+        return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    }
+
+    // Informational only — the Landing screen's own "goes live in" strip,
+    // same purpose as the equivalent strip on the Instructions page.
+    const liveStripText = document.getElementById('kioskLiveStripText');
+    if (liveStripText && SCHEDULED_START_ISO) {
+        const target = new Date(SCHEDULED_START_ISO).getTime();
+        const handle = setInterval(() => {
+            const remain = (target - Date.now()) / 1000;
+            if (remain <= 0) {
+                const strip = document.getElementById('kioskLiveStrip');
+                if (strip) strip.style.display = 'none';
+                clearInterval(handle);
+                return;
+            }
+            liveStripText.textContent = formatHMS(remain);
+        }, 1000);
+        const remainNow = (target - Date.now()) / 1000;
+        liveStripText.textContent = formatHMS(remainNow);
+    }
+
+    const prepStatusText = document.getElementById('kioskPrepStatusText');
+    const countdownBlock = document.getElementById('kioskCountdownBlock');
+    const countdownBig = document.getElementById('kioskCountdownBig');
+    const prepError = document.getElementById('kioskPrepError');
+
+    let countdownHandle = null;
+    function startPrepCountdown(targetIso) {
+        if (prepStatusText) prepStatusText.textContent = 'Waiting for the official start time…';
+        if (countdownBlock) countdownBlock.style.display = 'block';
+        const target = new Date(targetIso).getTime();
+        if (countdownHandle) clearInterval(countdownHandle);
+        function tick() {
+            const remain = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+            if (countdownBig) countdownBig.textContent = formatHMS(remain);
+            if (remain <= 0) {
+                clearInterval(countdownHandle);
+                if (countdownBlock) countdownBlock.style.display = 'none';
+                if (prepStatusText) prepStatusText.textContent = 'Starting your exam…';
+                // Server remains authoritative: re-call /start. If the
+                // client's clock was slightly early, the server sends a
+                // fresh too_early + corrected timestamp and this simply
+                // restarts the countdown with the corrected value.
+                attemptStart();
+            }
+        }
+        tick();
+        countdownHandle = setInterval(tick, 250);
+    }
+
+    // Same preload API the old flow used — resources it fetches are
+    // picked up by exam_page.html itself once embedded (get_cached_exam_data),
+    // never re-fetched. A failure here is non-fatal: /start is the real
+    // gate and exam_page.html can preload on demand if this didn't finish.
+    async function callPreload() {
+        try {
+            await fetch(`/api/v01/exams/${examId}/preload`, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
+        } catch (e) { /* non-fatal */ }
+    }
+
+    async function attemptStart() {
+        let resp, data;
+        try {
+            resp = await fetch(`/api/v01/exams/${examId}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_ts: Date.now() }),
+            });
+            try { data = await resp.json(); }
+            catch (err) { const text = await resp.text().catch(() => null); throw new Error(text || 'Server error'); }
+        } catch (err) {
+            showPrepError(err.message || 'Unable to start the exam.');
+            return;
+        }
+
+        if (data && data.too_early && data.scheduled_start_iso) {
+            startPrepCountdown(data.scheduled_start_iso);
+            return;
+        }
+        if (!resp.ok || !data || !data.success) {
+            showPrepError((data && data.message) || 'Unable to start the exam.');
+            return;
+        }
+        embedExam(false);
+    }
+
+    function showPrepError(message) {
+        if (prepError) { prepError.style.display = 'block'; prepError.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + message; }
+        if (prepStatusText) prepStatusText.textContent = 'Something went wrong.';
+    }
+
+    async function runPrepareAndStartSequence() {
+        await callPreload();
+        await attemptStart();
+    }
+
+    // The real exam UI (templates/exam_page.html), embedded same-document
+    // instead of a new window/tab — a new browsing context can never
+    // inherit this document's fullscreen state, so opening one here would
+    // force a second fullscreen request/gate, exactly what this design
+    // removes. exam_page.html detects embedded=1 and reuses THIS
+    // document's fullscreen/violation handling instead of its own gate
+    // (see isEmbedded in templates/exam_page.html).
+    const examFrame = document.getElementById('kioskExamFrame');
+    function embedExam(resume) {
+        const url = `/exam/${examId}?secure=1&embedded=1` + (resume ? '&resume=1' : '&from_instructions=1');
+        examFrame.src = url;
+        showScreen('exam');
+    }
+
+    const viewResultBtn = document.getElementById('kioskViewResultBtn');
+    const closeBtn = document.getElementById('kioskCloseBtn');
+
+    // Fired once exam_page.html reports the attempt is over (manual
+    // submit, timer auto-submit, or a security-violation forced submit —
+    // all three converge on the same postMessage, see
+    // notifyParentExamCompleted() in exam_page.html). Fullscreen
+    // enforcement stops here, completely and permanently for this window.
+    async function handleExamCompleted(redirectUrl) {
+        setKioskGuards(false);
+        hideFsRestorePrompt();
+        await exitKioskFullscreen();
+        if (viewResultBtn) viewResultBtn.href = redirectUrl || `/result/${examId}`;
+        showScreen('complete');
+    }
+
+    function goBackOrClose() {
+        if (window.opener) { window.close(); }
+        else { window.location.href = {{ url_for('dashboard.dashboard') | tojson }}; }
+    }
+    window.kioskGoBack = goBackOrClose;
+    if (closeBtn) closeBtn.addEventListener('click', goBackOrClose);
+
+    const enterBtn = document.getElementById('kioskEnterBtn');
+    if (enterBtn) enterBtn.addEventListener('click', async () => {
+        enterBtn.disabled = true;
+        // Must happen first, still within this click's own call stack —
+        // the only user gesture anywhere in this window's lifetime.
+        await requestKioskFullscreen();
+        setKioskGuards(true);
+        if (ACTIVE_ATTEMPT) {
+            embedExam(true);
+        } else {
+            showScreen('prep');
+            runPrepareAndStartSequence();
+        }
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+        if (kioskState === 'prep' || kioskState === 'exam') {
+            const msg = 'Leaving now may interrupt your exam.';
+            e.preventDefault();
+            e.returnValue = msg;
+            return msg;
+        }
+    });
+
+    if (KIOSK_READY) {
+        if (ACTIVE_ATTEMPT) {
+            const t = document.getElementById('kioskLandingTitle'); if (t) t.textContent = 'Resume Your Exam';
+            const b = document.getElementById('kioskEnterBtnText'); if (b) b.textContent = 'Enter Fullscreen & Resume';
+        }
+        showScreen('landing');
+    } else {
+        showScreen('terminal');
+    }
+});
+</script>
+{% endblock %}

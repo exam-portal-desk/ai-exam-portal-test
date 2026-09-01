@@ -5,7 +5,7 @@
    (app/routes/api/v01/portal.py), so the two never drift apart. #}
 
 {% macro render_live_card(e) %}
-<div class="ec live" data-n="{{ e.name|lower }}">
+<div class="ec live" data-n="{{ e.name|lower }}"{% if e.next_transition_iso %} data-exam-id="{{ e.id }}" data-transition-target="{{ e.next_transition_iso }}"{% endif %}>
   <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-live"><i class="fas fa-circle" style="font-size:.4rem"></i>Live</span></div>
   <div class="ec-body">
     <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
@@ -14,6 +14,7 @@
       <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
       <span class="ec-tag"><i class="fas fa-stopwatch"></i>{{ e.duration }}m</span>
       <span class="ec-tag"><i class="fas fa-question-circle"></i>{{ e.total_questions }}Q</span>
+      {% if e.is_scheduled %}<span class="ec-tag ec-tag-sched" title="Scheduled Exam — opens automatically at its scheduled time"><i class="fas fa-calendar-check"></i>Scheduled</span>{% endif %}
     </div>
   </div>
   <div class="ec-foot"><a href="{{ url_for('exam.exam_instructions', exam_id=e.id) }}" class="ec-btn start"><i class="fas fa-play"></i> Start Exam</a></div>
@@ -21,8 +22,8 @@
 {% endmacro %}
 
 {% macro render_upcoming_card(e) %}
-<div class="ec" data-n="{{ e.name|lower }}">
-  <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-upcoming">Upcoming</span></div>
+<div class="ec" data-n="{{ e.name|lower }}"{% if e.next_transition_iso %} data-exam-id="{{ e.id }}" data-transition-target="{{ e.next_transition_iso }}"{% endif %}>
+  <div class="ec-head"><div class="ec-title">{{ e.name }}</div>{% if e.prep_open %}<span class="ebadge eb-prep"><i class="fas fa-clipboard-check" style="font-size:.6rem"></i>Preparation Available</span>{% else %}<span class="ebadge eb-upcoming">Upcoming</span>{% endif %}</div>
   <div class="ec-body">
     <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
     <div class="ec-meta">
@@ -30,9 +31,16 @@
       <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
       <span class="ec-tag"><i class="fas fa-stopwatch"></i>{{ e.duration }}m</span>
       <span class="ec-tag"><i class="fas fa-question-circle"></i>{{ e.total_questions }}Q</span>
+      {% if e.is_scheduled %}<span class="ec-tag ec-tag-sched" title="Scheduled Exam — please be ready before the scheduled start time"><i class="fas fa-calendar-check"></i>Scheduled</span>{% endif %}
     </div>
   </div>
-  <div class="ec-foot"><button class="ec-btn off" disabled><i class="fas fa-clock"></i> Not started yet</button></div>
+  <div class="ec-foot">
+    {% if e.prep_open %}
+    <a href="{{ url_for('exam.exam_instructions', exam_id=e.id) }}" class="ec-btn start"><i class="fas fa-clipboard-check"></i> Prepare Exam</a>
+    {% else %}
+    <button class="ec-btn off" disabled><i class="fas fa-clock"></i> Not started yet</button>
+    {% endif %}
+  </div>
 </div>
 {% endmacro %}
 
@@ -46,6 +54,7 @@
     <div class="ec-meta">
       <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date | calendar_date }}</span>
       {% if e.result and e.result != 'Pending' %}<span class="ec-tag"><i class="fas fa-chart-bar"></i>{{ e.result }}</span>{% endif %}
+      {% if e.is_scheduled %}<span class="ec-tag ec-tag-sched" title="This was a Scheduled Exam"><i class="fas fa-calendar-check"></i>Scheduled</span>{% endif %}
     </div>
   </div>
   <div class="ec-foot">

@@ -31,6 +31,7 @@
 .rh-table tbody tr:last-child td { border-bottom:none; }
 .rh-table tbody tr:hover td { background:var(--surface-2); }
 .rh-table .exam-col { font-weight:600; color:var(--text-1); max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+.sched-ico { color:var(--accent); font-size:.68rem; margin-left:.3rem; }
 
 .score-ok  { color:var(--success-text); font-weight:700; }
 .score-err { color:var(--danger-text);  font-weight:700; }
@@ -121,7 +122,7 @@
         {% set vis = r.result_visible if r.result_visible is defined else true %}
         <tr data-date="{{ r.completed_at }}" data-exam="{{ r.exam_name|lower }}" data-sub="{{ r.subject|lower }}">
           <td style="color:var(--text-3);font-size:.73rem">{{ r.completed_at | display_dt }}</td>
-          <td class="exam-col">{{ r.exam_name }}</td>
+          <td class="exam-col">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check sched-ico" title="Scheduled Exam"></i>{% endif %}</td>
           <td>{{ r.subject }}</td>
           {% if vis %}
           <td><span class="score-ok">{{ r.correct_answers }}</span></td>
@@ -170,7 +171,7 @@
     {% set vis = r.result_visible if r.result_visible is defined else true %}
     <div class="rh-card" data-date="{{ r.completed_at }}" data-exam="{{ r.exam_name|lower }}" data-sub="{{ r.subject|lower }}">
       <div class="rh-card-top">
-        <div class="rh-card-name">{{ r.exam_name }}</div>
+        <div class="rh-card-name">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check sched-ico" title="Scheduled Exam"></i>{% endif %}</div>
         <div class="rh-card-date">{{ r.completed_at | display_dt }}</div>
       </div>
       {% if vis %}

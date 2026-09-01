@@ -16,3 +16,41 @@ tree /F | findstr /V /I /C:".claude" /C:"__pycache__" /C:"venv" > project_struct
 
 6. Powershell folder structure command
 function Get-Tree($path, $indent="") { Get-ChildItem $path | Where-Object { $_.Name -notmatch '^(__pycache__|venv|\.claude)$' } | ForEach-Object { $item = $_; $indent + " |-- " + $item.Name | Out-File -Append project_structure.txt; if ($item.PSIsContainer) { Get-Tree $item.FullName ($indent + " |   ") } } }; Remove-Item -ErrorAction SilentlyContinue project_structure.txt; Get-Tree .
+
+7. Dynamic powershell command for project structure
+$ExcludeNames = @(
+    "__pycache__",
+    "venv",
+    ".git",
+    ".claude",
+    "database",
+    "migrations",
+    "FullDBReplication.sql"
+)
+
+$ExcludeExtensions = @(
+    ".pyc",
+    ".log",
+    ".tmp"
+)
+
+function Get-Tree($path, $indent="") {
+    Get-ChildItem $path |
+        Where-Object {
+            ($ExcludeNames -notcontains $_.Name) -and
+            ($ExcludeExtensions -notcontains $_.Extension)
+        } |
+        Sort-Object @{Expression={$_.PSIsContainer};Descending=$true}, Name |
+        ForEach-Object {
+            $item = $_
+            ($indent + "|-- " + $item.Name) |
+                Out-File -Append project_structure.txt
+
+            if ($item.PSIsContainer) {
+                Get-Tree $item.FullName ($indent + "|   ")
+            }
+        }
+}
+
+Remove-Item -ErrorAction SilentlyContinue project_structure.txt
+Get-Tree .

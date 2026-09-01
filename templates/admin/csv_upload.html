@@ -385,6 +385,53 @@
   /* Prevent any child from busting card width */
   .csv-q-card * { max-width: 100%; }
 }
+
+/* ── Target-exam picker (Step 1, manual upload) / locked chip (Step 2,
+   both paths) — see the exam-id security note in csvSaveToDB() below.
+   Same component shape as Manage Questions' own picker. ── */
+.csv-exam-field { margin-bottom: 1.1rem; }
+.csv-exam-field > label { font-size: .8rem; font-weight: 700; color: var(--text-2); margin-bottom: .4rem; display: block; }
+.csv-exam-picker { position: relative; }
+.csv-exam-trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .6rem .85rem; cursor: pointer; text-align: left; color: var(--text-1);
+}
+.csv-exam-trigger:hover { border-color: var(--border-focus); }
+.csv-exam-trigger.open { border-color: var(--accent); }
+.cet-name { font-size: .85rem; font-weight: 700; color: var(--text-1); }
+.cet-meta { font-size: .72rem; color: var(--text-3); margin-top: .1rem; }
+.cet-empty { font-size: .82rem; color: var(--text-3); }
+.csv-exam-trigger > i.chev { color: var(--text-3); font-size: .78rem; flex-shrink: 0; transition: transform .12s; }
+.csv-exam-trigger.open > i.chev { transform: rotate(180deg); }
+.csv-exam-panel {
+  position: absolute; top: calc(100% + .35rem); left: 0; right: 0; z-index: 50;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); max-height: 320px; display: flex; flex-direction: column; overflow: hidden;
+}
+.csv-exam-search { padding: .5rem; border-bottom: 1px solid var(--border); }
+.csv-exam-search input { width: 100%; font-size: .8rem; padding: .4rem .6rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-1); }
+.csv-exam-search input:focus { outline: none; border-color: var(--border-focus); }
+.csv-exam-list { overflow-y: auto; padding: .3rem; }
+.csv-exam-item { padding: .5rem .6rem; border-radius: 8px; cursor: pointer; margin-bottom: .1rem; }
+.csv-exam-item:hover { background: var(--surface-2); }
+.csv-exam-item.active { background: var(--accent-subtle); }
+.cei-name { font-size: .8rem; font-weight: 700; color: var(--text-1); }
+.cei-meta { font-size: .7rem; color: var(--text-3); margin-top: .1rem; }
+
+.csv-exam-locked {
+  display: flex; align-items: center; gap: .55rem;
+  background: var(--accent-subtle); border: 1px solid var(--accent); border-radius: var(--radius);
+  padding: .55rem .85rem; font-size: .82rem; color: var(--text-1);
+}
+.csv-exam-locked i.fa-lock { color: var(--accent); }
+.csv-exam-locked strong { color: var(--accent); }
+
+.csv-target-chip {
+  display: inline-flex; align-items: center; gap: .4rem; font-size: .74rem; font-weight: 700;
+  color: var(--accent); background: var(--accent-subtle); border: 1px solid var(--accent);
+  border-radius: 20px; padding: .3rem .7rem; white-space: nowrap;
+}
 </style>
 
 <!-- ── CSV Upload &amp; Editor — standalone page ────────────────────────────── -->
@@ -410,10 +457,38 @@
               <div class="card">
                 <div class="card-body p-4">
                   <h5 class="fw-bold mb-1" style="color:var(--text-1)">Upload your CSV file</h5>
-                  <p class="mb-4" style="font-size:0.82rem;color:var(--text-3)">
+                  <p class="mb-3" style="font-size:0.82rem;color:var(--text-3)">
                     Required columns:
-                    <code style="background:var(--input-bg);color:var(--accent);padding:2px 5px;border-radius:4px;font-size:0.78rem;">exam_id, question_text, option_a–d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance</code>
+                    <code style="background:var(--input-bg);color:var(--accent);padding:2px 5px;border-radius:4px;font-size:0.78rem;">question_text, option_a–d, correct_answer, question_type, image_path, positive_marks, negative_marks, tolerance</code>
+                    <br>Optional: <code style="background:var(--input-bg);color:var(--text-2);padding:2px 5px;border-radius:4px;font-size:0.78rem;">source_tag</code> (e.g. "ESE 2021") — leave blank or omit the column if not applicable.
                   </p>
+
+                  <div class="csv-exam-field">
+                    <label><i class="fas fa-graduation-cap me-1"></i>Import into</label>
+                    <div class="csv-exam-picker" id="csvExamPicker">
+                      <button type="button" class="csv-exam-trigger" id="csvExamTrigger">
+                        <span class="cet-empty">Select an exam&hellip;</span>
+                        <i class="fas fa-chevron-down chev"></i>
+                      </button>
+                      <div class="csv-exam-panel" id="csvExamPanel" style="display:none">
+                        <div class="csv-exam-search"><input type="text" id="csvExamSearch" placeholder="Search exams&hellip;" autocomplete="off"></div>
+                        <div class="csv-exam-list" id="csvExamList">
+                          {% for e in exams %}
+                          <div class="csv-exam-item" data-exam-id="{{ e.id }}" data-exam-name="{{ e.name }}"
+                               data-search="{{ (e.name ~ ' ' ~ (e.category_name or '')) | lower }}">
+                            <div class="cei-name">{{ e.name }}</div>
+                            <div class="cei-meta">
+                              {% if e.category_name %}{{ e.category_name }}{% if e.subcategory_name %} &middot; {{ e.subcategory_name }}{% endif %} &middot; {% endif %}{{ e.question_count }} question{{ 's' if e.question_count != 1 else '' }}
+                            </div>
+                          </div>
+                          {% else %}
+                          <div class="exam-picker-empty" style="padding:1rem;text-align:center;font-size:.8rem;color:var(--text-3);">No exams yet — create one on Manage Exams.</div>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    </div>
+                    <div style="font-size:.72rem;color:var(--text-3);margin-top:.35rem;">Every question in the file will be added to this exam — an exam_id column inside the file is no longer required (and is ignored unless it conflicts with what you pick here).</div>
+                  </div>
 
                   <label id="csvDropZone" for="csvFileInput"
                         ondragover="csvDragOver(event)"
@@ -469,6 +544,9 @@
                 <span class="fw-bold" style="font-size:1rem;color:var(--text-1);white-space:nowrap;">
                   <i class="fas fa-list-ol me-2" style="color:var(--accent)"></i>
                   <span id="csvQCount">0</span> questions
+                </span>
+                <span class="csv-target-chip" id="csvTargetChip" style="display:none">
+                  <i class="fas fa-graduation-cap"></i><span id="csvTargetChipText"></span>
                 </span>
               </div>
               <div class="d-flex gap-2 align-items-center csv-btn-row" style="flex-shrink:0;flex-wrap:wrap;">
@@ -649,9 +727,75 @@
 (function(){
   let _csvRows  = [];
   let _csvConfirm = null;
-  let _csvSkipped = 0;     // rows dropped during parse (missing exam_id / question_text)
+  let _csvSkipped = 0;     // rows dropped during parse (missing question_text)
   const _PAGE_SIZE = 50;   // cards rendered per "Load More" batch
   let _renderedCount = 0;  // how many _csvRows are currently in the DOM
+
+  // SECURITY: the one authoritative destination for every row about to be
+  // saved — set either by the admin picking an exam below (manual upload)
+  // or from the AI job's own exam_id (AI-generated path, see
+  // _loadAiGeneratedQuestions()), never derived from anything inside a
+  // parsed CSV row. See import_questions_csv() in
+  // app/routes/api/v01/admin/questions.py for the server-side half of
+  // this — it re-validates this value and rejects the whole import if any
+  // row's own (optional, legacy) exam_id column disagrees with it.
+  let _targetExamId = null, _targetExamName = null;
+
+  function _setTargetExam(id, name) {
+    _targetExamId = id ? String(id) : null;
+    _targetExamName = name || null;
+    const trigger = document.getElementById('csvExamTrigger');
+    if (trigger && _targetExamId) {
+      trigger.innerHTML = `<span class="cet-name">${_esc(_targetExamName)}</span><i class="fas fa-chevron-down chev"></i>`;
+    }
+    const chip = document.getElementById('csvTargetChip');
+    const chipText = document.getElementById('csvTargetChipText');
+    if (chip && chipText) {
+      if (_targetExamId) { chipText.textContent = _targetExamName; chip.style.display = 'inline-flex'; }
+      else { chip.style.display = 'none'; }
+    }
+  }
+
+  // ── Target-exam picker (Step 1, manual upload only — the AI path calls
+  // _setTargetExam() directly from the job data instead) ──────────────────
+  (function initExamPicker(){
+    const picker  = document.getElementById('csvExamPicker');
+    const trigger = document.getElementById('csvExamTrigger');
+    const panel   = document.getElementById('csvExamPanel');
+    const search  = document.getElementById('csvExamSearch');
+    const list    = document.getElementById('csvExamList');
+    if (!picker || !trigger || !panel) return;
+
+    function close(){ panel.style.display = 'none'; trigger.classList.remove('open'); }
+    function open(){
+      panel.style.display = 'flex'; trigger.classList.add('open');
+      if (search) { search.value = ''; filter(''); search.focus(); }
+    }
+    trigger.addEventListener('click', function(e){
+      e.preventDefault();
+      panel.style.display === 'none' ? open() : close();
+    });
+    document.addEventListener('click', function(e){ if (!picker.contains(e.target)) close(); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+
+    function filter(q){
+      q = (q||'').trim().toLowerCase();
+      list.querySelectorAll('.csv-exam-item').forEach(function(item){
+        const hay = item.dataset.search || '';
+        item.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+      });
+    }
+    if (search) search.addEventListener('input', function(){ filter(search.value); });
+
+    if (list) list.addEventListener('click', function(e){
+      const item = e.target.closest('.csv-exam-item');
+      if (!item) return;
+      list.querySelectorAll('.csv-exam-item').forEach(function(el){ el.classList.remove('active'); });
+      item.classList.add('active');
+      _setTargetExam(item.dataset.examId, item.dataset.examName);
+      close();
+    });
+  })();
 
   function _setProcessing(title, sub) {
     const t = document.getElementById('csvProcTitle');
@@ -719,9 +863,9 @@
   }
 
   window.csvDownloadSample=function(){
-    const hdr='exam_id,question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance';
-    const r1='1,"$\\\\large\\\\text{A particle moves with velocity }v$","$\\\\large\\\\text{10 m/s}$","$\\\\large\\\\text{20 m/s}$","$\\\\large\\\\text{30 m/s}$","$\\\\large\\\\text{40 m/s}$",B,MCQ,,4,1,0';
-    const r2='1,"$\\\\large\\\\text{Numeric: What is } 2+2?$","","","","",4,NUMERIC,,3,0,0.01';
+    const hdr='question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance,source_tag';
+    const r1='"$\\\\large\\\\text{A particle moves with velocity }v$","$\\\\large\\\\text{10 m/s}$","$\\\\large\\\\text{20 m/s}$","$\\\\large\\\\text{30 m/s}$","$\\\\large\\\\text{40 m/s}$",B,MCQ,,4,1,0,"ESE 2021"';
+    const r2='"$\\\\large\\\\text{Numeric: What is } 2+2?$","","","","",4,NUMERIC,,3,0,0.01,';
     _download(new Blob([[hdr,r1,r2].join('\n')],{type:'text/csv'}),'sample_questions.csv');
   };
 
@@ -729,6 +873,7 @@
     const input=document.getElementById('csvFileInput');
     const file=input.files[0];
     if(!file){csvToast('Please select or drop a CSV file first.','warning');return;}
+    if(!_targetExamId){csvToast('Select an exam first.','warning','Choose which exam these questions belong to before parsing.');return;}
 
     // Real, staged loading feedback (no fabricated percentages — local text
     // parsing has no meaningful "% done"). Each label change is yielded via
@@ -775,14 +920,17 @@
     }
     const headers=rows[0].map(h=>h.trim());
     const FIELDS=['exam_id','question_text','option_a','option_b','option_c','option_d',
-                  'correct_answer','question_type','image_path','positive_marks','negative_marks','tolerance'];
+                  'correct_answer','question_type','image_path','positive_marks','negative_marks','tolerance','source_tag'];
     const parsed=[]; let skipped=0;
     for(let i=1;i<rows.length;i++){
       const vals=rows[i];
       const q={};
       headers.forEach((h,idx)=>{if(h) q[h]=idx<vals.length?vals[idx]:''});
       FIELDS.forEach(f=>{if(q[f]===undefined)q[f]='';});
-      if(!q.exam_id||!q.question_text){ skipped++; continue; }
+      // exam_id is optional/legacy now (see the module-level security note
+      // above) — the picker's _targetExamId is what actually decides where
+      // these land; a row is only dropped here for missing question text.
+      if(!q.question_text){ skipped++; continue; }
       parsed.push(q);
     }
     if(!parsed.length){
@@ -826,6 +974,9 @@
       positive_marks: String(q.positive_marks ?? 4),
       negative_marks: String(q.negative_marks ?? 1),
       tolerance:      String(q.tolerance ?? 0),
+      // AI generation never invents a source — this is always '' unless a
+      // future generation request explicitly supplies one.
+      source_tag:     (q.metadata && q.metadata.source_tag) || q.source_tag || '',
     };
   }
 
@@ -839,9 +990,14 @@
           _hideProcessing(); document.getElementById('csvStep1').style.display='block';
           csvToast('No generated questions found for this job.','warning'); return;
         }
-        if(job.status === 'failed'){
-          csvToast('Partial results', 'warning', `${rows.length} question(s) recovered — some batches failed.`);
+        if(job.status === 'partially_completed'){
+          const nFailed = (job.batches || []).filter(b => b.status === 'failed').length;
+          csvToast('Partial results', 'warning', `${rows.length} question(s) recovered — ${nFailed} batch(es) failed. You can retry those from the AI Command Centre.`);
         }
+        // The admin's OWN exam selection at generation time (stored on the
+        // job itself) — not each question's own echoed exam_id, which is
+        // only ever LLM output. See the module-level security note above.
+        _setTargetExam(job.exam_id, job.exam_name || ('Exam ' + job.exam_id));
         _setProcessing(null, 'Normalizing data…');
         setTimeout(function(){ _loadRowsIntoEditor(rows, 0); }, 0);
       })
@@ -952,7 +1108,7 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="badge rounded-pill px-3 py-1 ${badgeCls}" style="font-size:.72rem;">${q.question_type}</span>
           <span class="badge" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:.72rem;">+${pm} / -${nm}</span>
-          <small style="color:var(--text-3)">Exam ID: ${q.exam_id}</small>
+          ${q.source_tag ?`<span class="badge" style="background:var(--accent-subtle);border:1px solid var(--accent);color:var(--accent);font-size:.68rem;"><i class="fas fa-bookmark" style="font-size:.6rem"></i> ${_esc(q.source_tag)}</span>` : ''}
           <div class="csv-size-wrap">
             <i class="fas fa-text-height" style="color:var(--accent);font-size:.68rem;"></i>
             <select onchange="csvChangeSize(${i},this.value)">
@@ -1006,6 +1162,9 @@
           <div class="col-2"><label class="form-label">Tolerance:</label><input type="number" step="0.01" class="form-control form-control-sm" id="cetol-${i}" value="${q.tolerance||0}"></div>
           <div class="col-2"><label class="form-label">Image Path:</label><input class="form-control form-control-sm" id="ceimg-${i}" value="${_esc(q.image_path||'')}"></div>
         </div>
+        <div class="row g-2 mb-3">
+          <div class="col-4"><label class="form-label">Source / Previous Year Tag <span style="font-weight:400;color:var(--text-3)">(optional)</span>:</label><input class="form-control form-control-sm" id="cetag-${i}" placeholder="e.g. ESE 2021" value="${_esc(q.source_tag||'')}"></div>
+        </div>
         <div class="d-flex gap-2">
           <button class="btn btn-primary btn-sm" onclick="csvSaveEdit(${i})"><i class="fas fa-save me-1"></i>Save</button>
           <button class="btn btn-secondary btn-sm" onclick="csvCancelEdit(${i})">Cancel</button>
@@ -1054,6 +1213,7 @@
     q.negative_marks=document.getElementById(`cenm-${i}`).value;
     q.tolerance=document.getElementById(`cetol-${i}`).value;
     q.image_path=document.getElementById(`ceimg-${i}`).value;
+    q.source_tag=document.getElementById(`cetag-${i}`).value;
     if(q.question_type!=='NUMERIC'){
       q.option_a=document.getElementById(`ceoa-${i}`).value;
       q.option_b=document.getElementById(`ceob-${i}`).value;
@@ -1093,6 +1253,13 @@
     document.getElementById('csvStep2').style.display='none';
     document.getElementById('csvFileInput').value='';
     document.getElementById('csvFileName').textContent='No file selected';
+    // Going back to Step 1 always means a fresh, explicit exam pick next —
+    // never carry over a target exam from whatever was just discarded
+    // (particularly important coming from the AI path, where it was
+    // locked to that job's exam, not chosen here).
+    _setTargetExam(null, null);
+    const trigger = document.getElementById('csvExamTrigger');
+    if (trigger) trigger.innerHTML = '<span class="cet-empty">Select an exam&hellip;</span><i class="fas fa-chevron-down chev"></i>';
   };
 
   window.csvExport=function(){
@@ -1104,8 +1271,12 @@
   window.csvExecuteExport=function(){
     document.getElementById('csvExportModal').style.display='none';
 
-    const hdr='exam_id,question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance';
-    const rows=_csvRows.map(q=>[q.exam_id,`"${(q.question_text||'').replace(/"/g,'""')}"`,`"${(q.option_a||'').replace(/"/g,'""')}"`,`"${(q.option_b||'').replace(/"/g,'""')}"`,`"${(q.option_c||'').replace(/"/g,'""')}"`,`"${(q.option_d||'').replace(/"/g,'""')}"`,`"${(q.correct_answer||'').replace(/"/g,'""')}"`,`"${(q.question_type||'').replace(/"/g,'""')}"`,`"${(q.image_path||'').replace(/"/g,'""')}"`,q.positive_marks||4,q.negative_marks||1,q.tolerance||0].join(',')).join('\n');
+    // exam_id dropped — this export is just the question data being
+    // reviewed, and re-importing it now always goes through the exam
+    // picker rather than trusting a column in the file (see the
+    // module-level security note above).
+    const hdr='question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance,source_tag';
+    const rows=_csvRows.map(q=>[`"${(q.question_text||'').replace(/"/g,'""')}"`,`"${(q.option_a||'').replace(/"/g,'""')}"`,`"${(q.option_b||'').replace(/"/g,'""')}"`,`"${(q.option_c||'').replace(/"/g,'""')}"`,`"${(q.option_d||'').replace(/"/g,'""')}"`,`"${(q.correct_answer||'').replace(/"/g,'""')}"`,`"${(q.question_type||'').replace(/"/g,'""')}"`,`"${(q.image_path||'').replace(/"/g,'""')}"`,q.positive_marks||4,q.negative_marks||1,q.tolerance||0,`"${(q.source_tag||'').replace(/"/g,'""')}"`].join(',')).join('\n');
 
     _download(new Blob([hdr+'\n'+rows],{type:'text/csv'}),'edited_questions.csv');
 
@@ -1120,10 +1291,15 @@
 
   window.csvSaveToDB=async function(){
     document.getElementById('csvConfirmModal').style.display='none';
-    const hdr='exam_id,question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance';
-    const rows=_csvRows.map(q=>[q.exam_id,`"${(q.question_text||'').replace(/"/g,'""')}"`,`"${(q.option_a||'').replace(/"/g,'""')}"`,`"${(q.option_b||'').replace(/"/g,'""')}"`,`"${(q.option_c||'').replace(/"/g,'""')}"`,`"${(q.option_d||'').replace(/"/g,'""')}"`,`"${(q.correct_answer||'').replace(/"/g,'""')}"`,`"${(q.question_type||'').replace(/"/g,'""')}"`,`"${(q.image_path||'').replace(/"/g,'""')}"`,q.positive_marks||4,q.negative_marks||1,q.tolerance||0].join(',')).join('\n');
+    if(!_targetExamId){ csvToast('No exam selected', 'danger', 'Go back and choose an exam before saving.'); return; }
+    const hdr='question_text,option_a,option_b,option_c,option_d,correct_answer,question_type,image_path,positive_marks,negative_marks,tolerance,source_tag';
+    const rows=_csvRows.map(q=>[`"${(q.question_text||'').replace(/"/g,'""')}"`,`"${(q.option_a||'').replace(/"/g,'""')}"`,`"${(q.option_b||'').replace(/"/g,'""')}"`,`"${(q.option_c||'').replace(/"/g,'""')}"`,`"${(q.option_d||'').replace(/"/g,'""')}"`,`"${(q.correct_answer||'').replace(/"/g,'""')}"`,`"${(q.question_type||'').replace(/"/g,'""')}"`,`"${(q.image_path||'').replace(/"/g,'""')}"`,q.positive_marks||4,q.negative_marks||1,q.tolerance||0,`"${(q.source_tag||'').replace(/"/g,'""')}"`].join(',')).join('\n');
     const fd=new FormData();
     fd.append('csv_file',new Blob([hdr+'\n'+rows],{type:'text/csv'}),'questions.csv');
+    // SECURITY: exam_id sent as its own field — the one authoritative
+    // destination for this whole batch (see the module-level note above
+    // and import_questions_csv() server-side).
+    fd.append('exam_id', _targetExamId);
     try {
       const res=await fetch('/api/v01/admin/questions/import-csv',{method:'POST',body:fd});
       const data=await res.json();

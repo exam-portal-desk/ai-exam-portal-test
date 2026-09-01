@@ -80,6 +80,17 @@ def validate_password_strength(password: str) -> Tuple[bool, str]:
 
 
 # ─────────────────────────────────────────────
+# OTP codes ("Existing Active Session" login verification)
+# ─────────────────────────────────────────────
+
+def generate_otp_code(length: int) -> str:
+    """Cryptographically secure random numeric OTP of the given length.
+    Hash/verify it with hash_password()/verify_password() above — bcrypt
+    works fine on any string, no need for a parallel hashing scheme."""
+    return "".join(secrets.choice("0123456789") for _ in range(length))
+
+
+# ─────────────────────────────────────────────
 # Secure tokens (setup / reset)
 # ─────────────────────────────────────────────
 

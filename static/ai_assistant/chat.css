@@ -1,18 +1,18 @@
 /* static/ai_assistant/chat.css — all colors via var(--token) */
 
-/* Prevent body scroll on AI page */
-html:has(.ai-page),
-body:has(.ai-page) {
-  overflow: hidden;
-  height: 100%;
-}
-/* Hide useless spacer (footer stays) */
+/* Hide useless spacer (footer stays, but pushed below the initial
+   viewport by .ai-shell's own fixed height below — see next rule) */
 .page-main:has(.ai-page) > div[style*="flex:1"] {
   display: none;
 }
 
+/* Fixed viewport-relative height (not height:100%, which depends on a
+   min-height:auto flex parent and gets squeezed by the footer's own
+   height — that footer reflows to several lines on narrow mobile
+   screens, which used to shrink the whole chat UI down to almost
+   nothing). Matches the same proven approach chat.html uses. */
 .ai-shell {
-  display: flex; flex: 1; min-height: 0; height: 100%;
+  display: flex; flex: none; min-height: 0; height: calc(100vh - 48px);
   background: var(--bg); overflow: hidden;
 }
 
@@ -221,7 +221,10 @@ body:has(.ai-page) {
   .ai-messages { padding: .85rem 1rem; }
   .ai-header { padding: .55rem 1rem; }
   .ai-input-area { padding: .6rem 1rem; }
-  .ai-stats { display: none; }
+  /* Restructured (not hidden): LIMIT/USED/LEFT don't fit on the header's
+     first row alongside the title, so they wrap onto their own full-width
+     row instead — .ai-header already has flex-wrap:wrap. */
+  .ai-stats { width: 100%; justify-content: space-around; margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--border); gap: 0; }
   .message-wrapper { max-width: 88%; }
   /* font-size must be >=16px or iOS Safari zooms the whole page in on focus */
   .chat-input { font-size: 16px; }
@@ -266,7 +269,10 @@ body:has(.ai-page) {
 .ai-new-chat-btn:active { transform: scale(.97); }
 .ai-sidebar.collapsed .ai-new-chat-btn { padding: .55rem; margin: .5rem .55rem .6rem; }
 
-.ai-search-box { padding: 0 .7rem .6rem; position: relative; }
+/* padding-bottom moved to margin: the icon's top:50% centers against this
+   box's own (padding) height, so an asymmetric bottom padding pushed the
+   icon below the input's actual vertical center. */
+.ai-search-box { padding: 0 .7rem; margin-bottom: .6rem; position: relative; }
 .ai-search-box .input-icon { position: absolute; left: 1.15rem; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: .74rem; pointer-events: none; }
 .ai-search-box input {
   width: 100%; padding: .5rem .65rem .5rem 2rem;
@@ -346,10 +352,14 @@ body:has(.ai-page) {
 .ai-mobile-menu-btn { display: none; }
 
 @media (max-width: 768px) {
+  /* top:0/height:100% put the drawer (and its New Chat button) behind the
+     sticky global nav bar (48px, z-index:200 — higher than this drawer's
+     z-index:50), clipping it. Start below the nav instead. */
   .ai-sidebar {
-    position: fixed; top: 0; left: 0; height: 100%; width: 85vw; max-width: 320px;
+    position: fixed; top: 48px; left: 0; height: calc(100% - 48px); width: 85vw; max-width: 320px;
     z-index: 50; transform: translateX(-100%); transition: transform .2s ease;
   }
+  .ai-sidebar-overlay { top: 48px; }
   .ai-sidebar.mobile-open { transform: translateX(0); }
   .ai-sidebar.collapsed { width: 85vw; max-width: 320px; } /* collapse state is desktop-only */
   .ai-sidebar.collapsed .ai-sb-label,

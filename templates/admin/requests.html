@@ -3,6 +3,7 @@
 
 {% block content %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
 <style>
 /* ── Page Header ── */
 .page-top {
@@ -16,19 +17,25 @@
 }
 .page-top p { font-size: .82rem; color: var(--text-3); margin: 0; }
 
-/* ── Stat Pills ── */
-.stat-pills { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.stat-pill {
-  display: inline-flex; align-items: center; gap: .4rem;
-  padding: .35rem .8rem; border-radius: 999px;
-  font-size: .75rem; font-weight: 700;
-  border: 1px solid var(--border);
-  background: var(--surface-2); color: var(--text-2);
+/* ── Header stat chips — same DNA as the dashboard's .dash-stat cards
+   (top accent border + icon square + number/label) scaled down for a
+   header strip, instead of the old icon+number pill. ── */
+.req-stats { display: flex; align-items: stretch; gap: .6rem; flex-wrap: wrap; }
+.req-stat {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 2px solid var(--stat-c, var(--border));
+  border-radius: var(--radius); padding: .5rem .9rem;
+  min-width: 112px;
 }
-.stat-pill i { font-size: .72rem; }
-.pill-pending  { background: var(--warning-bg);  color: var(--warning-text);  border-color: var(--warning-border); }
-.pill-approved { background: var(--success-bg);  color: var(--success-text);  border-color: var(--success-border); }
-.pill-denied   { background: var(--danger-bg);   color: var(--danger-text);   border-color: var(--danger-border); }
+.req-stat-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--stat-bg, var(--surface-2)); color: var(--stat-c, var(--text-3));
+  font-size: .78rem;
+}
+.req-stat-num { font-size: 1.05rem; font-weight: 800; color: var(--text-1); line-height: 1.15; }
+.req-stat-label { font-size: .68rem; font-weight: 600; color: var(--text-3); margin-top: .1rem; }
 
 /* ── Tabs Card ── */
 .tabs-card {
@@ -38,25 +45,26 @@
   overflow: hidden;
   box-shadow: var(--shadow-md);
 }
+/* Pill-style tabs — same pattern as templates/admin/users_analytics.html's
+   .tabs-nav/.tab-btn, reused here instead of the old underline style so
+   the two pages read as one design language. */
 .tabs-nav {
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: .3rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
-  padding: 0 1rem;
-  gap: .25rem;
+  padding: .55rem .75rem;
   overflow-x: auto;
 }
 .tab-btn {
   display: inline-flex; align-items: center; gap: .45rem;
-  padding: .75rem 1rem;
-  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: .42rem .95rem;
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius);
   font-size: .82rem; font-weight: 600; color: var(--text-3);
-  cursor: pointer; white-space: nowrap;
-  transition: color .15s, border-color .15s;
-  margin-bottom: -1px;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background .12s, color .12s, border-color .12s;
 }
-.tab-btn:hover { color: var(--text-1); }
-.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-btn:hover  { background: var(--surface); color: var(--text-1); }
+.tab-btn.active { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
 .tab-cnt {
   background: var(--danger); color: #fff;
   font-size: .65rem; font-weight: 700;
@@ -64,6 +72,14 @@
 }
 .tab-pane { display: none; }
 .tab-pane.active { display: block; }
+
+/* Narrow phones — tighten so all three tabs fit on one line with no
+   scrolling needed ("User Management" must never look clipped). */
+@media (max-width: 420px) {
+  .tabs-nav { padding: .5rem .5rem; gap: .2rem; }
+  .tab-btn { padding: .4rem .55rem; font-size: .74rem; gap: 0; }
+  .tab-btn i { display: none; }
+}
 
 /* ── Table ── */
 .table { width: 100%; border-collapse: collapse; }
@@ -105,19 +121,32 @@
 .access-badge.access-admin, .access-badge.ab-admin { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
 .access-badge.access-both,  .access-badge.ab-both  { background: var(--accent-subtle); color: var(--accent); border-color: var(--border); }
 
-/* ── Status Badges ── */
+/* ── Status Badges — text-only pill + subtle dot, same convention as
+   templates/admin/exams.html's .status-badge (upcoming/ongoing/completed):
+   no clock/tick/cross icon, just color + uppercase label communicating
+   state at a glance. ── */
 .status-badge {
-  display: inline-flex; align-items: center; gap: .3rem;
-  padding: .2rem .6rem; border-radius: 999px;
-  font-size: .72rem; font-weight: 700;
-  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .22rem .65rem; border-radius: 20px;
+  font-size: .68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  border: 1px solid;
 }
-.status-badge.status-pending,  .status-badge.sb-pending   { background: var(--warning-bg);  color: var(--warning-text);  border-color: var(--warning-border); }
-.status-badge.status-completed,.status-badge.sb-completed { background: var(--success-bg);  color: var(--success-text);  border-color: var(--success-border); }
-.status-badge.status-denied,   .status-badge.sb-denied    { background: var(--danger-bg);   color: var(--danger-text);   border-color: var(--danger-border); }
+.status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.status-badge.sb-pending   { background: var(--warning-bg);  color: var(--warning-text);  border-color: var(--warning-border); }
+.status-badge.sb-completed { background: var(--success-bg);  color: var(--success-text);  border-color: var(--success-border); }
+.status-badge.sb-denied    { background: var(--danger-bg);   color: var(--danger-text);   border-color: var(--danger-border); }
 
-/* ── Reason Text ── */
-.reason-text { max-width: 180px; font-size: .79rem; color: var(--text-2); word-break: break-word; }
+/* ── Reason Text — clamps long/multi-line audit trails instead of
+   letting them stretch the row; "Show more" reveals the rest. ── */
+.reason-cell { max-width: 220px; font-size: .79rem; color: var(--text-2); word-break: break-word; white-space: pre-wrap; }
+.reason-cell.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.reason-toggle {
+  display: inline-block; margin-top: .25rem;
+  background: none; border: none; padding: 0; font-family: inherit;
+  font-size: .7rem; font-weight: 700; color: var(--accent); cursor: pointer;
+}
+.reason-toggle:hover { text-decoration: underline; }
 
 /* ── Action Buttons ── */
 .icon-btn {
@@ -128,7 +157,49 @@
   font-size: .78rem;
 }
 .icon-btn.approve:hover { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
-.icon-btn.deny:hover    { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
+.icon-btn.deny:hover,
+.icon-btn.delete:hover  { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
+
+/* ── Pending age hint ── */
+.pending-age { font-size: .68rem; color: var(--text-3); margin-top: .3rem; white-space: nowrap; }
+
+/* ── Filter toolbar — same pattern as templates/admin/users_analytics.html's
+   .filter-bar/.f-select/.f-date: labeled controls in a row, all the same
+   36px height, wrapping cleanly on narrow screens. The date fields use the
+   shared themed calendar (static/shared/date-picker.js) instead of the
+   browser's native <input type=date> popup. ── */
+.filter-bar {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem;
+  padding: .9rem 1rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.filter-item { flex: 1 1 140px; min-width: 130px; }
+.filter-item.search-item { flex: 1 1 220px; min-width: 180px; }
+.filter-item.action-item { flex: 0 0 auto; min-width: 0; }
+.filter-bar label {
+  display: block; font-size: .72rem; font-weight: 600;
+  color: var(--text-3); margin-bottom: .3rem;
+}
+.f-select, .f-date {
+  width: 100%;
+  background: var(--bg) !important; border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important; color: var(--text-1) !important;
+  font-family: inherit; font-size: .83rem; padding: .4rem .65rem; min-height: 36px;
+  transition: border-color .12s;
+}
+.f-select:focus, .f-date:focus { border-color: var(--accent) !important; outline: none; box-shadow: 0 0 0 3px var(--accent-subtle); }
+.f-select option { background: var(--surface); color: var(--text-1); }
+.filter-bar .search-wrap { width: 100%; margin-left: 0; min-height: 36px; box-sizing: border-box; }
+.filter-bar .search-wrap input { width: 100%; }
+
+/* ── Table error state — replaces a plain line of red text with a proper
+   component (icon + message + retry), matching .empty-state's visual
+   weight so loading/error/empty all feel like the same family. ── */
+.table-error-state { text-align: center; padding: 2.5rem 1rem; }
+.table-error-state i { font-size: 1.7rem; color: var(--danger-text); opacity: .75; display: block; margin-bottom: .6rem; }
+.table-error-state p { margin: 0 0 .9rem; font-size: .85rem; }
+.table-error-state p strong { display: block; color: var(--text-1); font-size: .9rem; margin-bottom: .15rem; }
+.table-error-state p span { color: var(--text-3); font-size: .78rem; }
 
 /* ── Buttons ── */
 .btn-flat {
@@ -291,6 +362,21 @@
    on its very first line and never reaching the modal-close/list-refresh
    code after it, which is what made Approve/Deny look like they weren't
    doing anything) ── */
+/* ── Last Updated column — compact 2-line date/time instead of one long
+   inline string (was visually an oversized rectangle among short cells).
+   Stays visible on mobile too — just shrinks further — since the table
+   already scrolls horizontally within its own .table-responsive wrapper
+   (see admin_base.html's 768px breakpoint for that established pattern),
+   so hiding the column isn't necessary to keep the row compact. ── */
+.col-updated { white-space: nowrap; }
+.ts-date { font-size: .75rem; color: var(--text-2); font-weight: 500; line-height: 1.3; }
+.ts-time { font-size: .68rem; color: var(--text-3); line-height: 1.3; }
+@media (max-width: 768px) {
+  .col-updated { padding-left: .6rem !important; padding-right: .6rem !important; }
+  .col-updated .ts-date, .col-updated .ts-time { font-size: .68rem; }
+  .col-updated .ts-time { font-size: .62rem; }
+}
+
 #toastContainer { position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none; }
 .toast-item { display:flex;align-items:center;gap:0.65rem;padding:0.75rem 1.1rem;border-radius:12px;font-size:0.83rem;font-weight:600;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.35);min-width:240px;max-width:340px;pointer-events:all;animation:toastIn 0.25s cubic-bezier(.34,1.56,.64,1); }
 @keyframes toastIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
@@ -327,10 +413,19 @@
     <h1><i class="fas fa-user-plus me-2" style="color:var(--accent)"></i>Requests &amp; User Management</h1>
     <p>Manage access requests and update user roles.</p>
   </div>
-  <div class="stat-pills">
-    <span class="stat-pill pill-pending"><i class="fas fa-clock"></i><span id="hdrPending">—</span> Pending</span>
-    <span class="stat-pill pill-approved"><i class="fas fa-check"></i><span id="hdrApproved">—</span> Approved</span>
-    <span class="stat-pill pill-denied"><i class="fas fa-times"></i><span id="hdrDenied">—</span> Denied</span>
+  <div class="req-stats">
+    <div class="req-stat" style="--stat-c:var(--warning-text);--stat-bg:var(--warning-bg)">
+      <div class="req-stat-icon"><i class="fas fa-hourglass-half"></i></div>
+      <div><div class="req-stat-num" id="hdrPending">—</div><div class="req-stat-label">Pending</div></div>
+    </div>
+    <div class="req-stat" style="--stat-c:var(--success-text);--stat-bg:var(--success-bg)">
+      <div class="req-stat-icon"><i class="fas fa-check"></i></div>
+      <div><div class="req-stat-num" id="hdrApproved">—</div><div class="req-stat-label">Approved</div></div>
+    </div>
+    <div class="req-stat" style="--stat-c:var(--danger-text);--stat-bg:var(--danger-bg)">
+      <div class="req-stat-icon"><i class="fas fa-ban"></i></div>
+      <div><div class="req-stat-num" id="hdrDenied">—</div><div class="req-stat-label">Denied</div></div>
+    </div>
   </div>
 </div>
 
@@ -370,16 +465,71 @@
 
   {# ── TAB 2: History (AJAX) ── #}
   <div id="pane-history" class="tab-pane">
+    <div class="filter-bar">
+      <div class="filter-item">
+        <label for="histStatus">Status</label>
+        <select class="f-select" id="histStatus" onchange="histFetch(1)">
+          <option value="processed" selected>All Processed</option>
+          <option value="all">All (incl. Pending)</option>
+          <option value="pending">Pending Only</option>
+          <option value="completed">Approved Only</option>
+          <option value="denied">Denied Only</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label for="histCurRole">Current Role</label>
+        <select class="f-select" id="histCurRole" onchange="histFetch(1)">
+          <option value="">Any</option>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+          <option value="user,admin">User &amp; Admin</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label for="histReqRole">Requested Role</label>
+        <select class="f-select" id="histReqRole" onchange="histFetch(1)">
+          <option value="">Any</option>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+          <option value="user,admin">User &amp; Admin</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label for="histDateFrom">From</label>
+        <div class="dt-field">
+          <input type="text" class="f-date dt-date-input" id="histDateFrom" placeholder="Any date" readonly autocomplete="off">
+          <i class="fas fa-calendar-days dt-field-icon"></i>
+        </div>
+      </div>
+      <div class="filter-item">
+        <label for="histDateTo">To</label>
+        <div class="dt-field">
+          <input type="text" class="f-date dt-date-input" id="histDateTo" placeholder="Any date" readonly autocomplete="off">
+          <i class="fas fa-calendar-days dt-field-icon"></i>
+        </div>
+      </div>
+      <div class="filter-item search-item">
+        <label for="histSearch">Search</label>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" id="histSearch" placeholder="Username or email…" oninput="histDebounce()">
+        </div>
+      </div>
+      <div class="filter-item action-item">
+        <label>&nbsp;</label>
+        <button class="btn-flat secondary" onclick="histClearFilters()"><i class="fas fa-filter-circle-xmark"></i>Clear</button>
+      </div>
+    </div>
     <div class="table-responsive">
       <table class="table mb-0">
         <thead>
           <tr>
             <th>#</th><th>User</th><th>Email</th><th>Current</th><th>Requested</th>
-            <th>Date</th><th>Status</th><th>Processed By</th><th>Reason</th>
+            <th>Date</th><th>Status</th><th>Processed By</th><th>Reason</th><th>Actions</th>
           </tr>
         </thead>
         <tbody id="historyTbody">
-          <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-muted)">
+          <tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--text-muted)">
             <i class="fas fa-spinner fa-spin me-2"></i>Loading…
           </td></tr>
         </tbody>
@@ -432,7 +582,7 @@
               <input type="checkbox" id="selectAllChk" class="e-checkbox" onchange="handleSelectAll(this)">
             </th>
             <th>User</th><th>Email</th><th>Current Role</th>
-            <th>New Role</th><th>Update</th><th>Last Updated</th>
+            <th>New Role</th><th>Update</th><th class="col-updated">Last Updated</th>
           </tr>
         </thead>
         <tbody id="usersTbody">
@@ -501,6 +651,34 @@
   </div>
 </div>
 
+{# ── Delete Confirm Modal ── #}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-trash me-2" style="color:var(--danger-text)"></i>Delete Request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.9rem">
+          Remove the request from <strong id="deleteUname"></strong> from this list?
+        </p>
+        <div style="display:flex;gap:.5rem;align-items:flex-start;background:var(--info-bg);border:1px solid var(--info-border);color:var(--info-text);border-radius:var(--radius);padding:.65rem .85rem;font-size:.78rem;line-height:1.55">
+          <i class="fas fa-circle-info" style="margin-top:.15rem;flex-shrink:0"></i>
+          <span id="deleteConsequence"></span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-flat danger" id="confirmDelete" onclick="handleDeleteConfirm()">
+          <i class="fas fa-trash me-1"></i>Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
 <script>
 /* ═══════════════════════════════════════════════
    STATE
@@ -524,7 +702,7 @@ function switchTab(name, btn) {
   // Lazy-load history tab on first open
   if (name === 'history' && !document.getElementById('historyTbody').dataset.loaded) {
     document.getElementById('historyTbody').dataset.loaded = '1';
-    fetchRequests('history', 1);
+    histFetch(1);
   }
   // Lazy-load users tab on first open
   if (name === 'users' && !document.getElementById('usersTbody').dataset.loaded) {
@@ -560,7 +738,7 @@ function fetchRequests(status, page) {
       }
     })
     .catch(() => {
-      tbody.innerHTML = errRow(9, 'Error loading data');
+      tbody.innerHTML = errRow(9, "Couldn't load requests.", `fetchRequests('${status}', ${page})`);
     });
 }
 
@@ -572,21 +750,41 @@ function renderPendingRows(reqs) {
   }
   tbody.innerHTML = reqs.map(r => `
     <tr>
-      <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.request_id}</span></td>
+      <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.row_no ?? r.request_id}</span></td>
       <td>${userCell(r.username)}</td>
-      <td><span style="font-size:.8rem;color:var(--text-muted)">${r.email}</span></td>
+      <td><span style="font-size:.8rem;color:var(--text-muted)">${escHtml(r.email)}</span></td>
       <td>${accessBadge(r.current_access)}</td>
       <td>${accessBadge(r.requested_access)}</td>
-      <td><span style="font-size:.78rem;color:var(--text-muted)">${r.request_date||'—'}</span></td>
-      <td><div style="max-width:180px;font-size:.79rem;color:var(--text-secondary);word-break:break-word">${r.reason||'<em style="color:var(--text-muted)">—</em>'}</div></td>
-      <td><span class="status-badge sb-pending"><i class="fas fa-clock"></i>Pending</span></td>
+      <td>${_fmtTs(r.request_date)}</td>
+      <td>${reasonCell(r.reason)}</td>
+      <td>
+        <span class="status-badge sb-pending">Pending</span>
+        <div class="pending-age">${pendingAge(r.request_date_raw)}</div>
+      </td>
       <td>
         <div style="display:flex;gap:.35rem">
           <button class="icon-btn approve" title="Approve" onclick="openApprove(${r.request_id},'${esc(r.username)}')"><i class="fas fa-check"></i></button>
           <button class="icon-btn deny"    title="Deny"    onclick="openDeny(${r.request_id},'${esc(r.username)}')"><i class="fas fa-times"></i></button>
+          <button class="icon-btn delete"  title="Delete"  onclick="openDelete(${r.request_id},'${esc(r.username)}','pending')"><i class="fas fa-trash"></i></button>
         </div>
       </td>
     </tr>`).join('');
+}
+
+// "Pending for 2h" style age hint next to the Pending badge — request_date_raw
+// is a UTC ISO string (see _fmt() in the API), the display request_date is
+// locale-formatted for reading and isn't safe to re-parse for this.
+function pendingAge(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!isFinite(ms) || ms < 0) return '';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1)  return 'Just now';
+  if (mins < 60) return `Pending ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `Pending ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `Pending ${days}d`;
 }
 
 /* ═══════════════════════════════════════════════
@@ -595,28 +793,106 @@ function renderPendingRows(reqs) {
 function renderHistoryRows(reqs) {
   const tbody = document.getElementById('historyTbody');
   if (!reqs.length) {
-    tbody.innerHTML = `<tr><td colspan="9">${emptyState('fa-history','No History Yet','No requests have been processed.')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">${emptyState('fa-history','No Matching Records','Try adjusting or clearing the filters above.')}</td></tr>`;
     return;
   }
+  const STATUS_MAP = {
+    completed: ['sb-completed', 'Approved'],
+    denied:    ['sb-denied',    'Denied'],
+    pending:   ['sb-pending',   'Pending'],
+  };
   tbody.innerHTML = reqs.map(r => {
-    const sbC = r.status==='completed' ? 'sb-completed' : 'sb-denied';
-    const sbL = r.status==='completed' ? 'Approved' : 'Denied';
-    const sbI = r.status==='completed' ? 'fa-check' : 'fa-times';
+    const [sbC, sbL] = STATUS_MAP[r.status] || ['sb-pending', r.status || '—'];
     return `
     <tr>
-      <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.request_id}</span></td>
+      <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.row_no ?? r.request_id}</span></td>
       <td>${userCell(r.username)}</td>
-      <td><span style="font-size:.8rem;color:var(--text-muted)">${r.email}</span></td>
+      <td><span style="font-size:.8rem;color:var(--text-muted)">${escHtml(r.email)}</span></td>
       <td>${accessBadge(r.current_access)}</td>
       <td>${accessBadge(r.requested_access)}</td>
-      <td><span style="font-size:.78rem;color:var(--text-muted)">${r.request_date||'—'}</span></td>
-      <td><span class="status-badge ${sbC}"><i class="fas ${sbI}"></i>${sbL}</span></td>
+      <td>${_fmtTs(r.request_date)}</td>
+      <td><span class="status-badge ${sbC}">${sbL}</span></td>
       <td>
-        <div style="font-size:.82rem;font-weight:600;color:var(--text-primary)">${r.processed_by||'Admin'}</div>
-        ${r.processed_date?`<div style="font-size:.75rem;color:var(--text-muted)">${r.processed_date}</div>`:''}
+        ${r.processed_by ? `<div style="font-size:.82rem;font-weight:600;color:var(--text-primary)">${escHtml(r.processed_by)}</div>` : '<span style="font-size:.78rem;color:var(--text-muted)">—</span>'}
+        ${r.processed_date ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:.1rem">${r.processed_date}</div>` : ''}
       </td>
-      <td><div style="max-width:200px;font-size:.79rem;color:var(--text-secondary);word-break:break-word;white-space:pre-wrap">${r.reason||'<em style="color:var(--text-muted)">—</em>'}</div></td>
+      <td>${reasonCell(r.reason)}</td>
+      <td><button class="icon-btn delete" title="Delete" onclick="openDelete(${r.request_id},'${esc(r.username)}','history')"><i class="fas fa-trash"></i></button></td>
     </tr>`}).join('');
+}
+
+// Long/multi-line audit-trail reasons clamp to 3 lines with a toggle
+// instead of stretching the row; escHtml() guards against the reason text
+// being attacker-controlled free text (it originates from the public
+// access-request form and the admin's own denial-reason field).
+function reasonCell(reason) {
+  if (!reason) return '<em style="color:var(--text-muted)">—</em>';
+  const isLong = reason.length > 140 || reason.split('\n').length > 3;
+  const id = 'rz' + Math.random().toString(36).slice(2, 9);
+  const toggle = isLong ? `<button type="button" class="reason-toggle" onclick="toggleReason('${id}', this)">Show more</button>` : '';
+  return `<div class="reason-cell${isLong ? ' clamped' : ''}" id="${id}">${escHtml(reason)}</div>${toggle}`;
+}
+function toggleReason(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const nowClamped = el.classList.toggle('clamped');
+  btn.textContent = nowClamped ? 'Show more' : 'Show less';
+}
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+/* ═══════════════════════════════════════════════
+   REQUESTS — HISTORY FILTERS (server-side)
+═══════════════════════════════════════════════ */
+let _histTimer = null;
+function histDebounce() { clearTimeout(_histTimer); _histTimer = setTimeout(() => histFetch(1), 400); }
+
+function histParams() {
+  return {
+    status:         document.getElementById('histStatus')?.value || 'processed',
+    q:              (document.getElementById('histSearch')?.value || '').trim(),
+    current_role:   document.getElementById('histCurRole')?.value || '',
+    requested_role: document.getElementById('histReqRole')?.value || '',
+    // .dataset.iso ("YYYY-MM-DD") is kept in sync by the themed calendar
+    // picker (static/shared/date-picker.js) — .value holds the formatted
+    // display string ("29 August 2026"), not something the backend can use.
+    date_from:      document.getElementById('histDateFrom')?.dataset.iso || '',
+    date_to:        document.getElementById('histDateTo')?.dataset.iso || '',
+  };
+}
+
+function histFetch(page) {
+  const p = histParams();
+  if (p.date_from && p.date_to && p.date_from > p.date_to) {
+    toast('"From" date must be before or equal to "To" date.', 'warning');
+    return;
+  }
+  _historyPage = page;
+  const tbody = document.getElementById('historyTbody');
+  const pgDiv = document.getElementById('historyPaginator');
+  tbody.innerHTML = skeletonRows(10);
+  pgDiv.innerHTML = '';
+
+  const params = new URLSearchParams({ ...p, page });
+  fetch(`/api/v01/admin/access-requests?${params}`)
+    .then(r => r.json())
+    .then(d => {
+      renderHistoryRows(d.requests);
+      renderPaginator(pgDiv, page, d.total_pages, d.total, 25, p => histFetch(p));
+    })
+    .catch(() => { tbody.innerHTML = errRow(10, "Couldn't load history.", "histFetch(_historyPage)"); });
+}
+
+function histClearFilters() {
+  document.getElementById('histStatus').value = 'processed';
+  document.getElementById('histCurRole').value = '';
+  document.getElementById('histReqRole').value = '';
+  const df = document.getElementById('histDateFrom'), dt = document.getElementById('histDateTo');
+  df.value = ''; df.dataset.iso = '';
+  dt.value = ''; dt.dataset.iso = '';
+  document.getElementById('histSearch').value = '';
+  histFetch(1);
 }
 
 /* ═══════════════════════════════════════════════
@@ -681,6 +957,41 @@ function handleDeny() {
 }
 
 /* ═══════════════════════════════════════════════
+   DELETE (soft-delete) — works from either tab
+═══════════════════════════════════════════════ */
+let _delReqId = null;
+let _delCtx   = null;   // 'pending' | 'history' — decides which list to refresh
+
+function openDelete(id, uname, ctx) {
+  _delReqId = id;
+  _delCtx   = ctx;
+  document.getElementById('deleteUname').textContent = uname;
+  document.getElementById('deleteConsequence').textContent = ctx === 'pending'
+    ? "This clears the request from the queue without approving or denying it. It will NOT grant or change any access."
+    : "This removes the record from History. It will NOT change the user's current role or access.";
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+function handleDeleteConfirm() {
+  if (!_delReqId) return;
+  const btn = document.getElementById('confirmDelete');
+  setLoading(btn, true);
+  fetch(`/api/v01/admin/access-requests/${_delReqId}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('deleteModal'))?.hide();
+        if (_delCtx === 'pending') fetchRequests('pending', _pendingPage);
+        else histFetch(_historyPage);
+        loadHeaderStats();
+        toast(d.message, 'success');
+      } else toast(d.message, 'danger');
+    })
+    .catch(() => toast('Network error', 'danger'))
+    .finally(() => setLoading(btn, false));
+}
+
+/* ═══════════════════════════════════════════════
    HEADER STATS (pills top-right) — AJAX
 ═══════════════════════════════════════════════ */
 function loadHeaderStats() {
@@ -722,8 +1033,22 @@ function umFetch(page) {
       );
     })
     .catch(() => {
-      tbody.innerHTML = errRow(7, 'Error loading users');
+      tbody.innerHTML = errRow(7, "Couldn't load users.", `umFetch(${JSON.stringify(page)})`);
     });
+}
+
+// Compact 2-line rendering for a "DD Month YYYY HH:MM AM/PM" timestamp —
+// splits the trailing "HH:MM AM/PM" onto its own muted line instead of one
+// long inline string.
+function _fmtTs(raw) {
+  if (!raw) return '<span class="ts-date">—</span>';
+  const parts = String(raw).trim().split(' ');
+  if (parts.length >= 2) {
+    const time = parts.slice(-2).join(' ');
+    const date = parts.slice(0, -2).join(' ');
+    if (date) return `<div class="ts-date">${date}</div><div class="ts-time">${time}</div>`;
+  }
+  return `<span class="ts-date">${raw}</span>`;
 }
 
 function renderUsers(users) {
@@ -769,7 +1094,7 @@ function renderUsers(users) {
           <i class="fas fa-save me-1"></i>Update
         </button>
       </td>
-      <td><span class="ts" style="font-size:.75rem;color:var(--text-3)">${u.updated_at||u.created_at||'—'}</span></td>
+      <td class="col-updated">${_fmtTs(u.updated_at||u.created_at)}</td>
     </tr>`;
   }).join('');
   syncSelectAll();
@@ -956,8 +1281,15 @@ function skeletonRows(cols) {
     `<tr><td colspan="${cols}"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
   ).join('');
 }
-function errRow(cols, msg) {
-  return `<tr><td colspan="${cols}" style="text-align:center;padding:2rem;color:var(--danger-text)"><i class="fas fa-exclamation-circle me-2"></i>${msg}</td></tr>`;
+function errRow(cols, msg, retryCall) {
+  const retryBtn = retryCall
+    ? `<button type="button" class="btn-flat secondary" onclick="${retryCall}"><i class="fas fa-rotate-right"></i>Retry</button>`
+    : '';
+  return `<tr><td colspan="${cols}"><div class="table-error-state">
+    <i class="fas fa-triangle-exclamation"></i>
+    <p><strong>Couldn't load data</strong><span>${msg || 'Something went wrong. Please try again.'}</span></p>
+    ${retryBtn}
+  </div></td></tr>`;
 }
 function emptyState(icon, title, sub) {
   return `<div class="empty-state"><i class="fas ${icon}"></i><p><strong>${title}</strong><br><span style="font-size:.8rem">${sub}</span></p></div>`;
@@ -1002,12 +1334,21 @@ function removeToast(el){
    INIT
 ═══════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
-  // Load header stat pills
+  // Load header stat chips
   loadHeaderStats();
 
   // Auto-load pending requests (Tab 1 is default active)
   document.getElementById('pendingTbody').dataset.loaded = '1';
   fetchRequests('pending', 1);
+
+  // History date-range filters — same themed calendar/pattern as
+  // templates/admin/exams.html and users_analytics.html
+  // (static/shared/date-picker.js), not the browser's native picker.
+  const displayFmt = {{ DISPLAY_DATE_FORMAT | tojson }};
+  ['histDateFrom', 'histDateTo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) createDatePicker(el, { displayFormat: displayFmt, onChange: () => histFetch(1) });
+  });
 
   // Refresh stats every 60s in background
   setInterval(() => {

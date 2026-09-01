@@ -243,6 +243,17 @@ def response_pdf(exam_id):
         flash("Result not found.", "error")
         return redirect(url_for("dashboard.results_history"))
 
+    # SECURITY: this route had no visibility check at all — a student who
+    # knew/guessed the URL could download the full response PDF (score,
+    # question-by-question breakdown, correct answers) directly, bypassing
+    # the same result_mode='manual'/'delayed' gate every other result/
+    # response view enforces (result(), response_page(), leaderboard_more()
+    # above). Same can_user_see_result() check, same reason for existing.
+    visible, _ = can_user_see_result(exam, result_data)
+    if not visible:
+        flash("This result has not been released yet.", "warning")
+        return redirect(url_for("dashboard.results_history"))
+
     responses = get_responses_by_result(int(result_data["id"]))
     questions = get_questions_by_exam(exam_id)
     q_map     = {int(q["id"]): q for q in questions}

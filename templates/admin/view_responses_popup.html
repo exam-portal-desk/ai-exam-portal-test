@@ -21,6 +21,11 @@
   margin-bottom:1rem;
 }
 .header-card h3 { font-size:1rem; font-weight:700; color:var(--text-1); margin-bottom:.3rem; }
+.sched-pill-resp {
+  display:inline-flex; align-items:center; gap:.3rem; vertical-align:middle; margin-left:.5rem;
+  font-size:.62rem; font-weight:700; color:var(--accent); background:var(--accent-subtle);
+  border:1px solid var(--border); padding:.12rem .5rem; border-radius:20px;
+}
 .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
 .text-muted-light { color:var(--text-3); font-size:.8rem; }
 .score-summary { text-align:right; }
@@ -369,7 +374,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
           <div class="header-card">
             <div class="header-top">
               <div>
-                <h3><i class="fas fa-clipboard-check" style="color:var(--gold-2)"></i> {{ exam.name }} - Response Analysis</h3>
+                <h3><i class="fas fa-clipboard-check" style="color:var(--gold-2)"></i> {{ exam.name }} - Response Analysis{% if exam.scheduled_mode %}<span class="sched-pill-resp" title="This was a Scheduled Exam"><i class="fas fa-calendar-check"></i>Scheduled</span>{% endif %}</h3>
                 <p class="mb-1 text-muted-light">Student: {{ session.full_name }}</p>
                 <p class="mb-0 text-muted-light">Completed: {{ result.completed_at | display_dt if result.completed_at else '—' }}</p>
               </div>
@@ -446,6 +451,9 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
             </div>
 
             <div class="card-body">
+              {% if response.question.metadata and response.question.metadata.source_tag %}
+              <span style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(45,91,227,0.12);color:#93c5fd;border:1px solid rgba(45,91,227,0.35);border-radius:20px;padding:.15rem .65rem;font-size:.72rem;font-weight:700;margin-bottom:.5rem"><i class="fas fa-bookmark" style="font-size:.62rem"></i>{{ response.question.metadata.source_tag }}</span>
+              {% endif %}
               <h6><strong>Question:</strong></h6>
               <p data-raw="{{ response.question.question_text | e }}"></p>
 
