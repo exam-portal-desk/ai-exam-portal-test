@@ -19,6 +19,7 @@ from app.routes.api.v01.admin import (  # noqa: E402, F401
     attempts,
     requests,
     images,
+    image_mapping,
     ai_centre,
     categories,
     storage,

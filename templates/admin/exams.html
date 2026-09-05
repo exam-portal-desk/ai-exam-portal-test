@@ -6,6 +6,7 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/view-toggle.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
 <style>
 /* ── Manage Exams — layout + structure only, all colors via tokens ── */
 
@@ -800,6 +801,7 @@
 
 <script src="{{ url_for('static', filename='shared/view-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
 <script>
 let _examIdToDelete = null;
 
@@ -1562,10 +1564,31 @@ createViewToggle({
    load (server-rendered page 1), everything after that via AJAX. ── */
 const examCategoryFilterEl = document.getElementById('examCategoryFilter');
 const examSubcategoryFilterEl = document.getElementById('examSubcategoryFilter');
+const examStatusFilterEl = document.getElementById('examStatusFilter');
 examCategoryFilterEl.addEventListener('change', () => {
   loadSubcategoriesFor(examCategoryFilterEl, examSubcategoryFilterEl);
   examSubcategoryFilterEl.querySelectorAll('option').forEach(o => { if (o.value === '') o.textContent = 'All Subcategories'; });
 });
+
+// Themed dropdown-button in place of the native <select> list for these
+// three filters — see static/admin/select-enhance.js. The underlying
+// <select> elements above are unchanged and still what list-controller.js
+// reads/listens to; this is presentation only.
+enhanceSelect(examCategoryFilterEl, { icon: 'fas fa-layer-group' });
+enhanceSelect(examSubcategoryFilterEl, { icon: 'fas fa-sitemap' });
+enhanceSelect(examStatusFilterEl, { icon: 'fas fa-circle-half-stroke' });
+
+// Same treatment for the Add/Edit Exam form selects — full-width "block"
+// mode so they sit flush with their sibling .form-control inputs. The
+// per-row Edit modals are rebuilt wholesale on every AJAX list refresh
+// (see onData below), so this runs again there, not just once here.
+function _enhanceExamFormSelects(root) {
+  root.querySelectorAll('select[name="status"]').forEach(el => enhanceSelect(el, { icon: 'fas fa-toggle-on', block: true }));
+  root.querySelectorAll('select[name="category_id"]').forEach(el => enhanceSelect(el, { icon: 'fas fa-layer-group', block: true }));
+  root.querySelectorAll('select[name="subcategory_id"]').forEach(el => enhanceSelect(el, { icon: 'fas fa-sitemap', block: true }));
+  root.querySelectorAll('select[name="result_mode"]').forEach(el => enhanceSelect(el, { icon: 'fas fa-eye', block: true }));
+}
+_enhanceExamFormSelects(document); // static Add modal + server-rendered page-1 Edit modals
 
 const examList = createAdminList({
   endpoint: '/api/v01/admin/exams',
@@ -1575,14 +1598,16 @@ const examList = createAdminList({
   filters: {
     category_id: examCategoryFilterEl,
     subcategory_id: examSubcategoryFilterEl,
-    status: document.getElementById('examStatusFilter'),
+    status: examStatusFilterEl,
   },
   perPage: {{ exams_per_page | default(20) }},
   extraParams: () => ({ partial: 1 }),
   onData: data => {
     document.getElementById('examTbody').innerHTML = data.rows_html || '';
     document.getElementById('examGrid').innerHTML = data.cards_html || '';
-    document.getElementById('examEditModals').innerHTML = data.modals_html || '';
+    const modalsEl = document.getElementById('examEditModals');
+    modalsEl.innerHTML = data.modals_html || '';
+    _enhanceExamFormSelects(modalsEl); // freshly-rendered Edit modals for this page's rows
   },
 });
 examList.hydrate({ page: 1, total_pages: {{ exams_total_pages | default(1) }}, total: {{ exams_total | default(0) }}, per_page: {{ exams_per_page | default(20) }} });

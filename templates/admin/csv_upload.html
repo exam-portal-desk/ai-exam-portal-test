@@ -432,6 +432,48 @@
   color: var(--accent); background: var(--accent-subtle); border: 1px solid var(--accent);
   border-radius: 20px; padding: .3rem .7rem; white-space: nowrap;
 }
+
+/* ── Bulk selection + bulk actions bar ─────────────────────────────────── */
+.csv-sel-cb { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; margin-right:.15rem; flex-shrink:0; }
+
+.csv-bulk-bar { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); padding:.9rem 1rem; margin-bottom:.85rem; transition:border-color .15s; }
+.csv-bulk-bar.has-selection { border-color:var(--accent); }
+.csv-bulk-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.6rem; margin-bottom:.75rem; padding-bottom:.65rem; border-bottom:1px solid var(--border); }
+.csv-bulk-count { font-size:.85rem; font-weight:700; color:var(--text-2); }
+.csv-bulk-bar.has-selection .csv-bulk-count { color:var(--accent); }
+.csv-bulk-select-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+.csv-bulk-section { margin-bottom:.85rem; }
+.csv-bulk-section:last-child { margin-bottom:0; }
+.csv-bulk-section-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); margin-bottom:.55rem; display:flex; align-items:center; gap:.4rem; }
+/* flex-end, not center: every field in this row is a label-above-control
+   stack of a DIFFERENT label height (a hint like "(MCQ/MSQ)" can wrap) —
+   bottom-aligning keeps every control's own edge level regardless of how
+   tall its label happens to be, instead of centering whole stacks against
+   each other. */
+.csv-bulk-row { display:flex; align-items:flex-end; gap:1.1rem; flex-wrap:wrap; row-gap:.85rem; }
+.csv-bulk-scope { display:flex; gap:.9rem; flex-wrap:wrap; font-size:.8rem; color:var(--text-2); align-items:center; padding-bottom:.4rem; }
+.csv-bulk-scope label { display:flex; align-items:center; gap:.35rem; cursor:pointer; }
+.csv-bulk-scope input[type="radio"] { accent-color:var(--accent); cursor:pointer; }
+.csv-bulk-size-btns, .csv-bulk-mark-btns { display:flex; gap:.4rem; flex-wrap:wrap; }
+
+/* One consistent label+control shape shared by every field in the Bulk
+   Marking row (the type filter AND the three number inputs) — this is what
+   keeps them all reading as one aligned form instead of a native <select>
+   dropped in next to hand-built inputs. */
+.csv-bulk-field { display:flex; flex-direction:column; gap:.3rem; }
+.csv-bulk-field-label { font-size:.7rem; color:var(--text-3); font-weight:600; line-height:1.3; }
+.csv-bulk-field input { width:92px; }
+.csv-bulk-hint { font-weight:400; text-transform:none; color:var(--text-3); font-size:.66rem; }
+
+.csv-bulk-type-btn { min-width:150px; text-align:left; display:inline-flex; align-items:center; }
+
+@media (max-width: 640px) {
+  .csv-bulk-row { flex-direction:column; align-items:stretch; width:100%; }
+  .csv-bulk-field { width:100%; }
+  .csv-bulk-field input { width:100%; }
+  .csv-bulk-type-btn, .csv-bulk-type-btn + .dropdown-menu { width:100%; }
+  .csv-bulk-select-actions .btn, .csv-bulk-size-btns .btn, .csv-bulk-mark-btns .btn { font-size:.72rem; padding:.3rem .55rem; }
+}
 </style>
 
 <!-- ── CSV Upload &amp; Editor — standalone page ────────────────────────────── -->
@@ -561,6 +603,28 @@
                     <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyGlobalSize('Large');return false;">Extra Large</a></li>
                   </ul>
                 </div>
+                <div class="btn-group" style="flex-shrink:0;">
+                  <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space:nowrap;" title="Change LaTeX size for question text only, across every loaded question">
+                    <i class="fas fa-heading me-1"></i>Question Size
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);z-index:9999;">
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyQuestionSize('small');return false;">Small</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyQuestionSize('normalsize');return false;">Normal</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyQuestionSize('large');return false;">Large</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyQuestionSize('Large');return false;">Extra Large</a></li>
+                  </ul>
+                </div>
+                <div class="btn-group" style="flex-shrink:0;">
+                  <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space:nowrap;" title="Change LaTeX size for answer options only, across every loaded question">
+                    <i class="fas fa-list-ul me-1"></i>Options Size
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);z-index:9999;">
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyOptionsSize('small');return false;">Small</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyOptionsSize('normalsize');return false;">Normal</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyOptionsSize('large');return false;">Large</a></li>
+                    <li><a class="dropdown-item" href="#" style="color:var(--text-1);" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" onclick="csvApplyOptionsSize('Large');return false;">Extra Large</a></li>
+                  </ul>
+                </div>
                 <button class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap;" onclick="csvRenderAll()" title="Render all cards to MathJax view">
                   <i class="fas fa-calculator me-1"></i>Render All
                 </button>
@@ -582,6 +646,81 @@
               <div class="csv-stat"><span class="csv-stat-val" id="csvStatShowing">0</span><span class="csv-stat-lbl">Showing</span></div>
             </div>
           </div>
+
+<!-- Bulk selection + bulk actions — works identically for AI-generated and
+     manually-uploaded rows since both land in the same _csvRows array (see
+     _loadRowsIntoEditor). Always visible (not gated on a selection) so
+     "Select All" itself is reachable. -->
+<div id="csvBulkBar" class="csv-bulk-bar">
+  <div class="csv-bulk-head">
+    <span class="csv-bulk-count"><i class="fas fa-check-square me-1"></i><span id="csvBulkCount">0</span> selected</span>
+    <div class="csv-bulk-select-actions">
+      <button class="btn btn-secondary btn-sm" onclick="csvSelectAll()"><i class="fas fa-check-double me-1"></i>Select All</button>
+      <div class="btn-group">
+        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">By Type</button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="#" onclick="csvSelectByType('MCQ');return false;">All MCQ</a></li>
+          <li><a class="dropdown-item" href="#" onclick="csvSelectByType('MSQ');return false;">All MSQ</a></li>
+          <li><a class="dropdown-item" href="#" onclick="csvSelectByType('NUMERIC');return false;">All Numeric</a></li>
+        </ul>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="csvClearSelection()"><i class="fas fa-times me-1"></i>Clear</button>
+    </div>
+  </div>
+
+  <div class="csv-bulk-section">
+    <div class="csv-bulk-section-title"><i class="fas fa-text-height"></i>Bulk LaTeX Size — selected questions</div>
+    <div class="csv-bulk-row">
+      <div class="csv-bulk-scope">
+        <label><input type="radio" name="csvBulkFmtScope" value="both" checked>Text + Options</label>
+        <label><input type="radio" name="csvBulkFmtScope" value="question">Text only</label>
+        <label><input type="radio" name="csvBulkFmtScope" value="options">Options only</label>
+      </div>
+      <div class="csv-bulk-size-btns">
+        <button class="btn btn-secondary btn-sm" onclick="csvBulkApplySize('small')">Small</button>
+        <button class="btn btn-secondary btn-sm" onclick="csvBulkApplySize('normalsize')">Normal</button>
+        <button class="btn btn-secondary btn-sm" onclick="csvBulkApplySize('large')">Large</button>
+        <button class="btn btn-secondary btn-sm" onclick="csvBulkApplySize('Large')">Extra Large</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="csv-bulk-section">
+    <div class="csv-bulk-section-title"><i class="fas fa-star"></i>Bulk Marking Scheme — selected questions</div>
+    <div class="csv-bulk-row">
+      <div class="csv-bulk-field">
+        <span class="csv-bulk-field-label">Question Type</span>
+        <div class="btn-group">
+          <button class="btn btn-secondary btn-sm dropdown-toggle csv-bulk-type-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-filter me-1"></i><span id="csvBulkTypeScopeLabel">All selected types</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="#" onclick="csvSetBulkTypeScope('ALL','All selected types');return false;">All selected types</a></li>
+            <li><a class="dropdown-item" href="#" onclick="csvSetBulkTypeScope('MCQ','MCQ only');return false;">MCQ only</a></li>
+            <li><a class="dropdown-item" href="#" onclick="csvSetBulkTypeScope('MSQ','MSQ only');return false;">MSQ only</a></li>
+            <li><a class="dropdown-item" href="#" onclick="csvSetBulkTypeScope('NUMERIC','Numeric only');return false;">Numeric only</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="csv-bulk-field">
+        <span class="csv-bulk-field-label">+ Marks</span>
+        <input type="number" step="0.25" id="csvBulkPM" class="form-control form-control-sm" placeholder="—">
+      </div>
+      <div class="csv-bulk-field">
+        <span class="csv-bulk-field-label">&minus; Marks <span class="csv-bulk-hint">(MCQ/MSQ)</span></span>
+        <input type="number" step="0.25" id="csvBulkNM" class="form-control form-control-sm" placeholder="—">
+      </div>
+      <div class="csv-bulk-field">
+        <span class="csv-bulk-field-label">Tolerance <span class="csv-bulk-hint">(Numeric)</span></span>
+        <input type="number" step="0.01" id="csvBulkTol" class="form-control form-control-sm" placeholder="—">
+      </div>
+      <div class="csv-bulk-mark-btns">
+        <button class="btn btn-secondary btn-sm" onclick="csvBulkApplyMarks('adjust')" title="Add these values to the current marks (use a negative number to decrease)"><i class="fas fa-arrows-up-down me-1"></i>Adjust (&plusmn;)</button>
+        <button class="btn btn-primary btn-sm" onclick="csvBulkApplyMarks('set')" title="Overwrite the current marks with these values">Set Values</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="csvCardList"></div>
 
@@ -730,6 +869,12 @@
   let _csvSkipped = 0;     // rows dropped during parse (missing question_text)
   const _PAGE_SIZE = 50;   // cards rendered per "Load More" batch
   let _renderedCount = 0;  // how many _csvRows are currently in the DOM
+
+  // Bulk-selection state: a set of _csvRows indices, shared by the same
+  // preview/edit surface both AI-generated and manually-uploaded rows go
+  // through (see _loadRowsIntoEditor) — so bulk actions work identically
+  // for either source with zero duplicated logic.
+  let _csvSelected = new Set();
 
   // SECURITY: the one authoritative destination for every row about to be
   // saved — set either by the admin picking an exam below (manual upload)
@@ -946,6 +1091,8 @@
   function _loadRowsIntoEditor(rows, skipped){
     _csvRows = rows;
     _csvSkipped = skipped || 0;
+    _csvSelected = new Set();
+    window.csvSetBulkTypeScope('ALL', 'All selected types');
     _setProcessing(null, 'Preparing preview…');
     setTimeout(function(){
       _hideProcessing();
@@ -1106,6 +1253,7 @@
     <div class="csv-q-card" id="ccard-${i}">
       <div class="d-flex justify-content-between align-items-center mb-3 flex-nowrap gap-2 csv-top-toolbar">
         <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input type="checkbox" class="csv-sel-cb" data-idx="${i}" ${_csvSelected.has(i)?'checked':''} onchange="csvToggleSelect(${i},this.checked)" title="Select for bulk actions">
           <span class="badge rounded-pill px-3 py-1 ${badgeCls}" style="font-size:.72rem;">${q.question_type}</span>
           <span class="badge" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:.72rem;">+${pm} / -${nm}</span>
           ${q.source_tag ?`<span class="badge" style="background:var(--accent-subtle);border:1px solid var(--accent);color:var(--accent);font-size:.68rem;"><i class="fas fa-bookmark" style="font-size:.6rem"></i> ${_esc(q.source_tag)}</span>` : ''}
@@ -1236,8 +1384,18 @@
 
     if(_csvDeleteIdx !== null){
       _csvRows.splice(_csvDeleteIdx,1);
+      // Every card is keyed by array index, so a splice shifts every later
+      // index down by 1 — re-map the selection set to match, same reasoning
+      // _renderCards(_renderedCount) below already relies on.
+      const _shifted = new Set();
+      _csvSelected.forEach(idx => {
+        if (idx < _csvDeleteIdx) _shifted.add(idx);
+        else if (idx > _csvDeleteIdx) _shifted.add(idx - 1);
+      });
+      _csvSelected = _shifted;
       _csvDeleteIdx=null;
       _renderCards(_renderedCount);
+      _updateBulkBar();
       csvToast('Question deleted', 'success', 'Removed from preview list');
     }
   };
@@ -1249,6 +1407,8 @@
     _renderedCount = 0;
     _csvSkipped = 0;
     _csvRows=[];
+    _csvSelected = new Set();
+    _updateBulkBar();
     document.getElementById('csvStep1').style.display='block';
     document.getElementById('csvStep2').style.display='none';
     document.getElementById('csvFileInput').value='';
@@ -1471,6 +1631,150 @@
       _updateCardInPlace(i);
     });
     csvToast(`LaTeX size updated`, 'success', `Applied \\${size} to all formulas across ${_csvRows.length} questions`);
+  };
+
+  // Global, question-text-only size (independent of Options Size below) —
+  // reuses the exact same _applyLatexSize/_updateCardInPlace path as
+  // csvApplyGlobalSize, just scoped to one field.
+  window.csvApplyQuestionSize = function(size) {
+    if (!_csvRows || _csvRows.length === 0) return;
+    _csvRows.forEach((q, i) => {
+      q.question_text = _applyLatexSize(q.question_text, size);
+      _updateCardInPlace(i);
+    });
+    csvToast('Question text size updated', 'success', `Applied \\${size} to question text across ${_csvRows.length} questions`);
+  };
+
+  // Global, options-only size (independent of Question Size above). Numeric
+  // questions have no options to touch, same guard used everywhere else.
+  window.csvApplyOptionsSize = function(size) {
+    if (!_csvRows || _csvRows.length === 0) return;
+    _csvRows.forEach((q, i) => {
+      if (q.question_type !== 'NUMERIC') {
+        ['option_a', 'option_b', 'option_c', 'option_d'].forEach(opt => {
+          if (q[opt]) q[opt] = _applyLatexSize(q[opt], size);
+        });
+      }
+      _updateCardInPlace(i);
+    });
+    csvToast('Options size updated', 'success', `Applied \\${size} to answer options across ${_csvRows.length} questions`);
+  };
+
+  // ── Bulk selection ─────────────────────────────────────────────────────
+  function _syncSelectionCheckboxes() {
+    document.querySelectorAll('.csv-sel-cb').forEach(cb => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      cb.checked = _csvSelected.has(idx);
+    });
+  }
+  function _updateBulkBar() {
+    const bar = document.getElementById('csvBulkBar');
+    const countEl = document.getElementById('csvBulkCount');
+    if (countEl) countEl.textContent = _csvSelected.size;
+    if (bar) bar.classList.toggle('has-selection', _csvSelected.size > 0);
+  }
+  window.csvToggleSelect = function(i, checked) {
+    if (checked) _csvSelected.add(i); else _csvSelected.delete(i);
+    _updateBulkBar();
+  };
+  window.csvSelectAll = function() {
+    // Operates over the full parsed dataset, not just what "Load More" has
+    // rendered so far — consistent with Save/Export/Render All/Raw All,
+    // which already all act on the complete _csvRows regardless of pagination.
+    _csvRows.forEach((_, i) => _csvSelected.add(i));
+    _syncSelectionCheckboxes();
+    _updateBulkBar();
+  };
+  window.csvClearSelection = function() {
+    _csvSelected.clear();
+    _syncSelectionCheckboxes();
+    _updateBulkBar();
+  };
+  window.csvSelectByType = function(type) {
+    _csvSelected.clear();
+    _csvRows.forEach((q, i) => { if (q.question_type === type) _csvSelected.add(i); });
+    _syncSelectionCheckboxes();
+    _updateBulkBar();
+    csvToast(`Selected all ${type}`, 'success', `${_csvSelected.size} question(s) selected`);
+  };
+
+  // ── Bulk LaTeX-size formatting, scoped to the current selection ────────
+  // Same _applyLatexSize/_updateCardInPlace primitives as the global size
+  // controls above — only the set of rows touched differs.
+  window.csvBulkApplySize = function(size) {
+    if (!_csvSelected.size) { csvToast('No questions selected', 'warning', 'Select at least one question first.'); return; }
+    const scopeEl = document.querySelector('input[name="csvBulkFmtScope"]:checked');
+    const scope = scopeEl ? scopeEl.value : 'both';
+    _csvSelected.forEach(i => {
+      const q = _csvRows[i];
+      if (!q) return;
+      if (scope === 'both' || scope === 'question') q.question_text = _applyLatexSize(q.question_text, size);
+      if ((scope === 'both' || scope === 'options') && q.question_type !== 'NUMERIC') {
+        ['option_a', 'option_b', 'option_c', 'option_d'].forEach(opt => {
+          if (q[opt]) q[opt] = _applyLatexSize(q[opt], size);
+        });
+      }
+      _updateCardInPlace(i);
+    });
+    csvToast('Bulk formatting applied', 'success', `Applied \\${size} (${scope === 'both' ? 'text + options' : scope}) to ${_csvSelected.size} selected question(s)`);
+  };
+
+  // ── Bulk marking-scheme update, scoped to the current selection ────────
+  // Fields shown per type mirror the marking config actually used at
+  // generation time (app/services/ai_question_generator.py's
+  // _config_block): MCQ/MSQ use +/-marks, NUMERIC uses +marks/tolerance —
+  // there is no "negative marks" concept for NUMERIC in this app, so a
+  // -Marks value is never applied to a NUMERIC row even if one is typed in,
+  // and a Tolerance value is never applied to an MCQ/MSQ row.
+  function _roundMark(v) { return Math.round(v * 100) / 100; }
+
+  // Themed dropdown-button (matches Global Size/By Type elsewhere on this
+  // page) standing in for a native <select> — its chosen value is tracked
+  // here rather than read off a form element.
+  let _csvBulkTypeScope = 'ALL';
+  window.csvSetBulkTypeScope = function(value, label) {
+    _csvBulkTypeScope = value;
+    const el = document.getElementById('csvBulkTypeScopeLabel');
+    if (el) el.textContent = label;
+  };
+
+  window.csvBulkApplyMarks = function(mode) {
+    if (!_csvSelected.size) { csvToast('No questions selected', 'warning', 'Select at least one question first.'); return; }
+    const typeScope = _csvBulkTypeScope; // ALL | MCQ | MSQ | NUMERIC
+    const pmRaw  = document.getElementById('csvBulkPM').value.trim();
+    const nmRaw  = document.getElementById('csvBulkNM').value.trim();
+    const tolRaw = document.getElementById('csvBulkTol').value.trim();
+    if (pmRaw === '' && nmRaw === '' && tolRaw === '') { csvToast('Enter at least one value', 'warning'); return; }
+    const pmV  = pmRaw  !== '' ? parseFloat(pmRaw)  : null;
+    const nmV  = nmRaw  !== '' ? parseFloat(nmRaw)  : null;
+    const tolV = tolRaw !== '' ? parseFloat(tolRaw) : null;
+
+    let touched = 0;
+    _csvSelected.forEach(i => {
+      const q = _csvRows[i];
+      if (!q) return;
+      if (typeScope !== 'ALL' && q.question_type !== typeScope) return;
+      const isNum = q.question_type === 'NUMERIC';
+
+      if (pmV !== null && !isNaN(pmV)) {
+        q.positive_marks = _roundMark(mode === 'set' ? pmV : (parseFloat(q.positive_marks) || 0) + pmV);
+      }
+      if (nmV !== null && !isNaN(nmV) && !isNum) { // -Marks isn't a NUMERIC field
+        q.negative_marks = _roundMark(mode === 'set' ? nmV : (parseFloat(q.negative_marks) || 0) + nmV);
+      }
+      if (tolV !== null && !isNaN(tolV) && isNum) { // Tolerance only applies to NUMERIC
+        q.tolerance = _roundMark(mode === 'set' ? tolV : (parseFloat(q.tolerance) || 0) + tolV);
+      }
+      touched++;
+    });
+
+    if (!touched) { csvToast('No matching questions', 'warning', `None of the selected questions are type "${typeScope}".`); return; }
+    // Marks are shown in each card's header badge, which _updateCardInPlace
+    // does not touch (it only rebuilds the raw/rendered content blocks) —
+    // a full rebuild is the same pattern csvSaveEdit already uses whenever
+    // a card's header-level data (not just its content) changes.
+    _renderCards(_renderedCount);
+    csvToast('Marking scheme updated', 'success', `${mode === 'set' ? 'Set' : 'Adjusted'} marks for ${touched} question(s)`);
   };
 
   // Global Render All — switch every card to rendered view, typeset MathJax in small batches

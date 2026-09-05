@@ -1,0 +1,923 @@
+{% extends "admin_base.html" %}
+{% block title %}Question Image Mapping{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Bootstrap button theming — same convention every admin page declares
+   for itself (see templates/admin/questions.html); Bootstrap's own
+   .btn-primary/.btn-secondary/.btn-danger ship hardcoded blue/grey/red. */
+.btn-primary   { background:var(--accent)    !important; border-color:var(--accent)    !important; color:var(--accent-on) !important; }
+.btn-primary:hover   { background:var(--accent-hover) !important; }
+.btn-secondary { background:var(--surface-2) !important; border-color:var(--border)     !important; color:var(--text-2)   !important; }
+.btn-secondary:hover { border-color:var(--accent) !important; color:var(--accent) !important; }
+.btn-danger    { background:var(--danger)     !important; border-color:var(--danger)     !important; color:#fff !important; }
+.btn-danger:hover    { opacity:.9; }
+.btn { font-family:inherit; }
+.btn:disabled { opacity:.55; cursor:not-allowed; }
+
+/* ── Page header ── */
+.imap-header { margin-bottom:1.25rem; }
+.imap-header h1 { font-size:1.3rem; font-weight:800; color:var(--text-1); margin:0 0 .3rem; }
+.imap-header p { font-size:.85rem; color:var(--text-3); margin:0; }
+
+/* ── Step cards ── */
+.imap-step { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); box-shadow:var(--shadow-sm); padding:1.1rem 1.25rem; margin-bottom:1rem; transition:opacity .15s; }
+.imap-step.locked { opacity:.55; pointer-events:none; }
+.imap-step-title { display:flex; align-items:center; gap:.55rem; font-size:.95rem; font-weight:700; color:var(--text-1); margin-bottom:.85rem; }
+.imap-step-num { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--accent); color:var(--accent-on); font-size:.78rem; font-weight:800; flex-shrink:0; }
+.imap-step-title .done-check { color:var(--success); margin-left:.3rem; }
+.imap-step-hint { font-size:.78rem; color:var(--text-3); margin-top:.5rem; }
+
+/* ── Picker (shared by Exam + Subject steps) ── */
+.imap-picker { position:relative; max-width:460px; }
+.imap-picker-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; gap:.6rem; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.6rem .85rem; cursor:pointer; text-align:left; color:var(--text-1); font-family:inherit; font-size:.85rem; }
+.imap-picker-trigger:hover { border-color:var(--border-focus); }
+.imap-picker-trigger.open { border-color:var(--accent); }
+.imap-picker-trigger > i.chev { color:var(--text-3); font-size:.78rem; flex-shrink:0; transition:transform .12s; }
+.imap-picker-trigger.open > i.chev { transform:rotate(180deg); }
+.ipt-info { min-width:0; flex:1; }
+.ipt-name { font-size:.85rem; font-weight:700; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ipt-meta { font-size:.72rem; color:var(--text-3); margin-top:.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ipt-empty { font-size:.82rem; color:var(--text-3); }
+.imap-picker-panel { position:absolute; top:calc(100% + .35rem); left:0; right:0; z-index:80; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); max-height:360px; display:flex; flex-direction:column; overflow:hidden; }
+.imap-picker-search { padding:.55rem; border-bottom:1px solid var(--border); flex-shrink:0; }
+.imap-picker-search input { width:100%; font-size:.8rem; padding:.4rem .6rem; border-radius:7px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-1); }
+.imap-picker-search input:focus { outline:none; border-color:var(--border-focus); }
+.imap-picker-list { overflow-y:auto; padding:.35rem; }
+.imap-picker-item { padding:.55rem .65rem; border-radius:8px; cursor:pointer; margin-bottom:.15rem; }
+.imap-picker-item:hover { background:var(--surface-2); }
+.imap-picker-item.active { background:var(--accent-subtle); }
+.ipi-name { font-size:.82rem; font-weight:700; color:var(--text-1); }
+.ipi-meta { font-size:.72rem; color:var(--text-3); margin-top:.2rem; }
+.imap-picker-empty, .imap-picker-loading { padding:1rem; text-align:center; font-size:.8rem; color:var(--text-3); }
+.imap-picker-empty a { color:var(--accent); }
+
+/* ── Question list (Step 3) ── */
+.imap-qtoolbar { display:flex; flex-wrap:wrap; gap:.75rem; align-items:flex-end; margin-bottom:1rem; }
+.imap-qtoolbar label { display:block; font-size:.72rem; font-weight:600; color:var(--text-3); margin-bottom:.3rem; }
+.imap-qtoolbar input.form-control { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-1); font-size:.82rem; padding:.5rem .7rem; }
+.imap-qtoolbar input.form-control:focus { outline:none; border-color:var(--border-focus); box-shadow:0 0 0 3px var(--accent-subtle); }
+
+.imap-qbulkbar { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; padding:.6rem .8rem; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:.75rem; }
+.imap-qbulkbar .count { font-size:.78rem; font-weight:700; color:var(--accent); margin-right:auto; }
+.imap-qbulkbar .btn-flat { font-size:.74rem; font-weight:600; padding:.4rem .65rem; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-2); cursor:pointer; font-family:inherit; }
+.imap-qbulkbar .btn-flat:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+
+.imap-qlist { border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); overflow:hidden; }
+.imap-qrow { display:flex; align-items:center; gap:.75rem; padding:.65rem .85rem; border-bottom:1px solid var(--border); background:var(--surface); font-size:.82rem; }
+.imap-qlist .imap-qrow:last-child { border-bottom:none; }
+.imap-qrow:hover { background:var(--surface-2); }
+.imap-qrow input[type="checkbox"] { width:16px; height:16px; accent-color:var(--accent); flex-shrink:0; cursor:pointer; }
+.imap-qrow .qno { flex-shrink:0; min-width:44px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-3); font-size:.7rem; font-weight:700; padding:.15rem .5rem; border-radius:6px; text-align:center; }
+.imap-qrow .qtype { flex-shrink:0; padding:.18rem .55rem; border-radius:20px; font-size:.65rem; font-weight:700; text-transform:uppercase; border:1px solid; }
+.qtype.MCQ { background:var(--info-bg); color:var(--info-text); border-color:var(--info-border); }
+.qtype.MSQ { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
+.qtype.NUMERIC { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.imap-qrow .qtext { flex:1; min-width:0; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.imap-qrow .qstatus { flex-shrink:0; font-size:.68rem; font-weight:700; padding:.15rem .55rem; border-radius:20px; white-space:nowrap; }
+.qstatus.none    { background:var(--surface-2); color:var(--text-3); border:1px solid var(--border); }
+.qstatus.attached{ background:var(--success-bg); color:var(--success-text); border:1px solid var(--success-border); }
+.qstatus.broken  { background:var(--danger-bg);  color:var(--danger-text);  border:1px solid var(--danger-border); }
+.imap-qempty { padding:2rem 1rem; text-align:center; color:var(--text-3); font-size:.85rem; }
+
+.imap-pagination { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.6rem; margin-top:.85rem; }
+.imap-pagination .info { font-size:.76rem; color:var(--text-3); }
+.imap-page-nav { display:flex; gap:.3rem; }
+.imap-page-btn { min-width:30px; height:30px; padding:0 .5rem; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--text-2); font-size:.78rem; cursor:pointer; font-family:inherit; }
+.imap-page-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.imap-page-btn.active { background:var(--accent); border-color:var(--accent); color:var(--accent-on); font-weight:700; }
+.imap-page-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+.imap-continue-row { display:flex; justify-content:flex-end; margin-top:1rem; }
+
+/* ── Mapping workspace (Step 4-6) ── */
+.imap-workspace-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.85rem; }
+.imap-pending-pill { font-size:.8rem; font-weight:700; color:var(--accent); background:var(--accent-subtle); border-radius:20px; padding:.35rem .8rem; }
+.imap-workspace-actions { display:flex; gap:.6rem; }
+
+.imap-workspace-body { display:flex; gap:1rem; align-items:stretch; }
+.imap-panel { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); box-shadow:var(--shadow-sm); overflow:hidden; }
+.imap-panel-head { padding:.7rem 1rem; border-bottom:1px solid var(--border); background:var(--surface-2); font-size:.85rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-shrink:0; }
+.imap-panel-toolbar { padding:.6rem .85rem; border-bottom:1px solid var(--border); display:flex; gap:.5rem; flex-wrap:wrap; flex-shrink:0; }
+.imap-panel-toolbar input.form-control { flex:1; min-width:120px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text-1); font-size:.8rem; padding:.4rem .6rem; }
+.imap-panel-body { flex:1; min-height:0; overflow-y:auto; padding:.85rem; height:62vh; }
+
+/* Question cards (left panel) */
+.imap-qcard { border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; margin-bottom:.7rem; background:var(--surface); transition:border-color .12s, background .12s; }
+.imap-qcard:last-child { margin-bottom:0; }
+.imap-qcard.active-target { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-subtle); }
+.imap-qcard.drop-active { border-color:var(--accent); background:var(--accent-subtle); border-style:dashed; }
+.imap-qcard-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.5rem; cursor:pointer; }
+.imap-qcard-title { display:flex; align-items:center; gap:.5rem; min-width:0; }
+.imap-qcard-title .qno { flex-shrink:0; background:var(--accent); color:var(--accent-on); font-size:.72rem; font-weight:800; padding:.18rem .55rem; border-radius:6px; }
+.imap-qcard-title .qtext { font-size:.8rem; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.imap-qcard-body { display:flex; gap:.7rem; align-items:center; }
+.imap-qcard-thumb { width:56px; height:56px; border-radius:8px; object-fit:cover; border:1px solid var(--border); background:var(--surface-2); flex-shrink:0; cursor:pointer; }
+.imap-qcard-thumb-empty { width:56px; height:56px; border-radius:8px; border:1px dashed var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; color:var(--text-3); font-size:1.1rem; flex-shrink:0; }
+.imap-qcard-info { flex:1; min-width:0; }
+.imap-qcard-fname { font-size:.78rem; color:var(--text-1); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.imap-qcard-badge { display:inline-flex; align-items:center; gap:.3rem; font-size:.68rem; font-weight:700; padding:.12rem .5rem; border-radius:20px; margin-top:.2rem; }
+.imap-qcard-badge.saved   { background:var(--surface-2); color:var(--text-3); border:1px solid var(--border); }
+.imap-qcard-badge.pending { background:var(--warning-bg); color:var(--warning-text); border:1px solid var(--warning-border); }
+.imap-qcard-badge.removed { background:var(--danger-bg); color:var(--danger-text); border:1px solid var(--danger-border); }
+.imap-qcard-actions { display:flex; gap:.4rem; flex-shrink:0; }
+.imap-qcard-actions button { font-size:.7rem; font-weight:600; padding:.3rem .55rem; border-radius:7px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); cursor:pointer; font-family:inherit; }
+.imap-qcard-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.imap-qcard-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+.imap-qcard-drop-hint { font-size:.72rem; color:var(--text-3); margin-top:.4rem; text-align:center; padding:.3rem; border-top:1px dashed var(--border); }
+
+/* Image grid (right panel) */
+.imap-img-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:.7rem; }
+.imap-img-card { border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--surface); cursor:grab; transition:border-color .12s, transform .08s; }
+.imap-img-card:hover { border-color:var(--accent); }
+.imap-img-card:active { cursor:grabbing; transform:scale(.98); }
+.imap-img-card.is-mapped { border-color:var(--success-border); }
+.imap-img-card img { width:100%; height:88px; object-fit:cover; display:block; background:var(--surface-2); }
+.imap-img-card .imc-body { padding:.4rem .5rem; }
+.imap-img-card .imc-name { font-size:.7rem; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.imap-img-card .imc-badge { font-size:.6rem; font-weight:700; color:var(--success-text); margin-top:.15rem; }
+.imap-img-loadmore { display:block; margin:.85rem auto 0; }
+.imap-img-empty { padding:2rem 1rem; text-align:center; color:var(--text-3); font-size:.85rem; }
+
+@media (max-width:900px) {
+  .imap-workspace-body { flex-direction:column; }
+  .imap-panel-body { height:46vh; }
+}
+
+/* ── Themed toast (no alert()/confirm()/prompt() anywhere) ── */
+.imap-toast { position:fixed; bottom:1.25rem; right:1.25rem; z-index:99999; min-width:260px; max-width:400px; background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:var(--radius); padding:.75rem 1rem; box-shadow:var(--shadow-lg); display:flex; align-items:flex-start; gap:.65rem; animation:imapToastIn .2s ease-out; }
+.imap-toast.success { border-left-color:var(--success); }
+.imap-toast.danger  { border-left-color:var(--danger); }
+.imap-toast.warning { border-left-color:var(--warning); }
+@keyframes imapToastIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Themed modal backdrop (Review / Discard-confirm / Image preview) ── */
+.imap-modal-backdrop { display:none; position:fixed; inset:0; z-index:10060; background:rgba(0,0,0,.6); align-items:center; justify-content:center; padding:1rem; }
+.imap-modal-backdrop.show { display:flex; }
+.imap-modal-box { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 6px); padding:1.5rem; max-width:480px; width:100%; box-shadow:var(--shadow-lg); max-height:80vh; display:flex; flex-direction:column; }
+.imap-modal-box h5 { font-size:1rem; font-weight:800; color:var(--text-1); margin:0 0 .3rem; display:flex; align-items:center; gap:.5rem; }
+.imap-modal-box p.sub { font-size:.82rem; color:var(--text-3); margin:0 0 1rem; }
+.imap-modal-body { overflow-y:auto; margin-bottom:1rem; }
+.imap-review-row { display:flex; align-items:center; gap:.5rem; padding:.5rem .6rem; border-radius:8px; background:var(--surface-2); border:1px solid var(--border); margin-bottom:.4rem; font-size:.8rem; }
+.imap-review-row:last-child { margin-bottom:0; }
+.imap-review-row .qno { flex-shrink:0; font-weight:700; color:var(--accent); }
+.imap-review-row .arrow { color:var(--text-3); flex-shrink:0; }
+.imap-review-row .target { flex:1; min-width:0; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.imap-review-row .target.removed { color:var(--danger-text); font-style:italic; }
+.imap-modal-footer { display:flex; gap:.6rem; flex-shrink:0; }
+.imap-modal-footer button { flex:1; padding:.6rem; border-radius:var(--radius); font-weight:700; font-size:.85rem; cursor:pointer; font-family:inherit; border:none; }
+.imap-modal-cancel { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border) !important; }
+.imap-modal-ok { background:var(--accent); color:var(--accent-on); }
+.imap-modal-ok.danger { background:var(--danger); color:#fff; }
+.imap-preview-img { max-width:100%; max-height:60vh; border-radius:var(--radius); display:block; margin:0 auto; }
+
+.imap-spinner { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; animation:imapSpin .7s linear infinite; display:inline-block; margin-right:.4rem; }
+@keyframes imapSpin { to { transform:rotate(360deg); } }
+</style>
+
+<div class="imap-header">
+  <h1><i class="fas fa-link"></i> Question Image Mapping</h1>
+  <p>Map uploaded Subject images to exam questions quickly and safely.</p>
+</div>
+
+<!-- STEP 1: EXAM -->
+<div class="imap-step" id="stepExam">
+  <div class="imap-step-title"><span class="imap-step-num">1</span> Select Exam <i class="fas fa-check-circle done-check" id="examDoneCheck" style="display:none"></i></div>
+  <div class="imap-picker" id="examPicker">
+    <button type="button" class="imap-picker-trigger" id="examPickerTrigger">
+      <span class="ipt-empty">Select an exam&hellip;</span>
+      <i class="fas fa-chevron-down chev"></i>
+    </button>
+    <div class="imap-picker-panel" id="examPickerPanel" style="display:none">
+      <div class="imap-picker-search"><input type="text" id="examPickerSearch" placeholder="Search exams by name, category&hellip;" autocomplete="off"></div>
+      <div class="imap-picker-list" id="examPickerList">
+        {% for e in exams %}
+        <div class="imap-picker-item" data-id="{{ e.id }}" data-name="{{ e.name }}"
+             data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">
+          <div class="ipi-name">{{ e.name }}</div>
+          <div class="ipi-meta">
+            {%- if e.category_name %}{{ e.category_name }}{% endif -%}
+            {%- if e.subcategory_name %} &middot; {{ e.subcategory_name }}{% endif -%}
+            &middot; {{ e.question_count }} question{{ 's' if e.question_count != 1 else '' }}
+          </div>
+        </div>
+        {% else %}
+        <div class="imap-picker-empty">No exams yet — create one on <a href="{{ url_for('admin.exams') }}">Manage Exams</a>.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: SUBJECT -->
+<div class="imap-step locked" id="stepSubject">
+  <div class="imap-step-title"><span class="imap-step-num">2</span> Select Subject <i class="fas fa-check-circle done-check" id="subjectDoneCheck" style="display:none"></i></div>
+  <div class="imap-picker" id="subjectPicker">
+    <button type="button" class="imap-picker-trigger" id="subjectPickerTrigger">
+      <span class="ipt-empty">Select a subject&hellip;</span>
+      <i class="fas fa-chevron-down chev"></i>
+    </button>
+    <div class="imap-picker-panel" id="subjectPickerPanel" style="display:none">
+      <div class="imap-picker-search"><input type="text" id="subjectPickerSearch" placeholder="Search subjects&hellip;" autocomplete="off"></div>
+      <div class="imap-picker-list" id="subjectPickerList"><div class="imap-picker-loading">Loading subjects&hellip;</div></div>
+    </div>
+  </div>
+  <div class="imap-step-hint" id="subjectEmptyHint" style="display:none">
+    No images are available in this Subject. <a href="{{ url_for('admin.upload_images_page') }}">Upload images for it here.</a>
+  </div>
+</div>
+
+<!-- STEP 3: QUESTIONS -->
+<div class="imap-step locked" id="stepQuestions">
+  <div class="imap-step-title"><span class="imap-step-num">3</span> Select Questions <i class="fas fa-check-circle done-check" id="questionsDoneCheck" style="display:none"></i></div>
+
+  <div class="imap-qtoolbar">
+    <div style="flex:1;min-width:200px">
+      <label>Search Questions</label>
+      <input type="text" id="qSearch" class="form-control" placeholder="Search by text, ID, type…">
+    </div>
+    <div>
+      <label>Question Type</label>
+      <select id="qTypeFilter" class="form-select">
+        <option value="">All Types</option>
+        <option value="MCQ">MCQ</option>
+        <option value="MSQ">MSQ</option>
+        <option value="NUMERIC">Numerical</option>
+      </select>
+    </div>
+    <div>
+      <label>Image Status</label>
+      <select id="qImageFilter" class="form-select">
+        <option value="">All</option>
+        <option value="none">No Image</option>
+        <option value="attached">Image Attached</option>
+        <option value="broken">Missing/Broken Image</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="imap-qbulkbar">
+    <span class="count"><span id="qSelectedCount">0</span> selected</span>
+    <button class="btn-flat" id="qSelectPageBtn">Select This Page</button>
+    <button class="btn-flat" id="qSelectAllBtn">Select All Matching</button>
+    <button class="btn-flat" id="qClearBtn">Clear Selection</button>
+  </div>
+
+  <div class="imap-qlist" id="qList"><div class="imap-qempty">Loading questions&hellip;</div></div>
+  <div class="imap-pagination" id="qPagination" style="display:none">
+    <div class="info" id="qPaginationInfo"></div>
+    <div class="imap-page-nav" id="qPageNav"></div>
+  </div>
+
+  <div class="imap-continue-row">
+    <button class="btn btn-primary" id="continueToMappingBtn" disabled>
+      Continue to Mapping <i class="fas fa-arrow-right ms-1"></i>
+    </button>
+  </div>
+</div>
+
+<!-- STEPS 4-6: MAPPING WORKSPACE -->
+<div class="imap-step" id="stepWorkspace" style="display:none">
+  <div class="imap-workspace-top">
+    <div class="imap-step-title" style="margin:0"><span class="imap-step-num">4</span> Map Images to Questions</div>
+    <div class="imap-workspace-actions">
+      <span class="imap-pending-pill"><span id="pendingCount">0</span> pending change<span id="pendingPlural">s</span></span>
+      <button class="btn btn-secondary btn-sm" id="startOverBtn">Start Over</button>
+      <button class="btn btn-primary btn-sm" id="reviewBtn" disabled>Review &amp; Save</button>
+    </div>
+  </div>
+
+  <div class="imap-workspace-body">
+    <div class="imap-panel" id="questionsPanel">
+      <div class="imap-panel-head"><span><i class="fas fa-list-check me-1"></i>Selected Questions</span><span id="qPanelCount" style="font-weight:400;color:var(--text-3);font-size:.75rem"></span></div>
+      <div class="imap-panel-body" id="questionsPanelBody"></div>
+    </div>
+    <div class="imap-panel" id="imagesPanel">
+      <div class="imap-panel-head"><span><i class="fas fa-images me-1"></i>Subject Image Library</span><span id="imgPanelSubject" style="font-weight:400;color:var(--text-3);font-size:.75rem"></span></div>
+      <div class="imap-panel-toolbar">
+        <input type="text" id="imgSearch" class="form-control" placeholder="Search image filename…">
+        <select id="imgMappedFilter" class="form-select" style="max-width:160px">
+          <option value="">All Images</option>
+          <option value="unmapped">Unmapped</option>
+          <option value="mapped">Mapped</option>
+        </select>
+      </div>
+      <div class="imap-panel-body" id="imagesPanelBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Review modal -->
+<div class="imap-modal-backdrop" id="reviewModalBackdrop">
+  <div class="imap-modal-box">
+    <h5><i class="fas fa-clipboard-check"></i> Review Pending Changes</h5>
+    <p class="sub"><span id="reviewCount">0</span> question(s) will be updated. Nothing is saved until you confirm.</p>
+    <div class="imap-modal-body" id="reviewList"></div>
+    <div class="imap-modal-footer">
+      <button class="imap-modal-cancel" id="reviewCancelBtn">Cancel Changes</button>
+      <button class="imap-modal-ok" id="reviewSaveBtn"><i class="fas fa-save me-1"></i>Save All Mappings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discard-changes confirm modal -->
+<div class="imap-modal-backdrop" id="discardModalBackdrop">
+  <div class="imap-modal-box">
+    <h5><i class="fas fa-triangle-exclamation" style="color:var(--warning-text)"></i> Unsaved Changes</h5>
+    <p class="sub">You have pending image mappings that haven't been saved yet. Discarding them cannot be undone.</p>
+    <div class="imap-modal-footer">
+      <button class="imap-modal-cancel" id="discardCancelBtn">Continue Editing</button>
+      <button class="imap-modal-ok danger" id="discardConfirmBtn">Discard Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image full-preview modal -->
+<div class="imap-modal-backdrop" id="previewModalBackdrop">
+  <div class="imap-modal-box" style="max-width:640px">
+    <h5><i class="fas fa-image"></i> <span id="previewModalTitle">Image Preview</span></h5>
+    <div class="imap-modal-body"><img class="imap-preview-img" id="previewModalImg" src="" alt="Preview"></div>
+    <div class="imap-modal-footer"><button class="imap-modal-cancel" id="previewCloseBtn">Close</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const API = '/api/v01/admin/image-mapping';
+  const STORAGE_API = '/api/v01/admin/storage/objects';
+  const MAX_MAPPINGS = 300;
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function debounce(fn, ms){ let t; return function(...a){ clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
+
+  function toast(msg, type){
+    const t = document.createElement('div');
+    t.className = 'imap-toast ' + (type || 'success');
+    const icons = {success:'fa-check-circle', danger:'fa-times-circle', warning:'fa-exclamation-triangle'};
+    const colors = {success:'var(--success)', danger:'var(--danger)', warning:'var(--warning)'};
+    t.innerHTML = '<i class="fas ' + (icons[type] || icons.success) + '" style="color:' + (colors[type] || colors.success) + '"></i>' +
+                  '<div style="font-size:.82rem;color:var(--text-1)">' + escapeHtml(msg) + '</div>';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4200);
+  }
+  function openModal(id){ document.getElementById(id).classList.add('show'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+  async function apiFetch(url, opts){
+    let res;
+    try {
+      res = await fetch(url, opts);
+    } catch (e) {
+      toast('Network error — please check your connection and try again.', 'danger');
+      throw e;
+    }
+    if (res.status === 401) {
+      toast('Your session has expired — please log in again.', 'danger');
+      throw new Error('unauthorized');
+    }
+    return res;
+  }
+
+  // ── Generic searchable single-select picker (Exam + Subject steps) ──
+  function makePicker({ triggerEl, panelEl, searchEl, listEl, onSelect, emptyHtml, remoteSearch }) {
+    let items = []; // {id, name, meta, el}
+    function close(){ panelEl.style.display = 'none'; triggerEl.classList.remove('open'); }
+    function open(){ panelEl.style.display = 'flex'; triggerEl.classList.add('open'); if (searchEl) { searchEl.focus(); } }
+    triggerEl.addEventListener('click', e => { e.preventDefault(); panelEl.style.display === 'none' ? open() : close(); });
+    document.addEventListener('click', e => { if (!triggerEl.contains(e.target) && !panelEl.contains(e.target)) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+    function renderLocalFilter(q){
+      q = (q || '').trim().toLowerCase();
+      listEl.querySelectorAll('.imap-picker-item').forEach(el => {
+        const hay = el.dataset.search || el.dataset.name.toLowerCase();
+        el.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+      });
+    }
+    if (searchEl) {
+      if (remoteSearch) searchEl.addEventListener('input', debounce(() => remoteSearch(searchEl.value), 350));
+      else searchEl.addEventListener('input', () => renderLocalFilter(searchEl.value));
+    }
+    listEl.addEventListener('click', e => {
+      const item = e.target.closest('.imap-picker-item');
+      if (!item) return;
+      listEl.querySelectorAll('.imap-picker-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      onSelect(item.dataset.id, item.dataset.name, item);
+      close();
+    });
+    return {
+      setLoading(){ listEl.innerHTML = '<div class="imap-picker-loading">Loading…</div>'; },
+      setEmpty(){ listEl.innerHTML = emptyHtml || '<div class="imap-picker-empty">Nothing found.</div>'; },
+      setTrigger(name, metaHtml){
+        triggerEl.innerHTML = '<div class="ipt-info"><div class="ipt-name"></div><div class="ipt-meta">' + (metaHtml || '') + '</div></div><i class="fas fa-chevron-down chev"></i>';
+        triggerEl.querySelector('.ipt-name').textContent = name;
+      },
+      close, open,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Main app state
+  // ══════════════════════════════════════════════════════════════════
+  const state = {
+    examId: null,
+    examName: null,
+    subjectName: null,
+    qFilters: { q:'', type:'', image_status:'' },
+    qPage: 1,
+    selectedIds: new Set(),
+    pending: new Map(),      // question_id -> {image_key: str|null, filename: str|null}
+    workspaceQuestions: [],  // [{id,row_no,question_type,question_text,image_path,image_status,image_url}]
+    activeTargetId: null,
+    subjectImages: [],       // accumulated {key,size,last_modified,preview_url}
+    imgCursor: null,
+    imgTruncated: false,
+    saving: false,
+  };
+
+  function hasPendingChanges(){ return state.pending.size > 0; }
+
+  function withGuard(action){
+    if (hasPendingChanges()) {
+      openModal('discardModalBackdrop');
+      document.getElementById('discardConfirmBtn').onclick = () => { closeModal('discardModalBackdrop'); state.pending.clear(); updatePendingUI(); action(); };
+      document.getElementById('discardCancelBtn').onclick = () => closeModal('discardModalBackdrop');
+    } else {
+      action();
+    }
+  }
+  window.addEventListener('beforeunload', e => { if (hasPendingChanges()) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ── Step 1: Exam picker ──
+  const examPicker = makePicker({
+    triggerEl: document.getElementById('examPickerTrigger'),
+    panelEl:   document.getElementById('examPickerPanel'),
+    searchEl:  document.getElementById('examPickerSearch'),
+    listEl:    document.getElementById('examPickerList'),
+    onSelect(id, name, el){
+      const doSelect = () => {
+        state.examId = parseInt(id, 10);
+        state.examName = name;
+        examPicker.setTrigger(name, el.querySelector('.ipi-meta') ? el.querySelector('.ipi-meta').innerHTML : '');
+        document.getElementById('examDoneCheck').style.display = '';
+        resetFromStep(2);
+        document.getElementById('stepSubject').classList.remove('locked');
+        loadSubjects('');
+      };
+      withGuard(doSelect);
+    },
+  });
+
+  // ── Step 2: Subject picker (AJAX search) ──
+  const subjectPicker = makePicker({
+    triggerEl: document.getElementById('subjectPickerTrigger'),
+    panelEl:   document.getElementById('subjectPickerPanel'),
+    searchEl:  document.getElementById('subjectPickerSearch'),
+    listEl:    document.getElementById('subjectPickerList'),
+    remoteSearch(q){ loadSubjects(q); },
+    onSelect(id, name){
+      const doSelect = () => {
+        state.subjectName = name;
+        subjectPicker.setTrigger(name, '');
+        document.getElementById('subjectDoneCheck').style.display = '';
+        const hint = document.getElementById('subjectEmptyHint');
+        const item = document.querySelector('#subjectPickerList .imap-picker-item[data-id="' + CSS.escape(id) + '"]');
+        const count = item ? parseInt(item.dataset.count, 10) : null;
+        hint.style.display = (count === 0) ? '' : 'none';
+        resetFromStep(3);
+        document.getElementById('stepQuestions').classList.remove('locked');
+        loadQuestions(1);
+      };
+      withGuard(doSelect);
+    },
+  });
+
+  async function loadSubjects(q){
+    subjectPicker.setLoading();
+    try {
+      const res = await apiFetch(API + '/subjects?q=' + encodeURIComponent(q) + '&per_page=25');
+      const data = await res.json();
+      const list = document.getElementById('subjectPickerList');
+      if (!data.success || !data.subjects.length) { subjectPicker.setEmpty(); return; }
+      list.innerHTML = data.subjects.map(s =>
+        '<div class="imap-picker-item" data-id="' + s.id + '" data-name="' + escapeHtml(s.subject_name) + '" data-count="' + s.image_count + '">' +
+          '<div class="ipi-name">' + escapeHtml(s.subject_name) + '</div>' +
+          '<div class="ipi-meta">Images: ' + s.image_count + (s.truncated ? '+' : '') + '</div>' +
+        '</div>'
+      ).join('');
+    } catch (e) { /* toast already shown by apiFetch */ }
+  }
+
+  function resetFromStep(stepNum){
+    state.pending.clear();
+    if (stepNum <= 2) {
+      state.subjectName = null;
+      subjectPicker.setTrigger('', ''); document.getElementById('subjectPickerTrigger').querySelector('.ipt-info').innerHTML = '<span class="ipt-empty">Select a subject…</span>';
+      document.getElementById('subjectDoneCheck').style.display = 'none';
+      document.getElementById('stepSubject').classList.add('locked');
+    }
+    if (stepNum <= 3) {
+      state.selectedIds.clear();
+      state.qFilters = { q:'', type:'', image_status:'' };
+      state.qPage = 1;
+      document.getElementById('qSearch').value = '';
+      document.getElementById('questionsDoneCheck').style.display = 'none';
+      document.getElementById('stepQuestions').classList.add('locked');
+      updateQSelectedCount();
+    }
+    document.getElementById('stepWorkspace').style.display = 'none';
+  }
+
+  document.getElementById('startOverBtn').addEventListener('click', () => withGuard(() => {
+    document.getElementById('stepWorkspace').style.display = 'none';
+    document.getElementById('stepQuestions').scrollIntoView({behavior:'smooth', block:'start'});
+  }));
+
+  // ── Step 3: Question list ──
+  const qSearchEl = document.getElementById('qSearch');
+  qSearchEl.addEventListener('input', debounce(() => { state.qFilters.q = qSearchEl.value.trim(); loadQuestions(1); }, 350));
+  document.getElementById('qTypeFilter').addEventListener('change', function(){ state.qFilters.type = this.value; loadQuestions(1); });
+  document.getElementById('qImageFilter').addEventListener('change', function(){ state.qFilters.image_status = this.value; loadQuestions(1); });
+  enhanceSelect(document.getElementById('qTypeFilter'), { icon:'fas fa-shapes' });
+  enhanceSelect(document.getElementById('qImageFilter'), { icon:'fas fa-image' });
+
+  let qLastPage = { total:0, total_pages:1 };
+  async function loadQuestions(page){
+    state.qPage = page;
+    const listEl = document.getElementById('qList');
+    listEl.innerHTML = '<div class="imap-qempty">Loading questions…</div>';
+    const params = new URLSearchParams({
+      exam_id: state.examId, page, per_page: 20,
+      q: state.qFilters.q, type: state.qFilters.type, image_status: state.qFilters.image_status,
+    });
+    try {
+      const res = await apiFetch(API + '/questions?' + params.toString());
+      const data = await res.json();
+      if (!data.success) { listEl.innerHTML = '<div class="imap-qempty">' + escapeHtml(data.message || 'Unable to load questions.') + '</div>'; return; }
+      qLastPage = data;
+      renderQuestionList(data.questions);
+      renderQPagination(data);
+    } catch (e) {
+      listEl.innerHTML = '<div class="imap-qempty">Network error while loading questions.</div>';
+    }
+  }
+
+  const statusLabel = { none:'No Image', attached:'Image Attached', broken:'Missing/Broken' };
+  function renderQuestionList(questions){
+    const listEl = document.getElementById('qList');
+    if (!questions.length) { listEl.innerHTML = '<div class="imap-qempty">No questions match your search/filters.</div>'; return; }
+    listEl.innerHTML = questions.map(q =>
+      '<div class="imap-qrow">' +
+        '<input type="checkbox" class="q-row-cb" data-id="' + q.id + '" ' + (state.selectedIds.has(q.id) ? 'checked' : '') + '>' +
+        '<span class="qno">Q' + q.row_no + '</span>' +
+        '<span class="qtype ' + q.question_type + '">' + q.question_type + '</span>' +
+        '<span class="qtext">' + escapeHtml(q.question_text || '(empty)') + '</span>' +
+        '<span class="qstatus ' + q.image_status + '">' + statusLabel[q.image_status] + '</span>' +
+      '</div>'
+    ).join('');
+    listEl.querySelectorAll('.q-row-cb').forEach(cb => cb.addEventListener('change', function(){
+      const id = parseInt(this.dataset.id, 10);
+      if (this.checked) state.selectedIds.add(id); else state.selectedIds.delete(id);
+      updateQSelectedCount();
+    }));
+  }
+
+  function renderQPagination(data){
+    const wrap = document.getElementById('qPagination');
+    if (data.total_pages <= 1) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'flex';
+    const start = (data.page - 1) * data.per_page + 1;
+    const end = Math.min(data.page * data.per_page, data.total);
+    document.getElementById('qPaginationInfo').textContent = 'Showing ' + start + '–' + end + ' of ' + data.total;
+    const nav = document.getElementById('qPageNav');
+    let html = '<button class="imap-page-btn" data-p="' + (data.page - 1) + '" ' + (data.page <= 1 ? 'disabled' : '') + '><i class="fas fa-chevron-left"></i></button>';
+    const totalPages = data.total_pages;
+    const cur = data.page;
+    const pages = new Set([1, totalPages, cur, cur-1, cur+1].filter(p => p >= 1 && p <= totalPages));
+    let last = 0;
+    Array.from(pages).sort((a,b)=>a-b).forEach(p => {
+      if (last && p - last > 1) html += '<span style="padding:0 .3rem;color:var(--text-3)">…</span>';
+      html += '<button class="imap-page-btn' + (p === cur ? ' active' : '') + '" data-p="' + p + '">' + p + '</button>';
+      last = p;
+    });
+    html += '<button class="imap-page-btn" data-p="' + (data.page + 1) + '" ' + (data.page >= totalPages ? 'disabled' : '') + '><i class="fas fa-chevron-right"></i></button>';
+    nav.innerHTML = html;
+    nav.querySelectorAll('.imap-page-btn').forEach(b => b.addEventListener('click', () => loadQuestions(parseInt(b.dataset.p, 10))));
+  }
+
+  function updateQSelectedCount(){
+    document.getElementById('qSelectedCount').textContent = state.selectedIds.size;
+    document.getElementById('continueToMappingBtn').disabled = state.selectedIds.size === 0;
+    document.getElementById('questionsDoneCheck').style.display = state.selectedIds.size > 0 ? '' : 'none';
+  }
+
+  document.getElementById('qSelectPageBtn').addEventListener('click', () => {
+    document.querySelectorAll('.q-row-cb').forEach(cb => { cb.checked = true; state.selectedIds.add(parseInt(cb.dataset.id, 10)); });
+    updateQSelectedCount();
+  });
+  document.getElementById('qClearBtn').addEventListener('click', () => {
+    state.selectedIds.clear();
+    document.querySelectorAll('.q-row-cb').forEach(cb => cb.checked = false);
+    updateQSelectedCount();
+  });
+  document.getElementById('qSelectAllBtn').addEventListener('click', async () => {
+    const params = new URLSearchParams({ exam_id: state.examId, q: state.qFilters.q, type: state.qFilters.type, image_status: state.qFilters.image_status });
+    try {
+      const res = await apiFetch(API + '/questions/select-all?' + params.toString());
+      const data = await res.json();
+      if (!data.success) { toast(data.message || 'Unable to select all matching questions.', 'danger'); return; }
+      data.ids.forEach(id => state.selectedIds.add(id));
+      document.querySelectorAll('.q-row-cb').forEach(cb => { if (state.selectedIds.has(parseInt(cb.dataset.id, 10))) cb.checked = true; });
+      updateQSelectedCount();
+      if (data.truncated) toast('Selected the first ' + MAX_MAPPINGS + ' matching questions (there are more).', 'warning');
+      else toast(data.ids.length + ' question(s) selected.', 'success');
+    } catch (e) {}
+  });
+
+  // ── Continue to Mapping ──
+  document.getElementById('continueToMappingBtn').addEventListener('click', async () => {
+    const ids = Array.from(state.selectedIds).slice(0, MAX_MAPPINGS);
+    const btn = document.getElementById('continueToMappingBtn');
+    btn.disabled = true;
+    try {
+      const res = await apiFetch(API + '/questions?exam_id=' + state.examId + '&ids=' + ids.join(','));
+      const data = await res.json();
+      if (!data.success) { toast(data.message || 'Unable to load selected questions.', 'danger'); return; }
+      state.workspaceQuestions = data.questions;
+      state.pending.clear();
+      state.activeTargetId = null;
+      enterWorkspace();
+    } finally {
+      btn.disabled = state.selectedIds.size === 0;
+    }
+  });
+
+  function enterWorkspace(){
+    document.getElementById('stepWorkspace').style.display = '';
+    document.getElementById('qPanelCount').textContent = state.workspaceQuestions.length + ' question(s)';
+    document.getElementById('imgPanelSubject').textContent = state.subjectName;
+    renderQuestionCards();
+    state.subjectImages = []; state.imgCursor = null; state.imgTruncated = false;
+    loadSubjectImages(true);
+    updatePendingUI();
+    document.getElementById('stepWorkspace').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  // ── Question cards (left panel) ──
+  function pendingFor(qid){ return state.pending.get(qid); }
+
+  function renderQuestionCards(){
+    const body = document.getElementById('questionsPanelBody');
+    body.innerHTML = state.workspaceQuestions.map(q => renderQuestionCardHtml(q)).join('') +
+      '<div class="imap-qcard-drop-hint">Drag an image here, or select a question then click an image.</div>';
+    body.querySelectorAll('.imap-qcard').forEach(card => {
+      const qid = parseInt(card.dataset.qid, 10);
+      card.querySelector('.imap-qcard-head').addEventListener('click', () => setActiveTarget(qid));
+      card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drop-active'); });
+      card.addEventListener('dragleave', () => card.classList.remove('drop-active'));
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        card.classList.remove('drop-active');
+        const key = e.dataTransfer.getData('text/plain');
+        const img = state.subjectImages.find(i => i.key === key);
+        if (img) mapImageToQuestion(qid, img);
+      });
+      const replaceBtn = card.querySelector('.act-replace');
+      if (replaceBtn) replaceBtn.addEventListener('click', ev => { ev.stopPropagation(); setActiveTarget(qid); toast('Now click an image in the library to replace it.', 'success'); });
+      const removeBtn = card.querySelector('.act-remove');
+      if (removeBtn) removeBtn.addEventListener('click', ev => { ev.stopPropagation(); removeImageFromQuestion(qid); });
+      const thumb = card.querySelector('.imap-qcard-thumb');
+      if (thumb) thumb.addEventListener('click', ev => { ev.stopPropagation(); openPreview(thumb.src, thumb.dataset.name || ''); });
+    });
+    updateActiveTargetHighlight();
+  }
+
+  function renderQuestionCardHtml(q){
+    const pend = pendingFor(q.id);
+    let thumbHtml, fnameHtml, badgeHtml, actionsHtml;
+    if (pend) {
+      if (pend.image_key) {
+        thumbHtml = '<img class="imap-qcard-thumb" src="' + escapeHtml(pend.preview_url) + '" data-name="' + escapeHtml(pend.filename) + '">';
+        fnameHtml = escapeHtml(pend.filename);
+        badgeHtml = '<span class="imap-qcard-badge pending"><i class="fas fa-clock"></i> Pending Mapping</span>';
+        actionsHtml = '<button class="act-replace">Replace</button><button class="act-remove danger">Remove</button>';
+      } else {
+        thumbHtml = '<div class="imap-qcard-thumb-empty"><i class="fas fa-image-slash"></i></div>';
+        fnameHtml = '(image will be removed)';
+        badgeHtml = '<span class="imap-qcard-badge removed"><i class="fas fa-times"></i> Pending Removal</span>';
+        actionsHtml = '<button class="act-replace">Choose Image</button>';
+      }
+    } else if (q.image_status !== 'none') {
+      thumbHtml = '<img class="imap-qcard-thumb" src="' + escapeHtml(q.image_url || '') + '" data-name="' + escapeHtml(q.image_path) + '">';
+      fnameHtml = escapeHtml((q.image_path || '').split('/').pop());
+      badgeHtml = q.image_status === 'broken'
+        ? '<span class="imap-qcard-badge removed"><i class="fas fa-triangle-exclamation"></i> Missing/Broken</span>'
+        : '<span class="imap-qcard-badge saved"><i class="fas fa-check"></i> Current Image</span>';
+      actionsHtml = '<button class="act-replace">Replace</button><button class="act-remove danger">Remove</button>';
+    } else {
+      thumbHtml = '<div class="imap-qcard-thumb-empty"><i class="fas fa-image"></i></div>';
+      fnameHtml = 'No Image';
+      badgeHtml = '';
+      actionsHtml = '<button class="act-replace">Choose Image</button>';
+    }
+    return '<div class="imap-qcard" data-qid="' + q.id + '">' +
+      '<div class="imap-qcard-head"><div class="imap-qcard-title"><span class="qno">Q' + q.row_no + '</span><span class="qtext">' + escapeHtml(q.question_text || '') + '</span></div>' +
+        '<span class="qtype ' + q.question_type + '">' + q.question_type + '</span></div>' +
+      '<div class="imap-qcard-body">' + thumbHtml +
+        '<div class="imap-qcard-info"><div class="imap-qcard-fname">' + fnameHtml + '</div>' + badgeHtml + '</div>' +
+        '<div class="imap-qcard-actions">' + actionsHtml + '</div>' +
+      '</div></div>';
+  }
+
+  function setActiveTarget(qid){
+    state.activeTargetId = (state.activeTargetId === qid) ? null : qid;
+    updateActiveTargetHighlight();
+  }
+  function updateActiveTargetHighlight(){
+    document.querySelectorAll('.imap-qcard').forEach(c => c.classList.toggle('active-target', parseInt(c.dataset.qid, 10) === state.activeTargetId));
+  }
+
+  function mapImageToQuestion(qid, img){
+    state.pending.set(qid, { image_key: img.key, filename: img.key.split('/').pop(), preview_url: img.preview_url });
+    refreshCardAndGrid(qid);
+  }
+  function removeImageFromQuestion(qid){
+    state.pending.set(qid, { image_key: null, filename: null, preview_url: null });
+    refreshCardAndGrid(qid);
+  }
+  function refreshCardAndGrid(qid){
+    const card = document.querySelector('.imap-qcard[data-qid="' + qid + '"]');
+    const q = state.workspaceQuestions.find(x => x.id === qid);
+    if (card && q) {
+      const fresh = document.createElement('div'); fresh.innerHTML = renderQuestionCardHtml(q);
+      card.replaceWith(fresh.firstElementChild);
+      renderQuestionCards(); // re-bind listeners cleanly across the whole list
+    }
+    renderImageGrid();
+    updatePendingUI();
+  }
+
+  // ── Image library (right panel) ──
+  async function loadSubjectImages(reset){
+    const body = document.getElementById('imagesPanelBody');
+    if (reset) { body.innerHTML = '<div class="imap-img-empty">Loading images…</div>'; }
+    const params = new URLSearchParams({ prefix: state.subjectName + '/', limit: 60 });
+    if (state.imgCursor && !reset) params.set('cursor', state.imgCursor);
+    const q = document.getElementById('imgSearch').value.trim();
+    if (q) params.set('q', state.subjectName + '/' + q);
+    try {
+      const res = await apiFetch(STORAGE_API + '?' + params.toString());
+      const data = await res.json();
+      if (!data.success) { body.innerHTML = '<div class="imap-img-empty">Unable to load images for this subject.</div>'; return; }
+      const images = data.objects.filter(o => o.is_image);
+      state.subjectImages = reset ? images : state.subjectImages.concat(images);
+      state.imgCursor = data.next_cursor;
+      state.imgTruncated = !!data.next_cursor;
+      renderImageGrid();
+    } catch (e) {
+      body.innerHTML = '<div class="imap-img-empty">Network error while loading images.</div>';
+    }
+  }
+  document.getElementById('imgSearch').addEventListener('input', debounce(() => loadSubjectImages(true), 350));
+  const imgMappedFilterEl = document.getElementById('imgMappedFilter');
+  imgMappedFilterEl.addEventListener('change', renderImageGrid);
+  enhanceSelect(imgMappedFilterEl, { icon:'fas fa-filter' });
+
+  function currentMappedKeys(){
+    // Union of already-saved image_path values (not overridden by a
+    // pending removal) and every pending image_key — this is what "Mapped"
+    // means at this exact moment, purely client-side, no extra network call.
+    const keys = new Set();
+    state.workspaceQuestions.forEach(q => {
+      const pend = state.pending.get(q.id);
+      if (pend) { if (pend.image_key) keys.add(pend.image_key); }
+      else if (q.image_path) keys.add(q.image_path);
+    });
+    return keys;
+  }
+
+  function renderImageGrid(){
+    const body = document.getElementById('imagesPanelBody');
+    const mappedKeys = currentMappedKeys();
+    const filter = imgMappedFilterEl.value;
+    const filtered = state.subjectImages.filter(img => {
+      const isMapped = mappedKeys.has(img.key);
+      if (filter === 'mapped' && !isMapped) return false;
+      if (filter === 'unmapped' && isMapped) return false;
+      return true;
+    });
+    if (!filtered.length) { body.innerHTML = '<div class="imap-img-empty">No images match your search/filter.</div>'; return; }
+    body.innerHTML = '<div class="imap-img-grid">' + filtered.map(img => {
+      const isMapped = mappedKeys.has(img.key);
+      const name = img.key.split('/').pop();
+      return '<div class="imap-img-card' + (isMapped ? ' is-mapped' : '') + '" draggable="true" data-key="' + escapeHtml(img.key) + '">' +
+        '<img src="' + escapeHtml(img.preview_url) + '" loading="lazy" alt="' + escapeHtml(name) + '">' +
+        '<div class="imc-body"><div class="imc-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>' +
+        (isMapped ? '<div class="imc-badge"><i class="fas fa-check"></i> Mapped</div>' : '') +
+        '</div></div>';
+    }).join('') + '</div>' +
+    (state.imgTruncated ? '<button type="button" class="btn btn-secondary btn-sm imap-img-loadmore" id="imgLoadMoreBtn">Load more</button>' : '');
+
+    body.querySelectorAll('.imap-img-card').forEach(card => {
+      const key = card.dataset.key;
+      const img = state.subjectImages.find(i => i.key === key);
+      card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', key); e.dataTransfer.effectAllowed = 'copy'; });
+      card.addEventListener('click', () => {
+        if (state.activeTargetId != null) {
+          mapImageToQuestion(state.activeTargetId, img);
+          toast('Mapped to Q' + (state.workspaceQuestions.find(q => q.id === state.activeTargetId) || {}).row_no + '.', 'success');
+        } else {
+          openPreview(img.preview_url, key.split('/').pop());
+        }
+      });
+    });
+    const loadMoreBtn = document.getElementById('imgLoadMoreBtn');
+    if (loadMoreBtn) loadMoreBtn.addEventListener('click', () => loadSubjectImages(false));
+  }
+
+  function openPreview(src, name){
+    document.getElementById('previewModalImg').src = src;
+    document.getElementById('previewModalTitle').textContent = name || 'Image Preview';
+    openModal('previewModalBackdrop');
+  }
+  document.getElementById('previewCloseBtn').addEventListener('click', () => closeModal('previewModalBackdrop'));
+  document.getElementById('previewModalBackdrop').addEventListener('click', e => { if (e.target.id === 'previewModalBackdrop') closeModal('previewModalBackdrop'); });
+
+  // ── Pending state / Review / Save ──
+  function updatePendingUI(){
+    const n = state.pending.size;
+    document.getElementById('pendingCount').textContent = n;
+    document.getElementById('pendingPlural').textContent = n === 1 ? '' : 's';
+    document.getElementById('reviewBtn').disabled = n === 0;
+  }
+
+  document.getElementById('reviewBtn').addEventListener('click', () => {
+    const rows = Array.from(state.pending.entries()).map(([qid, p]) => {
+      const q = state.workspaceQuestions.find(x => x.id === qid);
+      const target = p.image_key
+        ? '<span class="target">' + escapeHtml(p.filename) + '</span>'
+        : '<span class="target removed">(image removed)</span>';
+      return '<div class="imap-review-row"><span class="qno">Q' + (q ? q.row_no : qid) + '</span><span class="arrow"><i class="fas fa-arrow-right"></i></span>' + target + '</div>';
+    });
+    document.getElementById('reviewCount').textContent = state.pending.size;
+    document.getElementById('reviewList').innerHTML = rows.join('') || '<div class="imap-qempty">Nothing pending.</div>';
+    openModal('reviewModalBackdrop');
+  });
+  document.getElementById('reviewCancelBtn').addEventListener('click', () => closeModal('reviewModalBackdrop'));
+  document.getElementById('reviewModalBackdrop').addEventListener('click', e => { if (e.target.id === 'reviewModalBackdrop') closeModal('reviewModalBackdrop'); });
+
+  document.getElementById('reviewSaveBtn').addEventListener('click', async () => {
+    if (state.saving) return;
+    state.saving = true;
+    const btn = document.getElementById('reviewSaveBtn');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="imap-spinner"></span>Saving…';
+
+    const mappings = Array.from(state.pending.entries()).map(([question_id, p]) => ({ question_id, image_key: p.image_key }));
+    try {
+      const res = await apiFetch(API + '/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exam_id: state.examId, subject_name: state.subjectName, mappings }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        toast(data.message || 'Unable to save mappings. No changes were applied. Please try again.', 'danger');
+        return; // pending map is left intact for retry, per spec
+      }
+      // Merge fresh saved state into the in-memory question list, then
+      // re-render — no full page reload.
+      data.mappings.forEach(m => {
+        const q = state.workspaceQuestions.find(x => x.id === m.question_id);
+        if (q) { q.image_path = m.image_path; q.image_url = m.image_url; q.image_status = m.image_path ? (m.image_url ? 'attached' : 'broken') : 'none'; }
+      });
+      state.pending.clear();
+      closeModal('reviewModalBackdrop');
+      renderQuestionCards();
+      renderImageGrid();
+      updatePendingUI();
+      toast('✓ ' + data.updated + ' image mapping' + (data.updated === 1 ? '' : 's') + ' saved successfully.', 'success');
+    } finally {
+      state.saving = false;
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  });
+
+  // ── Init ──
+  document.getElementById('stepSubject').classList.add('locked');
+  document.getElementById('stepQuestions').classList.add('locked');
+})();
+</script>
+{% endblock %}

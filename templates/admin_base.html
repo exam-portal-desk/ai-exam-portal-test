@@ -527,6 +527,13 @@
           </a>
         </li>
         <li>
+          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.image_mapping') %}active{% endif %}"
+             href="{{ url_for('admin.image_mapping_page') }}" data-tooltip="Image Mapping" aria-label="Image Mapping">
+            <span class="nav-icon"><i class="fas fa-link"></i></span>
+            <span class="nav-label">Image Mapping</span>
+          </a>
+        </li>
+        <li>
           <button id="open-latex-editor-admin-base" class="nav-link" data-tooltip="LaTeX Editor" aria-label="LaTeX Editor">
             <span class="nav-icon"><i class="fas fa-square-root-alt"></i></span>
             <span class="nav-label">LaTeX Editor</span>

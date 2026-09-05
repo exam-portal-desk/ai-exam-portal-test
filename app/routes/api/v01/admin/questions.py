@@ -136,8 +136,22 @@ def edit_question_ajax(question_id):
     if not q:
         return jsonify({"success": False, "message": "Not found."}), 404
     d = request.form.to_dict()
+
+    # EXAM ISOLATION: this endpoint used to trust a client-supplied exam_id
+    # outright (`int(d.get("exam_id") or q["exam_id"])`), which meant a
+    # payload carrying a DIFFERENT exam_id than this question's real one
+    # would silently reassign it to that other exam — no caller has ever
+    # legitimately needed that (the existing edit modal always sends the
+    # question's own current exam_id already). Reject a mismatch instead of
+    # applying it; a request that omits exam_id entirely (the Admin Exam
+    # Preview editor does this deliberately) is unaffected and still falls
+    # through to the question's own exam_id below.
+    supplied_exam_id = d.get("exam_id")
+    if supplied_exam_id and int(supplied_exam_id) != int(q["exam_id"]):
+        return jsonify({"success": False, "message": "exam_id mismatch: cannot reassign a question to a different exam via this endpoint."}), 403
+
     ok = update_question(question_id, {
-        "exam_id":        int(d.get("exam_id") or q["exam_id"]),
+        "exam_id":        q["exam_id"],  # never trust the client for this field — see the check above
         "question_text":  d.get("question_text","").strip(),
         "option_a":       d.get("option_a","").strip(),
         "option_b":       d.get("option_b","").strip(),

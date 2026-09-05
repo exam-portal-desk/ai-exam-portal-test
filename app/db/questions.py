@@ -14,8 +14,8 @@ DELETE FIX (v2):
     4. questions             (the row itself)
 """
 
-from typing import Optional, List, Dict
-from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning, insert_many
+from typing import Optional, List, Dict, Set
+from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning, insert_many, transaction
 from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
 
 
@@ -223,6 +223,80 @@ def update_questions_by_type(exam_id: int, question_type: str, updates: Dict) ->
     except Exception as e:
         print(f"[db.questions] update_questions_by_type error: {e}")
         return 0
+
+
+def get_questions_by_ids(exam_id: int, ids: List[int]) -> List[Dict]:
+    """Full rows for an arbitrary subset of one exam's questions (e.g. a
+    saved selection from Image Mapping's "select all matching" step, which
+    may span many list pages) — with a `row_no` that reflects each
+    question's TRUE position across the WHOLE exam (via ROW_NUMBER() OVER
+    the full ordered set, then filtered down), not its position within
+    this arbitrary subset. That's what keeps "Q14" meaning the same thing
+    here as it does on the paginated list."""
+    if not ids:
+        return []
+    try:
+        return fetch_all(
+            f"SELECT {', '.join('t.' + c for c in _ALL_COLS.split(','))}, t.row_no FROM ("
+            f"  SELECT {_ALL_COLS}, ROW_NUMBER() OVER (ORDER BY id) AS row_no "
+            "   FROM questions WHERE exam_id=%s"
+            ") t WHERE t.id = ANY(%s) ORDER BY t.id",
+            (exam_id, ids),
+        )
+    except Exception as e:
+        print(f"[db.questions] get_questions_by_ids error: {e}")
+        return []
+
+
+def get_question_ids_for_exam(exam_id: int, ids: List[int]) -> Set[int]:
+    """Which of `ids` actually belong to `exam_id` — used by the Image
+    Mapping bulk-save to reject any question id that doesn't belong to the
+    exam the admin selected, BEFORE writing anything (see
+    bulk_set_image_paths() below). Returns a set for cheap membership
+    checks against the requested id list."""
+    if not ids:
+        return set()
+    try:
+        rows = fetch_all(
+            "SELECT id FROM questions WHERE exam_id=%s AND id = ANY(%s)",
+            (exam_id, ids),
+        )
+        return {r["id"] for r in rows}
+    except Exception as e:
+        print(f"[db.questions] get_question_ids_for_exam error: {e}")
+        return set()
+
+
+def bulk_set_image_paths(exam_id: int, mappings: List[Dict]) -> List[Dict]:
+    """Set `image_path` for many questions in one atomic round trip — the
+    Image Mapping feature's bulk save. `mappings` is a list of
+    {"id": question_id, "image_path": str|None} (None clears the image).
+    Mirrors app/db/notes.py's existing bulk-VALUES pattern: a single
+    UPDATE ... FROM (VALUES ...) inside one transaction, so a save either
+    fully applies or fully rolls back — never a partially-updated exam.
+    `AND q.exam_id=%s` is defense-in-depth on top of the caller's own
+    get_question_ids_for_exam() pre-check. Returns the updated rows
+    (id, image_path) so the caller can resolve fresh image URLs without a
+    second fetch."""
+    if not mappings:
+        return []
+    try:
+        with transaction() as cur:
+            values_sql = ", ".join(["(%s::int,%s::text)"] * len(mappings))
+            params: List = []
+            for m in mappings:
+                params += [m["id"], m["image_path"]]
+            cur.execute(
+                "UPDATE questions AS q SET image_path=v.image_path "
+                f"FROM (VALUES {values_sql}) AS v(id,image_path) "
+                "WHERE q.id=v.id AND q.exam_id=%s "
+                "RETURNING q.id, q.image_path",
+                params + [exam_id],
+            )
+            return [dict(row) for row in cur.fetchall()]
+    except Exception as e:
+        print(f"[db.questions] bulk_set_image_paths error: {e}")
+        return []
 
 
 def _purge_question_children(question_id: int) -> None:

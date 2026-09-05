@@ -65,6 +65,10 @@
   </td>
   <td>
     <div class="action-btns">
+      <a class="icon-btn" title="Preview Exam"
+         href="{{ url_for('admin.preview_exam', exam_id=exam.id) }}" target="_blank">
+        <i class="fas fa-eye"></i>
+      </a>
       <button class="icon-btn" title="Edit"
               data-bs-toggle="modal"
               data-bs-target="#editExamModal{{ exam.id }}">
@@ -116,6 +120,9 @@
     {% endif %}
   </div>
   <div class="egi-actions">
+    <a class="icon-btn" title="Preview Exam" href="{{ url_for('admin.preview_exam', exam_id=exam.id) }}" target="_blank">
+      <i class="fas fa-eye"></i>
+    </a>
     <button class="icon-btn" title="Edit" data-bs-toggle="modal" data-bs-target="#editExamModal{{ exam.id }}">
       <i class="fas fa-pencil-alt"></i>
     </button>

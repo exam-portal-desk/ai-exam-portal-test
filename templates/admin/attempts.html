@@ -1,6 +1,11 @@
 {% extends "admin_base.html" %}
 {% block title %}Attempts Management{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -571,5 +576,14 @@ document.getElementById('actionModal').addEventListener('click', e => {
 document.getElementById('bulkModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeBulkModal();
 });
+
+/* ═══════════════════════════════════════════════
+   THEMED DROPDOWNS
+═══════════════════════════════════════════════ */
+// Same component used elsewhere in the admin UI (static/admin/select-enhance.js) —
+// the underlying <select> stays fully functional, so fetchAttempts()/clearFilters()
+// above (which read/set .value and rely on the "change" event) need no changes.
+enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-alt' });
+enhanceSelect(document.getElementById('statusFilter'), { icon: 'fas fa-chart-bar' });
 </script>
 {% endblock %}

@@ -1,0 +1,1076 @@
+{% extends "admin_base.html" %}
+{% block title %}Preview: {{ exam.name }} - Admin{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Admin Exam Preview ──────────────────────────────────────────────────
+   CSS below is copied from templates/exam_page.html (the real student exam
+   page) for everything that must look/behave identically — question card,
+   options, numeric keypad, palette, sidebar, nav bar, image modal — minus
+   the exam-gate/submit-confirmation/auto-submit-notice styles, which this
+   page never uses (no timer, no submit flow, no fullscreen gate here). ── */
+
+/* ── Independent-scroll workspace ──────────────────────────────────────
+   The previous layout relied on the normal admin page-scroll (one body
+   scrollbar dragging the banner/topbar, question content, and right
+   sidebar together as a single unit) — scrolling through a long question
+   or a long bulk-edit list moved everything else too, and the left admin
+   nav (position:sticky, height:100vh, confined to the height of its own
+   flex container .admin-wrapper) would run out of "stick range" once that
+   shared page grew tall, so it visually scrolled away too.
+
+   Fixed the same way templates/exam_page.html (the real student page)
+   solves it: stop the page from scrolling at all and give each region its
+   own bounded, independently-scrolling box instead. The one difference
+   from exam_page.html is that this page still shares admin_base.html's
+   persistent left sidebar, so instead of exam_page.html's position:fixed
+   full-viewport overlay, .content-wrap itself becomes the fixed-height
+   flex column — .exam-wrap and the nav bar are already its only two
+   children, so no HTML restructuring is needed, and since this <style>
+   block only exists in THIS page's document, none of this reaches any
+   other admin page — the left sidebar's own CSS is untouched and keeps
+   behaving exactly as it does everywhere else in the Admin Portal. ── */
+html, body { overflow:hidden !important; height:100% !important; }
+.content-wrap { padding:0 !important; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+
+.exam-wrap { display:flex; flex-direction:column; flex:1; min-height:0; background:var(--bg); }
+
+.preview-banner {
+  display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap;
+  padding:.55rem 1.25rem; background:var(--accent-subtle); border-bottom:1px solid var(--accent);
+  font-size:.82rem; color:var(--text-1);
+}
+.preview-banner-left { display:flex; align-items:center; gap:.6rem; min-width:0; flex-wrap:wrap; }
+.preview-banner-badge {
+  display:inline-flex; align-items:center; gap:.4rem; font-weight:800; letter-spacing:.03em;
+  color:var(--accent); background:var(--surface); border:1px solid var(--accent); border-radius:20px;
+  padding:.25rem .7rem; font-size:.72rem; text-transform:uppercase; flex-shrink:0;
+}
+.preview-banner-note { color:var(--text-2); font-size:.78rem; }
+.preview-banner-right { display:flex; align-items:center; gap:.5rem; flex-shrink:0; }
+.preview-back-link {
+  display:inline-flex; align-items:center; gap:.4rem; color:var(--text-2); text-decoration:none;
+  font-weight:600; font-size:.8rem; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.35rem .75rem;
+}
+.preview-back-link:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Top bar */
+.exam-topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.6rem 1.25rem; border-bottom:1px solid var(--border);
+  background:var(--surface); flex-shrink:0; gap:.75rem; flex-wrap:wrap;
+}
+.exam-name { font-size:.92rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:.45rem; min-width:0; flex:1 1 auto; }
+.exam-name i { color:var(--accent); flex-shrink:0; }
+.exam-name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.exam-qcounter {
+  display:inline-flex; align-items:center; flex-shrink:0;
+  background:var(--accent-subtle); color:var(--accent);
+  border:1px solid var(--border); border-radius:20px;
+  padding:.2rem .65rem; font-size:.75rem; font-weight:700;
+}
+.exam-topbar-right { display:flex; align-items:center; gap:.5rem; flex-shrink:0; }
+.exam-duration-pill {
+  display:flex; align-items:center; gap:.4rem; flex-shrink:0;
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.35rem .75rem;
+  font-size:.82rem; font-weight:700; color:var(--text-2); white-space:nowrap;
+}
+.exam-duration-pill i { color:var(--accent); }
+@media (max-width:560px) {
+  .exam-topbar { padding:.5rem .75rem; gap:.5rem; }
+  .exam-name { font-size:.82rem; }
+  .exam-qcounter { padding:.15rem .5rem; font-size:.68rem; }
+  .preview-banner { padding:.5rem .75rem; }
+}
+
+.question-source-tag {
+  display:inline-flex; align-items:center; gap:.35rem;
+  background:var(--accent-subtle); color:var(--accent);
+  border:1px solid var(--accent); border-radius:20px;
+  padding:.2rem .65rem; font-size:.7rem; font-weight:700;
+  letter-spacing:.01em; margin:0 0 .75rem;
+}
+
+.exam-body { display:flex; width:100%; flex:1; min-height:0; overflow:hidden; }
+.exam-content { flex:1; min-width:0; padding:1.25rem 1.5rem; overflow-y:auto; }
+.question-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:calc(var(--radius) + 4px); padding:1.5rem;
+  transition:opacity .15s, box-shadow .2s; box-shadow:var(--shadow-sm);
+}
+.question-card.loading { opacity:.4; }
+
+.option-container {
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.65rem .9rem;
+  margin-bottom:.5rem; cursor:pointer; transition:border-color .12s, background .12s;
+}
+.option-container:hover { border-color:var(--accent); background:var(--accent-subtle); }
+.option-container.selected { border-color:var(--accent); background:var(--accent-subtle); }
+.option-container.selected-msq { border-color:var(--success); background:var(--success-bg); }
+.option-container .form-check-label { cursor:pointer; color:var(--text-1); font-size:.875rem; }
+.form-check-input { accent-color:var(--accent); }
+
+.numeric-display {
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.65rem 1rem;
+  font-size:1.25rem; font-weight:700; color:var(--text-1);
+  min-height:52px; display:flex; align-items:center;
+  font-family:monospace; letter-spacing:.05em;
+}
+.cursor-blink { animation:blink .8s step-end infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.numeric-keypad { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; }
+.keypad-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.4rem; }
+.keypad-btn {
+  padding:.55rem; border-radius:var(--radius); border:1px solid var(--border);
+  background:var(--surface); color:var(--text-1); font-size:.88rem; font-weight:600;
+  cursor:pointer; transition:background .1s, transform .08s; font-family:inherit;
+  display:flex; align-items:center; justify-content:center;
+}
+.keypad-btn:hover { background:var(--accent-subtle); border-color:var(--accent); }
+.keypad-btn:active { transform:scale(.94); }
+.keypad-btn.clear { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+.keypad-btn.backspace { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.keypad-btn.sign,.keypad-btn.decimal { background:var(--info-bg); color:var(--info-text); border-color:var(--info-border); }
+.keypad-guide-card { background:var(--surface-2); border:1px solid var(--border); color:var(--text-1); }
+.keypad-guide-grid { display:grid; grid-template-columns:1fr 1fr; gap:.4rem; }
+.keypad-guide-item { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.4rem .6rem; text-align:center; font-size:.72rem; color:var(--text-2); }
+
+.exam-navigation-btn {
+  padding:.55rem 1rem; min-height:44px; border-radius:var(--radius); font-size:.82rem;
+  font-weight:700; font-family:inherit; cursor:pointer; transition:all .12s;
+  display:inline-flex; align-items:center; gap:.4rem; border:1.5px solid var(--border);
+}
+.btn-outline-secondary.exam-navigation-btn { background:var(--info-bg); color:var(--info-text); border-color:var(--info-border); }
+.btn-outline-secondary.exam-navigation-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+.btn-outline-secondary.exam-navigation-btn:disabled { opacity:.4; cursor:not-allowed; background:var(--surface-2); color:var(--text-3); border-color:var(--border); }
+.btn-warning.exam-navigation-btn  { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.btn-warning.exam-navigation-btn:hover { background:var(--warning); color:#fff; }
+.btn-warning.exam-navigation-btn.marked { background:var(--success); color:#fff; border-color:var(--success); }
+.btn-primary.exam-navigation-btn  { background:var(--accent); color:var(--accent-on); border-color:var(--accent); }
+.btn-primary.exam-navigation-btn:hover { background:var(--accent-hover); }
+.btn-outline-danger.btn-sm { background:var(--danger-bg); color:var(--danger-text); border:1px solid var(--danger-border); border-radius:var(--radius); padding:.28rem .65rem; font-size:.75rem; font-weight:600; cursor:pointer; font-family:inherit; }
+.btn-outline-danger.btn-sm:hover { background:var(--danger); color:#fff; }
+
+.badge.bg-primary { background:var(--accent) !important; color:var(--accent-on) !important; }
+.badge-info { background:var(--info-bg); color:var(--info-text); border:1px solid var(--info-border); border-radius:20px; padding:.2rem .65rem; font-size:.72rem; font-weight:700; }
+.badge.bg-success { background:var(--success) !important; color:#fff !important; }
+.badge.bg-warning { background:var(--warning) !important; color:#fff !important; }
+.badge.bg-info    { background:var(--info)    !important; color:#fff !important; }
+.badge.bg-secondary { background:var(--surface-2) !important; color:var(--text-2) !important; border:1px solid var(--border); }
+.alert-info    { background:var(--info-bg)   !important; border-color:var(--info-border)   !important; color:var(--info-text)    !important; }
+.alert-warning { background:var(--warning-bg)!important; border-color:var(--warning-border)!important; color:var(--warning-text) !important; }
+.alert-danger  { background:var(--danger-bg) !important; border-color:var(--danger-border) !important; color:var(--danger-text)  !important; }
+
+.exam-sidebar {
+  width:290px; flex-shrink:0;
+  background:var(--surface); border-left:1px solid var(--border);
+  padding:1rem; display:flex; flex-direction:column; gap:.9rem;
+  overflow-y:auto;
+}
+.exam-sidebar .card { background:var(--surface-2); border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); overflow:hidden; flex-shrink:0; box-shadow:var(--shadow-sm); }
+.exam-sidebar .card-header { background:var(--surface); border-bottom:1px solid var(--border); padding:.65rem .9rem; font-size:.8rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:.4rem; justify-content:space-between; }
+.exam-sidebar .card-header.bg-primary { background:var(--accent) !important; color:var(--accent-on) !important; }
+.exam-sidebar .card-body { padding:.75rem; color:var(--text-2); font-size:.82rem; }
+
+.question-palette { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:center; }
+.palette-link {
+  width:32px; height:32px; border-radius:7px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:.72rem; font-weight:700; cursor:pointer;
+  transition:transform .1s; position:relative;
+  background:linear-gradient(135deg,#6c757d,#495057); color:#fff;
+  border:2px solid transparent;
+}
+.palette-link:hover { transform:scale(1.1); }
+.palette-link.current { border-color:var(--text-1) !important; box-shadow:0 0 0 2px var(--accent); }
+.palette-link.answered { background:linear-gradient(135deg,#16a34a,#059669); }
+.palette-link.review   { background:linear-gradient(135deg,#f59e0b,#f97316); }
+.palette-link.visited  { background:linear-gradient(135deg,#0ea5e9,#0369a1); }
+.palette-link.not-visited { background:linear-gradient(135deg,#6c757d,#495057); }
+.legend-box { display:flex; align-items:center; gap:.4rem; font-size:.75rem; color:var(--text-2); }
+.swatch { width:14px; height:14px; border-radius:4px; flex-shrink:0; display:inline-block; }
+
+.question-image img { border-radius:var(--radius); max-height:420px; width:auto; max-width:100%; cursor:pointer; }
+.image-loading { padding:2rem; color:var(--text-3); font-size:.85rem; }
+.image-error { padding:1rem; color:var(--danger-text); }
+.loading-spinner { width:28px; height:28px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); animation:spin .8s linear infinite; margin:0 auto .75rem; }
+@keyframes spin{to{transform:rotate(360deg)}}
+.img-fluid { border-radius:var(--radius); max-width:100%; height:auto; }
+
+.exam-nav-bar {
+  flex-shrink:0; padding:.85rem 1.5rem;
+  background:var(--surface-2); border-top:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:.6rem; box-shadow:0 -2px 8px rgba(0,0,0,.1);
+}
+
+.container-fluid { width:100%; }
+.mb-0{margin-bottom:0}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.me-2{margin-right:.4rem}.me-1{margin-right:.25rem}.ms-2{margin-left:.4rem}
+.d-flex{display:flex}.align-items-center{align-items:center}.justify-content-between{justify-content:space-between}.gap-1{gap:.25rem}.gap-2{gap:.5rem}.fw-bold{font-weight:700}
+.small{font-size:.82rem}.fs-6{font-size:.88rem}.w-100{width:100%}
+.form-check{display:flex;align-items:flex-start;gap:.5rem}.form-check-input{width:15px;height:15px;flex-shrink:0;margin-top:.15rem}.form-check-label{flex:1}
+
+/* Below ~992px, three independently-scrolling regions stacked in a
+   fixed-height column stop being usable (each pane ends up too short to
+   read comfortably) — so on tablet/mobile this reverts to one natural,
+   page-level scroll through content-then-sidebar instead, with the nav
+   bar pinned via position:fixed the way it always was before. This is
+   the exact layout already verified on a real mobile viewport earlier. */
+@media(max-width:992px){
+  html, body { overflow:auto !important; height:auto !important; }
+  .content-wrap { padding:1.75rem 2rem !important; height:auto !important; overflow:visible !important; display:block !important; }
+  .exam-wrap { display:block; }
+  .exam-body { display:flex; flex-direction:column; overflow:visible; }
+  .exam-content { overflow-y:visible; padding-bottom:140px; }
+  .exam-sidebar { width:100%; overflow-y:visible; border-left:none; border-top:1px solid var(--border); }
+  .exam-nav-bar { position:fixed; bottom:0; left:0; right:0; z-index:50; }
+}
+@media(max-width:768px){
+  .content-wrap { padding:4.5rem 1rem 1.5rem !important; }
+  .exam-content{padding:.85rem .85rem 140px;}
+  .question-card{padding:1.1rem;}
+}
+@media(max-width:576px){
+  .content-wrap { padding:4rem .75rem 1rem !important; }
+}
+@media(max-width:600px){
+  .exam-nav-bar{padding:.6rem .75rem;gap:.4rem;}
+  .exam-navigation-btn{padding:.5rem .75rem;font-size:.78rem;}
+}
+
+/* ── Admin-only additions ── */
+.pv-edit-btn {
+  background:var(--surface-2); border:1px solid var(--border); color:var(--text-2);
+  border-radius:var(--radius); padding:.3rem .65rem; font-size:.72rem; font-weight:700;
+  cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:.35rem;
+  margin-top:.5rem;
+}
+.pv-edit-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+
+.pv-bulk-list { display:flex; flex-direction:column; gap:.3rem; max-height:220px; overflow-y:auto; margin-bottom:.7rem; padding-right:.15rem; }
+.pv-bulk-row {
+  display:flex; align-items:center; gap:.55rem; padding:.4rem .55rem; border-radius:8px; font-size:.76rem;
+  color:var(--text-2); cursor:pointer; background:var(--surface); border:1px solid var(--border);
+  transition:background .12s, border-color .12s;
+}
+.pv-bulk-row:hover { background:var(--accent-subtle); border-color:var(--accent); }
+.pv-bulk-row input[type="checkbox"] { accent-color:var(--accent); cursor:pointer; flex-shrink:0; width:15px; height:15px; }
+.pv-bulk-row .pv-bulk-type { font-size:.62rem; font-weight:700; padding:.1rem .45rem; border-radius:10px; flex-shrink:0; }
+.pv-bulk-type.MCQ { background:var(--success-bg); color:var(--success-text); }
+.pv-bulk-type.MSQ { background:var(--warning-bg); color:var(--warning-text); }
+.pv-bulk-type.NUMERIC { background:var(--info-bg); color:var(--info-text); }
+.pv-bulk-actions { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; margin-bottom:.75rem; }
+.pv-bulk-actions .btn-flat {
+  font-size:.74rem; font-weight:600; padding:.45rem .5rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text-2); cursor:pointer; font-family:inherit; text-align:center;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.pv-bulk-actions .btn-flat:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+.pv-bulk-actions .btn-flat.pv-bulk-clear { grid-column:1 / -1; color:var(--danger-text); border-color:var(--danger-border); background:var(--danger-bg); }
+.pv-bulk-actions .btn-flat.pv-bulk-clear:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
+.pv-bulk-toolbar { display:none; border-top:1px solid var(--border); padding-top:.75rem; }
+.pv-bulk-toolbar.show { display:block; }
+.pv-bulk-count {
+  font-size:.74rem; font-weight:700; color:var(--accent); margin-bottom:.65rem;
+  background:var(--accent-subtle); border-radius:8px; padding:.35rem .6rem; text-align:center;
+}
+.pv-bulk-field { display:flex; flex-direction:column; gap:.3rem; margin-bottom:.55rem; }
+.pv-bulk-field label { font-size:.7rem; color:var(--text-3); font-weight:600; }
+.pv-bulk-field input {
+  width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px;
+  color:var(--text-1); font-size:.8rem; padding:.4rem .6rem; font-family:inherit;
+  transition:border-color .12s, box-shadow .12s;
+}
+.pv-bulk-field input:focus { outline:none; border-color:var(--border-focus); box-shadow:0 0 0 3px var(--accent-subtle); }
+.pv-bulk-btns { display:flex; gap:.45rem; }
+.pv-bulk-btns button { flex:1; font-size:.74rem; padding:.5rem; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-weight:700; transition:opacity .12s, transform .08s; }
+.pv-bulk-btns button:hover { opacity:.88; }
+.pv-bulk-btns button:active { transform:scale(.97); }
+.pv-bulk-btns .adjust { background:var(--surface); border:1px solid var(--border); color:var(--text-2); }
+.pv-bulk-btns .set { background:var(--accent); color:var(--accent-on); }
+
+/* Themed modal (Add/Edit modals below reuse admin's existing Bootstrap
+   modal + form-control theming — declared here since each admin page in
+   this codebase re-declares its own copy rather than relying on a global
+   admin_base.html rule, matching templates/admin/questions.html's own
+   convention). */
+.form-label { font-size:.78rem; font-weight:600; color:var(--text-2); margin-bottom:.35rem; }
+.form-control, .form-select {
+  background:var(--bg) !important; border:1px solid var(--border) !important;
+  border-radius:var(--radius) !important; color:var(--text-1) !important;
+  font-family:inherit; font-size:.855rem;
+}
+.form-control:focus, .form-select:focus { border-color:var(--border-focus) !important; box-shadow:0 0 0 3px var(--accent-subtle) !important; }
+/* Bootstrap's own .btn-primary/.btn-secondary/.btn-danger ship hardcoded
+   blue/grey/red — override with the same theme tokens every other admin
+   page uses (see templates/admin/questions.html) so Save/Cancel/Delete
+   read as this app's own buttons, not Bootstrap defaults. */
+.btn-primary   { background:var(--accent)    !important; border-color:var(--accent)    !important; color:var(--accent-on) !important; }
+.btn-primary:hover   { background:var(--accent-hover) !important; }
+.btn-secondary { background:var(--surface-2) !important; border-color:var(--border)     !important; color:var(--text-2)   !important; }
+.btn-secondary:hover { border-color:var(--accent) !important; color:var(--accent) !important; }
+.btn-danger    { background:var(--danger)     !important; border-color:var(--danger)     !important; color:#fff !important; }
+.modal-content { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:calc(var(--radius)+4px) !important; }
+.modal-header { border-bottom:1px solid var(--border) !important; }
+.modal-title { color:var(--text-1) !important; }
+.modal-body { background:var(--surface) !important; }
+.modal-footer { border-top:1px solid var(--border) !important; }
+.btn-close { filter:var(--btn-close-filter,none); }
+
+/* Themed toast (no alert()/confirm() anywhere on this page) */
+.pv-toast {
+  position:fixed; bottom:1.25rem; right:1.25rem; z-index:99999; min-width:260px; max-width:380px;
+  background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent);
+  border-radius:var(--radius); padding:.75rem 1rem; box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.2));
+  display:flex; align-items:flex-start; gap:.65rem; animation:pvToastIn .2s ease-out;
+}
+.pv-toast.success { border-left-color:var(--success); }
+.pv-toast.danger  { border-left-color:var(--danger); }
+.pv-toast.warning { border-left-color:var(--warning); }
+@keyframes pvToastIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* Themed confirm dialog (bulk apply) */
+.pv-confirm-backdrop { display:none; position:fixed; inset:0; z-index:10060; background:rgba(0,0,0,.6); align-items:center; justify-content:center; }
+.pv-confirm-backdrop.show { display:flex; }
+.pv-confirm-box { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+6px); padding:1.5rem; max-width:380px; width:90%; box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.3)); text-align:center; }
+.pv-confirm-box h5 { font-size:.95rem; font-weight:700; color:var(--text-1); margin:0 0 .5rem; }
+.pv-confirm-box p { font-size:.83rem; color:var(--text-3); margin:0 0 1.1rem; line-height:1.6; }
+.pv-confirm-footer { display:flex; gap:.6rem; }
+.pv-confirm-footer button { flex:1; padding:.55rem; border-radius:var(--radius); font-weight:700; font-size:.82rem; cursor:pointer; font-family:inherit; border:none; }
+.pv-confirm-cancel { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border) !important; }
+.pv-confirm-ok { background:var(--accent); color:var(--accent-on); }
+</style>
+
+<div class="exam-wrap">
+
+  {# Admin preview banner — the one thing that must never be mistaken for the real exam #}
+  <div class="preview-banner">
+    <div class="preview-banner-left">
+      <span class="preview-banner-badge"><i class="fas fa-eye"></i> Admin Preview</span>
+      <span class="preview-banner-note">No answers are recorded &middot; no attempt is created &middot; changes save directly to this exam's questions.</span>
+    </div>
+    <div class="preview-banner-right">
+      <a class="preview-back-link" href="{{ url_for('admin.exams') }}"><i class="fas fa-arrow-left"></i> Back to Manage Exams</a>
+    </div>
+  </div>
+
+  <div class="exam-topbar">
+    <div class="exam-name">
+      <i class="fas fa-file-alt"></i>
+      <span class="exam-name-text">{{ exam.name }}</span>
+      <span class="exam-qcounter">Q <span id="questionCounter">1</span> / {{ questions | length }}</span>
+    </div>
+    <div class="exam-topbar-right">
+      <div class="exam-duration-pill"><i class="fas fa-hourglass-half"></i> {{ exam.duration }} min (not counted down)</div>
+    </div>
+  </div>
+
+  <div class="exam-body">
+
+    <div class="exam-content">
+      {% if questions %}
+      <div class="question-card" id="questionCard">
+        <div id="questionContent"></div>
+      </div>
+      {% else %}
+      <div class="question-card" style="text-align:center;padding:3rem 1.5rem;color:var(--text-3)">
+        <i class="fas fa-inbox" style="font-size:2rem;opacity:.4;display:block;margin-bottom:.75rem"></i>
+        This exam has no questions yet.
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="exam-sidebar">
+      <div class="card">
+        <div class="card-header bg-primary"><i class="fas fa-th"></i> Question Navigation</div>
+        <div class="card-body">
+          <div class="question-palette" id="questionPalette"></div>
+          <div style="margin-top:.75rem">
+            <div style="font-size:.75rem;font-weight:700;color:var(--text-2);margin-bottom:.4rem">Legend</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
+              <div class="legend-box"><span class="swatch" style="background:linear-gradient(90deg,#16a34a,#059669)"></span><small>Answered (<span id="answeredCount">0</span>)</small></div>
+              <div class="legend-box"><span class="swatch" style="background:linear-gradient(90deg,#f59e0b,#f97316)"></span><small>Review (<span id="reviewCount">0</span>)</small></div>
+              <div class="legend-box"><span class="swatch" style="background:linear-gradient(90deg,#0ea5e9,#0369a1)"></span><small>Visited (<span id="visitedCount">0</span>)</small></div>
+              <div class="legend-box"><span class="swatch" style="background:linear-gradient(90deg,#6c757d,#495057)"></span><small>Not visited (<span id="notVisitedCount">0</span>)</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><i class="fas fa-layer-group"></i> Bulk Edit</div>
+        <div class="card-body">
+          <div class="pv-bulk-actions">
+            <button class="btn-flat" onclick="preview.bulkSelectAll()"><i class="fas fa-check-double"></i> Select All</button>
+            <button class="btn-flat" onclick="preview.bulkSelectByType('MCQ')">All MCQ</button>
+            <button class="btn-flat" onclick="preview.bulkSelectByType('MSQ')">All MSQ</button>
+            <button class="btn-flat" onclick="preview.bulkSelectByType('NUMERIC')">All Numeric</button>
+            <button class="btn-flat pv-bulk-clear" onclick="preview.bulkClear()"><i class="fas fa-times"></i> Clear Selection</button>
+          </div>
+          <div class="pv-bulk-list" id="pvBulkList"></div>
+          <div class="pv-bulk-toolbar" id="pvBulkToolbar">
+            <div class="pv-bulk-count"><span id="pvBulkCount">0</span> selected</div>
+            <div class="pv-bulk-field">
+              <label>+ Marks</label>
+              <input type="number" step="0.25" id="pvBulkPM" placeholder="—">
+            </div>
+            <div class="pv-bulk-field" id="pvBulkNMField">
+              <label>&minus; Marks <span style="font-weight:400">(MCQ/MSQ)</span></label>
+              <input type="number" step="0.25" id="pvBulkNM" placeholder="—">
+            </div>
+            <div class="pv-bulk-field" id="pvBulkTolField">
+              <label>Tolerance <span style="font-weight:400">(Numeric)</span></label>
+              <input type="number" step="0.01" id="pvBulkTol" placeholder="—">
+            </div>
+            <div class="pv-bulk-btns">
+              <button class="adjust" onclick="preview.bulkConfirm('adjust')"><i class="fas fa-arrows-up-down"></i> Adjust</button>
+              <button class="set" onclick="preview.bulkConfirm('set')">Set Values</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><i class="fas fa-info-circle"></i> Quick Guide</div>
+        <div class="card-body small">
+          <div class="mb-2"><strong>Navigation:</strong> Click question numbers to jump</div>
+          <div class="mb-2"><strong>MCQ:</strong> Select one option to see the selected state</div>
+          <div class="mb-2"><strong>MSQ:</strong> Select multiple options</div>
+          <div class="mb-2"><strong>Numerical:</strong> Use the keypad to try an answer</div>
+          <div><strong>Edit:</strong> Use the pencil on a question, or Bulk Edit in the sidebar</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% if questions %}
+<div id="examNavBar" class="exam-nav-bar"></div>
+{% endif %}
+
+{# Image Modal — identical to the student page #}
+<div id="imageModal" style="display:none;position:fixed;inset:0;z-index:19999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;" onclick="if(event.target===this)document.getElementById('imageModal').style.display='none'">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:calc(var(--radius)+4px);max-width:90vw;max-height:90vh;overflow:auto;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.1rem;border-bottom:1px solid var(--border);">
+      <span id="imageModalTitle" style="font-size:.9rem;font-weight:700;color:var(--text-1)"><i class="fas fa-image me-2"></i>Question Image</span>
+      <button onclick="document.getElementById('imageModal').style.display='none'" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:1rem;padding:.2rem .4rem;"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:1.1rem;text-align:center;">
+      <img id="modalImage" src="" alt="Question image" style="max-height:75vh;max-width:100%;border-radius:var(--radius);">
+    </div>
+  </div>
+</div>
+
+{# Single-question Edit modal — same field set as templates/admin/questions.html's
+   Add/Edit modal, minus the exam picker (this page only ever edits questions
+   belonging to THIS exam — the field simply doesn't exist here, so there is
+   nothing for a client to tamper with to reassign a question elsewhere). #}
+<div class="modal fade" id="pvEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pvEditModalTitle"><i class="fas fa-pencil-alt me-2"></i>Edit Question</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pv-question-id" value="">
+        <div class="mb-3">
+          <label class="form-label">Question Text <span style="color:var(--danger-text)">*</span></label>
+          <textarea class="form-control" id="pv-question-text" rows="3"></textarea>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6"><label class="form-label">Option A</label><textarea class="form-control" id="pv-option-a" rows="2"></textarea></div>
+          <div class="col-md-6"><label class="form-label">Option B</label><textarea class="form-control" id="pv-option-b" rows="2"></textarea></div>
+          <div class="col-md-6"><label class="form-label">Option C</label><textarea class="form-control" id="pv-option-c" rows="2"></textarea></div>
+          <div class="col-md-6"><label class="form-label">Option D</label><textarea class="form-control" id="pv-option-d" rows="2"></textarea></div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-4"><label class="form-label">Correct Answer <span style="color:var(--danger-text)">*</span></label><input class="form-control" id="pv-correct-answer" placeholder="e.g. A, B,C or numeric"></div>
+          <div class="col-md-4">
+            <label class="form-label">Question Type</label>
+            <select class="form-select" id="pv-question-type">
+              <option value="MCQ">Multiple Choice (MCQ)</option>
+              <option value="MSQ">Multiple Select (MSQ)</option>
+              <option value="NUMERIC">Numerical Answer</option>
+            </select>
+          </div>
+          <div class="col-md-4" id="pv-tolerance-wrap"><label class="form-label">Tolerance <span style="font-weight:400;color:var(--text-3)">(NUMERIC)</span></label><input class="form-control" id="pv-tolerance" placeholder="e.g. 0.1"></div>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label">Positive Marks</label><input class="form-control" id="pv-positive-marks" value="4"></div>
+          <div class="col-md-4"><label class="form-label">Negative Marks</label><input class="form-control" id="pv-negative-marks" value="1"></div>
+          <div class="col-md-4"><label class="form-label">Image Path <span style="font-weight:400;color:var(--text-3)">(optional)</span></label><input class="form-control" id="pv-image-path"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between;align-items:center">
+        <span id="pvEditModalError" style="color:var(--danger-text);font-size:.82rem;display:none"></span>
+        <div style="display:flex;gap:.5rem;margin-left:auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm" id="pvEditSaveBtn" onclick="preview.saveEdit()"><i class="fas fa-save me-1"></i>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pv-confirm-backdrop" id="pvConfirmBackdrop">
+  <div class="pv-confirm-box">
+    <h5 id="pvConfirmTitle">Apply bulk change?</h5>
+    <p id="pvConfirmMsg"></p>
+    <div class="pv-confirm-footer">
+      <button class="pv-confirm-cancel" onclick="preview.closeConfirm()">Cancel</button>
+      <button class="pv-confirm-ok" id="pvConfirmOkBtn">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+class ExamPreviewPortal {
+  constructor() {
+    this.examId = {{ exam.id }};
+    this.totalQuestions = {{ questions | length }};
+    this.currentIndex = 0;
+    this.questions = {{ questions | tojson }};
+    this.answers = {};
+    this.markedForReview = [];
+    this.palette = {};
+    this.currentValue = '';
+    this.hasDecimal = false;
+    this.selected = new Set();
+    this.imageCache = {};
+    if (this.totalQuestions) this.init();
+  }
+
+  init() {
+    this.loadSessionData();
+    this.preloadAllImages();
+    this.initializePalette();
+    this.loadQuestion(this.currentIndex);
+    this.updateMetricsCounts();
+    this.renderBulkList();
+  }
+
+  // ── sessionStorage only (per-tab, browser-local) — never touches the
+  //    server, so this can never collide with or affect a real attempt's
+  //    autosave/answers_draft. Distinct key prefix from the real exam page
+  //    as a defensive measure even though the two never run in the same tab. ──
+  loadSessionData() {
+    try {
+      const a = sessionStorage.getItem(`examPreview_${this.examId}_answers`);
+      const r = sessionStorage.getItem(`examPreview_${this.examId}_review`);
+      if (a) this.answers = JSON.parse(a);
+      if (r) this.markedForReview = JSON.parse(r);
+    } catch (e) {}
+  }
+  saveSessionData() {
+    try {
+      sessionStorage.setItem(`examPreview_${this.examId}_answers`, JSON.stringify(this.answers));
+      sessionStorage.setItem(`examPreview_${this.examId}_review`, JSON.stringify(this.markedForReview));
+    } catch (e) {}
+  }
+
+  preloadAllImages() {
+    this.questions.forEach(q => {
+      if (q.has_image && q.image_url && !this.imageCache[q.image_url]) {
+        const img = new Image();
+        img.onload = () => { this.imageCache[q.image_url] = { status: 'loaded', element: img }; };
+        img.onerror = () => { this.imageCache[q.image_url] = { status: 'error', element: null }; };
+        this.imageCache[q.image_url] = { status: 'loading', element: img };
+        img.src = q.image_url;
+      }
+    });
+  }
+
+  isAnswered(qid) {
+    const v = this.answers[qid];
+    if (v === undefined || v === null || v === '') return false;
+    return Array.isArray(v) ? v.length > 0 : true;
+  }
+  getStatus(index) {
+    const qid = String(this.questions[index].id);
+    if (this.markedForReview.includes(qid)) return 'review';
+    if (this.isAnswered(qid)) return 'answered';
+    return this.palette[index] === 'visited' ? 'visited' : 'not-visited';
+  }
+  getStatusCounts() {
+    const c = { answered: 0, review: 0, visited: 0, 'not-visited': 0 };
+    for (let i = 0; i < this.totalQuestions; i++) { const s = this.getStatus(i); c[s] = (c[s] || 0) + 1; }
+    return c;
+  }
+  updateMetricsCounts() {
+    const c = this.getStatusCounts();
+    Object.entries({ answeredCount: c.answered, reviewCount: c.review, visitedCount: c.visited, notVisitedCount: c['not-visited'] })
+      .forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.textContent = v; });
+  }
+  initializePalette() {
+    for (let i = 0; i < this.totalQuestions; i++) this.palette[i] = 'not-visited';
+    this.palette[this.currentIndex] = 'visited';
+    this.renderPalette();
+  }
+  renderPalette() {
+    const c = document.getElementById('questionPalette'); if (!c) return;
+    c.innerHTML = '';
+    for (let i = 0; i < this.totalQuestions; i++) {
+      const q = this.questions[i], status = this.getStatus(i), qtype = q.question_type || 'MCQ';
+      const link = document.createElement('div');
+      link.className = `palette-link ${status}${i === this.currentIndex ? ' current' : ''}`;
+      link.title = `Q${i + 1} - ${qtype}${q.has_image ? ' (Image)' : ''}`;
+      link.textContent = i + 1;
+      if (q.has_image) { const ic = document.createElement('i'); ic.className = 'fas fa-image position-absolute'; ic.style.cssText = 'font-size:7px;top:2px;right:2px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.8)'; link.appendChild(ic); }
+      const ti = document.createElement('div'); ti.style.cssText = 'position:absolute;bottom:1px;left:50%;transform:translateX(-50%);font-size:6px;line-height:1';
+      const sym = { MCQ: ['●', '#28a745'], MSQ: ['■', '#007bff'], NUMERIC: ['▲', '#ffc107'] }[qtype] || ['?', '#6c757d'];
+      ti.innerHTML = `<span style="color:${sym[1]};font-weight:900">${sym[0]}</span>`; link.appendChild(ti);
+      link.addEventListener('click', () => this.navigateToQuestion(i));
+      c.appendChild(link);
+    }
+  }
+  navigateToQuestion(index) {
+    if (index < 0 || index >= this.totalQuestions) return;
+    this.saveCurrentAnswer(); this.currentIndex = index;
+    this.loadQuestion(index); this.updatePaletteCurrentQuestion(); this.updateQuestionCounter();
+  }
+  updatePaletteCurrentQuestion() { document.querySelectorAll('.palette-link').forEach((l, i) => l.classList.toggle('current', i === this.currentIndex)); }
+  updateQuestionCounter() { const el = document.getElementById('questionCounter'); if (el) el.textContent = this.currentIndex + 1; }
+  updatePaletteStatus() {
+    if (this.palette[this.currentIndex] !== 'visited') this.palette[this.currentIndex] = 'visited';
+    this.renderPalette(); this.updateMetricsCounts();
+  }
+
+  loadQuestion(index) {
+    const q = this.questions[index]; if (!q) return;
+    const card = document.getElementById('questionCard'); if (!card) return;
+    card.classList.add('loading');
+    setTimeout(() => {
+      this.renderQuestion(q); card.classList.remove('loading');
+      if (this.palette[index] === 'not-visited') { this.palette[index] = 'visited'; this.renderPalette(); this.updateMetricsCounts(); }
+      this.renderMathJax();
+    }, 30);
+  }
+  renderMathJax() {
+    if (!window.mathJaxTypeset) return;
+    const qc = document.getElementById('questionContent');
+    window.mathJaxTypeset(qc ? [qc] : undefined);
+  }
+
+  // ── Rendering below is copied verbatim from templates/exam_page.html's
+  //    ExamPortal class (the actual student view) so the preview is
+  //    pixel-for-pixel identical, not a re-implementation. ──
+  renderQuestion(question) {
+    const qc = document.getElementById('questionContent'), qid = String(question.id), sel = this.answers[qid];
+    const p = (t) => {
+      if (!t) return '';
+      t = String(t);
+      const lz = [];
+      t = t.replace(/\$\$[\s\S]*?\$\$/g, m => { lz.push(m); return `\x00L${lz.length - 1}\x00`; })
+           .replace(/\$[^$\n]+?\$/g, m => { lz.push(m); return `\x00L${lz.length - 1}\x00`; });
+      t = t.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const lines = t.split('\n'), out = [], buf = [];
+      const isTR = l => { const s = l.trim(); return (s.startsWith('|') && s.endsWith('|') && s.length > 2) || /^[^|]+(\|[^|]+){1,}$/.test(s); };
+      const isSep = l => /^\|?[\s|:|-]+\|?$/.test(l.trim()) && /[-]{2,}/.test(l);
+      const flush = () => {
+        if (!buf.length) return;
+        let h = '<div style="overflow-x:auto;margin:.4rem 0"><table style="border-collapse:collapse;width:100%;font-size:.82rem;">';
+        let hdr = true;
+        buf.forEach(r => {
+          if (isSep(r)) return;
+          const s = r.trim(); let cells;
+          if (s.startsWith('|') && s.endsWith('|')) cells = s.split('|').map(c => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+          else cells = s.split('|').map(c => c.trim());
+          if (!cells.length) return;
+          if (hdr) { h += '<tr>' + cells.map(c => `<th style="border:1px solid var(--border);padding:.3rem .55rem;background:var(--surface-2);font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('') + '</tr>'; hdr = false; }
+          else h += '<tr>' + cells.map(c => `<td style="border:1px solid var(--border);padding:.28rem .55rem;">${c}</td>`).join('') + '</tr>';
+        });
+        h += '</table></div>'; out.push(h); buf.length = 0;
+      };
+      const stg = lines.map(l => isTR(l) ? { t: 'p', l } : { t: 'x', l });
+      let i = 0;
+      while (i < stg.length) {
+        if (stg[i].t === 'p') { let j = i; while (j < stg.length && stg[j].t === 'p') j++; const run = stg.slice(i, j); if (run.length >= 2) { run.forEach(s => buf.push(s.l)); flush(); } else out.push(stg[i].l); i = j; }
+        else { out.push(stg[i].l); i++; }
+      }
+      flush();
+      let r = out.join('\n').replace(/\n{3,}/g, '\n\n').split('\n').map(l => l.trim() === '' ? '<br>' : l).join('<br>');
+      r = r.replace(/\x00L(\d+)\x00/g, (_, idx) => lz[+idx]);
+      return r;
+    };
+    const sourceTag = question.metadata && question.metadata.source_tag ? String(question.metadata.source_tag).trim() : '';
+    let html = sourceTag ? `<div class="question-source-tag"><i class="fas fa-bookmark"></i> ${sourceTag.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : '';
+    html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:1rem">
+      <div style="flex:1"><h5 style="margin:0;font-size:.95rem;color:var(--text-1);line-height:1.5;display:flex;align-items:flex-start"><span class="badge bg-primary me-2" style="flex-shrink:0">Q${this.currentIndex + 1}</span><span style="flex:1;min-width:0">${p(question.question_text) || ''}</span></h5>
+        <button type="button" class="pv-edit-btn" onclick="preview.openEdit(${question.id})"><i class="fas fa-pencil-alt"></i> Edit This Question</button>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <span class="badge ${this.getQTypeBadge(question.question_type)} fs-6">${this.getQTypeDisplay(question.question_type)}</span>
+        <div style="margin-top:.5rem;font-size:.75rem;color:var(--text-2)"><i class="fas fa-plus" style="color:var(--success-text)"></i> <span style="color:var(--success-text)">${question.positive_marks || 1}</span>${question.negative_marks ? ` <i class="fas fa-minus ms-2" style="color:var(--danger-text)"></i><span style="color:var(--danger-text)">${question.negative_marks}</span>` : '<i class="fas fa-shield-alt ms-2" style="color:var(--warning-text)"></i> <span style="color:var(--warning-text)">No neg</span>'}</div>
+      </div></div>`;
+    if (question.has_image && question.image_url && String(question.image_url).trim() && question.image_url !== 'None' && question.image_url !== 'null') html += this.renderQuestionImage(question);
+    html += `<div style="margin-top:1rem">${this.renderQuestionOptions(question, sel, p)}</div>`;
+    html += `<div style="margin:.85rem 0"><button type="button" id="clearSelectionBtn" class="btn-outline-danger btn-sm" onclick="preview.clearSelection()"><i class="fas fa-times-circle me-1"></i>Clear Selection</button></div>`;
+    qc.innerHTML = html;
+    this.attachQListeners(question);
+    if (question.question_type === 'NUMERIC') this.initializeNumericKeypad(sel);
+    this.renderNavButtonsExternal();
+  }
+
+  getQTypeBadge(t) { return { MCQ: 'bg-success', MSQ: 'bg-warning', NUMERIC: 'bg-info' }[t] || 'bg-secondary'; }
+  getQTypeDisplay(t) { return { MCQ: 'Single Choice', MSQ: 'Multiple Choice', NUMERIC: 'Numerical' }[t] || t || 'Unknown'; }
+
+  renderQuestionImage(question) {
+    const idx = this.currentIndex, url = question.image_url, cached = this.imageCache && this.imageCache[url];
+    if (cached && cached.status === 'loaded') return `<div class="question-image mb-3"><img src="${url}" alt="Q${idx + 1}" class="img-fluid" onclick="preview.openImageModal('${url}','Question ${idx + 1}')" title="Click to enlarge"></div>`;
+    if (cached && cached.status === 'error') return `<div class="image-error"><i class="fas fa-exclamation-triangle"></i> Image failed to load.</div>`;
+    return `<div class="question-image mb-3"><div class="image-loading" id="imageLoading${idx}"><div class="loading-spinner"></div><div>Loading image...</div></div><div id="imageContainer${idx}" style="display:none"><img id="questionImage${idx}" src="${url}" alt="Q${idx + 1}" class="img-fluid" onclick="preview.openImageModal('${url}','Question ${idx + 1}')" onload="preview.handleImageLoad(${idx})" onerror="preview.handleImageError(${idx})" title="Click to enlarge"></div><div id="imageError${idx}" style="display:none" class="image-error"><i class="fas fa-exclamation-triangle"></i> Image failed to load.</div></div>`;
+  }
+  handleImageLoad(i) { document.getElementById(`imageLoading${i}`)?.style.setProperty('display', 'none'); const co = document.getElementById(`imageContainer${i}`); if (co) co.style.display = 'block'; }
+  handleImageError(i) { document.getElementById(`imageLoading${i}`)?.style.setProperty('display', 'none'); document.getElementById(`imageContainer${i}`)?.style.setProperty('display', 'none'); const er = document.getElementById(`imageError${i}`); if (er) er.style.display = 'block'; }
+  openImageModal(src, title) { document.getElementById('modalImage').src = src; document.getElementById('imageModalTitle').innerHTML = `<i class="fas fa-image me-2"></i>${title || 'Question Image'}`; document.getElementById('imageModal').style.display = 'flex'; }
+
+  renderQuestionOptions(q, sel, p) {
+    const t = q.question_type || 'MCQ';
+    if (t === 'MCQ') return this.renderMCQ(q, sel, p);
+    if (t === 'MSQ') return this.renderMSQ(q, sel, p);
+    if (t === 'NUMERIC') return this.renderNumeric(q, sel);
+    return '<div class="alert-danger" style="padding:.65rem;border-radius:var(--radius)">Unknown question type</div>';
+  }
+  renderMCQ(q, sel, p) {
+    return [['A', q.option_a], ['B', q.option_b], ['C', q.option_c], ['D', q.option_d]].filter(([, t]) => t && t !== 'nan' && String(t).trim() && t !== 'None').map(([id, text]) => `
+      <div class="option-container mcq-option${sel === id ? ' selected' : ''}" data-option-id="${id}">
+        <div class="form-check"><input class="form-check-input" type="radio" name="answer" value="${id}" id="opt${id}" ${sel === id ? 'checked' : ''}>
+        <label class="form-check-label w-100" for="opt${id}"><strong>${id}.</strong> ${p(text)}</label></div>
+      </div>`).join('');
+  }
+  renderMSQ(q, sel, p) {
+    const chosen = Array.isArray(sel) ? sel : [];
+    return `<div class="alert-info" style="padding:.65rem .85rem;border-radius:var(--radius);margin-bottom:.85rem;font-size:.83rem"><i class="fas fa-info-circle me-2"></i><strong>Multiple Select:</strong> Select ALL correct options.</div>` +
+    [['A', q.option_a], ['B', q.option_b], ['C', q.option_c], ['D', q.option_d]].filter(([, t]) => t && t !== 'nan' && String(t).trim() && t !== 'None').map(([id, text]) => `
+      <div class="option-container msq-option${chosen.includes(id) ? ' selected-msq' : ''}" data-option-id="${id}">
+        <div class="form-check"><input class="form-check-input" type="checkbox" name="answer" value="${id}" id="optMSQ${id}" ${chosen.includes(id) ? 'checked' : ''}>
+        <label class="form-check-label w-100" for="optMSQ${id}"><strong>${id}.</strong> ${p(text)}</label></div>
+      </div>`).join('');
+  }
+  renderNumeric(q, sel) {
+    return `<div style="padding:.65rem .85rem;border-radius:var(--radius);background:var(--warning-bg);color:var(--warning-text);border:1px solid var(--warning-border);margin-bottom:.85rem;font-size:.83rem"><i class="fas fa-calculator me-2"></i><strong>Numerical Answer:</strong> Enter using keypad${q.tolerance ? ` &middot; Tolerance: &plusmn;${q.tolerance}` : ''}</div>
+    <div style="margin-bottom:1rem"><label class="form-label"><strong><i class="fas fa-hashtag me-2"></i>Try an answer:</strong></label>
+    <div class="numeric-display" id="numericDisplay"><span id="displayValue">${sel || ''}</span><span id="cursor" class="cursor-blink" style="color:var(--text-3)">|</span></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="numeric-keypad"><div class="keypad-grid">
+        <button type="button" class="keypad-btn clear" onclick="preview.clearAll()"><i class="fas fa-times"></i></button>
+        <button type="button" class="keypad-btn sign" onclick="preview.toggleSign()"><i class="fas fa-plus-minus"></i></button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('0')">0</button>
+        <button type="button" class="keypad-btn backspace" onclick="preview.backspace()"><i class="fas fa-backspace"></i></button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('1')">1</button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('2')">2</button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('3')">3</button>
+        <button type="button" class="keypad-btn decimal" onclick="preview.addDecimal()"><i class="fas fa-circle" style="font-size:.4rem"></i></button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('4')">4</button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('5')">5</button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('6')">6</button>
+        <div></div>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('7')">7</button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('8')">8</button>
+        <button type="button" class="keypad-btn" onclick="preview.addDigit('9')">9</button>
+        <div></div>
+      </div></div>
+      <div class="keypad-guide-card" style="padding:.75rem;border-radius:var(--radius)">
+        <div style="font-size:.8rem;font-weight:700;color:var(--text-1);margin-bottom:.5rem"><i class="fas fa-keyboard"></i> Guide</div>
+        <div class="keypad-guide-grid">
+          <div class="keypad-guide-item">0–9<br><small>Numbers</small></div>
+          <div class="keypad-guide-item"><i class="fas fa-circle" style="font-size:.45rem"></i><br><small>Decimal</small></div>
+          <div class="keypad-guide-item"><i class="fas fa-plus-minus"></i><br><small>Sign</small></div>
+          <div class="keypad-guide-item"><i class="fas fa-backspace"></i><br><small>Delete</small></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  renderNavButtonsExternal() {
+    const container = document.getElementById('examNavBar'); if (!container) return;
+    const html = `<button type="button" class="btn-outline-secondary exam-navigation-btn" onclick="preview.navigatePrevious()" ${this.currentIndex === 0 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i> Previous</button>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;align-items:center">
+        <button type="button" id="markReviewBtn" class="btn-warning exam-navigation-btn" onclick="preview.markForReview()"><i class="fas fa-flag"></i> Mark for Review</button>
+        ${this.currentIndex < this.totalQuestions - 1 ? '<button type="button" class="btn-primary exam-navigation-btn" onclick="preview.navigateNext()">Next <i class="fas fa-chevron-right"></i></button>' : ''}
+      </div>`;
+    container.innerHTML = html;
+    this.updateMarkReviewButton();
+  }
+  updateMarkReviewButton() {
+    const btn = document.getElementById('markReviewBtn'); if (!btn) return;
+    const qid = String(this.questions[this.currentIndex].id);
+    const marked = this.markedForReview.includes(qid);
+    btn.classList.toggle('marked', marked);
+    btn.innerHTML = marked ? '<i class="fas fa-flag-checkered"></i> Marked — Unmark' : '<i class="fas fa-flag"></i> Mark for Review';
+  }
+
+  attachQListeners(question) {
+    setTimeout(() => {
+      document.querySelectorAll('.mcq-option').forEach(c => {
+        const r = c.querySelector('input[type="radio"]'), l = c.querySelector('label');
+        [c, r, l].forEach(el => { if (el) el.addEventListener('click', (e) => { e.stopPropagation(); this.selectMCQOption(c.dataset.optionId); }); });
+      });
+      document.querySelectorAll('.msq-option').forEach(c => {
+        c.replaceWith(c.cloneNode(true));
+        const nc = document.querySelector(`[data-option-id="${c.dataset.optionId}"].msq-option`);
+        if (nc) nc.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); this.selectMSQOption(nc.dataset.optionId); });
+      });
+    }, 10);
+  }
+
+  selectMCQOption(optionId) {
+    const qid = String(this.questions[this.currentIndex].id);
+    document.querySelectorAll('.mcq-option').forEach(c => { c.classList.remove('selected'); const r = c.querySelector('input[type="radio"]'); if (r) r.checked = false; });
+    const tc = document.querySelector(`[data-option-id="${optionId}"]`), tr = document.querySelector(`#opt${optionId}`);
+    if (tc && tr) { tc.classList.add('selected'); tr.checked = true; this.answers[qid] = optionId; this.saveSessionData(); this.updatePaletteStatus(); }
+  }
+  selectMSQOption(optionId) {
+    const qid = String(this.questions[this.currentIndex].id);
+    let cur = this.answers[qid] || []; if (!Array.isArray(cur)) cur = [];
+    const tc = document.querySelector(`[data-option-id="${optionId}"].msq-option`), cb = document.querySelector(`#optMSQ${optionId}`);
+    if (tc && cb) {
+      if (cur.includes(optionId)) { cur = cur.filter(i => i !== optionId); tc.classList.remove('selected-msq'); cb.checked = false; }
+      else { cur.push(optionId); tc.classList.add('selected-msq'); cb.checked = true; }
+      this.answers[qid] = cur; this.saveSessionData(); this.updatePaletteStatus();
+    }
+  }
+  initializeNumericKeypad(sel) { this.currentValue = sel || ''; this.hasDecimal = this.currentValue.includes('.'); this.updateDisplay(); }
+  addDigit(d) { if (this.currentValue.replace('-', '').replace('.', '').length >= 12) return; this.currentValue += d; this.updateNumericAnswer(); this.updateDisplay(); }
+  addDecimal() { if (this.hasDecimal) return; if (!this.currentValue || this.currentValue === '-') this.currentValue += '0'; this.currentValue += '.'; this.hasDecimal = true; this.updateNumericAnswer(); this.updateDisplay(); }
+  toggleSign() { if (!this.currentValue) this.currentValue = '-'; else if (this.currentValue === '-') this.currentValue = ''; else if (this.currentValue.startsWith('-')) this.currentValue = this.currentValue.slice(1); else this.currentValue = '-' + this.currentValue; this.updateNumericAnswer(); this.updateDisplay(); }
+  backspace() { if (this.currentValue.length > 0) { if (this.currentValue.slice(-1) === '.') this.hasDecimal = false; this.currentValue = this.currentValue.slice(0, -1); this.updateNumericAnswer(); this.updateDisplay(); } }
+  clearAll() { this.currentValue = ''; this.hasDecimal = false; this.updateNumericAnswer(); this.updateDisplay(); }
+  updateDisplay() { const d = document.getElementById('displayValue'), c = document.getElementById('cursor'); if (d) d.textContent = this.currentValue || ''; if (c) c.style.display = this.currentValue ? 'none' : 'inline'; }
+  updateNumericAnswer() { const qid = String(this.questions[this.currentIndex].id); if (this.currentValue.trim()) { this.answers[qid] = this.currentValue.trim(); } else { delete this.answers[qid]; } this.updatePaletteStatus(); this.saveSessionData(); }
+
+  navigatePrevious() { if (this.currentIndex > 0) { this.saveCurrentAnswer(); this.navigateToQuestion(this.currentIndex - 1); } }
+  navigateNext() { if (this.currentIndex < this.totalQuestions - 1) { this.saveCurrentAnswer(); this.navigateToQuestion(this.currentIndex + 1); } }
+  saveCurrentAnswer() {
+    const q = this.questions[this.currentIndex], qid = String(q.id), t = q.question_type || 'MCQ';
+    if (t === 'MCQ') { const s = document.querySelector('input[name="answer"]:checked'); if (s) this.answers[qid] = s.value; }
+    else if (t === 'MSQ') { const s = Array.from(document.querySelectorAll('input[name="answer"]:checked')).map(i => i.value); if (s.length) this.answers[qid] = s; }
+    else if (t === 'NUMERIC') { if (this.currentValue.trim()) this.answers[qid] = this.currentValue.trim(); }
+    this.saveSessionData();
+  }
+  markForReview() {
+    const qid = String(this.questions[this.currentIndex].id);
+    const idx = this.markedForReview.indexOf(qid);
+    if (idx > -1) this.markedForReview.splice(idx, 1); else this.markedForReview.push(qid);
+    this.saveSessionData(); this.updatePaletteStatus(); this.updateMarkReviewButton();
+  }
+  clearSelection() {
+    const qid = String(this.questions[this.currentIndex].id);
+    delete this.answers[qid];
+    const ri = this.markedForReview.indexOf(qid); if (ri > -1) this.markedForReview.splice(ri, 1);
+    this.saveSessionData(); this.updatePaletteStatus(); this.updateMarkReviewButton();
+    document.querySelectorAll('input[name="answer"]').forEach(i => i.checked = false);
+    document.querySelectorAll('.option-container').forEach(c => c.classList.remove('selected', 'selected-msq'));
+    if (this.questions[this.currentIndex].question_type === 'NUMERIC') { this.currentValue = ''; this.hasDecimal = false; this.updateDisplay(); }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Admin-only: single-question edit — reuses the existing admin question
+  // API verbatim (GET .../questions/<id>, PATCH .../questions/<id>), the
+  // same endpoints templates/admin/questions.html's own edit modal uses.
+  // No exam_id is ever sent, so a save can never reassign this question
+  // to a different exam (see the hardening in edit_question_ajax()).
+  // ══════════════════════════════════════════════════════════════════
+  async openEdit(questionId) {
+    const idx = this.questions.findIndex(q => q.id === questionId);
+    if (idx === -1) return;
+    this._editIdx = idx;
+    const q = this.questions[idx];
+    document.getElementById('pv-question-id').value = q.id;
+    document.getElementById('pv-question-text').value = q.question_text || '';
+    document.getElementById('pv-option-a').value = q.option_a || '';
+    document.getElementById('pv-option-b').value = q.option_b || '';
+    document.getElementById('pv-option-c').value = q.option_c || '';
+    document.getElementById('pv-option-d').value = q.option_d || '';
+    document.getElementById('pv-correct-answer').value = q.correct_answer || '';
+    document.getElementById('pv-question-type').value = q.question_type || 'MCQ';
+    document.getElementById('pv-tolerance').value = q.tolerance != null ? q.tolerance : '';
+    document.getElementById('pv-positive-marks').value = q.positive_marks != null ? q.positive_marks : '4';
+    document.getElementById('pv-negative-marks').value = q.negative_marks != null ? q.negative_marks : '1';
+    document.getElementById('pv-image-path').value = q.image_path || '';
+    document.getElementById('pvEditModalError').style.display = 'none';
+    this._toggleToleranceField();
+    new bootstrap.Modal(document.getElementById('pvEditModal')).show();
+  }
+  _toggleToleranceField() {
+    const tw = document.getElementById('pv-tolerance-wrap');
+    if (tw) tw.style.display = (document.getElementById('pv-question-type').value === 'NUMERIC') ? '' : 'none';
+  }
+
+  async saveEdit() {
+    const id = document.getElementById('pv-question-id').value;
+    const qText = document.getElementById('pv-question-text').value.trim();
+    const correct = document.getElementById('pv-correct-answer').value.trim();
+    const errEl = document.getElementById('pvEditModalError');
+    errEl.style.display = 'none';
+    if (!qText) { errEl.textContent = 'Question text is required.'; errEl.style.display = 'block'; return; }
+    if (!correct) { errEl.textContent = 'Correct answer is required.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('pvEditSaveBtn');
+    const prevHtml = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+    // exam_id intentionally omitted — see edit_question_ajax()'s isolation guard.
+    const form = new FormData();
+    form.append('question_text', qText);
+    form.append('option_a', document.getElementById('pv-option-a').value);
+    form.append('option_b', document.getElementById('pv-option-b').value);
+    form.append('option_c', document.getElementById('pv-option-c').value);
+    form.append('option_d', document.getElementById('pv-option-d').value);
+    form.append('correct_answer', correct);
+    form.append('question_type', document.getElementById('pv-question-type').value);
+    form.append('tolerance', document.getElementById('pv-tolerance').value || '0');
+    form.append('positive_marks', document.getElementById('pv-positive-marks').value || '4');
+    form.append('negative_marks', document.getElementById('pv-negative-marks').value || '1');
+    form.append('image_path', document.getElementById('pv-image-path').value);
+
+    try {
+      const res = await fetch(`/api/v01/admin/questions/${id}`, { method: 'PATCH', body: form });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to save.');
+
+      // Immediately reflect in the preview — no reload, no re-fetch of the
+      // whole question list. Re-fetch just this ONE question so image_url/
+      // has_image stay correctly resolved (the PATCH response itself
+      // doesn't return them).
+      const fresh = await fetch(`/api/v01/admin/questions/${id}`).then(r => r.json());
+      if (fresh.success) {
+        const merged = { ...this.questions[this._editIdx], ...fresh.question };
+        this.questions[this._editIdx] = merged;
+      }
+      bootstrap.Modal.getInstance(document.getElementById('pvEditModal'))?.hide();
+      if (this._editIdx === this.currentIndex) { this.renderQuestion(this.questions[this.currentIndex]); this.renderMathJax(); }
+      this.renderPalette(); this.renderBulkList();
+      this.toast('Question updated', 'success');
+    } catch (err) {
+      errEl.textContent = err.message; errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.innerHTML = prevHtml;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Admin-only: bulk edit — mirrors the selection/type-gating pattern
+  // already used in templates/admin/csv_upload.html's bulk marking panel,
+  // but persists via a loop of the SAME single-question PATCH endpoint
+  // (no second bulk-by-ID backend path).
+  // ══════════════════════════════════════════════════════════════════
+  renderBulkList() {
+    const list = document.getElementById('pvBulkList'); if (!list) return;
+    list.innerHTML = this.questions.map((q, i) => `
+      <label class="pv-bulk-row">
+        <input type="checkbox" data-idx="${i}" ${this.selected.has(q.id) ? 'checked' : ''} onchange="preview.bulkToggle(${q.id}, this.checked)">
+        <span class="pv-bulk-type ${q.question_type}">${q.question_type}</span>
+        <span>Q${i + 1}</span>
+      </label>`).join('');
+    this.updateBulkToolbar();
+  }
+  bulkToggle(id, checked) { if (checked) this.selected.add(id); else this.selected.delete(id); this.updateBulkToolbar(); }
+  bulkSelectAll() { this.questions.forEach(q => this.selected.add(q.id)); this.renderBulkList(); }
+  bulkSelectByType(type) { this.selected.clear(); this.questions.forEach(q => { if (q.question_type === type) this.selected.add(q.id); }); this.renderBulkList(); }
+  bulkClear() { this.selected.clear(); this.renderBulkList(); }
+  updateBulkToolbar() {
+    const bar = document.getElementById('pvBulkToolbar'); const count = document.getElementById('pvBulkCount');
+    if (count) count.textContent = this.selected.size;
+    if (bar) bar.classList.toggle('show', this.selected.size > 0);
+    const selectedQs = this.questions.filter(q => this.selected.has(q.id));
+    const hasMcqMsq = selectedQs.some(q => q.question_type === 'MCQ' || q.question_type === 'MSQ');
+    const hasNumeric = selectedQs.some(q => q.question_type === 'NUMERIC');
+    const nmField = document.getElementById('pvBulkNMField'); if (nmField) nmField.style.display = hasMcqMsq ? '' : 'none';
+    const tolField = document.getElementById('pvBulkTolField'); if (tolField) tolField.style.display = hasNumeric ? '' : 'none';
+  }
+
+  bulkConfirm(mode) {
+    if (!this.selected.size) { this.toast('No questions selected', 'warning'); return; }
+    const pm = document.getElementById('pvBulkPM').value.trim();
+    const nm = document.getElementById('pvBulkNM').value.trim();
+    const tol = document.getElementById('pvBulkTol').value.trim();
+    if (!pm && !nm && !tol) { this.toast('Enter at least one value', 'warning'); return; }
+    document.getElementById('pvConfirmTitle').textContent = mode === 'set' ? 'Overwrite marks?' : 'Adjust marks?';
+    document.getElementById('pvConfirmMsg').textContent =
+      `This will ${mode === 'set' ? 'overwrite' : 'adjust'} marks for ${this.selected.size} selected question(s) in this exam. This saves immediately.`;
+    document.getElementById('pvConfirmOkBtn').onclick = () => { this.closeConfirm(); this.bulkApplyMarks(mode, pm, nm, tol); };
+    document.getElementById('pvConfirmBackdrop').classList.add('show');
+  }
+  closeConfirm() { document.getElementById('pvConfirmBackdrop').classList.remove('show'); }
+
+  async bulkApplyMarks(mode, pmRaw, nmRaw, tolRaw) {
+    const round = v => Math.round(v * 100) / 100;
+    const pmV = pmRaw !== '' ? parseFloat(pmRaw) : null;
+    const nmV = nmRaw !== '' ? parseFloat(nmRaw) : null;
+    const tolV = tolRaw !== '' ? parseFloat(tolRaw) : null;
+
+    const targets = this.questions.filter(q => this.selected.has(q.id));
+    const results = await Promise.allSettled(targets.map(async (q) => {
+      const isNum = q.question_type === 'NUMERIC';
+      const next = { ...q };
+      if (pmV !== null && !isNaN(pmV)) next.positive_marks = round(mode === 'set' ? pmV : (parseFloat(q.positive_marks) || 0) + pmV);
+      if (nmV !== null && !isNaN(nmV) && !isNum) next.negative_marks = round(mode === 'set' ? nmV : (parseFloat(q.negative_marks) || 0) + nmV);
+      if (tolV !== null && !isNaN(tolV) && isNum) next.tolerance = round(mode === 'set' ? tolV : (parseFloat(q.tolerance) || 0) + tolV);
+
+      const form = new FormData();
+      form.append('question_text', next.question_text || '');
+      form.append('option_a', next.option_a || ''); form.append('option_b', next.option_b || '');
+      form.append('option_c', next.option_c || ''); form.append('option_d', next.option_d || '');
+      form.append('correct_answer', next.correct_answer || '');
+      form.append('question_type', next.question_type || 'MCQ');
+      form.append('tolerance', next.tolerance != null ? next.tolerance : '0');
+      form.append('positive_marks', next.positive_marks != null ? next.positive_marks : '4');
+      form.append('negative_marks', next.negative_marks != null ? next.negative_marks : '1');
+      form.append('image_path', next.image_path || '');
+
+      const res = await fetch(`/api/v01/admin/questions/${q.id}`, { method: 'PATCH', body: form });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed');
+      return { id: q.id, next };
+    }));
+
+    let okCount = 0;
+    results.forEach(r => {
+      if (r.status === 'fulfilled') {
+        okCount++;
+        const idx = this.questions.findIndex(q => q.id === r.value.id);
+        if (idx !== -1) this.questions[idx] = r.value.next;
+      }
+    });
+
+    this.renderPalette();
+    if (this.questions[this.currentIndex]) { this.renderQuestion(this.questions[this.currentIndex]); this.renderMathJax(); }
+    const failCount = results.length - okCount;
+    if (failCount === 0) this.toast(`Updated ${okCount} of ${results.length} question(s)`, 'success');
+    else this.toast(`Updated ${okCount} of ${results.length} — ${failCount} failed`, 'warning');
+  }
+
+  toast(msg, type) {
+    const colors = { success: 'var(--success)', danger: 'var(--danger)', warning: 'var(--warning)' };
+    const icons = { success: 'fa-check-circle', danger: 'fa-times-circle', warning: 'fa-exclamation-triangle' };
+    const t = document.createElement('div');
+    t.className = `pv-toast ${type || 'success'}`;
+    t.innerHTML = `<i class="fas ${icons[type] || icons.success}" style="color:${colors[type] || colors.success}"></i><div style="font-size:.82rem;color:var(--text-1)">${msg}</div>`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+}
+
+let preview;
+document.addEventListener('DOMContentLoaded', () => {
+  preview = new ExamPreviewPortal();
+  // Themed dropdown-button in place of the native <select> — same
+  // component used on Manage Exams/Questions (static/admin/select-enhance.js).
+  // block:true matches how it's used for the other Add/Edit modal selects.
+  enhanceSelect(document.getElementById('pv-question-type'), { icon: 'fas fa-shapes', block: true });
+  document.getElementById('pv-question-type')?.addEventListener('change', () => preview._toggleToleranceField());
+});
+</script>
+{% endblock %}

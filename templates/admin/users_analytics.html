@@ -4,6 +4,8 @@
 {% block content %}
 
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
 <style>
 /* ── Page Header ── */
 .page-top { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
@@ -760,6 +762,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) createDatePicker(el, { displayFormat: displayFmt });
   });
+
+  // Themed dropdown-button in place of these native <select>s — same
+  // component used elsewhere in the admin UI (static/admin/select-enhance.js).
+  enhanceSelect(document.getElementById('rf-exam'), { icon: 'fas fa-file-alt' });
+  enhanceSelect(document.getElementById('af-period'), { icon: 'fas fa-clock' });
+  enhanceSelect(document.getElementById('af-exam'), { icon: 'fas fa-file-alt' });
 });
 </script>
 {% endblock %}

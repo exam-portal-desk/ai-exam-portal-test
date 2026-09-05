@@ -142,6 +142,13 @@
 }
 .gd-link-row a:hover { opacity: .85; }
 
+.gd-badge-new {
+  display: inline-flex; align-items: center; gap: .25rem; margin-left: .4rem;
+  font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--success-text); background: var(--success-bg); border: 1px solid var(--success-border);
+  border-radius: 20px; padding: .12rem .55rem; vertical-align: middle;
+}
+
 /* ── Question-creation paths — 4 parallel mini-flows converging ── */
 .gd-paths { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin: .75rem 0 .5rem; }
 .gd-path-card {
@@ -223,7 +230,7 @@
   <div class="gd-body">
     <p>The sidebar on the left is grouped into sections, each covering one part of running the portal:</p>
     <h4>Content</h4>
-    <p>Everything used to build an exam — <strong>Manage Categories</strong>, <strong>Manage Exams</strong>, <strong>Manage Subjects</strong>, <strong>Manage Questions</strong>, <strong>Upload Images</strong>, the <strong>LaTeX Editor</strong>, <strong>Object Storage</strong>, and the <strong>AI Command Centre</strong>.</p>
+    <p>Everything used to build an exam — <strong>Manage Categories</strong>, <strong>Manage Exams</strong>, <strong>Manage Subjects</strong>, <strong>Manage Questions</strong>, <strong>Upload Images</strong>, <strong>Image Mapping</strong>, the <strong>LaTeX Editor</strong>, <strong>Object Storage</strong>, and the <strong>AI Command Centre</strong>.</p>
     <h4>Management</h4>
     <p><strong>Users &amp; Requests</strong> (approving new account requests) and <strong>Manage Attempts</strong> (every exam attempt taken on the portal).</p>
     <h4>Analytics</h4>
@@ -438,19 +445,118 @@
     <span class="gd-section-icon"><i class="fas fa-image"></i></span>
     <span style="flex:1">
       <span class="gd-section-title">Images in Questions</span>
-      <span class="gd-section-sub" style="display:block">Uploading and referencing question images</span>
+      <span class="gd-section-sub" style="display:block">Two ways to attach an image to a question — classic manual entry, or the new Image Mapping tool</span>
     </span>
     <i class="fas fa-chevron-down gd-chevron"></i>
   </summary>
   <div class="gd-body">
+
+    <h4>Step Zero — Upload the Image (needed either way)</h4>
+    <p>Both methods below start from the same place: the image file has to already be uploaded to a <strong>Subject</strong> before it can be attached to any question.</p>
     <ol class="gd-steps">
-      <li><strong>Upload the image</strong><span><strong>Where to go:</strong> Upload Images. Upload the file under the appropriate subject.</span></li>
-      <li><strong>Reference it in a question</strong><span>In the question's Image Path field (single-add, batch-add, or CSV), enter <code>SubjectName/filename.ext</code> — matching the subject you uploaded it under.</span></li>
-      <li><strong>What happens next</strong><span>Once saved, the image renders with the question wherever it's shown — the question form, the exam page, and response review.</span></li>
+      <li><strong>Create or reuse a Subject</strong><span><strong>Where to go:</strong> Manage Subjects. A Subject is just a named folder for organizing images — e.g. one per topic area.</span></li>
+      <li><strong>Upload the image(s)</strong><span><strong>Where to go:</strong> Upload Images. Pick the Subject, then drag in the file(s) — the original filename and extension are kept exactly as uploaded.</span></li>
     </ol>
-    <p>For direct browsing or cleanup of stored files, use <strong>Object Storage</strong>, which shows the underlying folders and files as uploaded.</p>
     <div class="gd-link-row">
+      <a href="{{ url_for('admin.subjects') }}"><i class="fas fa-book"></i> Manage Subjects</a>
       <a href="{{ url_for('admin.upload_images_page') }}"><i class="fas fa-images"></i> Upload Images</a>
+    </div>
+
+    <h4 style="margin-top:1.5rem">Method 1 — Classic Manual Path Entry</h4>
+    <p>The original way to attach an image: type its storage reference directly into the question's own <strong>Image Path</strong> field.</p>
+    <ol class="gd-steps">
+      <li><strong>Open the question</strong><span><strong>Where to go:</strong> Manage Questions → select the exam → click the pencil icon on the question, or <strong>Add Question</strong> for a new one.</span></li>
+      <li><strong>Find the Image Path field</strong><span>In the Add/Edit Question form it's labeled <strong>Image Path (optional)</strong>. The same field (labeled just <strong>Image Path</strong>) also appears in every row of <strong>Batch Add Questions</strong>, and as the <code>image_path</code> column when importing a CSV.</span></li>
+      <li><strong>Type the reference in the exact format</strong><span>Type <code>SubjectName/filename.ext</code> — the Subject name exactly as it appears on Manage Subjects, a forward slash, then the filename exactly as it was uploaded, including its extension. Example: <code>physics/ph-1.png</code>.</span></li>
+      <li><strong>Save the question</strong><span>Click <strong>Save Changes</strong> (Edit) or <strong>Add Question</strong> (new). Nothing validates the path at this point — a typo is accepted silently.</span></li>
+      <li><strong>Verify what was saved</strong><span>Back on the Manage Questions list, the question's Image column shows a small pill with the exact text you entered — hover it to read the full path. This confirms what's <em>stored</em>, not whether it's <em>correct</em>.</span></li>
+      <li><strong>Confirm the image actually appears</strong><span>Open <strong>Preview Exam</strong> (the eye icon next to the exam on Manage Exams) and navigate to the question. If the path was wrong, no image renders there — same as on the real Student Exam page.</span></li>
+    </ol>
+    <div class="gd-callout warn">
+      <i class="fas fa-triangle-exclamation"></i>
+      <div>
+        <strong>Common mistakes with this method:</strong>
+        <ul style="margin:.4rem 0 0;padding-left:1.1rem">
+          <li>Subject name doesn't exactly match Manage Subjects (wrong case, an extra space, or a rename that happened afterward)</li>
+          <li>Filename doesn't exactly match what was uploaded</li>
+          <li>Missing or wrong file extension (<code>.png</code> vs <code>.jpg</code>)</li>
+          <li>A plain typo anywhere in the path</li>
+          <li>The image was never actually uploaded to that Subject</li>
+          <li>The correct file exists, but under a different Subject than the one typed</li>
+        </ul>
+      </div>
+    </div>
+    <p>This method still has its place — a quick one-off fix, or attaching a single image while already editing a question for another reason, without leaving Manage Questions.</p>
+
+    <h4 style="margin-top:1.5rem">Method 2 — Question Image Mapping <span class="gd-badge-new"><i class="fas fa-star"></i> Recommended</span></h4>
+    <p>A dedicated visual tool for attaching images to many questions at once, with no manual typing at all. <strong>Where to go:</strong> <strong>Image Mapping</strong> in the sidebar.</p>
+    <p>Why it's recommended over the classic method:</p>
+    <ul>
+      <li>No manual path typing — you pick the image, you don't type its name</li>
+      <li>Built for mapping many questions in one visit, not just one</li>
+      <li>Every image shows a real thumbnail before anything is saved</li>
+      <li>Drag-and-drop, with a click-to-select alternative for touch devices</li>
+      <li>The Subject's image library is searchable</li>
+      <li>Every pending change is listed for review before it's saved</li>
+      <li>One "Save All Mappings" click applies everything together</li>
+      <li>Far less room for a filename or path mistake</li>
+    </ul>
+    <ol class="gd-steps">
+      <li><strong>Open Image Mapping</strong><span><strong>Where to go:</strong> the <strong>Image Mapping</strong> link in the sidebar.</span></li>
+      <li><strong>Select Exam</strong><span>Step 1 — pick the exam whose questions need images from the searchable dropdown.</span></li>
+      <li><strong>Select Subject</strong><span>Step 2 — pick the Subject whose uploaded images you want to use. Each option shows how many images it holds, e.g. "Images: 184".</span></li>
+      <li><strong>Select Questions</strong><span>Step 3 — search and filter the exam's questions (by text, Question Type, or Image Status — <strong>No Image</strong> / <strong>Image Attached</strong> / <strong>Missing/Broken Image</strong>), then tick the ones that need images. Use <strong>Select This Page</strong>, <strong>Select All Matching</strong>, or <strong>Clear Selection</strong> as needed.</span></li>
+      <li><strong>Continue to Mapping</strong><span>Click <strong>Continue to Mapping</strong> to open the workspace — <strong>Selected Questions</strong> on the left, the <strong>Subject Image Library</strong> on the right.</span></li>
+      <li><strong>Map an image</strong><span>Drag an image card from the right panel and drop it onto a question card on the left. Nothing is saved yet — the question card immediately shows the image with a <strong>Pending Mapping</strong> badge.</span></li>
+      <li><strong>No drag-and-drop? Click instead</strong><span>Click a question card to make it the active target (it highlights), then click any image in the library — it maps the same way as dragging.</span></li>
+      <li><strong>Replace an existing image</strong><span>On a question that already has one, click <strong>Replace</strong>, then drag or click a different image onto it — the new choice simply overwrites the pending one.</span></li>
+      <li><strong>Remove an image</strong><span>Click <strong>Remove</strong> on a question's card to mark its image for removal, shown as a <strong>Pending Removal</strong> badge until you save.</span></li>
+      <li><strong>Verify visually before saving</strong><span>Every mapped or current image shows as a real thumbnail on its question card — click a thumbnail to open a larger preview. Confirm each one is the right image before moving on.</span></li>
+      <li><strong>Review Pending Changes</strong><span>Click <strong>Review &amp; Save</strong> — a panel lists every pending change as "Q&lt;number&gt; → filename", so everything can be checked at a glance before it's committed.</span></li>
+      <li><strong>Save All Mappings</strong><span>Click <strong>Save All Mappings</strong>. All pending changes are saved together in one operation — never one at a time.</span></li>
+      <li><strong>Wait for it to finish</strong><span>The button shows a brief "Saving…" state and is disabled automatically until the save completes — no need to click it again.</span></li>
+      <li><strong>Confirm the success message</strong><span>A confirmation such as "✓ 3 image mappings saved successfully." appears, and the affected question cards update immediately to show their new saved image — no page reload needed.</span></li>
+      <li><strong>Verify the final result</strong><span>Open <strong>Preview Exam</strong> for the exam, or check the real Student Exam page, to confirm each image renders correctly where students will actually see it.</span></li>
+    </ol>
+    <div class="gd-link-row">
+      <a href="{{ url_for('admin.image_mapping_page') }}"><i class="fas fa-link"></i> Image Mapping</a>
+    </div>
+
+    <h4 style="margin-top:1.5rem">Classic Method vs. Image Mapping</h4>
+    <table class="gd-table">
+      <tr><th></th><th>Classic Method</th><th>Image Mapping</th></tr>
+      <tr><td>How you attach an image</td><td>Type <code>SubjectName/filename.ext</code> by hand</td><td>Drag or click the image itself</td></tr>
+      <tr><td>Best for</td><td>A single quick fix while already editing a question</td><td>Attaching images to many questions in one visit</td></tr>
+      <tr><td>Preview before saving</td><td>None — mistakes surface only after saving</td><td>Real thumbnail shown immediately</td></tr>
+      <tr><td>Risk of mistakes</td><td>Higher — a typo is accepted silently</td><td>Much lower — you're selecting a real, existing image</td></tr>
+      <tr><td>Saving multiple questions</td><td>One at a time</td><td>Reviewed together, then saved as one bulk operation</td></tr>
+    </table>
+
+    <h4 style="margin-top:1.5rem">Important Notes</h4>
+    <div class="gd-callout tip">
+      <i class="fas fa-circle-info"></i>
+      <div>
+        <ul style="margin:0;padding-left:1.1rem">
+          <li>Images must be uploaded to a Subject first — Image Mapping only shows what's already there, it doesn't upload anything itself.</li>
+          <li>Uploading and mapping are two separate steps: upload the image(s) on <strong>Upload Images</strong>, then map them on <strong>Image Mapping</strong>.</li>
+          <li>Picking the wrong Subject in Step 2 means the image you're looking for simply won't be in the library — double-check it's the Subject the image was actually uploaded to.</li>
+          <li>Image Mapping doesn't replace the bulk upload workflow — it's what you use <em>after</em> uploading, to attach what's already there to specific questions.</li>
+          <li>Always visually check every mapped thumbnail before clicking Save All Mappings.</li>
+          <li>For any question mapped through Image Mapping, you never need to type <code>SubjectName/filename.ext</code> by hand.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h4 style="margin-top:1.5rem">Troubleshooting / FAQ</h4>
+    <p><strong>I uploaded an image but can't find it in Image Mapping.</strong><br>Confirm it was uploaded to the Subject selected in Step 2, not a different one — then re-select the Subject (or search again) to refresh the image library.</p>
+    <p><strong>The image is showing on the wrong question.</strong><br>Check the Review panel before clicking Save All Mappings — every pending change is listed as "Q&lt;number&gt; → filename", so a misplaced mapping is easy to catch before it's saved.</p>
+    <p><strong>Can I replace an image a question already has?</strong><br>Yes — click <strong>Replace</strong> (or <strong>Choose Different</strong>) on that question's card and pick a different image from the library.</p>
+    <p><strong>Can I map several questions at once?</strong><br>Yes — select the questions that need images, map each one, review the full list of pending changes, then use Save All Mappings once for all of them.</p>
+    <p><strong>Do I still need to type the image path myself?</strong><br>Not when using Image Mapping — manual typing is only part of the classic method above.</p>
+    <p><strong>What happens if Save All Mappings fails?</strong><br>Nothing is partially applied — a save either fully succeeds or fully fails, never something in between. An error message explains what went wrong (e.g. an image that could no longer be found), and the pending changes stay exactly as they were so the issue can be fixed and the save retried.</p>
+
+    <p style="margin-top:1rem">For direct browsing or cleanup of the underlying stored files, use <strong>Object Storage</strong>, which shows the raw folders and files as uploaded.</p>
+    <div class="gd-link-row">
       <a href="{{ url_for('admin.object_storage') }}"><i class="fas fa-hdd"></i> Object Storage</a>
     </div>
   </div>

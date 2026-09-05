@@ -26,6 +26,8 @@ window.MathJax = {
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -1170,6 +1172,16 @@ window.MathJax = {
   const nextBtn      = document.getElementById('next-page');
   const lastBtn      = document.getElementById('last-page');
 
+  // Themed dropdown-button in place of the native <select> list — see
+  // static/admin/select-enhance.js. Each underlying <select> is unchanged
+  // and still what the filter/pagination logic below reads/listens to;
+  // this is presentation only.
+  enhanceSelect(typeFilter, { icon: 'fas fa-shapes' });
+  enhanceSelect(imageFilter, { icon: 'fas fa-image' });
+  enhanceSelect(entriesSelect, { icon: 'fas fa-list-ol' });
+  enhanceSelect(document.getElementById('list-type'), { icon: 'fas fa-shapes' });
+  enhanceSelect(document.getElementById('global-type'), { icon: 'fas fa-shapes' });
+
   let _searchDebounce;
   if (searchInput) searchInput.addEventListener('input', () => {
     clearTimeout(_searchDebounce);
@@ -1251,6 +1263,9 @@ window.MathJax = {
       </div>
     `;
     div.querySelector('.remove-row').addEventListener('click', () => div.remove());
+    // Each batch row is a freshly-created copy of this template — enhance
+    // its own Type select individually (see static/admin/select-enhance.js).
+    enhanceSelect(div.querySelector('.q-type'), { icon: 'fas fa-shapes', block: true });
     return div;
   }
 
@@ -1462,6 +1477,15 @@ window.MathJax = {
 /* These must be on window scope because onclick= attributes reference them */
 
 function _qField(id) { return document.getElementById(id); }
+
+// Themed dropdown-button in place of the native <select> list — see
+// static/admin/select-enhance.js. block:true matches these two selects'
+// full-width form-grid placement next to their sibling .form-control
+// fields. The wrapped value-setter this utility installs keeps the
+// trigger label correct even though _qResetForm()/openEditQuestionModal()
+// below set .value directly rather than through the dropdown itself.
+enhanceSelect(_qField('qf-exam-id'), { icon: 'fas fa-graduation-cap', block: true });
+enhanceSelect(_qField('qf-question-type'), { icon: 'fas fa-shapes', block: true });
 
 function _toggleToleranceField() {
   const tw = _qField('qf-tolerance-wrap');

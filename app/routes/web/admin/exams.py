@@ -11,10 +11,12 @@ from app.routes.web.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
 from app.db.exams import get_exam_by_id, create_exam, update_exam, get_exams_page
 from app.db.attempts import get_exam_attempts_count
+from app.db.questions import get_questions_by_exam
 from app.utils.helpers import (
     parse_max_attempts, parse_passing_percentage, parse_start_time, parse_exam_date,
     parse_scheduled_minutes_field, parse_instructions_field,
 )
+from app.utils.sanitize import sanitize_html
 from app.db.categories import get_all_categories
 from app.db.users import get_view_prefs
 
@@ -228,3 +230,50 @@ def edit_exam(exam_id):
         return redirect(url_for("admin.exams"))
 
     return render_template("admin/edit_exam.html", exam=exam, categories=categories)
+
+
+@admin_bp.route("/exams/<int:exam_id>/preview")
+@require_admin_role
+def preview_exam(exam_id):
+    """Admin-only "what will a student actually see" preview — reuses the
+    real exam_page.html rendering logic (copied into its own template, see
+    templates/admin/exam_preview.html) but creates NO exam_attempts row,
+    runs no timer, and has no fullscreen/kiosk/submit machinery at all.
+
+    Deliberately does NOT use get_active_attempt()/get_cached_exam_data()
+    (the student-facing per-session cache) — that cache is security-scoped
+    to omit correct_answer, which an admin needs to see here, and there is
+    no guarantee it reflects an edit just made from this same preview.
+    Instead this always reads directly from the DB, same as CSV export/
+    scoring do for "the complete, current set of questions" — always
+    fresh, no cache-invalidation to get wrong.
+    """
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        flash("Exam not found.", "danger")
+        return redirect(url_for("admin.exams"))
+
+    questions = get_questions_by_exam(exam_id)
+
+    from app.services.image_storage_service import resolve_question_image_urls_bulk
+    image_paths = [
+        str(q.get("image_path", "")).strip()
+        for q in questions
+        if str(q.get("image_path", "")).strip() not in ("", "nan", "None")
+    ]
+    image_url_map = resolve_question_image_urls_bulk(image_paths)
+
+    prepared = []
+    for q in questions:
+        pq = dict(q)
+        pq["question_text"] = sanitize_html(q.get("question_text", ""))
+        for opt in ("option_a", "option_b", "option_c", "option_d"):
+            pq[opt] = sanitize_html(q.get(opt, ""))
+        path = str(q.get("image_path", "")).strip()
+        has_img, img_url = image_url_map.get(path, (False, None)) if path not in ("", "nan", "None") else (False, None)
+        pq["has_image"] = has_img
+        pq["image_url"] = img_url
+        pq["metadata"] = q.get("metadata") or None
+        prepared.append(pq)
+
+    return render_template("admin/exam_preview.html", exam=exam, questions=prepared)

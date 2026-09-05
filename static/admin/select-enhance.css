@@ -1,0 +1,58 @@
+/* Companion styles for static/admin/select-enhance.js — a themed dropdown-
+   button standing in for a native <select>. Sizing/colors mirror
+   .admin-list-filter (list-controller.css) so the enhanced control looks
+   identical to the plain select it replaces. */
+.sel-enh { position: relative; display: inline-flex; }
+.sel-enh-trigger {
+  display: flex; align-items: center; gap: .45rem;
+  background: var(--surface); color: var(--text-2);
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: .5rem .65rem; font-size: .82rem; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+}
+.sel-enh-trigger:hover { border-color: var(--accent); }
+.sel-enh.open .sel-enh-trigger { border-color: var(--accent); }
+.sel-enh-label { flex: 1; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.sel-enh-chev { font-size: .68rem; color: var(--text-3); flex-shrink: 0; transition: transform .12s; }
+.sel-enh.open .sel-enh-chev { transform: rotate(180deg); }
+.sel-enh-menu {
+  display: none;
+  position: absolute; top: calc(100% + .3rem); left: 0; min-width: 100%;
+  z-index: 60; max-height: 280px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: var(--shadow-lg); padding: .3rem;
+}
+.sel-enh.open .sel-enh-menu { display: block; }
+.sel-enh-item {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; border-radius: 7px;
+  padding: .45rem .6rem; font-size: .82rem; font-family: inherit;
+  color: var(--text-2); cursor: pointer; white-space: nowrap;
+}
+.sel-enh-item:hover { background: var(--surface-2); color: var(--text-1); }
+.sel-enh-item.active { background: var(--accent-subtle); color: var(--accent); font-weight: 700; }
+
+/* Positioning (top/left/min-width) is computed and set inline by
+   positionMenu() in select-enhance.js on every open, using the trigger's
+   real screen coordinates — not fixed here — since the menu also switches
+   from absolute to `position:fixed` at that point (see the JS comment for
+   why: escaping a card's overflow:hidden clip near the bottom of the
+   page). The absolute/top/left values above only matter for the instant
+   before that inline override applies. */
+
+/* Full-width "form field" variant — for a select standing in a Bootstrap
+   form grid column next to .form-control inputs (Add/Edit Exam modals)
+   rather than sitting compactly in a filter toolbar. Same interaction,
+   sized/colored to match .form-control/.form-select (var(--bg)/var(--radius)/
+   .855rem) instead of the toolbar's .admin-list-filter tokens, so it reads
+   as one consistent field row with its sibling inputs. */
+.sel-enh.sel-enh-block { display: flex; width: 100%; }
+.sel-enh.sel-enh-block .sel-enh-trigger {
+  width: 100%; justify-content: space-between;
+  background: var(--bg); border-radius: var(--radius); font-size: .855rem;
+}
+.sel-enh.sel-enh-block .sel-enh-trigger:focus-visible {
+  border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-subtle);
+  outline: none;
+}
+.sel-enh.sel-enh-block .sel-enh-menu { width: 100%; }

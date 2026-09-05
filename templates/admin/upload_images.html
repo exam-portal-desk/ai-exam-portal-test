@@ -1,6 +1,11 @@
 {% extends "admin_base.html" %}
 {% block title %}Upload Question Images{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -243,14 +248,12 @@
   <div class="field-col">
     <label class="form-label" for="subject_folder_id">Subject Folder</label>
     <div class="field-wrap">
-      <i class="fas fa-folder-open field-icon-l"></i>
       <select class="field-select" id="subject_folder_id" name="subject_folder_id" required>
         <option value="" disabled selected>Choose a subject folder…</option>
         {% for subj in subjects %}
           <option value="{{ subj.folder_id }}">{{ subj.name }}</option>
         {% endfor %}
       </select>
-      <i class="fas fa-chevron-down select-chevron"></i>
     </div>
 
     <div class="hint-callout">
@@ -357,6 +360,10 @@
     }
     render();
   }
+
+  // Themed dropdown-button in place of the native <select> — same
+  // component used elsewhere in the admin UI (static/admin/select-enhance.js).
+  enhanceSelect(selectEl, { icon: 'fas fa-folder-open', block: true });
 
   selectEl.addEventListener('change', () => {
     if (selectEl.value) {

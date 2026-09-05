@@ -4,6 +4,8 @@
 {% block content %}
 
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
 <style>
 /* ── Page Header ── */
 .page-top {
@@ -1097,6 +1099,16 @@ function renderUsers(users) {
       <td class="col-updated">${_fmtTs(u.updated_at||u.created_at)}</td>
     </tr>`;
   }).join('');
+  // Themed dropdown-button for every "New Role" select just inserted above —
+  // these are freshly-created elements each render, so each one needs its
+  // own enhanceSelect() call (static/admin/select-enhance.js); the original
+  // inline min-width is reapplied to the new trigger it replaces so rows
+  // still line up the same as the plain <select> did.
+  tbody.querySelectorAll('.role-sel').forEach(sel => {
+    enhanceSelect(sel, { icon: 'fas fa-user-shield' });
+    const wrap = sel.nextElementSibling;
+    if (wrap && wrap.classList.contains('sel-enh')) wrap.style.minWidth = '150px';
+  });
   syncSelectAll();
 }
 
@@ -1354,6 +1366,18 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     if (document.visibilityState === 'visible') loadHeaderStats();
   }, 60000);
+
+  // Themed dropdown-button in place of these native <select>s — same
+  // component used elsewhere in the admin UI (static/admin/select-enhance.js).
+  // The dynamically-created per-row "New Role" select (.role-sel, built in
+  // umRenderTable() above) is enhanced there instead, right after each
+  // batch of rows is inserted.
+  enhanceSelect(document.getElementById('histStatus'), { icon: 'fas fa-filter' });
+  enhanceSelect(document.getElementById('histCurRole'), { icon: 'fas fa-user' });
+  enhanceSelect(document.getElementById('histReqRole'), { icon: 'fas fa-user-shield' });
+  enhanceSelect(document.getElementById('umRoleFilter'), { icon: 'fas fa-filter' });
+  enhanceSelect(document.getElementById('bulkRoleSelect'), { icon: 'fas fa-users-cog' });
+  enhanceSelect(document.getElementById('approvedAccess'), { icon: 'fas fa-user-shield', block: true });
 });
 </script>
 {% endblock %}

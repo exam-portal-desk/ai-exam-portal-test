@@ -1,5 +1,9 @@
 {% extends "admin_base.html" %}
 {% block title %}AI Command Centre{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+{% endblock %}
 {% block content %}
 
 <style>
@@ -502,7 +506,7 @@ window.MathJax = {
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">Select Exam</label>
-                <select name="exam_id" class="form-select" required>
+                <select name="exam_id" id="aiExamSelect" class="form-select" required>
                   <option value="">Choose exam...</option>
                   {% for exam in exams %}
                   <option value="{{ exam.id }}">{{ exam.name }}</option>
@@ -511,7 +515,7 @@ window.MathJax = {
               </div>
               <div class="col-md-6">
                 <label class="form-label">Difficulty Level</label>
-                <select name="difficulty" class="form-select">
+                <select name="difficulty" id="aiDifficultySelect" class="form-select">
                   <option>Easy</option>
                   <option selected>Medium</option>
                   <option>Hard</option>
@@ -732,6 +736,13 @@ let genModal;
 document.addEventListener('DOMContentLoaded', function() {
     const modalEl = document.getElementById('generationModal');
     if (modalEl) genModal = new bootstrap.Modal(modalEl);
+
+    // Themed dropdown-button in place of these native <select>s — same
+    // component used elsewhere in the admin UI (static/admin/select-enhance.js).
+    // Doing this even while the modal is still hidden is fine — enhanceSelect()
+    // only needs the element to exist, not be visible yet.
+    enhanceSelect(document.getElementById('aiExamSelect'), { icon: 'fas fa-graduation-cap', block: true });
+    enhanceSelect(document.getElementById('aiDifficultySelect'), { icon: 'fas fa-gauge-high', block: true });
 });
 // ── Tips Panel toggle ────────────────────────────────────────────────────
 function toggleTipsPanel() {
