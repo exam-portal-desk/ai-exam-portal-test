@@ -55,6 +55,13 @@
 .os-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
 .os-stats { font-size: .78rem; color: var(--text-3); white-space: nowrap; }
 
+.os-selectbar {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .6rem 1.1rem; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.os-sel-count { font-size: .78rem; font-weight: 700; color: var(--accent); margin-right: auto; }
+
 .os-breadcrumb {
   display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
   padding: .7rem 1.1rem; font-size: .82rem; color: var(--text-2);
@@ -118,7 +125,13 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
     <span class="os-stats" id="osStats">&nbsp;</span>
     <button class="btn-flat secondary" id="osCalcUsage"><i class="fas fa-calculator"></i> Calculate usage</button>
     <button class="btn-flat secondary" id="osRefresh"><i class="fas fa-sync-alt"></i> Refresh</button>
-    <button class="btn-flat danger" id="osBulkDelete" disabled><i class="fas fa-trash"></i> Delete selected (<span id="osSelCount">0</span>)</button>
+  </div>
+  <div class="os-selectbar">
+    <button class="btn-flat secondary" id="osSelectAll"><i class="fas fa-check-double"></i> Select All</button>
+    <button class="btn-flat secondary" id="osClearSelection"><i class="fas fa-times"></i> Clear Selection</button>
+    <span class="os-sel-count"><span id="osSelCount">0</span> object(s) selected</span>
+    <button class="btn-flat secondary" id="osBulkDownload" disabled><i class="fas fa-download"></i> Download Selected</button>
+    <button class="btn-flat danger" id="osBulkDelete" disabled><i class="fas fa-trash"></i> Delete Selected</button>
   </div>
   <div class="os-breadcrumb" id="osBreadcrumb"></div>
   <div id="osTableWrap"></div>
@@ -163,6 +176,8 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
   var LIST_URL = '{{ url_for("admin_api.list_storage_objects") }}';
   var STATS_URL = '{{ url_for("admin_api.storage_stats") }}';
   var DELETE_URL = '{{ url_for("admin_api.delete_storage_objects") }}';
+  var DOWNLOAD_URL = '{{ url_for("admin_api.download_storage_object") }}';
+  var DOWNLOAD_ZIP_URL = '{{ url_for("admin_api.download_storage_objects_zip") }}';
 
   var state = { prefix: '', cursor: null, objects: [], prefixes: [], searching: false };
   var selected = new Set();
@@ -229,8 +244,9 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
         '<td>' + (o.last_modified || '&mdash;') + '</td>' +
         '<td></td>' +
         '<td><div class="os-row-actions">' +
-        (o.is_image ? '<a class="os-icon-btn" href="' + o.preview_url + '" target="_blank" rel="noopener"><i class="fas fa-eye"></i></a>' : '') +
-        '<button class="os-icon-btn" data-del="' + o.key.replace(/"/g, '&quot;') + '"><i class="fas fa-trash"></i></button>' +
+        (o.is_image ? '<a class="os-icon-btn" href="' + o.preview_url + '" target="_blank" rel="noopener" title="Preview"><i class="fas fa-eye"></i></a>' : '') +
+        '<a class="os-icon-btn" href="' + DOWNLOAD_URL + '?key=' + encodeURIComponent(o.key) + '" title="Download"><i class="fas fa-download"></i></a>' +
+        '<button class="os-icon-btn" data-del="' + o.key.replace(/"/g, '&quot;') + '" title="Delete"><i class="fas fa-trash"></i></button>' +
         '</div></td></tr>';
     });
 
@@ -271,6 +287,61 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
   function updateSelectionUI() {
     document.getElementById('osSelCount').textContent = selected.size;
     document.getElementById('osBulkDelete').disabled = selected.size === 0;
+    document.getElementById('osBulkDownload').disabled = selected.size === 0;
+  }
+
+  function selectAllVisible() {
+    state.objects.forEach(function (o) { selected.add(o.key); });
+    document.querySelectorAll('.os-check').forEach(function (cb) { cb.checked = true; });
+    updateSelectionUI();
+  }
+
+  function clearSelection() {
+    selected.clear();
+    document.querySelectorAll('.os-check').forEach(function (cb) { cb.checked = false; });
+    updateSelectionUI();
+  }
+
+  function downloadSelectedZip() {
+    var keys = Array.from(selected);
+    if (!keys.length) return;
+    var btn = document.getElementById('osBulkDownload');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing…';
+
+    fetch(DOWNLOAD_ZIP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys: keys }),
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (d) {
+          throw new Error(d.message || 'Download failed.');
+        });
+      }
+      var missingCount = parseInt(res.headers.get('X-Missing-Count') || '0', 10);
+      var cd = res.headers.get('Content-Disposition') || '';
+      var m = /filename="([^"]+)"/.exec(cd);
+      var filename = m ? m[1] : 'object-storage-download.zip';
+      return res.blob().then(function (blob) { return { blob: blob, filename: filename, missingCount: missingCount }; });
+    }).then(function (result) {
+      var url = URL.createObjectURL(result.blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = result.filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      if (result.missingCount > 0) {
+        adminToast(result.missingCount + ' selected object(s) could not be found and were skipped.', 'warning');
+      } else {
+        adminToast('Downloaded ' + keys.length + ' object(s) as a ZIP.', 'success');
+      }
+    }).catch(function (err) {
+      adminToast(err.message || ('Network error: ' + err), 'danger');
+    }).finally(function () {
+      btn.disabled = selected.size === 0;
+      btn.innerHTML = orig;
+    });
   }
 
   function navigateTo(prefix) {
@@ -346,6 +417,9 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
     document.getElementById('osBulkDelete').addEventListener('click', function () {
       openDeleteModal(Array.from(selected));
     });
+    document.getElementById('osSelectAll').addEventListener('click', selectAllVisible);
+    document.getElementById('osClearSelection').addEventListener('click', clearSelection);
+    document.getElementById('osBulkDownload').addEventListener('click', downloadSelectedZip);
     document.getElementById('osConfirmDelete').addEventListener('click', performDelete);
 
     document.getElementById('osCalcUsage').addEventListener('click', function () {

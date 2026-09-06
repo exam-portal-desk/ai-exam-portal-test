@@ -96,16 +96,35 @@
 .imap-continue-row { display:flex; justify-content:flex-end; margin-top:1rem; }
 
 /* ── Mapping workspace (Step 4-6) ── */
+/* ── Mapping workspace: independent left/right scroll ──────────────────
+   #stepWorkspace is `position:sticky` (below) so, once scrolled into
+   view, its top bar stays pinned at a fixed viewport position regardless
+   of how far the outer page (Steps 1-3 above it) has been scrolled — that
+   gives fitWorkspaceHeight() (JS) a stable anchor to measure from. Height
+   is set in exactly ONE place: an inline `height` (in px, computed by
+   fitWorkspaceHeight() to fit whatever viewport room is actually left) on
+   .imap-workspace-body. Every child below it only uses `flex:1;
+   min-height:0` to fill that — no second/competing `height` anywhere in
+   the chain, which is what silently broke the internal scrolling before
+   (a `height:62vh` directly on .imap-panel-body fighting its own
+   `flex:1` let the content grow unbounded instead of clipping+scrolling,
+   so the whole page ended up scrolling instead of just the panel). */
 .imap-workspace-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.85rem; }
 .imap-pending-pill { font-size:.8rem; font-weight:700; color:var(--accent); background:var(--accent-subtle); border-radius:20px; padding:.35rem .8rem; }
 .imap-workspace-actions { display:flex; gap:.6rem; }
 
-.imap-workspace-body { display:flex; gap:1rem; align-items:stretch; }
-.imap-panel { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); box-shadow:var(--shadow-sm); overflow:hidden; }
+.imap-workspace-body { display:flex; gap:1rem; align-items:stretch; height:62vh; }
+.imap-panel { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); box-shadow:var(--shadow-sm); overflow:hidden; }
 .imap-panel-head { padding:.7rem 1rem; border-bottom:1px solid var(--border); background:var(--surface-2); font-size:.85rem; font-weight:700; color:var(--text-1); display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-shrink:0; }
 .imap-panel-toolbar { padding:.6rem .85rem; border-bottom:1px solid var(--border); display:flex; gap:.5rem; flex-wrap:wrap; flex-shrink:0; }
 .imap-panel-toolbar input.form-control { flex:1; min-width:120px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text-1); font-size:.8rem; padding:.4rem .6rem; }
-.imap-panel-body { flex:1; min-height:0; overflow-y:auto; padding:.85rem; height:62vh; }
+.imap-panel-body { flex:1; min-height:0; overflow-y:auto; padding:.85rem; }
+
+/* Sticky anchor so the workspace stays reachable at a stable viewport
+   position (see fitWorkspaceHeight() in the script below) without
+   hijacking the whole page's scroll the way a fixed-position overlay
+   would — Steps 1-3 above stay in normal, independently-scrollable flow. */
+#stepWorkspace { position:sticky; top:.75rem; }
 
 /* Question cards (left panel) */
 .imap-qcard { border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; margin-bottom:.7rem; background:var(--surface); transition:border-color .12s, background .12s; }
@@ -145,8 +164,15 @@
 .imap-img-empty { padding:2rem 1rem; text-align:center; color:var(--text-3); font-size:.85rem; }
 
 @media (max-width:900px) {
-  .imap-workspace-body { flex-direction:column; }
-  .imap-panel-body { height:46vh; }
+  /* Stacked layout — .imap-panel keeps flex:1, which now applies to the
+     COLUMN's main axis (height) instead of width, so the two panels still
+     split the row's single `height` (set above, and by fitWorkspaceHeight()
+     below) evenly, each independently scrollable via its own
+     .imap-panel-body. #stepWorkspace drops its sticky pin here — on a
+     narrow viewport there usually isn't spare vertical room above AND
+     below it at once, so pinning it fights the page instead of helping. */
+  .imap-workspace-body { flex-direction:column; height:80vh; }
+  #stepWorkspace { position:static; top:auto; }
 }
 
 /* ── Themed toast (no alert()/confirm()/prompt() anywhere) ── */
@@ -337,6 +363,25 @@
   </div>
 </div>
 
+<!-- Leave-page confirm modal — shown instead of navigating away (sidebar
+     links, any in-app link) whenever there are pending mappings. Mirrors
+     templates/admin/csv_upload.html's own "Leave This Page?" intercept
+     pattern (sidebar-link click interception + a themed modal instead of
+     the browser's unstylable confirm), with this feature's own wording.
+     beforeunload below remains the fallback for exits this can't
+     intercept in JS (browser Back/Forward, closing the tab, a typed URL)
+     — no site can replace that native dialog. -->
+<div class="imap-modal-backdrop" id="leaveModalBackdrop">
+  <div class="imap-modal-box">
+    <h5><i class="fas fa-triangle-exclamation" style="color:var(--warning-text)"></i> Changes may not be saved</h5>
+    <p class="sub">You have unsaved image mappings. If you leave this page, these changes will be lost.</p>
+    <div class="imap-modal-footer">
+      <button class="imap-modal-cancel" id="leaveStayBtn">Stay</button>
+      <button class="imap-modal-ok danger" id="leaveConfirmBtn">Leave Without Saving</button>
+    </div>
+  </div>
+</div>
+
 <!-- Image full-preview modal -->
 <div class="imap-modal-backdrop" id="previewModalBackdrop">
   <div class="imap-modal-box" style="max-width:640px">
@@ -371,6 +416,41 @@
   }
   function openModal(id){ document.getElementById(id).classList.add('show'); }
   function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+  // ── Cross-panel drag autoscroll ────────────────────────────────────
+  // The two panels scroll independently (see fitWorkspaceHeight() below),
+  // which means an image dragged from a scrolled-down Image Library can't
+  // reach a question further down in a separately-scrolled Question panel
+  // with native drag-and-drop alone — there's no way to scroll the target
+  // panel mid-drag otherwise. `dragover` only fires on pointer movement,
+  // not continuously while holding still near an edge, so a rAF loop
+  // (started on dragstart, stopped on dragend/drop) drives the actual
+  // scrolling from whatever the last known pointer Y was.
+  let _dragScrollRAF = null, _dragScrollTarget = null, _dragClientY = null;
+  function startDragAutoscroll(panelBody){
+    _dragScrollTarget = panelBody;
+    if (_dragScrollRAF) return;
+    const EDGE = 56, MAX_SPEED = 16;
+    function step(){
+      if (_dragScrollTarget && _dragClientY != null) {
+        const r = _dragScrollTarget.getBoundingClientRect();
+        if (_dragClientY < r.top + EDGE) {
+          const strength = (r.top + EDGE - _dragClientY) / EDGE;
+          _dragScrollTarget.scrollTop -= Math.ceil(MAX_SPEED * Math.min(1, strength));
+        } else if (_dragClientY > r.bottom - EDGE) {
+          const strength = (_dragClientY - (r.bottom - EDGE)) / EDGE;
+          _dragScrollTarget.scrollTop += Math.ceil(MAX_SPEED * Math.min(1, strength));
+        }
+      }
+      _dragScrollRAF = requestAnimationFrame(step);
+    }
+    _dragScrollRAF = requestAnimationFrame(step);
+  }
+  function stopDragAutoscroll(){
+    if (_dragScrollRAF) cancelAnimationFrame(_dragScrollRAF);
+    _dragScrollRAF = null; _dragScrollTarget = null; _dragClientY = null;
+  }
+  document.addEventListener('dragover', e => { _dragClientY = e.clientY; });
 
   async function apiFetch(url, opts){
     let res;
@@ -457,6 +537,38 @@
     }
   }
   window.addEventListener('beforeunload', e => { if (hasPendingChanges()) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ── Leave-page guard for in-app navigation (sidebar links, any other
+  //    link on this page) — same intercept pattern as csv_upload.html's
+  //    own "Leave This Page?" modal: capture the click, and only actually
+  //    navigate after the admin confirms. beforeunload above is only the
+  //    fallback for exits this can't intercept (browser Back/Forward, tab
+  //    close, typed URL).
+  let _pendingLeaveHref = null;
+  document.getElementById('leaveStayBtn').addEventListener('click', () => {
+    closeModal('leaveModalBackdrop');
+    _pendingLeaveHref = null;
+  });
+  document.getElementById('leaveConfirmBtn').addEventListener('click', () => {
+    closeModal('leaveModalBackdrop');
+    const href = _pendingLeaveHref;
+    _pendingLeaveHref = null;
+    if (href) {
+      state.pending.clear(); // so beforeunload doesn't also fire its own prompt
+      window.location.href = href;
+    }
+  });
+  function _interceptLeaveLink(el){
+    el.addEventListener('click', e => {
+      if (!hasPendingChanges()) return; // nothing unsaved — navigate normally
+      const href = el.getAttribute('href');
+      if (!href) return;
+      e.preventDefault();
+      _pendingLeaveHref = href;
+      openModal('leaveModalBackdrop');
+    });
+  }
+  document.querySelectorAll('.sidebar .nav-link[href]').forEach(_interceptLeaveLink);
 
   // ── Step 1: Exam picker ──
   const examPicker = makePicker({
@@ -671,6 +783,49 @@
     loadSubjectImages(true);
     updatePendingUI();
     document.getElementById('stepWorkspace').scrollIntoView({behavior:'smooth', block:'start'});
+    // Compute the two panels' shared height so they fit whatever viewport
+    // room is actually left. A single fixed-delay recompute isn't reliable
+    // here — how long the smooth scroll above takes to settle depends on
+    // how much the browser is simultaneously busy rendering (50+ question
+    // cards, 60+ image cards), so a guessed timeout can fire mid-scroll
+    // and lock in a too-small height. Instead, recompute every frame
+    // until window.scrollY stops changing for a couple of consecutive
+    // frames, which adapts to however long that actually takes.
+    fitWorkspaceHeight();
+    watchScrollSettle();
+  }
+
+  // ── Workspace panel height: single source of truth, computed to fit
+  //    whatever vertical room is actually left in the viewport, instead of
+  //    a guessed vh percentage that's too tall on a short laptop screen or
+  //    leaves dead space on a tall monitor. #stepWorkspace's sticky pin
+  //    (desktop/tablet — see CSS) keeps its top bar at a stable viewport
+  //    position once reached, so this only needs recomputing on resize
+  //    and while entering the workspace, not on every scroll. ──
+  function fitWorkspaceHeight(){
+    var ws = document.getElementById('stepWorkspace');
+    var topBar = ws.querySelector('.imap-workspace-top');
+    var body = ws.querySelector('.imap-workspace-body');
+    if (!topBar || !body || ws.style.display === 'none') return;
+    var topBarRect = topBar.getBoundingClientRect();
+    var isStacked = window.innerWidth <= 900;
+    var minHeight = isStacked ? 480 : 320;
+    var available = window.innerHeight - topBarRect.bottom - 20;
+    body.style.height = Math.max(minHeight, Math.round(available)) + 'px';
+  }
+  window.addEventListener('resize', fitWorkspaceHeight);
+
+  function watchScrollSettle(){
+    let lastY = -1, stableFrames = 0, framesLeft = 120; // ~2s ceiling at 60fps
+    function tick(){
+      fitWorkspaceHeight();
+      const y = window.scrollY;
+      stableFrames = (y === lastY) ? stableFrames + 1 : 0;
+      lastY = y;
+      if (stableFrames >= 3 || --framesLeft <= 0) return; // settled (or gave it enough time)
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
   }
 
   // ── Question cards (left panel) ──
@@ -688,6 +843,7 @@
       card.addEventListener('drop', e => {
         e.preventDefault();
         card.classList.remove('drop-active');
+        stopDragAutoscroll();
         const key = e.dataTransfer.getData('text/plain');
         const img = state.subjectImages.find(i => i.key === key);
         if (img) mapImageToQuestion(qid, img);
@@ -831,7 +987,12 @@
     body.querySelectorAll('.imap-img-card').forEach(card => {
       const key = card.dataset.key;
       const img = state.subjectImages.find(i => i.key === key);
-      card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', key); e.dataTransfer.effectAllowed = 'copy'; });
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', key);
+        e.dataTransfer.effectAllowed = 'copy';
+        startDragAutoscroll(document.getElementById('questionsPanelBody'));
+      });
+      card.addEventListener('dragend', stopDragAutoscroll);
       card.addEventListener('click', () => {
         if (state.activeTargetId != null) {
           mapImageToQuestion(state.activeTargetId, img);
