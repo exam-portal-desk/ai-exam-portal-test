@@ -20,7 +20,7 @@
 
 .page-top h1{
   margin:0 0 .25rem;
-  font-size:1.5rem;
+  font-size:1.25rem;
   font-weight:700;
   color:var(--text-1);
 }
@@ -28,7 +28,7 @@
 .page-top p{
   margin:0;
   color:var(--text-3);
-  font-size:.9rem;
+  font-size:.82rem;
 }
 
 /* =========================
@@ -57,21 +57,24 @@
   background:var(--surface-2);
   color:var(--text-3);
   border-bottom:1px solid var(--border);
-  padding:1rem 1.25rem;
-  font-size:.72rem;
+  padding:.85rem 1.1rem;
+  font-size:.7rem;
   font-weight:700;
   text-transform:uppercase;
-  letter-spacing:.08em;
+  letter-spacing:.07em;
   white-space:nowrap;
+  position:sticky;
+  top:0;
+  z-index:1;
 }
 
 .table tbody td{
   background:var(--surface);
   color:var(--text-2);
   border-bottom:1px solid var(--border);
-  padding:1rem 1.25rem;
+  padding:.85rem 1.1rem;
   vertical-align:middle;
-  font-size:.88rem;
+  font-size:.83rem;
 }
 
 .table tbody tr:last-child td{
@@ -103,7 +106,7 @@
 
 .subject-name-text{
   color:var(--text-1);
-  font-size:.92rem;
+  font-size:.85rem;
   font-weight:600;
 }
 
@@ -351,6 +354,20 @@
   filter:var(--btn-close-filter, none);
 }
 
+/* =========================
+   BOUNDED SCROLL AREA
+   The subject list can grow well past the viewport once "Load more" has
+   been clicked a few times — this keeps that growth inside its own
+   scrollbox (computed to fit whatever vertical room is actually left,
+   same technique as Image Mapping's fitWorkspaceHeight()) instead of
+   letting it push the page height and rely on body scroll. The search
+   box, "Add Subject" button and "Load more" control all stay outside
+   this box so they're always reachable without scrolling the list.
+========================= */
+
+.subject-scroll-area{
+  overflow-y:auto;
+}
 </style>
 
 <div class="page-top">
@@ -369,7 +386,7 @@
 
 <div class="card">
   <div class="card-body p-0">
-    <div class="table-responsive">
+    <div class="table-responsive subject-scroll-area" id="subjectScrollArea">
       <table class="table mb-0" style="min-width:500px">
         <thead>
           <tr>
@@ -483,16 +500,43 @@ document.addEventListener('click', async function(e) {
 var subjectList = createAdminList({
   endpoint: '/api/v01/admin/subjects',
   paginatorEl: document.getElementById('subjectPaginator'),
+  paginatorMode: 'loadmore',
   searchInputEl: document.getElementById('subjectSearch'),
   searchParam: 'q',
-  perPage: {{ subjects_per_page | default(20) }},
+  perPage: {{ subjects_per_page | default(25) }},
   extraParams: function () { return { partial: 1 }; },
   onData: function (data) {
-    document.getElementById('subjectTbody').innerHTML = data.rows_html || '';
-    document.getElementById('subjectEditModals').innerHTML = data.modals_html || '';
+    const tbody = document.getElementById('subjectTbody');
+    const modalsEl = document.getElementById('subjectEditModals');
+    if (data.page && data.page > 1) {
+      tbody.insertAdjacentHTML('beforeend', data.rows_html || '');
+      modalsEl.insertAdjacentHTML('beforeend', data.modals_html || '');
+    } else if (data.rows_html) {
+      tbody.innerHTML = data.rows_html;
+      modalsEl.innerHTML = data.modals_html || '';
+    } else {
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-book-open"></i>' +
+        '<p>No subjects match your search.</p></div></td></tr>';
+      modalsEl.innerHTML = '';
+    }
+    fitSubjectScrollHeight();
   },
 });
-subjectList.hydrate({ page: 1, total_pages: {{ subjects_total_pages | default(1) }}, total: {{ subjects_total | default(0) }}, per_page: {{ subjects_per_page | default(20) }} });
+subjectList.hydrate({ page: 1, total_pages: {{ subjects_total_pages | default(1) }}, total: {{ subjects_total | default(0) }}, per_page: {{ subjects_per_page | default(25) }} });
+
+// Bounded scroll area sized to whatever room is actually left below it in
+// the viewport (never a guessed vh%) — same technique used by Image
+// Mapping's fitWorkspaceHeight(), recomputed on resize and after every
+// load (Load More can change whether a scrollbar is even needed).
+function fitSubjectScrollHeight(){
+  var area = document.getElementById('subjectScrollArea');
+  if (!area) return;
+  var top = area.getBoundingClientRect().top;
+  var available = window.innerHeight - top - 90; // room for paginator/footer below the card
+  area.style.maxHeight = Math.max(240, Math.round(available)) + 'px';
+}
+window.addEventListener('resize', fitSubjectScrollHeight);
+fitSubjectScrollHeight();
 </script>
 <div class="modal fade" id="deleteSubjectModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

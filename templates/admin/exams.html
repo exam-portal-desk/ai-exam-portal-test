@@ -452,6 +452,32 @@
 .egi-row { font-size: .78rem; color: var(--text-3); display: flex; align-items: center; gap: .4rem; }
 .egi-row i { color: var(--text-3); width: 14px; }
 .egi-actions { display: flex; gap: .35rem; margin-top: auto; padding-top: .4rem; }
+
+/* ── Bulk selection checkbox + toolbar ── */
+.enhanced-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+.exam-bulk-bar {
+  display: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
+  background: var(--surface); border: 1px solid var(--accent); border-radius: calc(var(--radius) + 2px);
+  padding: .7rem 1rem; margin-bottom: .85rem;
+}
+.exam-bulk-count { font-size: .85rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: .4rem; }
+.exam-bulk-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+/* ── Bulk Update modal: per-field "Change this field" toggle. The checkbox
+   enables/disables (and visually dims) its own paired input(s) only —
+   unchecked fields are simply never added to the request body, so an
+   untouched field can never be overwritten. ── */
+.bulk-field-row { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+.bulk-field-row:last-child { border-bottom: none; }
+.bulk-field-toggle {
+  display: flex; align-items: center; gap: .5rem; cursor: pointer;
+  font-size: .82rem; font-weight: 600; color: var(--text-2);
+  min-width: 190px; padding-top: .4rem; flex-shrink: 0;
+}
+.bulk-field-input { flex: 1; min-width: 200px; transition: opacity .12s; }
+.bulk-field-row:not(.bulk-field-active) .bulk-field-input { opacity: .45; pointer-events: none; }
+.bulk-review-list { margin: 0 0 1rem; padding-left: 1.2rem; font-size: .85rem; color: var(--text-2); line-height: 1.9; }
+.bulk-review-notes { display: flex; flex-direction: column; gap: .4rem; }
 </style>
 
 <!-- ── Page Header ── -->
@@ -489,6 +515,16 @@
   </div>
 </div>
 
+<!-- ── Bulk selection toolbar — hidden until >=1 exam is selected ── -->
+<div class="exam-bulk-bar" id="examBulkBar">
+  <span class="exam-bulk-count"><i class="fas fa-check-square"></i><span id="examBulkCount">0</span> exam(s) selected</span>
+  <div class="exam-bulk-actions">
+    <button type="button" class="btn-flat secondary" onclick="selectAllOnPage()"><i class="fas fa-check-double"></i> Select all on page</button>
+    <button type="button" class="btn-flat secondary" onclick="clearExamSelection()"><i class="fas fa-times"></i> Clear selection</button>
+    <button type="button" class="btn-flat primary" onclick="openBulkUpdateModal()"><i class="fas fa-layer-group"></i> Bulk Update</button>
+  </div>
+</div>
+
 <!-- ── Table / Grid Card ── -->
 <div id="examViewWrapper" class="{{ 'list-view' if view_mode != 'grid' else '' }}">
   <div class="exam-card exam-table-wrap">
@@ -496,6 +532,7 @@
       <table class="exam-tbl">
         <thead>
           <tr>
+            <th style="width:36px"><input type="checkbox" id="examSelectAllHeader" class="enhanced-checkbox" onchange="toggleSelectAllOnPage(this)" title="Select all on this page"></th>
             <th>S.No.</th>
             <th>Exam Name</th>
             <th>Category</th>
@@ -514,7 +551,7 @@
             {% for exam in exams %}{{ render_exam_row(exam) }}{% endfor %}
           {% else %}
           <tr>
-            <td colspan="11">
+            <td colspan="12">
               <div class="empty-state">
                 <i class="fas fa-file-alt"></i>
                 <p>No exams found. Click <strong>Add Exam</strong> to create one.</p>
@@ -708,6 +745,196 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BULK UPDATE EXAMS MODAL ═════════════════════════════════════ -->
+<div class="modal fade" id="bulkUpdateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content" style="max-height:90vh;">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Bulk Update Exams</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-2);font-size:.85rem;margin:0 0 1rem">
+          Updating <strong id="bulkUpdateCount">0</strong> selected exam(s). Tick <strong>Change this field</strong> for
+          every field you want to overwrite — anything left unticked is never sent, and stays exactly as it is on every exam.
+        </p>
+        <div class="row g-3">
+          <!-- Instructions -->
+          <div class="col-12">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="instructions" onchange="bulkFieldToggle(this)">
+                <span>Instructions</span>
+              </label>
+              <div class="bulk-field-input" data-field-input="instructions">
+                <div class="instr-toolbar">
+                  <button type="button" class="instr-tb-btn" data-instr-cmd="bullet" title="Bullet list"><i class="fas fa-list-ul"></i></button>
+                  <button type="button" class="instr-tb-btn" data-instr-cmd="number" title="Numbered list"><i class="fas fa-list-ol"></i></button>
+                  <button type="button" class="instr-tb-btn" data-instr-cmd="bold" title="Bold"><i class="fas fa-bold"></i></button>
+                  <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Warning callout"><i class="fas fa-triangle-exclamation"></i></button>
+                </div>
+                <textarea class="form-control" name="instructions" rows="5" disabled placeholder="New instructions to apply to every selected exam…"></textarea>
+                <div class="instr-preview-label">Preview</div>
+                <div class="instr-preview"><span class="instr-preview-empty">Nothing to preview yet.</span></div>
+              </div>
+            </div>
+          </div>
+          <!-- Max Attempts -->
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="max_attempts" onchange="bulkFieldToggle(this)">
+                <span>Max Attempts <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = unlimited)</span></span>
+              </label>
+              <div class="bulk-field-input" data-field-input="max_attempts">
+                <input type="number" class="form-control" name="max_attempts" min="0" step="1" disabled placeholder="e.g. 3">
+              </div>
+            </div>
+          </div>
+          <!-- Passing Percentage -->
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="passing_percentage" onchange="bulkFieldToggle(this)">
+                <span>Passing % <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = no cutoff)</span></span>
+              </label>
+              <div class="bulk-field-input" data-field-input="passing_percentage">
+                <input type="number" class="form-control" name="passing_percentage" min="0" max="100" step="0.01" disabled placeholder="e.g. 40">
+              </div>
+            </div>
+          </div>
+          <!-- Duration -->
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="duration" onchange="bulkFieldToggle(this)">
+                <span>Duration (min) <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(locked for started Scheduled Exams)</span></span>
+              </label>
+              <div class="bulk-field-input" data-field-input="duration">
+                <input type="number" class="form-control" name="duration" min="1" step="1" disabled placeholder="e.g. 90">
+              </div>
+            </div>
+          </div>
+          <!-- Status -->
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="status" onchange="bulkFieldToggle(this)">
+                <span>Status <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(Manual exams only)</span></span>
+              </label>
+              <div class="bulk-field-input" data-field-input="status">
+                <select class="form-select" name="status" disabled>
+                  <option value="upcoming" selected>Upcoming</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Category / Subcategory -->
+          <div class="col-12">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="category" onchange="bulkFieldToggle(this)">
+                <span>Category / Subcategory</span>
+              </label>
+              <div class="bulk-field-input" data-field-input="category" style="display:flex;gap:1rem;flex-wrap:wrap;">
+                <div style="flex:1;min-width:160px;">
+                  <label class="form-label" style="font-size:.78rem;">Category</label>
+                  <select class="form-select" name="category_id" id="bulkCategorySelect" disabled data-cat-select
+                          onchange="loadSubcategoriesFor(this, document.getElementById('bulkSubcategorySelect'))">
+                    <option value="">Select Category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div style="flex:1;min-width:160px;">
+                  <label class="form-label" style="font-size:.78rem;">Subcategory</label>
+                  <select class="form-select" name="subcategory_id" id="bulkSubcategorySelect" disabled data-subcat-select>
+                    <option value="">Select Category first</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Positive / Negative Marks -->
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="positive_marks" onchange="bulkFieldToggle(this)">
+                <span>Positive Marks</span>
+              </label>
+              <div class="bulk-field-input" data-field-input="positive_marks">
+                <input type="text" class="form-control" name="positive_marks" disabled placeholder="e.g. 4">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="negative_marks" onchange="bulkFieldToggle(this)">
+                <span>Negative Marks</span>
+              </label>
+              <div class="bulk-field-input" data-field-input="negative_marks">
+                <input type="text" class="form-control" name="negative_marks" disabled placeholder="e.g. 1">
+              </div>
+            </div>
+          </div>
+          <!-- Result Mode -->
+          <div class="col-12">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="result_mode" onchange="bulkFieldToggle(this)">
+                <span>Result Mode</span>
+              </label>
+              <div class="bulk-field-input" data-field-input="result_mode" style="display:flex;gap:1rem;flex-wrap:wrap;">
+                <div style="flex:1;min-width:150px;">
+                  <label class="form-label" style="font-size:.82rem;">Mode</label>
+                  <select class="form-select" name="result_mode" disabled onchange="toggleDelayField(this, 'bulk-delay-field')">
+                    <option value="instant" selected>Instant (show immediately)</option>
+                    <option value="delayed">Delayed (show after X mins)</option>
+                    <option value="manual">Manual (admin releases)</option>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:150px;display:none;" id="bulk-delay-field">
+                  <label class="form-label" style="font-size:.82rem;">Delay (minutes)</label>
+                  <input type="number" class="form-control" name="result_delay" min="1" value="30" disabled placeholder="e.g. 30">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="bulkReviewBtn" onclick="prepareBulkReview()">
+          <i class="fas fa-magnifying-glass me-1"></i>Review Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BULK UPDATE REVIEW MODAL ════════════════════════════════════ -->
+<div class="modal fade" id="bulkUpdateReviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-clipboard-check me-2"></i>Confirm Bulk Update</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="bulkReviewBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="confirmBulkUpdateBtn">
+          <i class="fas fa-check me-1"></i>Confirm &amp; Update
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1530,6 +1757,7 @@ function wireInstructionsEditor(textarea) {
 }
 
 document.querySelectorAll('#addExamForm textarea[name="instructions"]').forEach(wireInstructionsEditor);
+document.querySelectorAll('#bulkUpdateModal textarea[name="instructions"]').forEach(wireInstructionsEditor);
 document.addEventListener('show.bs.modal', function (e) {
   const modal = e.target;
   if (!modal.id || modal.id.indexOf('editExamModal') !== 0) return;
@@ -1590,6 +1818,300 @@ function _enhanceExamFormSelects(root) {
 }
 _enhanceExamFormSelects(document); // static Add modal + server-rendered page-1 Edit modals
 
+/* ══════════════════════════════════════════════════════════════
+   Bulk Update Exams — row/card checkboxes -> toolbar -> Bulk Update
+   modal -> a client-computed Review step -> POST /api/v01/admin/
+   exams/bulk-update -> refresh via examList.reload().
+
+   selectedExams is a Map<String examId, {id, name, scheduled,
+   effectiveStatus}> rather than a plain id Set — the extra fields are
+   captured off each row's data-scheduled/data-effective-status at the
+   moment it's checked, so the Review step's "Duration/Status will be
+   skipped for N exam(s)" note stays computable even for an exam
+   selected on a page the admin has since paginated away from (its row
+   is long gone from the DOM by then, but the Map already has what it
+   needs). This is purely a client-side warning preview — the server
+   independently re-validates and is the real source of truth. ══ */
+let selectedExams = new Map();
+
+function _examMetaFromEl(el) {
+  return {
+    id: el.dataset.id,
+    name: el.dataset.name || ('Exam #' + el.dataset.id),
+    scheduled: el.dataset.scheduled === '1',
+    effectiveStatus: el.dataset.effectiveStatus || '',
+  };
+}
+
+function toggleExamSelect(cb) {
+  const id = cb.dataset.id;
+  if (cb.checked) {
+    const container = cb.closest('[data-id]');
+    selectedExams.set(id, container ? _examMetaFromEl(container) : { id: id, name: 'Exam #' + id, scheduled: false, effectiveStatus: '' });
+  } else {
+    selectedExams.delete(id);
+  }
+  _syncExamSelectionUI();
+}
+
+function selectAllOnPage() {
+  document.querySelectorAll('#examTbody tr[data-id]').forEach(tr => selectedExams.set(tr.dataset.id, _examMetaFromEl(tr)));
+  _syncExamSelectionUI();
+}
+
+function clearExamSelection() {
+  selectedExams.clear();
+  _syncExamSelectionUI();
+}
+
+function toggleSelectAllOnPage(headerCb) {
+  if (headerCb.checked) { selectAllOnPage(); return; }
+  document.querySelectorAll('#examTbody tr[data-id]').forEach(tr => selectedExams.delete(tr.dataset.id));
+  _syncExamSelectionUI();
+}
+
+// Re-checks every rendered row/card checkbox from current Set membership,
+// and refreshes the header "select all on page" + toolbar. Called after
+// every checkbox change AND after every AJAX re-render (see onData below),
+// since an innerHTML replacement wipes whatever checked state the admin
+// had — the Map, not the DOM, is the source of truth for selection.
+function _syncExamSelectionUI() {
+  document.querySelectorAll('.row-checkbox').forEach(cb => { cb.checked = selectedExams.has(cb.dataset.id); });
+
+  const pageRows = document.querySelectorAll('#examTbody tr[data-id]');
+  const headerCb = document.getElementById('examSelectAllHeader');
+  if (headerCb) {
+    const total = pageRows.length;
+    const selectedOnPage = Array.from(pageRows).filter(tr => selectedExams.has(tr.dataset.id)).length;
+    headerCb.checked = total > 0 && selectedOnPage === total;
+    headerCb.indeterminate = selectedOnPage > 0 && selectedOnPage < total;
+  }
+
+  const bar = document.getElementById('examBulkBar');
+  const countEl = document.getElementById('examBulkCount');
+  if (countEl) countEl.textContent = selectedExams.size;
+  if (bar) bar.style.display = selectedExams.size > 0 ? 'flex' : 'none';
+}
+
+/* ── Bulk Update modal: "Change this field" checkbox enables/dims its own
+   paired input(s) only — see .bulk-field-row/.bulk-field-input CSS. ── */
+function bulkFieldToggle(cb) {
+  const row = cb.closest('.bulk-field-row');
+  const input = row && row.querySelector('[data-field-input="' + cb.dataset.field + '"]');
+  if (!input) return;
+  const on = cb.checked;
+  row.classList.toggle('bulk-field-active', on);
+  input.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = !on; });
+}
+
+function openBulkUpdateModal() {
+  if (selectedExams.size === 0) return;
+  const modalEl = document.getElementById('bulkUpdateModal');
+  // Reset every field row back to its unchecked/disabled default each time
+  // the modal opens, so a previous bulk update's picks never leak into a
+  // new one.
+  modalEl.querySelectorAll('.bulk-chk').forEach(cb => { cb.checked = false; bulkFieldToggle(cb); });
+  document.getElementById('bulkUpdateCount').textContent = selectedExams.size;
+  new bootstrap.Modal(modalEl).show();
+}
+
+function _escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+// Reads the ticked fields out of the Bulk Update modal into the exact
+// {fields} shape the backend expects (app/routes/api/v01/admin/exams.py
+// bulk_update_exams_route) — an unticked field's key is simply never
+// added, mirroring how the single-exam Edit form only ever sends what's
+// actually in the form. Returns null (after toasting why) on the first
+// validation failure.
+function _bulkBuildFields() {
+  const modalEl = document.getElementById('bulkUpdateModal');
+  const fields = {};
+  const fail = msg => { adminToast(msg, 'danger'); return null; };
+  const isOn = fname => { const cb = modalEl.querySelector('.bulk-chk[data-field="' + fname + '"]'); return !!(cb && cb.checked); };
+  const val = sel => { const el = modalEl.querySelector(sel); return el ? el.value.trim() : ''; };
+
+  if (isOn('instructions')) {
+    const v = val('[data-field-input="instructions"] textarea[name="instructions"]');
+    if (!v) return fail('Instructions cannot be blank.');
+    fields.instructions = v;
+  }
+  if (isOn('max_attempts')) {
+    const v = val('[data-field-input="max_attempts"] input[name="max_attempts"]');
+    if (v !== '' && !/^\d+$/.test(v)) return fail('Max Attempts must be a whole non-negative number, or blank for unlimited.');
+    fields.max_attempts = v;
+  }
+  if (isOn('passing_percentage')) {
+    const v = val('[data-field-input="passing_percentage"] input[name="passing_percentage"]');
+    if (v !== '') {
+      const n = parseFloat(v);
+      if (isNaN(n) || n < 0 || n > 100) return fail('Passing Percentage must be between 0 and 100, or blank for no cutoff.');
+    }
+    fields.passing_percentage = v;
+  }
+  if (isOn('duration')) {
+    const v = val('[data-field-input="duration"] input[name="duration"]');
+    const n = parseInt(v, 10);
+    if (!v || isNaN(n) || n <= 0) return fail('Duration must be a whole number of minutes greater than 0.');
+    fields.duration = v;
+  }
+  if (isOn('status')) {
+    fields.status = val('[data-field-input="status"] select[name="status"]');
+  }
+  if (isOn('category')) {
+    const catVal = val('[data-field-input="category"] select[name="category_id"]');
+    const subcatVal = val('[data-field-input="category"] select[name="subcategory_id"]');
+    if (!catVal && !subcatVal) return fail('Select a category (and optionally a subcategory).');
+    fields.category_id = catVal;
+    if (subcatVal) fields.subcategory_id = subcatVal;
+  }
+  if (isOn('positive_marks')) {
+    const v = val('[data-field-input="positive_marks"] input[name="positive_marks"]');
+    if (!v || isNaN(parseFloat(v))) return fail('Positive Marks must be a number.');
+    fields.positive_marks = v;
+  }
+  if (isOn('negative_marks')) {
+    const v = val('[data-field-input="negative_marks"] input[name="negative_marks"]');
+    if (!v || isNaN(parseFloat(v))) return fail('Negative Marks must be a number.');
+    fields.negative_marks = v;
+  }
+  if (isOn('result_mode')) {
+    const mode = val('[data-field-input="result_mode"] select[name="result_mode"]');
+    fields.result_mode = mode;
+    if (mode === 'delayed') {
+      const d = val('[data-field-input="result_mode"] input[name="result_delay"]');
+      if (!d || parseInt(d, 10) <= 0) return fail('Result Delay must be a positive number of minutes.');
+      fields.result_delay = d;
+    }
+  }
+  if (Object.keys(fields).length === 0) return fail('Tick "Change this field" for at least one field.');
+  return fields;
+}
+
+// Human-readable {label, value} pairs for the Review step, in the same
+// order the modal shows them.
+function _bulkDescribeFields(fields) {
+  const modalEl = document.getElementById('bulkUpdateModal');
+  const out = [];
+  if ('instructions' in fields) {
+    const v = fields.instructions.length > 90 ? fields.instructions.slice(0, 90) + '…' : fields.instructions;
+    out.push({ label: 'Instructions', value: v });
+  }
+  if ('max_attempts' in fields) out.push({ label: 'Max Attempts', value: fields.max_attempts === '' ? 'Unlimited' : fields.max_attempts });
+  if ('passing_percentage' in fields) out.push({ label: 'Passing Percentage', value: fields.passing_percentage === '' ? 'No cutoff' : fields.passing_percentage + '%' });
+  if ('duration' in fields) out.push({ label: 'Duration', value: fields.duration + ' min' });
+  if ('status' in fields) out.push({ label: 'Status', value: fields.status.charAt(0).toUpperCase() + fields.status.slice(1) });
+  if ('category_id' in fields) {
+    const catSel = modalEl.querySelector('[data-field-input="category"] select[name="category_id"]');
+    const subcatSel = modalEl.querySelector('[data-field-input="category"] select[name="subcategory_id"]');
+    const catText = catSel.options[catSel.selectedIndex] ? catSel.options[catSel.selectedIndex].textContent : '';
+    const subcatText = (fields.subcategory_id && subcatSel.options[subcatSel.selectedIndex]) ? subcatSel.options[subcatSel.selectedIndex].textContent : '';
+    out.push({ label: 'Category / Subcategory', value: subcatText ? (catText + ' › ' + subcatText) : catText });
+  }
+  if ('positive_marks' in fields) out.push({ label: 'Positive Marks', value: '+' + fields.positive_marks });
+  if ('negative_marks' in fields) out.push({ label: 'Negative Marks', value: '−' + fields.negative_marks });
+  if ('result_mode' in fields) {
+    let v = fields.result_mode.charAt(0).toUpperCase() + fields.result_mode.slice(1);
+    if (fields.result_mode === 'delayed') v += ' (' + fields.result_delay + ' min delay)';
+    out.push({ label: 'Result Mode', value: v });
+  }
+  return out;
+}
+
+// Instant client-side mirror of the two lifecycle locks the backend
+// independently re-checks (app/routes/api/v01/admin/exams.py
+// bulk_update_exams_route): a Scheduled Exam's Duration is frozen once
+// its schedule is no longer "upcoming", and a Scheduled Exam's Status is
+// never hand-set at all. Pure convenience — worst case this under/over-
+// counts and the real warnings (server-authoritative) show up in the
+// success toast anyway.
+function _bulkComputeClientWarnings(fields) {
+  const notes = [];
+  if ('duration' in fields) {
+    let n = 0;
+    selectedExams.forEach(ex => { if (ex.scheduled && ex.effectiveStatus && ex.effectiveStatus !== 'upcoming') n++; });
+    if (n > 0) notes.push(`Duration will NOT be changed for ${n} exam(s) — they're Scheduled Exams whose schedule has already started.`);
+  }
+  if ('status' in fields) {
+    let n = 0;
+    selectedExams.forEach(ex => { if (ex.scheduled) n++; });
+    if (n > 0) notes.push(`Status will NOT be changed for ${n} exam(s) — Scheduled Exams compute their status automatically.`);
+  }
+  return notes;
+}
+
+let _bulkPayload = null;
+
+function prepareBulkReview() {
+  const fields = _bulkBuildFields();
+  if (!fields) return;
+  const items = _bulkDescribeFields(fields);
+  const notes = _bulkComputeClientWarnings(fields);
+
+  let html = '<p style="color:var(--text-2);margin-bottom:.75rem;font-size:.88rem">' +
+    'You are about to update <strong>' + selectedExams.size + '</strong> exam(s) with the following change(s):</p>' +
+    '<ul class="bulk-review-list">' +
+    items.map(it => '<li><strong>' + _escHtml(it.label) + ':</strong> ' + _escHtml(it.value) + '</li>').join('') +
+    '</ul>';
+  if (notes.length) {
+    html += '<div class="sched-locked-hint bulk-review-notes">' +
+      notes.map(n => '<div><i class="fas fa-lock"></i> ' + _escHtml(n) + '</div>').join('') +
+      '</div>';
+  }
+  document.getElementById('bulkReviewBody').innerHTML = html;
+  _bulkPayload = { exam_ids: Array.from(selectedExams.keys()).map(id => parseInt(id, 10)), fields: fields };
+
+  bootstrap.Modal.getInstance(document.getElementById('bulkUpdateModal')).hide();
+  new bootstrap.Modal(document.getElementById('bulkUpdateReviewModal')).show();
+}
+
+document.getElementById('confirmBulkUpdateBtn').addEventListener('click', function () {
+  if (!_bulkPayload) return;
+  const btn = this;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+  fetch('/api/v01/admin/exams/bulk-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify(_bulkPayload),
+  })
+  .then(r => r.json().then(data => ({ ok: r.ok, data })))
+  .then(({ ok, data }) => {
+    const reviewModalEl = document.getElementById('bulkUpdateReviewModal');
+    const inst = bootstrap.Modal.getInstance(reviewModalEl);
+    if (inst) inst.hide();
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    if (ok && data.success) {
+      let sub = '';
+      if (data.warnings && data.warnings.length) {
+        const byField = {};
+        data.warnings.forEach(w => { (byField[w.field] = byField[w.field] || []).push(w); });
+        sub = Object.keys(byField).map(f => {
+          const label = f === 'duration' ? 'Duration' : (f === 'status' ? 'Status' : f);
+          return label + ' was not changed for ' + byField[f].length + ' exam(s) (already Scheduled/started).';
+        }).join(' ');
+      }
+      adminToast('Updated ' + data.updated_exam_count + ' exam(s) successfully.', 'success', sub || undefined);
+      selectedExams.clear();
+      _bulkPayload = null;
+      _syncExamSelectionUI();
+      examList.reload();
+    } else {
+      adminToast((data && data.message) || 'Bulk update failed.', 'danger');
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    adminToast('Server error. Please try again.', 'danger');
+  });
+});
+
 const examList = createAdminList({
   endpoint: '/api/v01/admin/exams',
   paginatorEl: document.getElementById('examPaginator'),
@@ -1608,6 +2130,7 @@ const examList = createAdminList({
     const modalsEl = document.getElementById('examEditModals');
     modalsEl.innerHTML = data.modals_html || '';
     _enhanceExamFormSelects(modalsEl); // freshly-rendered Edit modals for this page's rows
+    _syncExamSelectionUI(); // re-apply bulk-selection checkbox state wiped out by the innerHTML replace above
   },
 });
 examList.hydrate({ page: 1, total_pages: {{ exams_total_pages | default(1) }}, total: {{ exams_total | default(0) }}, per_page: {{ exams_per_page | default(20) }} });

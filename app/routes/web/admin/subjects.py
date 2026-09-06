@@ -20,7 +20,7 @@ from app.middleware.session_guard import require_admin_role
 from app.db.misc import get_subject_by_id, create_subject, update_subject, delete_subject, get_subjects_page
 from app.utils.datetime_service import now_utc_naive
 
-SUBJECTS_PAGE_SIZE = 20
+SUBJECTS_PAGE_SIZE = 25
 
 
 @admin_bp.route("/subjects", methods=["GET", "POST"])

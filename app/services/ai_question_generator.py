@@ -121,11 +121,27 @@ def _is_pure_text_block(content: str) -> bool:
     return text_only is not None
 
 
+def _prefer_dfrac(latex: str) -> str:
+    """
+    \\frac{a}{b} renders visibly compressed/shrunk inline (especially inside
+    normal text blocks), while \\dfrac{a}{b} forces full display-style
+    sizing — noticeably more readable for the same fraction. The AI is
+    already told to prefer \\dfrac (see _LATEX_RULES/_schema_example
+    below), but this is the deterministic guarantee: applied to every real
+    math block regardless of whether the model actually followed that
+    instruction. \\dfrac itself is left untouched — the backslash isn't
+    immediately followed by "frac" there (it's "dfrac"), so this can never
+    double-convert an already-correct block.
+    """
+    return re.sub(r'\\frac\b', r'\\dfrac', latex)
+
+
 def sanitize_latex(text: str) -> str:
     """
     Cleans LaTeX in mixed text:
     - Unwraps $\large \text{plain english}$ back to plain english
     - Keeps genuine math blocks and adds \large to them
+    - Prefers \dfrac over \frac for full display-style fraction rendering
     - Standardizes $$ and \[...\] to single $
     """
     if not text:
@@ -147,7 +163,9 @@ def sanitize_latex(text: str) -> str:
         if text_only:
             return text_only.group(1).strip()
 
-        # Otherwise it's real math — keep as LaTeX with \large
+        # Otherwise it's real math — keep as LaTeX with \large, preferring
+        # \dfrac for any fraction so it renders at full display size.
+        cleaned = _prefer_dfrac(cleaned)
         return f'$\\large {cleaned}$'
 
     text = re.sub(r'\$([^$]+)\$', normalize_block, text)
@@ -217,7 +235,7 @@ RULE 1 — PLAIN TEXT IS DEFAULT:
 RULE 2 — LaTeX ONLY for math/science symbols:
   Use $...$ ONLY for: variables, equations, fractions, Greek letters,
   units in formulas, chemical formulas, or mathematical expressions.
-  CORRECT:   "The moment of inertia is $\large I = \frac{MR^2}{2}$."
+  CORRECT:   "The moment of inertia is $\large I = \dfrac{MR^2}{2}$."
   CORRECT:   "A block of mass $\large m$ slides with velocity $\large v$."
   CORRECT:   "What is the primary function of mortar in construction?"  <- NO LaTeX needed here
   WRONG:     "$\large \text{What is the primary function of mortar?}$"  <- NEVER do this
@@ -226,10 +244,16 @@ RULE 3 — \text{} is FORBIDDEN:
   NEVER use \text{} inside dollar signs. Plain English goes outside $...$.
 
 RULE 4 — Every LaTeX block needs \large:
-  CORRECT: $\large \frac{a}{b}$     WRONG: $\frac{a}{b}$
+  CORRECT: $\large \dfrac{a}{b}$     WRONG: $\frac{a}{b}$
 
 RULE 5 — Zero-math questions use ZERO LaTeX.
   If a question has no math/symbols, write it in 100% plain text.
+
+RULE 6 — Fractions ALWAYS use \dfrac, never \frac:
+  \frac renders visibly compressed/shrunk inline. \dfrac keeps it at full,
+  readable display size — always use \dfrac for every fraction.
+  CORRECT: $\large P = \dfrac{3\pi^2 EI}{(l)^2}$
+  WRONG:   $\large P = \frac{3\pi^2 EI}{(l)^2}$
 """
 
 _OUTPUT_RULES = r"""
@@ -304,10 +328,10 @@ def _schema_example(exam_id: int) -> str:
         '  {\n'
         f'    "exam_id": {exam_id},\n'
         '    "question_text": "A block of mass $\\large m$ slides with velocity $\\large v$ on a frictionless surface. Its kinetic energy is:",\n'
-        '    "option_a": "$\\large \\frac{1}{2}mv^2$",\n'
+        '    "option_a": "$\\large \\dfrac{1}{2}mv^2$",\n'
         '    "option_b": "$\\large mv^2$",\n'
         '    "option_c": "$\\large 2mv^2$",\n'
-        '    "option_d": "$\\large \\frac{mv^2}{4}$",\n'
+        '    "option_d": "$\\large \\dfrac{mv^2}{4}$",\n'
         '    "correct_answer": "A",\n'
         '    "question_type": "MCQ",\n'
         '    "positive_marks": 4.0,\n'

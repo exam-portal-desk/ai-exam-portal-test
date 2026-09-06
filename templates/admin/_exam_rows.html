@@ -6,7 +6,8 @@
    an exam row/card/modal looks like. #}
 
 {% macro render_exam_row(exam) %}
-<tr>
+<tr data-id="{{ exam.id }}" data-name="{{ exam.name }}" data-scheduled="{{ '1' if exam.scheduled_mode else '0' }}" data-effective-status="{{ exam.effective_status or exam.status }}">
+  <td><input type="checkbox" class="row-checkbox enhanced-checkbox" data-id="{{ exam.id }}" onchange="toggleExamSelect(this)" title="Select for bulk update"></td>
   <td><span class="exam-id-badge">{{ exam.row_no if exam.row_no is not none else exam.id }}</span></td>
   <td><div class="exam-name-text">{{ exam.name }}</div></td>
   <td>
@@ -90,9 +91,12 @@
 {% endmacro %}
 
 {% macro render_exam_card(exam) %}
-<div class="exam-grid-item">
+<div class="exam-grid-item" data-id="{{ exam.id }}" data-name="{{ exam.name }}" data-scheduled="{{ '1' if exam.scheduled_mode else '0' }}" data-effective-status="{{ exam.effective_status or exam.status }}">
   <div class="egi-top">
-    <span class="exam-id-badge">{{ exam.row_no if exam.row_no is not none else exam.id }}</span>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <input type="checkbox" class="row-checkbox enhanced-checkbox" data-id="{{ exam.id }}" onchange="toggleExamSelect(this)" title="Select for bulk update">
+      <span class="exam-id-badge">{{ exam.row_no if exam.row_no is not none else exam.id }}</span>
+    </div>
     <span class="status-badge status-{{ exam.effective_status or exam.status }}">{{ exam.effective_status or exam.status }}</span>
   </div>
   <div class="egi-name">{{ exam.name }}{% if exam.scheduled_mode %}<span class="sched-pill" title="Scheduled Exam — status is computed automatically"><i class="fas fa-clock"></i> Scheduled</span>{% endif %}</div>

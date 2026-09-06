@@ -4,7 +4,7 @@ All PostgreSQL queries related to the `exams` table.
 """
 
 from typing import Optional, List, Dict
-from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
+from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning, transaction
 from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
 
 
@@ -120,6 +120,29 @@ def get_exams_by_ids_full(exam_ids: List[int]) -> Dict[str, Dict]:
     except Exception as e:
         print(f"[db.exams] get_exams_by_ids_full error: {e}")
         return {}
+
+
+def bulk_update_exam_fields(ops: List[Dict]) -> int:
+    """Apply a batch of independent column updates inside ONE transaction —
+    one UPDATE per distinct field-group an admin ticked in the Bulk Update
+    panel (not per exam selected), so query count scales with fields
+    changed (bounded, ~10 max) regardless of whether 5 or 500 exams were
+    selected. Each op is {"sql": "col1=%s[, col2=%s]", "params": [...],
+    "ids": [exam ids this particular op applies to]} — callers already
+    split out per-field eligibility (e.g. a locked scheduled exam skipping
+    the Duration op) before building this list. All-or-nothing: any
+    failure rolls back every op already applied in this same call, so a
+    bulk update can never partially land."""
+    if not ops:
+        return 0
+    total = 0
+    with transaction() as cur:
+        for op in ops:
+            if not op["ids"]:
+                continue
+            cur.execute(f"UPDATE exams SET {op['sql']} WHERE id = ANY(%s)", op["params"] + [op["ids"]])
+            total += cur.rowcount
+    return total
 
 
 def _sync_category_from_subcategory(data: Dict) -> Dict:

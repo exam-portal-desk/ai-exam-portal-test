@@ -406,7 +406,9 @@ $$\\Large
 ...
 \\end{{aligned}}
 $$
-6. Keep equations large and readable, with clean spacing, on both desktop and mobile.
+6. Keep equations large and readable, with clean spacing, on both desktop and mobile. For every \
+fraction, use \\dfrac{{numerator}}{{denominator}} — never \\frac{{...}}{{...}} — since \\frac renders \
+visibly compressed/shrunk inline while \\dfrac keeps it at full, readable display size.
 7. For chemistry, use mhchem syntax and ALWAYS wrap it in math delimiters — never write \\ce{{...}} \
 outside $...$ or $$...$$:
    - Formulas: $\\ce{{H2O}}$, $\\ce{{CO2}}$

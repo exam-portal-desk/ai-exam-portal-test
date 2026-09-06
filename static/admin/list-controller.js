@@ -32,6 +32,12 @@
     } = opts;
 
     let currentPage = 1;
+    // Bumped on every load() call and captured per in-flight request — if a
+    // later request's response comes back before an earlier, slower one
+    // (e.g. fast-typing search racing a slower first keystroke's query),
+    // the stale response is dropped instead of overwriting what the admin
+    // is now actually looking at.
+    let requestSeq = 0;
 
     function buildParams(page) {
       const params = new URLSearchParams();
@@ -83,8 +89,10 @@
     async function load(page) {
       currentPage = page || 1;
       const params = buildParams(currentPage);
+      const mySeq = ++requestSeq;
       const res = await fetch(`${endpoint}?${params.toString()}`);
       const data = await res.json();
+      if (mySeq !== requestSeq) return data; // stale — a newer load() superseded this one
       onData(data);
       renderPaginator(data);
       return data;
