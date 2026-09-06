@@ -32,8 +32,10 @@ from flask import (
 
 from app.middleware.session_guard import require_user_role
 from app.db.exams import get_exam_by_id
-from app.db.questions import get_questions_by_exam
+from app.db.questions import get_questions_by_exam, get_question_type_summary_for_exam
 from app.db.results import get_result_by_attempt_id
+from app.utils.instructions_formatter import instructions_is_blank
+from app.utils.helpers import safe_int
 from app.db.attempts import (
     get_active_attempt, get_attempt_by_id,
     claim_attempt_for_finalization, update_attempt_answers_draft,
@@ -78,6 +80,13 @@ def _purge_exam_session(exam_id: int) -> None:
     # fresh data and cannot inherit the previous attempt's exam_data block.
     session.pop(f"exam_data_{exam_id}", None)
 
+    # Instructions-page acknowledgement (see acknowledge_instructions() in
+    # app/routes/api/v01/exams.py) is per-attempt, not permanent — clearing
+    # it here means a student starting a NEW attempt on a multi-attempt
+    # exam must tick the acknowledgement again, same as they did the first
+    # time, rather than it silently persisting from a previous attempt.
+    session.pop(f"ack_instructions_{exam_id}", None)
+
     # Also delegate to the service layer so any in-memory cache entry
     # tied to this session is evicted.
     purge_exam_session_cache(exam_id)
@@ -88,6 +97,94 @@ def _purge_exam_session(exam_id: int) -> None:
 # ─────────────────────────────────────────────
 # Instructions
 # ─────────────────────────────────────────────
+
+# Presentation-only metadata for the three question types this app's
+# scoring engine actually understands (app/services/exam_service.py
+# check_answer()) — labels/descriptions are fixed text describing *how the
+# exam UI behaves for that type*, never exam-specific data. Which of these
+# actually appear on a given exam's Instructions page, and their counts/
+# marks, comes entirely from that exam's real questions (see
+# _build_question_type_breakdown below) — a type absent from the exam is
+# simply never included.
+_QUESTION_TYPE_META = {
+    "MCQ":     {"order": 0, "label": "MCQ",       "short": "Multiple Choice",
+                "description": "Select the one correct option."},
+    "MSQ":     {"order": 1, "label": "MSQ",       "short": "Multiple Select",
+                "description": "Select all options that apply — every correct option must be chosen, with no incorrect ones, to receive credit."},
+    "NUMERIC": {"order": 2, "label": "Numerical", "short": "Numerical Answer",
+                "description": "Enter the numerical value that answers the question."},
+}
+
+
+def _build_question_type_breakdown(exam_id: int) -> list:
+    """Turns the raw per-type aggregate (get_question_type_summary_for_exam)
+    into ready-to-render rows for the Instructions page's Question
+    Structure / Marking Scheme sections — only the types actually present
+    in THIS exam, each with its real question count and its real
+    configured positive-marks value (a single number in the normal case; a
+    "min–max" range in the rare case a type's questions don't all share the
+    same positive_marks). Ordered MCQ -> MSQ -> Numerical -> anything else
+    alphabetically, so the page reads consistently across exams."""
+    rows = get_question_type_summary_for_exam(exam_id)
+    out = []
+    for r in rows:
+        qtype = str(r.get("question_type") or "MCQ").upper()
+        count = int(r.get("count") or 0)
+        if count <= 0:
+            continue
+        meta = _QUESTION_TYPE_META.get(qtype, {"order": 99, "label": qtype.title(), "short": qtype.title(), "description": ""})
+        min_pos = r.get("min_positive")
+        max_pos = r.get("max_positive")
+        if min_pos is None:
+            marks_display = "—"
+        elif float(min_pos) == float(max_pos or min_pos):
+            marks_display = f"+{min_pos:g}"
+        else:
+            marks_display = f"+{min_pos:g} to +{max_pos:g}"
+        out.append({
+            "type": qtype,
+            "label": meta["label"],
+            "short": meta["short"],
+            "description": meta["description"],
+            "count": count,
+            "positive_marks_display": marks_display,
+            "order": meta["order"],
+        })
+    out.sort(key=lambda x: (x["order"], x["label"]))
+    return out
+
+
+def _build_general_instructions(exam: dict, is_scheduled: bool) -> list:
+    """The "General Instructions" section's items — platform behavior
+    facts, not exam-specific data, but built in Python (not hardcoded in
+    the template) so the one item that genuinely varies per exam
+    (voluntary/manual submission) always matches this exam's actual
+    is_manual_submission_allowed() rule instead of a static blanket
+    statement that could contradict it for a Scheduled Exam with manual
+    submission turned off."""
+    items = [
+        {"icon": "fa-lock", "title": "Secure Exam Window",
+         "text": "The exam opens in its own dedicated window. Do not minimize it or navigate away once it has started."},
+        {"icon": "fa-ban", "title": "No Refresh or Close",
+         "text": "Do not refresh or close the exam window while the exam is in progress — doing so does not stop the timer."},
+        {"icon": "fa-stopwatch", "title": "Timer",
+         "text": "The exam automatically submits the moment the timer reaches zero, whether or not you have finished."},
+        {"icon": "fa-list-check", "title": "Navigation",
+         "text": "Use the question palette to move freely between questions in any order."},
+        {"icon": "fa-flag", "title": "Mark for Review",
+         "text": "Use “Mark for Review” on any question you want to revisit before submitting."},
+    ]
+    if is_manual_submission_allowed(exam):
+        items.append({"icon": "fa-paper-plane", "title": "Submission",
+                      "text": "Review your answers using the question palette, then submit manually whenever you're ready — or the exam auto-submits when time runs out."})
+    else:
+        items.append({"icon": "fa-paper-plane", "title": "Submission",
+                      "text": "Manual submission is disabled for this exam. It will submit automatically once the exam's official time ends."})
+    if is_scheduled:
+        items.append({"icon": "fa-calendar-check", "title": "Scheduled Exam",
+                      "text": "This is a Scheduled Exam — it opens at its scheduled time in a dedicated fullscreen window for its full duration."})
+    return items
+
 
 def _exam_action_context(exam_id):
     """Shared context-building for exam_instructions() and exam_kiosk() —
@@ -119,6 +216,33 @@ def _exam_action_context(exam_id):
     # never reads this flag).
     prep_already_started = bool(state["is_scheduled"] and get_cached_exam_data(exam_id))
 
+    # Dynamic, per-exam question-type breakdown (Question Structure /
+    # Marking Scheme sections on the Instructions page) — one aggregate
+    # query, only the types genuinely present in this exam. The actual
+    # question count is the sum of these real counts, not exams.total_
+    # questions (an admin-configured target that can drift from what's
+    # actually been added — see get_exams_for_selector()'s docstring for
+    # the same reasoning applied elsewhere).
+    question_types = _build_question_type_breakdown(exam_id)
+    actual_question_count = sum(t["count"] for t in question_types)
+
+    # Pre-formatted display strings (same convention as date_display
+    # elsewhere in this app) so the template does formatting-free, purely
+    # structural rendering — one place decides what "no cutoff" / "no
+    # negative marking" / "unlimited attempts" actually look like.
+    neg_val = float(exam.get("negative_marks") or 0)
+    negative_marks_display = f"−{neg_val:g}" if neg_val > 0 else "0"
+
+    result_mode = str(exam.get("result_mode") or "instant").lower()
+    if result_mode == "delayed":
+        result_mode_display = f"Delayed — visible {safe_int(exam.get('result_delay'), 0)} min after submission"
+    elif result_mode == "manual":
+        result_mode_display = "Released by the admin after review"
+    else:
+        result_mode_display = "Instant — visible immediately after submission"
+
+    max_attempts_display = "Unlimited" if not state["max_attempts"] else str(state["max_attempts"])
+
     return {
         "exam": exam,
         "active_attempt": state["active_attempt"],
@@ -133,6 +257,13 @@ def _exam_action_context(exam_id):
         "prep_open": state["prep_open"],
         "effective_status": state["effective_status"],
         "prep_already_started": prep_already_started,
+        "question_types": question_types,
+        "actual_question_count": actual_question_count,
+        "instructions_blank": instructions_is_blank(exam.get("instructions")),
+        "negative_marks_display": negative_marks_display,
+        "result_mode_display": result_mode_display,
+        "max_attempts_display": max_attempts_display,
+        "general_instructions": _build_general_instructions(exam, state["is_scheduled"]),
     }
 
 

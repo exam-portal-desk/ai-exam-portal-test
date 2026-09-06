@@ -36,6 +36,33 @@ def get_questions_by_type_counts() -> Dict[str, int]:
         return {}
 
 
+def get_question_type_summary_for_exam(exam_id: int) -> List[Dict]:
+    """Per-question-type aggregate for ONE exam — question count plus the
+    min/max positive_marks actually configured for that type — as a single
+    GROUP BY query, never a full row fetch. Used by the Exam Instructions
+    page so its Question Structure / Marking Scheme sections show only the
+    question types genuinely present in this exam, with their real counts
+    and marks, instead of a generic MCQ/MSQ/Numeric list. min==max in the
+    common case (an admin sets marks per-type in bulk); a real spread just
+    means the two differ and the caller can render it as a range.
+
+    negative_marks is deliberately NOT aggregated here: scoring
+    (finalize_exam_attempt in app/services/exam_service.py) applies a
+    single exam-wide exams.negative_marks value to every question
+    regardless of type, so a per-type negative-marks breakdown would
+    misrepresent how this exam actually gets scored."""
+    try:
+        return fetch_all(
+            "SELECT question_type, COUNT(*) AS count, "
+            "MIN(positive_marks) AS min_positive, MAX(positive_marks) AS max_positive "
+            "FROM questions WHERE exam_id=%s GROUP BY question_type",
+            (exam_id,),
+        )
+    except Exception as e:
+        print(f"[db.questions] get_question_type_summary_for_exam error: {e}")
+        return []
+
+
 def get_top_exams_by_question_count(limit: int = 5) -> List[Dict]:
     """Exams with the most questions (top N) — one aggregate JOIN query,
     for the dashboard's Exams by Question Count chart."""

@@ -72,6 +72,30 @@ def start_exam(exam_id):
             "attempt_id":   active["id"],
         })
 
+    # ── SECURITY: instructions acknowledgement gate (fresh-start only) ──────
+    # A resume (handled above) never re-enters here — a student who already
+    # legitimately started this attempt doesn't need to re-acknowledge to
+    # keep going. Starting a genuinely NEW attempt does: the Instructions
+    # page (templates/exam_instructions.html) disables its Start/Prepare
+    # button until the acknowledgement checkbox is ticked, and — since a
+    # disabled frontend button is a UI convenience only, never real
+    # enforcement — independently re-checks that here before a new attempt
+    # can be created. Two ways this can be satisfied, covering both exam
+    # flows that end up at this endpoint:
+    #   - Manual Exam: the Instructions page itself calls /start directly
+    #     and sends {"acknowledged": true} straight in this request body.
+    #   - Scheduled Exam: the Instructions page calls acknowledge_instructions()
+    #     below (setting the session flag) BEFORE opening the Kiosk window,
+    #     which is what actually calls /start — so the flag is already set
+    #     by the time this runs, and the Kiosk itself needed no changes.
+    body = request.get_json(silent=True) or {}
+    acknowledged = bool(body.get("acknowledged")) or bool(session.get(f"ack_instructions_{exam_id}"))
+    if not acknowledged:
+        return jsonify({
+            "success": False,
+            "message": "Please confirm you have read and understood the exam instructions before starting.",
+        }), 400
+
     # ── SECURITY: authoritative time-window gate (fresh-start only) ─────────
     # Resuming an existing in-progress attempt (handled above) is always
     # allowed — it was legitimately created while the window was open.
@@ -210,6 +234,32 @@ def start_exam(exam_id):
         "attempt_number": next_att_num,
         "fresh_start":    True,
     })
+
+
+# ─────────────────────────────────────────────
+# Instructions acknowledgement
+# ─────────────────────────────────────────────
+
+@exam_api_bp.route("/<int:exam_id>/acknowledge-instructions", methods=["POST"])
+@require_user_role
+def acknowledge_instructions(exam_id):
+    """Records, server-side, that this student ticked the "I have read and
+    understood the instructions" checkbox on the Instructions page for this
+    exam — the one thing start_exam() actually requires before creating a
+    fresh attempt (see the acknowledgement gate there). A Scheduled Exam's
+    Start/Prepare button calls this BEFORE opening the Kiosk window (which
+    is what calls /start), since the two are separate windows/page loads
+    sharing the same session cookie; a Manual Exam doesn't need this call
+    at all — it sends {"acknowledged": true} directly in its own /start
+    request instead. Cleared by _purge_exam_session() (see
+    app/routes/web/exams.py) on submit/fresh-start, so a later attempt on a
+    multi-attempt exam requires acknowledging again."""
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return jsonify({"success": False, "message": "Exam not found."}), 404
+    session[f"ack_instructions_{exam_id}"] = True
+    session.modified = True
+    return jsonify({"success": True})
 
 
 # ─────────────────────────────────────────────
