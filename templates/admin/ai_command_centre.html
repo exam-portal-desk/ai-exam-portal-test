@@ -68,13 +68,25 @@ textarea.form-control { resize:vertical; }
 .batch-row-icon.failed  { background:var(--danger-bg); color:var(--danger-text); border:1px solid var(--danger-border); }
 .batch-row-icon.retried { background:var(--warning-bg); color:var(--warning-text); border:1px solid var(--warning-border); }
 .batch-row-label { color:var(--text-2); flex:1; text-align:left; }
-.batch-row-detail { color:var(--text-3); font-size:.68rem; }
+.batch-row-detail { color:var(--text-3); font-size:.68rem; max-width:55%; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:default; }
 
 /* ── Terminal result panel (partial/failed) ── */
 #genResultPanel { display:none; }
 #genResultPanel.show { display:block; }
 .result-summary { font-size:.83rem; color:var(--text-2); margin:.25rem 0 .9rem; line-height:1.6; }
 .result-summary strong { color:var(--text-1); }
+/* The specific, root-cause detail (e.g. "First rejection reason: AI
+   returned an empty result") — previously buried as small grey subtext
+   under the generic bucketed message; now its own highlighted callout so
+   an admin can immediately see WHY, not just that something failed. */
+.result-reason-box {
+  display:flex; align-items:flex-start; gap:.55rem; text-align:left;
+  background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger-text);
+  border-radius:var(--radius); padding:.65rem .85rem; margin:.6rem 0 0;
+  font-size:.78rem; font-weight:600; line-height:1.55;
+}
+.result-reason-box i { margin-top:.15rem; flex-shrink:0; }
+.result-reason-label { display:block; text-transform:uppercase; font-size:.64rem; font-weight:700; letter-spacing:.05em; opacity:.8; margin-bottom:.15rem; }
 .result-actions { display:flex; gap:.55rem; flex-wrap:wrap; justify-content:center; margin-top:1rem; }
 .orbital-ring { position:relative; width:72px; height:72px; margin:0 auto 1.5rem; }
 .orbit { position:absolute; inset:0; border-radius:50%; border:2px solid transparent; }
@@ -592,25 +604,25 @@ window.MathJax = {
             <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label" style="color:var(--success-text)">MCQ: Positive Marks</label>
-                <input type="number" name="mcq_plus" class="form-control" value="4" step="0.5">
+                <input type="number" name="mcq_plus" class="form-control" value="4" step="any">
               </div>
               <div class="col-md-4">
                 <label class="form-label" style="color:var(--danger-text)">MCQ: Negative Marks</label>
-                <input type="number" name="mcq_minus" class="form-control" value="1" step="0.5">
+                <input type="number" name="mcq_minus" class="form-control" value="1" step="any">
               </div>
-              
+
               <div class="col-md-4">
                 <label class="form-label" style="color:var(--success-text)">MSQ: Positive Marks</label>
-                <input type="number" name="msq_plus" class="form-control" value="4" step="0.5">
+                <input type="number" name="msq_plus" class="form-control" value="4" step="any">
               </div>
               <div class="col-md-4">
                 <label class="form-label" style="color:var(--danger-text)">MSQ: Negative Marks</label>
-                <input type="number" name="msq_minus" class="form-control" value="2" step="0.5">
+                <input type="number" name="msq_minus" class="form-control" value="2" step="any">
               </div>
-              
+
               <div class="col-md-4">
                 <label class="form-label" style="color:var(--success-text)">NUMERIC: Positive Marks</label>
-                <input type="number" name="numeric_plus" class="form-control" value="3" step="0.5">
+                <input type="number" name="numeric_plus" class="form-control" value="3" step="any">
               </div>
               <div class="col-md-4">
                 <label class="form-label">NUMERIC: Tolerance</label>
@@ -1040,15 +1052,21 @@ function _renderBatchList(batches) {
   el.classList.add('show');
   el.innerHTML = batches.map(b => {
     const icon = _BATCH_ICONS[b.status] || 'fa-circle';
-    let detail = '';
+    let detail = '', fullDetail = '';
     if (b.status === 'done') detail = `${b.count || 0} question${b.count === 1 ? '' : 's'}`;
-    else if (b.status === 'failed') detail = (b.error_friendly || b.error || 'failed').substring(0, 60);
+    else if (b.status === 'failed') {
+      fullDetail = b.error_friendly || b.error || 'failed';
+      detail = fullDetail;
+    }
     else if (b.status === 'retried') detail = 'retrying…';
     else if (b.status === 'running') detail = 'in progress…';
+    // title= gives the full, untruncated reason on hover — the row itself
+    // stays single-line/compact (CSS ellipsis) since a batch list can have
+    // many rows, but nothing is lost, just not all shown inline.
     return `<div class="batch-row">
       <div class="batch-row-icon ${b.status}"><i class="fas ${icon}"></i></div>
       <div class="batch-row-label">Batch ${b.n}</div>
-      <div class="batch-row-detail">${_escHtml(detail)}</div>
+      <div class="batch-row-detail"${fullDetail ? ` title="${_escHtml(fullDetail)}"` : ''}>${_escHtml(detail)}</div>
     </div>`;
   }).join('');
 }
@@ -1083,7 +1101,15 @@ function _showTerminalPanel(job, jobId) {
     title.textContent = 'Generation Failed';
     sub.textContent = '';
     const friendly = job.error_friendly || _friendlyForType(job.error_type) || job.error || 'No questions could be generated.';
-    summary.innerHTML = `<strong>${_escHtml(friendly)}</strong>` + (job.error ? `<br><span style="font-size:.72rem;color:var(--text-3)">${_escHtml(job.error)}</span>` : '');
+    // job.error is the specific, unclassified root cause (e.g. "First
+    // rejection reason: AI returned an empty result") — shown as its own
+    // highlighted callout, not buried as small grey subtext, so the exact
+    // cause is impossible to miss. Only shown when it says something the
+    // bucketed "friendly" message above it doesn't already say.
+    const rawReason = (job.error && job.error !== friendly) ? job.error : '';
+    summary.innerHTML = `<strong>${_escHtml(friendly)}</strong>`
+      + (rawReason ? `<div class="result-reason-box"><i class="fas fa-triangle-exclamation"></i>`
+          + `<div><span class="result-reason-label">Specific reason</span>${_escHtml(rawReason)}</div></div>` : '');
   }
 
   let btns = '';

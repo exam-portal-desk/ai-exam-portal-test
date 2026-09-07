@@ -20,7 +20,9 @@ from app.db.subcategories import get_subcategory_by_id
 from app.db import fetch_all, execute
 from app.utils.datetime_service import format_calendar_date
 from app.utils.instructions_formatter import render_exam_instructions
-from app.utils.helpers import parse_max_attempts, parse_passing_percentage, parse_instructions_field
+from app.utils.helpers import (
+    parse_max_attempts, parse_passing_percentage, parse_instructions_field, parse_exam_date,
+)
 from app.services.exam_service import get_effective_status
 
 _ROWS_TPL = (
@@ -135,7 +137,7 @@ def cancel_scheduled_exam(exam_id):
 
 _BULK_ALLOWED_FIELDS = {
     "instructions", "max_attempts", "result_mode", "result_delay",
-    "passing_percentage", "duration", "status",
+    "passing_percentage", "date", "duration", "status",
     "category_id", "subcategory_id", "positive_marks", "negative_marks",
 }
 
@@ -151,14 +153,16 @@ def bulk_update_exams_route():
 
     Every value is re-validated with the exact same parsers/rules
     edit_exam() uses for a single exam (app/routes/web/admin/exams.py), and
-    the same two lifecycle locks apply per exam: a Scheduled Exam's status
-    is never hand-set (mirrors edit_exam() never taking status from the
-    form when scheduled_mode is true), and a Scheduled Exam's Duration is
+    the same lifecycle locks apply per exam: a Scheduled Exam's status is
+    never hand-set (mirrors edit_exam() never taking status from the form
+    when scheduled_mode is true), and a Scheduled Exam's Date/Duration are
     frozen once it's no longer Upcoming (mirrors edit_exam()'s
-    timing_changed guard). An exam ineligible for one of those two fields
-    is skipped for that field only (reported back as a warning) — every
-    other requested field still applies to it, and every other exam in the
-    batch is unaffected.
+    timing_changed guard — Date and Duration share the exact same
+    eligibility check here since they're both "schedule" fields locked
+    together). An exam ineligible for one of those fields is skipped for
+    that field only (reported back as a warning) — every other requested
+    field still applies to it, and every other exam in the batch is
+    unaffected.
 
     Writes go through bulk_update_exam_fields(): one UPDATE per distinct
     field group requested (not per exam), all inside one transaction, so
@@ -197,6 +201,8 @@ def bulk_update_exams_route():
             parsed["max_attempts"] = parse_max_attempts(fields.get("max_attempts"))
         if "passing_percentage" in fields:
             parsed["passing_percentage"] = parse_passing_percentage(fields.get("passing_percentage"))
+        if "date" in fields:
+            parsed["date"] = parse_exam_date(fields.get("date"))
         if "duration" in fields:
             dur = int(fields.get("duration") or 0)
             if dur <= 0:
@@ -249,18 +255,27 @@ def bulk_update_exams_route():
         return jsonify({"success": False, "message": str(e)}), 400
 
     warnings = []
-    duration_ids, status_ids = [], []
+    date_ids, duration_ids, status_ids = [], [], []
     for exam in exam_rows:
         is_scheduled = bool(exam.get("scheduled_mode"))
-        if "duration" in parsed:
+        # Date and Duration are both "schedule" fields — a Scheduled Exam
+        # locks them together the instant it's no longer Upcoming (mirrors
+        # edit_exam()'s timing_changed guard), so they share one check.
+        if "date" in parsed or "duration" in parsed:
             eff = get_effective_status(exam)
-            if is_scheduled and eff != "upcoming":
-                warnings.append({
-                    "exam_id": exam["id"], "exam_name": exam["name"], "field": "duration",
-                    "reason": f"This scheduled exam is already {eff} — its schedule can no longer be changed.",
-                })
+            locked = is_scheduled and eff != "upcoming"
+            if locked:
+                for field in ("date", "duration"):
+                    if field in parsed:
+                        warnings.append({
+                            "exam_id": exam["id"], "exam_name": exam["name"], "field": field,
+                            "reason": f"This scheduled exam is already {eff} — its schedule can no longer be changed.",
+                        })
             else:
-                duration_ids.append(exam["id"])
+                if "date" in parsed:
+                    date_ids.append(exam["id"])
+                if "duration" in parsed:
+                    duration_ids.append(exam["id"])
         if "status" in parsed:
             if is_scheduled:
                 warnings.append({
@@ -293,6 +308,8 @@ def bulk_update_exams_route():
         add_op({"result_mode": parsed["result_mode"], "result_delay": parsed["result_delay"]}, all_ids)
     if "category_id" in parsed:
         add_op({"category_id": parsed["category_id"], "subcategory_id": parsed.get("subcategory_id")}, all_ids)
+    if "date" in parsed:
+        add_op({"date": parsed["date"]}, date_ids)
     if "duration" in parsed:
         add_op({"duration": parsed["duration"]}, duration_ids)
     if "status" in parsed:

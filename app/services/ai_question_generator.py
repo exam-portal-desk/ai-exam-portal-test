@@ -292,6 +292,28 @@ def _count_line(config: Dict) -> str:
     )
 
 
+# Direct Extraction only (see the two call sites in extract_from_pdf) — an
+# additive safety net for the batch combination that produces the "AI's
+# output didn't contain any question that passed validation ... AI returned
+# an empty result" failure: a strict "extract EXACTLY as written" +
+# "ABSOLUTE DUPLICATE BAN" prompt gives the model no explicit permission to
+# return fewer than the requested count when the remaining, non-banned
+# portion of the PDF genuinely has less left to extract than was asked for
+# — observed behavior in that case is an all-or-nothing empty array rather
+# than the partial-but-real questions it could have returned. This never
+# changes output when the model CAN meet the exact count (the normal,
+# working case) — it only gives it an explicit, honest way out instead of
+# giving up entirely.
+_EXTRACTION_PARTIAL_RESULT_RULE = (
+    "\nIf the PDF (excluding anything already banned above) genuinely contains "
+    "FEWER remaining questions than the count requested, extract every remaining "
+    "one you can find instead of returning nothing — return a SHORTER JSON array, "
+    "never an empty array, as long as at least one real, non-banned question is "
+    "still present in the PDF. Only return an empty array if truly nothing "
+    "unbanned remains to extract."
+)
+
+
 def _exclude_block(config: Dict) -> str:
     """Prompt block listing already-generated question stubs to prevent duplicates."""
     texts = config.get("excluded_texts", [])
@@ -714,7 +736,7 @@ class AIQuestionGenerator:
                     f"{_config_block(batch_config)}\n\n"
                     f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
                     f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_exclude_block(batch_config)}"
-                    f"{sequential_instruction}\n{_count_line(batch_config)}"
+                    f"{sequential_instruction}\n{_count_line(batch_config)}\n{_EXTRACTION_PARTIAL_RESULT_RULE}"
                 )
                 if is_vision:
                     raw = (self._generate_vision_with_uri(file_uri, prompt)
@@ -728,7 +750,7 @@ class AIQuestionGenerator:
                         f"{_config_block(batch_config)}\n\n"
                         f"Return ONLY a valid JSON array. Example schema:\n{_schema_example(batch_config['exam_id'])}\n\n"
                         f"{_LATEX_RULES}\n{_OUTPUT_RULES}\n{_exclude_block(batch_config)}"
-                        f"{sequential_instruction}\n{_count_line(batch_config)}"
+                        f"{sequential_instruction}\n{_count_line(batch_config)}\n{_EXTRACTION_PARTIAL_RESULT_RULE}"
                     )
                     raw = self.generate_text(full_prompt)
                 batch_result = self._parse_and_validate(raw, batch_config)

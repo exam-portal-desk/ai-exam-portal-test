@@ -807,6 +807,21 @@
               </div>
             </div>
           </div>
+          <!-- Date -->
+          <div class="col-md-6">
+            <div class="bulk-field-row">
+              <label class="bulk-field-toggle">
+                <input type="checkbox" class="enhanced-checkbox bulk-chk" data-field="date" onchange="bulkFieldToggle(this)">
+                <span>Exam Date <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(locked for started Scheduled Exams)</span></span>
+              </label>
+              <div class="bulk-field-input" data-field-input="date">
+                <div class="dt-field">
+                  <input type="text" class="form-control dt-date-input" name="date" placeholder="Select date" readonly autocomplete="off" disabled>
+                  <i class="fas fa-calendar-days dt-field-icon"></i>
+                </div>
+              </div>
+            </div>
+          </div>
           <!-- Duration -->
           <div class="col-md-6">
             <div class="bulk-field-row">
@@ -1911,6 +1926,8 @@ function openBulkUpdateModal() {
   // the modal opens, so a previous bulk update's picks never leak into a
   // new one.
   modalEl.querySelectorAll('.bulk-chk').forEach(cb => { cb.checked = false; bulkFieldToggle(cb); });
+  const dateInput = modalEl.querySelector('[data-field-input="date"] .dt-date-input');
+  if (dateInput) { dateInput.value = ''; delete dateInput.dataset.iso; }
   document.getElementById('bulkUpdateCount').textContent = selectedExams.size;
   new bootstrap.Modal(modalEl).show();
 }
@@ -1951,6 +1968,17 @@ function _bulkBuildFields() {
       if (isNaN(n) || n < 0 || n > 100) return fail('Passing Percentage must be between 0 and 100, or blank for no cutoff.');
     }
     fields.passing_percentage = v;
+  }
+  if (isOn('date')) {
+    // The date field shows a formatted display string (DISPLAY_DATE_FORMAT)
+    // but the real ISO "YYYY-MM-DD" value the backend expects lives in
+    // data-iso (written by the calendar picker's selectDay(), same as the
+    // Add/Edit Exam forms) — read that directly rather than .value, since
+    // this modal has no native form submit to do that swap for us.
+    const dateEl = modalEl.querySelector('[data-field-input="date"] .dt-date-input');
+    const iso = dateEl ? dateEl.dataset.iso : '';
+    if (!iso) return fail('Select a date.');
+    fields.date = iso;
   }
   if (isOn('duration')) {
     const v = val('[data-field-input="duration"] input[name="duration"]');
@@ -2002,6 +2030,10 @@ function _bulkDescribeFields(fields) {
   }
   if ('max_attempts' in fields) out.push({ label: 'Max Attempts', value: fields.max_attempts === '' ? 'Unlimited' : fields.max_attempts });
   if ('passing_percentage' in fields) out.push({ label: 'Passing Percentage', value: fields.passing_percentage === '' ? 'No cutoff' : fields.passing_percentage + '%' });
+  if ('date' in fields) {
+    const dateEl = modalEl.querySelector('[data-field-input="date"] .dt-date-input');
+    out.push({ label: 'Exam Date', value: (dateEl && dateEl.value) || fields.date });
+  }
   if ('duration' in fields) out.push({ label: 'Duration', value: fields.duration + ' min' });
   if ('status' in fields) out.push({ label: 'Status', value: fields.status.charAt(0).toUpperCase() + fields.status.slice(1) });
   if ('category_id' in fields) {
@@ -2030,10 +2062,18 @@ function _bulkDescribeFields(fields) {
 // success toast anyway.
 function _bulkComputeClientWarnings(fields) {
   const notes = [];
-  if ('duration' in fields) {
+  // Date and Duration share the exact same "schedule locked" eligibility
+  // (see the matching comment in bulk_update_exams_route) — one shared
+  // count, one note per ticked field.
+  if ('date' in fields || 'duration' in fields) {
     let n = 0;
     selectedExams.forEach(ex => { if (ex.scheduled && ex.effectiveStatus && ex.effectiveStatus !== 'upcoming') n++; });
-    if (n > 0) notes.push(`Duration will NOT be changed for ${n} exam(s) — they're Scheduled Exams whose schedule has already started.`);
+    if (n > 0) {
+      const lockedFields = [];
+      if ('date' in fields) lockedFields.push('Date');
+      if ('duration' in fields) lockedFields.push('Duration');
+      notes.push(`${lockedFields.join(' and ')} will NOT be changed for ${n} exam(s) — they're Scheduled Exams whose schedule has already started.`);
+    }
   }
   if ('status' in fields) {
     let n = 0;
@@ -2091,8 +2131,9 @@ document.getElementById('confirmBulkUpdateBtn').addEventListener('click', functi
       if (data.warnings && data.warnings.length) {
         const byField = {};
         data.warnings.forEach(w => { (byField[w.field] = byField[w.field] || []).push(w); });
+        const FIELD_LABELS = { date: 'Date', duration: 'Duration', status: 'Status' };
         sub = Object.keys(byField).map(f => {
-          const label = f === 'duration' ? 'Duration' : (f === 'status' ? 'Status' : f);
+          const label = FIELD_LABELS[f] || f;
           return label + ' was not changed for ' + byField[f].length + ' exam(s) (already Scheduled/started).';
         }).join(' ');
       }
