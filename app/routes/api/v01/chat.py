@@ -44,6 +44,8 @@ import mimetypes
 
 from flask import Blueprint, request, jsonify, session
 from flask_socketio import join_room, leave_room
+from app import entitlements
+from app.entitlements.guard import gate_blueprint
 from werkzeug.utils import secure_filename
 
 import app.db.chat as chat_db
@@ -62,6 +64,7 @@ CHAT_BG_PRESETS = {
 CHAT_BG_ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 chat_api_bp = Blueprint('chat_api', __name__, url_prefix='/api/v01/chat')
+gate_blueprint(chat_api_bp, 'chat')
 socketio = None
 
 
@@ -815,10 +818,13 @@ def delete_custom_background():
 
 
 def register_chat_socketio_events(sio):
+    def may_chat(uid):
+        return bool(uid) and entitlements.has_access(int(uid), 'chat')
+
     @sio.on('connect')
     def on_connect(auth=None):
         uid = session.get('user_id')
-        if uid:
+        if may_chat(uid):
             chat_service.set_online(uid, request.sid)
             join_room(f'user_{uid}')
             sio.emit('user_online', {'user_id': uid}, skip_sid=request.sid)
@@ -839,7 +845,7 @@ def register_chat_socketio_events(sio):
     @sio.on('join_conv')
     def on_join_conv(data):
         uid = session.get('user_id')
-        if not uid:
+        if not may_chat(uid):
             return
         cid = data.get('conv_id')
         if not cid:
@@ -859,11 +865,11 @@ def register_chat_socketio_events(sio):
         cid = data.get('conv_id')
         uid = session.get('user_id')
         name = session.get('full_name') or session.get('username', '')
-        if cid and uid:
+        if cid and may_chat(uid):
             sio.emit('user_typing', {'user_id': uid, 'name': name, 'conv_id': cid}, room=f'conv_{cid}', skip_sid=request.sid)
 
     @sio.on('heartbeat')
     def on_heartbeat():
         uid = session.get('user_id')
-        if uid:
+        if may_chat(uid):
             chat_service.set_online(uid, request.sid)

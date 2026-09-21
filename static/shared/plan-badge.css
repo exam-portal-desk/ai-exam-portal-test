@@ -1,0 +1,55 @@
+/* static/shared/plan-badge.css
+   The look of a plan: FREE is dark, PRO is royal blue, ELITE is crimson, each with its own symbol. The colours are fixed on
+   purpose (not theme tokens) so a plan is recognisable on every theme; text is always white on them. Which plan a user HAS is
+   never decided here: the badge is only drawn from what app.entitlements reports (label, tone, icon). */
+
+.plan-badge {
+  --pb-a: #34343a; --pb-b: #0f0f12; --pb-ring: rgba(255, 255, 255, .18); --pb-shadow: rgba(0, 0, 0, .28);
+  --pb-icon-bg: rgba(255, 255, 255, .14); --pb-icon: #ececf0;
+  display: inline-flex; align-items: center; gap: .42rem; vertical-align: middle;
+  padding: .2rem .7rem .2rem .22rem; border: 0; border-radius: 999px;
+  background: linear-gradient(135deg, var(--pb-a), var(--pb-b)); color: #fff;
+  box-shadow: inset 0 0 0 1px var(--pb-ring), 0 1px 3px var(--pb-shadow);
+  font: inherit; font-size: .66rem; font-weight: 800; letter-spacing: .1em; line-height: 1; text-transform: uppercase; white-space: nowrap;
+  text-decoration: none; transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.plan-badge > i {
+  width: 1.55em; height: 1.55em; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--pb-icon-bg); color: var(--pb-icon); font-size: .78em;
+}
+.plan-badge[data-tone="royal"]   { --pb-a: #4263eb; --pb-b: #1b2670; --pb-ring: rgba(190, 205, 255, .38); --pb-shadow: rgba(27, 38, 112, .4); --pb-icon-bg: rgba(255, 255, 255, .16); --pb-icon: #dbe4ff; }
+.plan-badge[data-tone="crimson"] { --pb-a: #e03131; --pb-b: #7f0d0d; --pb-ring: rgba(255, 205, 205, .4);  --pb-shadow: rgba(127, 13, 13, .45); --pb-icon-bg: rgba(255, 214, 102, .22); --pb-icon: #ffd66b; }
+/* tones for a plan added later that wants a softer, theme-following look */
+.plan-badge[data-tone="neutral"] { --pb-a: var(--surface-2); --pb-b: var(--surface-2); --pb-ring: var(--border); --pb-shadow: transparent; --pb-icon-bg: var(--surface); --pb-icon: var(--text-2); color: var(--text-2); }
+.plan-badge[data-tone="info"]    { --pb-a: var(--info-bg); --pb-b: var(--info-bg); --pb-ring: var(--info-border); --pb-shadow: transparent; --pb-icon-bg: transparent; --pb-icon: var(--info-text); color: var(--info-text); }
+.plan-badge[data-tone="accent"]  { --pb-a: var(--accent-subtle); --pb-b: var(--accent-subtle); --pb-ring: var(--accent); --pb-shadow: transparent; --pb-icon-bg: transparent; --pb-icon: var(--accent); color: var(--accent); }
+.plan-badge[data-tone="success"] { --pb-a: var(--success-bg); --pb-b: var(--success-bg); --pb-ring: var(--success-border); --pb-shadow: transparent; --pb-icon-bg: transparent; --pb-icon: var(--success-text); color: var(--success-text); }
+.plan-badge[data-tone="warning"] { --pb-a: var(--warning-bg); --pb-b: var(--warning-bg); --pb-ring: var(--warning-border); --pb-shadow: transparent; --pb-icon-bg: transparent; --pb-icon: var(--warning-text); color: var(--warning-text); }
+
+.plan-badge.pb-sm { font-size: .6rem; padding: .16rem .58rem .16rem .18rem; gap: .34rem; }
+.plan-badge.pb-lg { font-size: .78rem; padding: .28rem .95rem .28rem .28rem; gap: .5rem; }
+.plan-badge.pb-xl { font-size: .95rem; padding: .36rem 1.2rem .36rem .36rem; gap: .6rem; }
+
+/* clickable badge (a <button> or <a>) */
+button.plan-badge, a.plan-badge { cursor: pointer; }
+button.plan-badge:hover, a.plan-badge:hover { transform: translateY(-1px); filter: brightness(1.1); box-shadow: inset 0 0 0 1px var(--pb-ring), 0 4px 10px var(--pb-shadow); color: #fff; }
+button.plan-badge:active, a.plan-badge:active { transform: translateY(0); filter: brightness(.96); }
+button.plan-badge:focus-visible, a.plan-badge:focus-visible { outline: 2px solid var(--border-focus, var(--accent)); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .plan-badge { transition: none; } }
+
+/* the plan hero on the profile page: the same identity, larger */
+.plan-hero {
+  --pb-a: #34343a; --pb-b: #0f0f12; --pb-icon-bg: rgba(255, 255, 255, .14); --pb-icon: #ececf0;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1.1rem 1.25rem; border-radius: calc(var(--radius) + 4px);
+  background: linear-gradient(135deg, var(--pb-a), var(--pb-b)); color: #fff; box-shadow: var(--shadow-sm);
+}
+.plan-hero[data-tone="royal"]   { --pb-a: #4263eb; --pb-b: #1b2670; --pb-icon-bg: rgba(255, 255, 255, .16); --pb-icon: #dbe4ff; }
+.plan-hero[data-tone="crimson"] { --pb-a: #e03131; --pb-b: #7f0d0d; --pb-icon-bg: rgba(255, 214, 102, .22); --pb-icon: #ffd66b; }
+.plan-hero-icon { width: 3rem; height: 3rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: var(--pb-icon-bg); color: var(--pb-icon); font-size: 1.3rem; }
+.plan-hero-name { font-size: 1.35rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; line-height: 1.1; }
+.plan-hero-sub { font-size: .78rem; opacity: .82; margin-top: .2rem; }
+
+@media (max-width: 480px) {
+  .plan-hero { padding: .9rem 1rem; gap: .75rem; }
+  .plan-hero-name { font-size: 1.15rem; }
+}

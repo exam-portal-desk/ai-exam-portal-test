@@ -1,0 +1,36 @@
+/* AI provider + model badge — ONE component for every place AI is visible (see templates/partials/_ai_badge.html).
+   Theme tokens only. Provider branding and model branding are separate parts; neither ever borrows the other's logo. */
+
+.ai-badge {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: .25rem .4rem;
+  max-width: 100%; min-width: 0; font-size: .7rem; line-height: 1.2; color: var(--text-3);
+}
+.ai-badge-label { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: .6rem; }
+
+.ai-badge-part {
+  display: inline-flex; align-items: center; gap: .3rem; min-width: 0; max-width: 100%;
+  padding: .14rem .5rem .14rem .18rem; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-1);
+}
+.ai-badge-part.no-mark { padding-left: .5rem; }
+
+.ai-badge-logo {
+  height: 18px; width: auto; max-width: 62px; object-fit: contain; flex-shrink: 0;
+  background: #fff; border-radius: 6px; padding: 2px 3px;
+}
+.ai-badge-mono {
+  height: 18px; min-width: 18px; padding: 0 3px; flex-shrink: 0; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-subtle); color: var(--accent); font-size: .58rem; font-weight: 700;
+}
+.ai-badge-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 26ch; }
+.ai-badge-sep { color: var(--text-3); }
+
+.ai-badge.is-unavailable .ai-badge-part { opacity: .6; }
+
+/* narrow screens: the two parts stack instead of overflowing */
+@media (max-width: 520px) {
+  .ai-badge { gap: .2rem; }
+  .ai-badge-sep { display: none; }
+  .ai-badge-name { max-width: 22ch; }
+}

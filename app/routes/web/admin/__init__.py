@@ -23,6 +23,7 @@ from app.routes.web.admin import (  # noqa: E402, F401
     images,
     image_mapping,
     ai_centre,
+    ai_configuration,
     categories,
     latex_editor,
     storage,

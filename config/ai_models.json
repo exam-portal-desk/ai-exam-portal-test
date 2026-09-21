@@ -1,44 +1,649 @@
 {
-  "text_models": [
-    {
-      "name": "assistant-default",
-      "provider": "groq",
-      "model": "openai/gpt-oss-120b",
-      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
-      "api_key_env": "TEXT_MODEL_ASSISTANT_API_KEY"
+  "_about": "SmartAIExam AI registry (configuration only). How to edit it: config/AI_MODELS.md",
+  "schema_version": 3,
+  "capabilities": {
+    "text": {
+      "label": "Text",
+      "icon": "fa-font",
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
     },
-    {
-      "name": "explanation-default",
-      "provider": "groq",
-      "model": "openai/gpt-oss-120b",
-      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
-      "api_key_env": "TEXT_MODEL_EXPLANATION_API_KEY"
+    "vision": {
+      "label": "Vision",
+      "icon": "fa-eye",
+      "input": [
+        "image"
+      ]
     },
-    {
-      "name": "question-generator-default",
-      "provider": "gemini",
-      "model": "gemini-2.5-flash",
-      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-      "api_key_env": "TEXT_MODEL_QUESTIONGEN_API_KEY",
-      "auth_header": "x-goog-api-key"
+    "pdf": {
+      "label": "PDF / Document",
+      "icon": "fa-file-pdf",
+      "input": [
+        "pdf"
+      ]
+    },
+    "structured_output": {
+      "label": "Structured Output",
+      "icon": "fa-code",
+      "output": [
+        "json"
+      ]
+    },
+    "embedding": {
+      "label": "Embeddings",
+      "icon": "fa-project-diagram",
+      "output": [
+        "vector"
+      ]
     }
-  ],
-  "vision_models": [
-    {
-      "name": "explanation-vision-default",
-      "provider": "groq",
-      "model": "llama-4-scout-17b-16e-instruct",
-      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
-      "api_key_env": "VISION_MODEL_EXPLANATION_API_KEY"
+  },
+  "providers": {
+    "groq": {
+      "display_name": "Groq",
+      "protocol": "openai_compatible",
+      "enabled": true,
+      "api": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "endpoint": "/chat/completions",
+        "auth": {
+          "header": "Authorization",
+          "scheme": "Bearer"
+        },
+        "key_env": "GROQ_API_KEY"
+      },
+      "ui": {
+        "logo": "/static/ai/providers/groq.svg",
+        "icon": null,
+        "color": "#f55036",
+        "website": "https://groq.com"
+      }
     },
-    {
-      "name": "question-generator-vision-default",
-      "provider": "gemini",
-      "model": "gemini-2.5-flash",
-      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-      "upload_endpoint": "https://generativelanguage.googleapis.com/upload/v1beta/files",
-      "api_key_env": "VISION_MODEL_QUESTIONGEN_API_KEY",
-      "auth_header": "x-goog-api-key"
+    "gemini": {
+      "display_name": "Google Gemini",
+      "protocol": "gemini",
+      "enabled": true,
+      "api": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "upload_url": "https://generativelanguage.googleapis.com/upload/v1beta/files",
+        "auth": {
+          "header": "x-goog-api-key",
+          "scheme": ""
+        },
+        "key_env": "GEMINI_API_KEY"
+      },
+      "ui": {
+        "logo": "/static/ai/providers/gemini.svg",
+        "icon": null,
+        "color": "#4285f4",
+        "website": "https://ai.google.dev"
+      }
     }
-  ]
+  },
+  "models": {
+    "gpt-oss-120b": {
+      "display_name": "GPT-OSS 120B",
+      "description": "Open-weight reasoning model from OpenAI.",
+      "capabilities": [
+        "text"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gpt.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-2.5-flash": {
+      "display_name": "Gemini 2.5 Flash",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "display_name": "Gemini 3.5 Flash-Lite",
+      "description": "Google's fastest, most cost-effective Gemini 3.5 model, built for high-throughput work.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-2.5-flash-lite": {
+      "display_name": "Gemini 2.5 Flash Lite",
+      "description": "Cost-efficient, high-throughput multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3-flash-preview": {
+      "display_name": "Gemini 3 Flash",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3.1-flash-lite": {
+      "display_name": "Gemini 3.1 Flash Lite",
+      "description": "Cost-efficient, high-throughput multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3.5-flash": {
+      "display_name": "Gemini 3.5 Flash",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3.6-flash": {
+      "display_name": "Gemini 3.6 Flash",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3.7-flash": {
+      "display_name": "Gemini 3.7 Flash",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemini-3.8-flash": {
+      "display_name": "Gemini 3.8 Flash",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": [
+        "text",
+        "vision",
+        "pdf",
+        "structured_output"
+      ],
+      "ui": {
+        "logo": "/static/ai/models/gemini.svg",
+        "icon": null,
+        "color": null,
+        "website": null
+      }
+    },
+    "gemma-4-26b-a4b-it": {
+      "display_name": "Gemma 4 26B (MoE)",
+      "description": "Fast multimodal Gemini model from Google.",
+      "capabilities": ["text", "vision", "pdf", "structured_output"],
+      "ui": { "logo": "/static/ai/models/gemini.svg" }
+    },
+    "gemma-4-31b-it": {
+      "display_name": "Gemma 4 31B (Dense)",
+      "description": "Larger open-weight Gemma 4 model from Google.",
+      "capabilities": ["text", "vision"],
+      "ui": { "logo": "/static/ai/models/gemini.svg" }
+    }    
+  },
+  "offerings": {
+    "groq": {
+      "gpt-oss-120b": {
+        "model_id": "openai/gpt-oss-120b",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 131072,
+          "max_output_tokens": 65536
+        },
+        "options": {
+          "low_reasoning_effort": "low"
+        }
+      }
+    },
+    "gemini": {
+      "gemini-2.5-flash": {
+        "model_id": "gemini-2.5-flash",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3.5-flash-lite": {
+        "model_id": "gemini-3.5-flash-lite",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-2.5-flash-lite": {
+        "model_id": "gemini-2.5-flash-lite",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3-flash-preview": {
+        "model_id": "gemini-3-flash-preview",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3.1-flash-lite": {
+        "model_id": "gemini-3.1-flash-lite",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3.5-flash": {
+        "model_id": "gemini-3.5-flash",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3.6-flash": {
+        "model_id": "gemini-3.6-flash",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3.7-flash": {
+        "model_id": "gemini-3.7-flash",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemini-3.8-flash": {
+        "model_id": "gemini-3.8-flash",
+        "enabled": true,
+        "limits": {
+          "context_tokens": 1048576,
+          "max_output_tokens": 65536
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "model_id": "gemma-4-26b-a4b-it",
+        "enabled": true,
+        "limits": { 
+          "context_tokens": 262144, 
+          "max_output_tokens": 32768 
+        },
+        "options": {
+          "extra_generation_config": { "thinkingConfig": { "thinkingLevel": "minimal" } }
+        }
+      },
+      "gemma-4-31b-it": {
+        "model_id": "gemma-4-31b-it",
+        "enabled": true,
+        "limits": { 
+          "context_tokens": 262144, 
+          "max_output_tokens": 32768 
+        },
+        "options": {
+          "extra_generation_config": { "thinkingConfig": { "thinkingLevel": "minimal" } }
+        }
+      }
+    }
+  },
+  "rate_limit_fields": {
+    "rpm": {
+      "label": "Requests per minute",
+      "abbr": "RPM"
+    },
+    "rpd": {
+      "label": "Requests per day",
+      "abbr": "RPD"
+    },
+    "tpm": {
+      "label": "Tokens per minute",
+      "abbr": "TPM"
+    },
+    "tpd": {
+      "label": "Tokens per day",
+      "abbr": "TPD"
+    },
+    "input_tpm": {
+      "label": "Input tokens per minute",
+      "abbr": "Input TPM"
+    },
+    "output_tpm": {
+      "label": "Output tokens per minute",
+      "abbr": "Output TPM"
+    },
+    "concurrent_requests": {
+      "label": "Concurrent requests",
+      "abbr": "Concurrent"
+    }
+  },
+  "rate_limits": {
+    "groq/gpt-oss-120b": {
+      "tier": "Free plan",
+      "scope": "organization",
+      "source": "https://console.groq.com/docs/rate-limits",
+      "as_of": "2026-09-20",
+      "limits": {
+        "rpm": 30,
+        "rpd": 1000,
+        "tpm": 8000,
+        "tpd": 200000
+      },
+      "note": "Published Free-plan limits, applied per organization. Higher on the Developer plan."
+    },
+    "gemini/gemini-2.5-flash": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-20",
+      "limits": {
+        "rpm": 5,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3.5-flash-lite": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-20",
+      "limits": {
+        "rpm": 15,
+        "rpd": 500,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-2.5-flash-lite": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 10,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3-flash-preview": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 5,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3.1-flash-lite": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 15,
+        "rpd": 500,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3.5-flash": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 5,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3.6-flash": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 5,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3.7-flash": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 5,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemini-3.8-flash": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-21",
+      "limits": {
+        "rpm": 5,
+        "rpd": 20,
+        "tpm": 250000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemma-4-26b-a4b-it": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-20",
+      "limits": {
+        "rpm": 30,
+        "rpd": 14400,
+        "tpm": 16000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    },
+    "gemini/gemma-4-31b-it": {
+      "scope": "project",
+      "source": "Google AI Studio → Rate limits (SmartAIExam project)",
+      "as_of": "2026-09-20",
+      "limits": {
+        "rpm": 30,
+        "rpd": 14400,
+        "tpm": 16000
+      },
+      "note": "Google publishes no per-model limits; these are the values Google AI Studio shows for this project. They depend on the project's usage tier and can change."
+    }          
+  },
+  "groups": {
+    "assistant": {
+      "display_name": "AI Assistant",
+      "description": "Student study chat assistant.",
+      "icon": "fa-comments",
+      "order": 10
+    },
+    "explanation": {
+      "display_name": "Question Explanation",
+      "description": "Step-by-step explanations of wrongly answered questions.",
+      "icon": "fa-lightbulb",
+      "order": 20
+    },
+    "question_generation": {
+      "display_name": "Question Generation",
+      "description": "Admin AI Command Centre question extraction and generation.",
+      "icon": "fa-robot",
+      "order": 30
+    }
+  },
+  "features": {
+    "assistant_chat": {
+      "group": "assistant",
+      "display_name": "Assistant Chat Replies",
+      "description": "Answers a student's message in the AI Assistant chat.",
+      "requires": [
+        "text"
+      ],
+      "used_by": "app/services/ai_service.py · get_groq_response"
+    },
+    "assistant_title": {
+      "group": "assistant",
+      "display_name": "Chat Title Generation",
+      "description": "Writes a short conversation title from the student's first message.",
+      "requires": [
+        "text"
+      ],
+      "used_by": "app/services/ai_service.py · generate_title_via_model"
+    },
+    "explanation_text": {
+      "group": "explanation",
+      "display_name": "Explanation (text questions)",
+      "description": "Explains questions that have no image.",
+      "requires": [
+        "text"
+      ],
+      "used_by": "app/services/explanation_service.py · generate_explanation"
+    },
+    "explanation_vision": {
+      "group": "explanation",
+      "display_name": "Explanation (image questions)",
+      "description": "Explains questions that include a diagram or image.",
+      "requires": [
+        "vision"
+      ],
+      "used_by": "app/services/explanation_service.py · generate_explanation"
+    },
+    "question_generation_text": {
+      "group": "question_generation",
+      "display_name": "Generation from text",
+      "description": "Direct extraction from text PDFs, concept mining, and pure topic generation.",
+      "requires": [
+        "text"
+      ],
+      "used_by": "app/services/ai_question_generator.py · AIQuestionGenerator.generate_text"
+    },
+    "question_generation_vision": {
+      "group": "question_generation",
+      "display_name": "Generation from scanned PDFs",
+      "description": "Reads image-based PDFs directly (vision) when a PDF has no usable text layer.",
+      "requires": [
+        "vision",
+        "pdf"
+      ],
+      "used_by": "app/services/ai_question_generator.py · AIQuestionGenerator._generate_vision_*"
+    }
+  },
+  "assignments": {
+    "assistant_chat": {
+      "model": "gemini/gemma-4-26b-a4b-it",
+      "credential_env": {
+        "gemini": "TEXT_MODEL_ASSISTANT_API_KEY"
+      }
+    },
+    "assistant_title": {
+      "model": "gemini/gemma-4-26b-a4b-it",
+      "credential_env": {
+        "gemini": "TEXT_MODEL_ASSISTANT_API_KEY"
+      }
+    },
+    "explanation_text": {
+      "model": "groq/gpt-oss-120b",
+      "credential_env": {
+        "groq": "TEXT_MODEL_EXPLANATION_API_KEY"
+      }
+    },
+    "explanation_vision": {
+      "model": "gemini/gemma-4-26b-a4b-it",
+      "credential_env": {
+        "gemini": "VISION_MODEL_EXPLANATION_API_KEY"
+      }
+    },
+    "question_generation_text": {
+      "model": "gemini/gemini-2.5-flash",
+      "credential_env": {
+        "gemini": "TEXT_MODEL_QUESTIONGEN_API_KEY"
+      }
+    },
+    "question_generation_vision": {
+      "model": "gemini/gemini-2.5-flash",
+      "credential_env": {
+        "gemini": "VISION_MODEL_QUESTIONGEN_API_KEY"
+      }
+    }
+  }
 }

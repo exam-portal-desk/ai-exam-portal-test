@@ -10,7 +10,7 @@ app/routes/admin/exams.py.
 from flask import jsonify, flash, request, render_template_string
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import (
     get_exam_by_id, release_exam_results, get_exams_page, set_scheduled_exam_cancelled,
     get_exams_by_ids_full, bulk_update_exam_fields,
@@ -36,7 +36,7 @@ _ROWS_TPL = (
 
 
 @admin_api_bp.route("/exams", methods=["GET"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def api_exams_list():
     result = get_exams_page(
         search=request.args.get("q", "").strip(),
@@ -64,7 +64,7 @@ def api_exams_list():
 
 
 @admin_api_bp.route("/exams/preview-instructions", methods=["POST"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def preview_instructions():
     """Renders the same HTML the student-facing pages will show — the one
     renderer (app/utils/instructions_formatter.py) is reused verbatim here
@@ -74,7 +74,7 @@ def preview_instructions():
 
 
 @admin_api_bp.route("/exams/<int:exam_id>", methods=["DELETE"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def delete_exam_route(exam_id):
     exam = get_exam_by_id(exam_id)
     if not exam:
@@ -100,7 +100,7 @@ def delete_exam_route(exam_id):
 
 
 @admin_api_bp.route("/exams/<int:exam_id>/release-results", methods=["POST"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def release_results(exam_id):
     exam = get_exam_by_id(exam_id)
     if not exam:
@@ -115,7 +115,7 @@ def release_results(exam_id):
 
 
 @admin_api_bp.route("/exams/<int:exam_id>/cancel", methods=["POST"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def cancel_scheduled_exam(exam_id):
     """Toggle a Scheduled Exam's explicit 'cancelled' override — the only
     other writer of exams.status for a scheduled exam besides the create/
@@ -143,7 +143,7 @@ _BULK_ALLOWED_FIELDS = {
 
 
 @admin_api_bp.route("/exams/bulk-update", methods=["POST"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def bulk_update_exams_route():
     """Apply an admin-selected subset of fields across many exams in one
     request. A field is only ever touched when its own "Change this field"

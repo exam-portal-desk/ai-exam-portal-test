@@ -144,6 +144,52 @@
     </div>
   </div>
 
+  {% from 'partials/_plan_badge.html' import plan_badge %}
+  {% set _plan = user_plan() %}
+  {% if _plan %}
+  <div class="pf-card" id="plan">
+    <div class="pf-sec-hdr"><i class="fas fa-layer-group" style="color:var(--accent)"></i><h6>Your Plan</h6></div>
+    <div class="pf-body" style="padding-top:.3rem">
+      <style>
+        .plan-feat { list-style:none; margin:.95rem 0 .2rem; padding:0; }
+        .plan-feat li { display:flex; align-items:center; gap:.6rem; padding:.42rem 0; border-top:1px solid var(--border); font-size:.82rem; color:var(--text-1); }
+        .plan-feat li:first-child { border-top:0; }
+        .plan-feat li > i { width:1.1rem; text-align:center; font-size:.75rem; flex-shrink:0; }
+        .plan-feat li.on > i { color:var(--success-text); }
+        .plan-feat li.off { color:var(--text-3); }
+        .plan-feat li.off > i { color:var(--text-3); }
+        .plan-feat small { color:var(--text-3); font-size:.72rem; }
+        .plan-feat .plan-need { margin-left:auto; }
+        .plan-note { margin:.7rem 0 0; font-size:.74rem; color:var(--text-3); line-height:1.5; }
+      </style>
+      <div class="plan-hero" data-tone="{{ _plan.tone }}">
+        <div class="plan-hero-icon"><i class="fas {{ _plan.icon }}" aria-hidden="true"></i></div>
+        <div>
+          <div class="plan-hero-name">{{ _plan.plan_label }}</div>
+          {# the state and the formatted date come from the server (entitlements.user_plan -> expiry), in the configured date format #}
+          {% set _ex = _plan.expiry %}
+          <div class="plan-hero-sub" id="planExpiry" data-state="{{ _ex.state }}">
+            {% if _ex.state == 'expired' %}Your {{ _ex.expired_plan_label }} plan expired on {{ _ex.expires_display }}
+            {% elif _ex.state == 'active' %}Expires: {{ _ex.expires_display }}
+            {% else %}No expiry{% endif %}
+            {% if _plan.custom %} &middot; plus {{ _plan.custom }} custom access{% endif %}
+          </div>
+        </div>
+      </div>
+      <ul class="plan-feat">
+        {% for f in _plan.features %}
+        <li class="{{ 'on' if f.allowed else 'off' }}">
+          <i class="fas fa-{{ 'check' if f.allowed else 'lock' }}" aria-hidden="true"></i>
+          <span>{{ f.label }}{% if f.allowed and f.limits %} <small>({{ f.limits | join(', ') }})</small>{% endif %}</span>
+          {% if not f.allowed and f.required_plan %}<span class="plan-need">{{ plan_badge(f.required_plan, f.required_tone, f.required_icon, 'sm') }}</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="plan-note">Your plan is set by an administrator. Features marked with a lock are included in the plan shown next to them.</p>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="pf-card">
     <div class="pf-sec-hdr"><i class="fas fa-user-shield" style="color:var(--accent)"></i><h6>Admin Access</h6></div>
     <div class="pf-body" style="padding-top:.3rem">

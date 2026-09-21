@@ -13,7 +13,7 @@ from flask import request, jsonify
 from werkzeug.utils import secure_filename
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.misc import get_subject_by_folder_id
 from app.services import image_storage_service
 from app.utils.cache import set_force_refresh
@@ -21,7 +21,7 @@ import app.config as config
 
 
 @admin_api_bp.route("/images", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def upload_images_api():
     # The form still submits the subject's Drive folder id (unchanged UI) —
     # resolve it to the subject's name, which is the storage key prefix

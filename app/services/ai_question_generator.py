@@ -1,10 +1,10 @@
 """
 AI Question Generator Engine
-Calls the Gemini REST API directly over HTTP (no provider SDK) + pypdf for
-PDF text extraction. Model, endpoint, and API key all come from
-config/ai_models.json via app.services.ai_provider — nothing provider-specific
-is hardcoded here beyond the shape of the Gemini REST request/response, which
-is unavoidable for any provider once you drop its SDK.
+Calls the configured AI model through the provider-agnostic AI layer
+(app/services/ai — plain HTTP, no provider SDK) + pypdf for PDF text
+extraction. Which model serves "question_generation_text" and
+"question_generation_vision" is set in Admin > AI Configuration; this module
+builds normalized requests and knows nothing about any provider's wire format.
 
 ROOT CAUSE FIX (historical):
   The old implementation used GoogleGenerativeAIEmbeddings (langchain_google_genai)
@@ -14,7 +14,7 @@ ROOT CAUSE FIX (historical):
 SOLUTION:
   - Removed FAISS vector store and LangChain embeddings entirely.
   - PDF text is extracted with pypdf (already in requirements.txt).
-  - Context is passed straight to Gemini — no embedding pipeline.
+  - Context is passed straight to the model — no embedding pipeline.
   - Eliminates the SSL recursion and speeds up generation significantly.
 """
 
@@ -25,12 +25,11 @@ import re
 import time
 from typing import List, Dict, Optional, Callable, Optional
 
-import requests
 from pydantic import BaseModel, Field, validator
 from pypdf import PdfReader
 
-import app.config as app_config
-from app.services import ai_provider
+from app.services import ai as ai_client
+from app.services.ai import AIConfigError, AIRequest, Message, Part
 
 
 # ========================
@@ -38,9 +37,9 @@ from app.services import ai_provider
 # ========================
 # Turns a raised exception into (error_type, message) so the admin sees WHY
 # a batch/job failed instead of a single generic string, without leaking
-# secrets (API keys/tokens never appear in these messages — Gemini error
-# bodies don't echo the request's Authorization header/key back, and the
-# messages built here never include header/config values).
+# secrets (API keys/tokens never appear in these messages — provider error
+# bodies don't echo the request's auth header/key back, and the messages
+# built here never include header/config values).
 
 _ERROR_TYPE_PATTERNS = [
     # (error_type, message, [substrings to match in the raw error, any-of])
@@ -61,7 +60,7 @@ _ERROR_TYPE_PATTERNS = [
     ("upload_failed", "Uploading the PDF to the AI provider failed.",
      ('file upload', 'upload init', 'upload_endpoint')),
     ("provider_error", "The AI provider returned an error response.",
-     ('Gemini API error', 'Gemini Vision PDF error', 'no candidates')),
+     ('API error', 'Vision PDF error', 'no candidates', 'unexpected response shape', 'request failed')),
     ("pdf_extraction_failed", "The PDF could not be read/parsed.",
      ('PDF extraction failed',)),
 ]
@@ -77,7 +76,7 @@ _SECRET_PATTERNS = [
 
 def _redact_secrets(text: str) -> str:
     """Defense-in-depth for req #1 ("never expose API keys/tokens"): this
-    codebase sends the key via a request HEADER (see ai_provider.build_headers),
+    codebase sends the key via a request HEADER (see app/services/ai adapters),
     never in the endpoint URL or echoed by the provider's own error body, so a
     real key should never actually reach an exception message here — this
     exists purely as a second layer in case a future provider/error path ever
@@ -95,6 +94,13 @@ def classify_error(exc: Exception) -> tuple:
     callers can choose to show it alongside the friendly message for full
     transparency — it is never suppressed, just classified."""
     raw = _redact_secrets(str(exc))
+    if isinstance(exc, AIConfigError):
+        # The selected model can't be used as configured (disabled / no API
+        # key / lacks a required capability) — say so plainly rather than a
+        # generic failure. Message never contains a key value.
+        return ("model_config_error",
+                f"The AI model selected for this task can't be used: {exc} "
+                f"Fix it in Admin > AI Configuration.", raw[:400])
     for error_type, friendly, needles in _ERROR_TYPE_PATTERNS:
         if any(n.lower() in raw.lower() for n in needles):
             return error_type, friendly, raw[:400]
@@ -384,17 +390,17 @@ def _schema_example(exam_id: int) -> str:
 _MAX_CONTEXT_CHARS = 12000  # ~3k tokens — fast and sufficient
 _MIN_TEXT_CHARS_PER_PAGE = 150  # Below this avg, PDF is treated as image-based
 _MAX_INLINE_PDF_BYTES = 15 * 1024 * 1024  # 15 MB — above this use File API
-_BATCH_SIZE = 20  # max questions per single Gemini call to prevent JSON truncation
+_BATCH_SIZE = 20  # max questions per single AI call to prevent JSON truncation
 _DEDUP_KEY_LEN = 80   # chars used for dedup fingerprint (first N chars of question_text)
 _EXCLUDE_STUB_LEN = 160  # chars sent to AI in the banned-questions block
 
-_GEMINI_TIMEOUT = 120       # seconds — generateContent can take a while for large batches
-_GEMINI_UPLOAD_TIMEOUT = 180  # seconds — uploading a large PDF via the File API
-_GENERATION_CONFIG = {
-    "responseMimeType": "application/json",
-    "temperature": 0.3,
-    "maxOutputTokens": 65536,
-}
+_TEXT_FEATURE = "question_generation_text"
+_VISION_FEATURE = "question_generation_vision"
+
+_AI_TIMEOUT = 120       # seconds — a generation call can take a while for large batches
+_AI_UPLOAD_TIMEOUT = 180  # seconds — uploading a large PDF via the provider's file API
+_TEMPERATURE = 0.3
+_MAX_OUTPUT_TOKENS = 65536   # clamped to the model's own limit by the AI layer
 
 
 def _dedup_key(text: str) -> str:
@@ -413,36 +419,30 @@ class AIQuestionGenerator:
     """
     Fast, stable question generator.
     - pypdf for direct PDF text extraction (no FAISS, no LangChain embeddings).
-    - Plain HTTP calls to the configured Gemini REST endpoint — no provider SDK.
+    - Plain HTTP calls via the provider-agnostic AI layer — no provider SDK.
     - Clean error handling — never crashes the caller.
     """
 
     def __init__(self, api_key: str = None):
-        self.text_model = ai_provider.get_model("text_models", app_config.QUESTION_GENERATOR_TEXT_MODEL)
-        if api_key:
-            self.text_model = {**self.text_model, "api_key": api_key}
-        if not self.text_model["api_key"]:
-            raise ValueError(f"No API key configured for AI model '{self.text_model['name']}'")
-        if not self.text_model.get("endpoint"):
-            raise ValueError(f"No endpoint configured for AI model '{self.text_model['name']}'")
-        self.model_name = self.text_model["model"]
+        self._api_key = api_key
+        # Resolves + validates the model now (enabled, API key present, right
+        # capabilities) so a misconfigured model fails the job up front with
+        # a clear AIConfigError instead of partway through a batch.
+        self.text_model = ai_client.resolve(_TEXT_FEATURE, api_key)
+        self.model_name = self.text_model.model_id
         self._vision_model = None  # resolved lazily, only when a PDF actually needs vision
         print(f"AI Question Generator ready — model: {self.model_name}")
 
-    def _get_vision_model(self) -> Dict:
+    def _get_vision_model(self):
         """
         Explicitly resolve the configured vision-capable model for question
         generation. Never falls back to the text model or guesses — if the
-        vision model isn't configured with an endpoint + API key, this fails
-        loudly instead of silently using the wrong model.
+        vision model isn't usable (disabled / no API key / can't read PDFs)
+        this fails loudly with an AIConfigError instead of silently using
+        the wrong model.
         """
         if self._vision_model is None:
-            model = ai_provider.get_model("vision_models", app_config.QUESTION_GENERATOR_VISION_MODEL)
-            if not model["api_key"]:
-                raise ValueError(f"No API key configured for AI vision model '{model['name']}'")
-            if not model.get("endpoint"):
-                raise ValueError(f"No endpoint configured for AI vision model '{model['name']}'")
-            self._vision_model = model
+            self._vision_model = ai_client.resolve(_VISION_FEATURE)
         return self._vision_model
 
     # ------------------------------------------------------------------
@@ -494,7 +494,7 @@ class AIQuestionGenerator:
 
     @staticmethod
     def _retry_call(fn: Callable, max_retries: int = 3, base_delay: float = 5.0):
-        """Retry a Gemini API call on transient errors (503/UNAVAILABLE/429 rate-limit)
+        """Retry an AI provider call on transient errors (503/UNAVAILABLE/429 rate-limit)
         with exponential backoff. 429 previously fell through as non-retryable, which
         meant a routine rate-limit bump always failed the whole batch immediately."""
         for attempt in range(max_retries + 1):
@@ -508,124 +508,77 @@ class AIQuestionGenerator:
                 ))
                 if is_transient and attempt < max_retries:
                     wait = base_delay * (2 ** attempt)  # 5s → 10s → 20s
-                    print(f"Gemini transient error (attempt {attempt + 1}/{max_retries}) — retrying in {wait:.0f}s...")
+                    print(f"AI provider transient error (attempt {attempt + 1}/{max_retries}) — retrying in {wait:.0f}s...")
                     time.sleep(wait)
                 else:
                     raise
 
     def _upload_pdf(self, pdf_path: str) -> str:
         """
-        Upload PDF via the configured vision model's File API (resumable
-        upload protocol, plain HTTP) once — returns a file URI reusable
-        across batches.
+        Upload the PDF via the configured vision model's provider file API
+        once — returns a file reference reusable across batches.
         """
-        model = self._get_vision_model()
-        upload_endpoint = model.get("upload_endpoint")
-        if not upload_endpoint:
-            raise Exception(f"No upload_endpoint configured for AI vision model '{model['name']}'")
-
+        self._get_vision_model()   # fail early if the vision model isn't usable
         file_size = os.path.getsize(pdf_path)
-        print(f"Uploading PDF ({file_size / (1024*1024):.1f} MB) via File API.")
-
-        start_headers = {
-            **ai_provider.build_headers(model),
-            "X-Goog-Upload-Protocol": "resumable",
-            "X-Goog-Upload-Command": "start",
-            "X-Goog-Upload-Header-Content-Length": str(file_size),
-            "X-Goog-Upload-Header-Content-Type": "application/pdf",
-        }
-        start_resp = requests.post(
-            upload_endpoint,
-            headers=start_headers,
-            json={"file": {"display_name": os.path.basename(pdf_path)}},
-            timeout=_GEMINI_TIMEOUT,
-        )
-        if start_resp.status_code != 200:
-            raise Exception(f"Gemini file upload init failed {start_resp.status_code}: {start_resp.text[:300]}")
-
-        upload_url = start_resp.headers.get("X-Goog-Upload-URL") or start_resp.headers.get("x-goog-upload-url")
-        if not upload_url:
-            raise Exception("Gemini file upload did not return an upload URL")
-
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
-
-        upload_resp = requests.post(
-            upload_url,
-            headers={
-                "Content-Length": str(file_size),
-                "X-Goog-Upload-Offset": "0",
-                "X-Goog-Upload-Command": "upload, finalize",
-            },
-            data=pdf_bytes,
-            timeout=_GEMINI_UPLOAD_TIMEOUT,
-        )
-        if upload_resp.status_code != 200:
-            raise Exception(f"Gemini file upload failed {upload_resp.status_code}: {upload_resp.text[:300]}")
-
-        file_uri = upload_resp.json().get("file", {}).get("uri")
-        if not file_uri:
-            raise Exception(f"Gemini file upload response missing file URI: {upload_resp.text[:300]}")
-        return file_uri
+        print(f"Uploading PDF ({file_size / (1024*1024):.1f} MB) via the provider file API.")
+        return ai_client.upload_file(_VISION_FEATURE, pdf_path, "application/pdf", _AI_UPLOAD_TIMEOUT)
 
     # ------------------------------------------------------------------
-    # Gemini REST API calls (generic HTTP — no provider SDK)
+    # Model calls (normalized request — the AI layer adapts it per provider)
     # ------------------------------------------------------------------
 
-    def _post_generate_content(self, model: Dict, parts: List[Dict]) -> str:
-        """POST one generateContent request to the given model's configured endpoint."""
-        resp = requests.post(
-            model["endpoint"],
-            headers=ai_provider.build_headers(model),
-            json={
-                "contents": [{"parts": parts}],
-                "generationConfig": _GENERATION_CONFIG,
-            },
-            timeout=_GEMINI_TIMEOUT,
+    def _call_model(self, feature: str, parts: List[Part]) -> str:
+        """One normalized request (JSON output requested where the model
+        supports it) to the model currently assigned to `feature`."""
+        response = ai_client.generate(
+            feature,
+            AIRequest(
+                messages=[Message.of("user", parts)],
+                temperature=_TEMPERATURE,
+                max_tokens=_MAX_OUTPUT_TOKENS,
+                response_format="json",
+                timeout=_AI_TIMEOUT,
+            ),
+            api_key_override=self._api_key if feature == _TEXT_FEATURE else None,
         )
-        if resp.status_code != 200:
-            raise Exception(f"Gemini API error {resp.status_code}: {resp.text[:300]}")
-
-        data = resp.json()
-        candidates = data.get("candidates") or []
-        if not candidates:
-            raise Exception(f"Gemini API returned no candidates: {json.dumps(data)[:300]}")
-
-        out_parts = candidates[0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in out_parts)
+        return response.text
 
     def _generate_vision_with_uri(self, file_uri: str, prompt: str) -> str:
-        """Call the configured vision model with a pre-uploaded PDF URI. Retries on 503."""
-        model = self._get_vision_model()
+        """Call the configured vision model with a pre-uploaded PDF reference. Retries on transient errors."""
+        self._get_vision_model()
         try:
-            return self._retry_call(lambda: self._post_generate_content(model, [
-                {"fileData": {"fileUri": file_uri, "mimeType": "application/pdf"}},
-                {"text": prompt},
+            return self._retry_call(lambda: self._call_model(_VISION_FEATURE, [
+                Part.of_file("application/pdf", uri=file_uri),
+                Part.of_text(prompt),
             ]))
+        except AIConfigError:
+            raise
         except Exception as e:
-            raise Exception(f"Gemini Vision PDF error: {str(e)}")
+            raise Exception(f"Vision PDF error: {str(e)}")
 
     def _generate_vision_inline(self, pdf_path: str, prompt: str) -> str:
-        """Call the configured vision model with an inline base64 PDF (small PDFs <= 15 MB). Retries on 503."""
-        model = self._get_vision_model()
+        """Call the configured vision model with an inline base64 PDF (small PDFs <= 15 MB). Retries on transient errors."""
+        self._get_vision_model()
         try:
             with open(pdf_path, "rb") as f:
                 pdf_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
-            return self._retry_call(lambda: self._post_generate_content(model, [
-                {"inlineData": {"mimeType": "application/pdf", "data": pdf_b64}},
-                {"text": prompt},
+            return self._retry_call(lambda: self._call_model(_VISION_FEATURE, [
+                Part.of_file("application/pdf", data_b64=pdf_b64),
+                Part.of_text(prompt),
             ]))
+        except AIConfigError:
+            raise
         except Exception as e:
-            raise Exception(f"Gemini Vision PDF error: {str(e)}")
+            raise Exception(f"Vision PDF error: {str(e)}")
 
     def generate_text(self, prompt: str) -> str:
-        """Single Gemini call with JSON mode, low temperature, and transient-error retry."""
+        """Single model call with JSON mode (where supported), low temperature, and transient-error retry."""
         try:
-            return self._retry_call(lambda: self._post_generate_content(self.text_model, [
-                {"text": prompt},
-            ]))
+            return self._retry_call(lambda: self._call_model(_TEXT_FEATURE, [Part.of_text(prompt)]))
+        except AIConfigError:
+            raise
         except Exception as e:
-            raise Exception(f"Gemini API error: {str(e)}")
+            raise Exception(f"Text generation API error: {str(e)}")
 
     # ------------------------------------------------------------------
     # Generation modes
@@ -657,7 +610,7 @@ class AIQuestionGenerator:
                 _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
                 file_size = os.path.getsize(pdf_path)
                 if file_size > _MAX_INLINE_PDF_BYTES:
-                    _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
+                    _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to the AI provider file API..."})
                     file_uri = self._upload_pdf(pdf_path)
                     _cb({"type": "uploaded", "message": "PDF uploaded. Starting batch extraction..."})
             else:
@@ -819,7 +772,7 @@ class AIQuestionGenerator:
                 _cb({"type": "vision_detected", "message": "Image-based PDF detected — switching to Vision mode."})
                 file_size = os.path.getsize(pdf_path)
                 if file_size > _MAX_INLINE_PDF_BYTES:
-                    _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to Gemini File API..."})
+                    _cb({"type": "uploading", "message": f"Uploading PDF ({file_size / (1024*1024):.1f} MB) to the AI provider file API..."})
                     file_uri = self._upload_pdf(pdf_path)
                     _cb({"type": "uploaded", "message": "PDF uploaded. Starting concept mining..."})
             else:

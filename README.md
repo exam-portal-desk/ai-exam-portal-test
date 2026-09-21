@@ -126,7 +126,7 @@ ExamPortal/
 ├── main.py                    # Entry point — gevent monkey-patch, app factory, socketio.run()
 ├── requirements.txt
 ├── config/
-│   └── ai_models.json         # AI provider/model registry (text + vision models)
+│   └── ai_models.json         # AI registry: providers, models, features, default assignments (see AI_MODELS.md)
 ├── migrations/                 # Incremental SQL migrations (applied manually)
 │
 ├── app/
@@ -244,21 +244,20 @@ DEFAULT_FROM_EMAIL=noreply@your-domain.com
 EMAIL_SERVICE_AUTH_HEADER=Authorization
 EMAIL_SERVICE_AUTH_PREFIX=Bearer 
 
-# AI — selects which config/ai_models.json entry is active per flow
-ASSISTANT_TEXT_MODEL=assistant-default
-EXPLANATION_TEXT_MODEL=explanation-default
-EXPLANATION_VISION_MODEL_NAME=explanation-vision-default
-QUESTION_GENERATOR_TEXT_MODEL=question-generator-default
-QUESTION_GENERATOR_VISION_MODEL=question-generator-vision-default
-
-# AI — one API key per registry entry (names must match config/ai_models.json's api_key_env)
+# AI — providers/models/features live in config/ai_models.json (see config/AI_MODELS.md);
+# the model each feature uses is chosen in Admin > AI Configuration.
+# API keys: only the variable NAMES are in the JSON. These are the current per-feature keys:
 TEXT_MODEL_ASSISTANT_API_KEY=
 TEXT_MODEL_EXPLANATION_API_KEY=
 TEXT_MODEL_QUESTIONGEN_API_KEY=
 VISION_MODEL_EXPLANATION_API_KEY=
 VISION_MODEL_QUESTIONGEN_API_KEY=
+# Provider-wide keys (recommended) — one per provider; every feature and model of that provider uses it.
+# The per-feature keys above are optional: a feature uses its own key when set, else its provider's.
+# GROQ_API_KEY=  GEMINI_API_KEY=
+# Models are NEVER chosen here — only in Admin > AI Configuration (or the default in config/ai_models.json).
+# AI_CONFIG_CACHE_TTL_SECONDS=30
 
-AI_DAILY_LIMIT_PER_STUDENT=50
 AI_MAX_MESSAGE_LENGTH=500
 
 # OTP — second-device login verification
@@ -275,12 +274,18 @@ OTP_EXPIRY_SECONDS=600
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Sign in with Google |
 | `STORAGE_BACKEND` | `local` or `s3` — selects the active storage provider |
 | `EMAIL_SERVICE_*` | Endpoint, key, and payload shape for the HTTP email provider in use |
-| `ASSISTANT_TEXT_MODEL` / `EXPLANATION_*` / `QUESTION_GENERATOR_*` | Which `config/ai_models.json` entry each AI flow uses |
-| `*_API_KEY` (per model) | API key for that specific registry entry — see `api_key_env` in `config/ai_models.json` |
+| `*_API_KEY` (AI) | API keys referenced by name from `config/ai_models.json` — never stored in the JSON, DB, or sent to the browser |
+| ~~`ASSISTANT_TEXT_MODEL`, `EXPLANATION_*_MODEL*`, `QUESTION_GENERATOR_*_MODEL`~~ | **No longer used.** The environment never chooses a model; old lines are ignored and can be deleted |
+| `AI_CONFIG_CACHE_TTL_SECONDS` | How long a worker caches the AI registry and Admin selections (default 30) |
+| `AI_REQUEST_TIMEOUT` / `AI_CONNECT_TIMEOUT` | Seconds to wait for a provider's reply (for a streamed reply: between two pieces) / to connect to it (defaults 30 / 10) |
+| `AI_STREAM_TOTAL_TIMEOUT` | Ceiling for one whole streamed reply (default 120) |
+| `AI_LOG_LEVEL` | Level of the safe AI request/response/timing log lines — provider, model, timings, token counts; never keys or prompts (default `INFO`) |
 | `OTP_*` | Tuning for the existing-active-session email verification flow |
 | `APP_TIMEZONE` | Timezone used for all display timestamps (storage is always UTC) |
 
-Adding or swapping an AI model only requires editing `config/ai_models.json` and setting its `api_key_env` variable — no code changes.
+Plans (Free / Pro / Elite), which features each includes, and every per-student limit (AI requests per day, messages per conversation, explanation quotas) are defined in one place, `config/entitlements.json`, and are never set in `.env`; the guide is [`config/ENTITLEMENTS.md`](config/ENTITLEMENTS.md) and the Admin Guide's **Plans & Access** section.
+
+AI providers, models, logos, limits and per-feature model choices are managed through `config/ai_models.json` and the Admin **AI Configuration** page. The how-to guide (add or remove a model, change a key or logo, troubleshooting) is [`config/AI_MODELS.md`](config/AI_MODELS.md) — also opened by the **Guide** button on that page.
 
 ---
 
@@ -295,7 +300,7 @@ Core table groups:
 | **Identity & access** | `users`, `sessions`, `login_attempts`, `otp_challenges`, `password_history`, `pw_tokens`, `jwt_refresh_tokens`, `requests_raised` |
 | **Exam content** | `categories`, `subcategories`, `exams`, `subjects`, `questions` |
 | **Attempts & results** | `exam_attempts`, `results`, `responses` |
-| **AI** | `ai_chat_history`, `ai_conversations`, `ai_usage_tracking`, `ai_explanation_history`, `ai_explanation_usage` |
+| **AI** | `ai_chat_history`, `ai_conversations`, `ai_usage_tracking`, `ai_explanation_history`, `ai_explanation_usage`, `ai_feature_assignments` |
 | **Chat** | `chat_conversations`, `chat_messages`, `chat_members`, `chat_unread`, `chat_visibility`, `chat_connections` |
 | **Discussions** | `question_discussions`, `discussion_counts` |
 | **Notes** | `notes_notebooks`, `notes_pages`, `notes_objects`, `notes_assets`, `notes_revisions`, `notes_bookmarks`, `notes_likes`, `notes_views`, `notes_downloads`, `notes_reports`, `notes_notebook_metrics`, `notes_notebook_shares` |

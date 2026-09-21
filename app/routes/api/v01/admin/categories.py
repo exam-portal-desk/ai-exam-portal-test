@@ -17,7 +17,7 @@ from flask import request, jsonify, render_template_string
 from werkzeug.utils import secure_filename
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.categories import (
     get_all_categories, get_categories_page, get_category_by_id,
     create_category, update_category, delete_category,
@@ -66,7 +66,7 @@ def _delete_stored_image(storage_key: str):
 
 
 @admin_api_bp.route("/categories", methods=["GET"])
-@require_admin_role
+@require_admin_permission("category_management")
 def api_categories():
     # Bare GET (no page/q/partial) still returns the full list — used by
     # dependent-dropdown populators elsewhere (e.g. exam create/edit forms)
@@ -98,7 +98,7 @@ def api_categories():
 
 
 @admin_api_bp.route("/categories", methods=["POST"])
-@require_admin_role
+@require_admin_permission("category_management")
 def create_category_route():
     name = request.form.get("name", "").strip()
     if not name:
@@ -124,7 +124,7 @@ def create_category_route():
 
 
 @admin_api_bp.route("/categories/<int:cat_id>", methods=["PATCH"])
-@require_admin_role
+@require_admin_permission("category_management")
 def update_category_route(cat_id):
     cat = get_category_by_id(cat_id)
     if not cat:
@@ -157,7 +157,7 @@ def update_category_route(cat_id):
 
 
 @admin_api_bp.route("/categories/<int:cat_id>", methods=["DELETE"])
-@require_admin_role
+@require_admin_permission("category_management")
 def delete_category_route(cat_id):
     cat = get_category_by_id(cat_id)
     if not cat:
@@ -185,7 +185,7 @@ def delete_category_route(cat_id):
 # admin UI, never eagerly joined into the categories list.
 
 @admin_api_bp.route("/categories/<int:cat_id>/subcategories", methods=["GET"])
-@require_admin_role
+@require_admin_permission("category_management")
 def api_subcategories(cat_id):
     if not get_category_by_id(cat_id):
         return jsonify({"success": False, "message": "Category not found"}), 404
@@ -193,7 +193,7 @@ def api_subcategories(cat_id):
 
 
 @admin_api_bp.route("/categories/<int:cat_id>/subcategories", methods=["POST"])
-@require_admin_role
+@require_admin_permission("category_management")
 def create_subcategory_route(cat_id):
     if not get_category_by_id(cat_id):
         return jsonify({"success": False, "message": "Category not found"}), 404
@@ -211,7 +211,7 @@ def create_subcategory_route(cat_id):
 
 
 @admin_api_bp.route("/subcategories/<int:subcat_id>", methods=["PATCH"])
-@require_admin_role
+@require_admin_permission("category_management")
 def update_subcategory_route(subcat_id):
     subcat = get_subcategory_by_id(subcat_id)
     if not subcat:
@@ -227,7 +227,7 @@ def update_subcategory_route(subcat_id):
 
 
 @admin_api_bp.route("/subcategories/<int:subcat_id>", methods=["DELETE"])
-@require_admin_role
+@require_admin_permission("category_management")
 def delete_subcategory_route(subcat_id):
     subcat = get_subcategory_by_id(subcat_id)
     if not subcat:

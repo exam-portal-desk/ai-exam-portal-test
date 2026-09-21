@@ -10,7 +10,7 @@ CHANGES vs original:
 
 import time
 from functools import wraps
-from flask import session, redirect, url_for, flash, g, jsonify, request
+from flask import session, redirect, url_for, flash, g, jsonify, request, render_template
 
 from app.db.sessions import get_session_by_token, update_session_last_seen
 
@@ -125,3 +125,31 @@ def require_admin_role(f):
         return f(*args, **kwargs)
 
     return wrapped
+
+
+def _permission_denied(permission: str):
+    from app import entitlements
+    info = entitlements.admin_denied_reason(permission)
+    message = f"You do not have access to {info['label']}. The Admin role does not include it; it has to be granted to you."
+    if _is_api_request():
+        return jsonify({"status": "error", "success": False, "message": message, "permission": permission}), 403
+    return render_template("admin/forbidden.html", info=info), 403
+
+
+def require_admin_permission(permission: str):
+    """
+    Admin route that needs one named admin feature (e.g. "exam_management" = admin.exam_management), on top of an admin
+    session. The Admin role only gets a person into the portal: the decision comes from app.entitlements, which requires an
+    active grant of that feature for this person (and refuses a name the catalog does not list, so a typo cannot open a
+    route). Server-side and read from the database, never from the session or the browser.
+    """
+    def decorator(f):
+        @wraps(f)
+        def permitted(*args, **kwargs):
+            from app.entitlements import has_admin_permission
+            if not has_admin_permission(session.get("user_id"), permission):
+                return _permission_denied(permission)
+            return f(*args, **kwargs)
+        permitted.required_permission = permission        # lets a test walk every route and prove each one is gated
+        return require_admin_role(permitted)
+    return decorator

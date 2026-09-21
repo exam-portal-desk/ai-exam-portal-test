@@ -123,6 +123,58 @@
 .access-badge.access-admin, .access-badge.ab-admin { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
 .access-badge.access-both,  .access-badge.ab-both  { background: var(--accent-subtle); color: var(--accent); border-color: var(--border); }
 
+/* ── Plan, admin role and special access (Users tab). The plan look is static/shared/plan-badge.css ── */
+.cell-none { color:var(--text-3); font-size:.74rem; }
+#usersTable .access-badge { white-space:nowrap; }
+.admin-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.16rem .55rem; border-radius:999px; border:1px solid var(--info-border); background:var(--info-bg); color:var(--info-text); font:inherit; font-size:.68rem; font-weight:700; white-space:nowrap; }
+.admin-chip.none { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+button.admin-chip, button.custom-chip { cursor:pointer; }
+span.custom-chip, span.admin-chip { cursor:default; }
+.ap-lim { padding:.06rem .4rem; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); font-size:.66rem; color:var(--text-2); }
+.ap-limits { display:flex; flex-direction:column; gap:.4rem; }
+.ap-limits:empty { display:none; }
+.ap-lock { margin-top:.5rem; padding:.5rem .65rem; border-radius:var(--radius); background:var(--warning-bg); color:var(--warning-text); font-size:.72rem; line-height:1.45; }
+.access-note { display:flex; gap:.5rem; align-items:center; margin:.2rem 0 .8rem; padding:.5rem .75rem; border-radius:var(--radius); background:var(--info-bg); border:1px solid var(--info-border); color:var(--info-text); font-size:.76rem; line-height:1.4; }
+.no-manage #usersTbody .sel-enh, .no-manage #usersTbody .update-btn, .no-manage #bulkRoleSelect + .sel-enh, .no-manage #applyBulkBtn { opacity:.45; pointer-events:none; }
+.custom-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.16rem .55rem; border-radius:999px; border:1px dashed var(--accent); background:var(--accent-subtle); color:var(--accent); font:inherit; font-size:.68rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+.custom-chip:hover { filter:brightness(.97); border-style:solid; }
+.access-pop { width:min(390px, calc(100vw - 16px)); padding:.85rem .95rem; font-size:.78rem; }
+.ap-title { font-size:.88rem; font-weight:800; }
+.ap-sub { color:var(--text-3); font-size:.7rem; margin-bottom:.55rem; }
+.ap-row { display:flex; align-items:flex-start; gap:.6rem; padding:.55rem 0; border-top:1px solid var(--border); }
+.ap-key { width:84px; flex-shrink:0; padding-top:.15rem; color:var(--text-3); font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.ap-val { flex:1; min-width:0; display:flex; flex-direction:column; gap:.35rem; }
+.ap-val > .plan-badge { align-self:flex-start; }
+.ap-note { color:var(--text-3); font-size:.7rem; line-height:1.4; }
+.ap-ov { display:flex; align-items:center; flex-wrap:wrap; gap:.2rem .45rem; }
+.ap-ov.expired { opacity:.55; }
+.ap-tag { padding:.08rem .45rem; border-radius:6px; border:1px solid var(--border); font-size:.66rem; font-weight:700; }
+.ap-tag.grant { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.ap-tag.deny  { background:var(--danger-bg);  color:var(--danger-text);  border-color:var(--danger-border); }
+.ap-x { margin-left:auto; padding:0 .25rem; border:none; background:none; color:var(--text-3); font-size:1rem; line-height:1; cursor:pointer; }
+.ap-x:hover { color:var(--danger-text); }
+.ap-form { display:flex; flex-direction:column; gap:.4rem; }
+.ap-form input { flex:1; min-width:0; padding:.35rem .55rem; border:1px solid var(--border); border-radius:9px; background:var(--bg); color:var(--text-1); font:inherit; font-size:.76rem; }
+.ap-form input:focus { outline:none; border-color:var(--border-focus, var(--accent)); }
+.ap-edit { display:flex; gap:.4rem; align-items:center; }
+.ap-edit .sel-enh.sel-enh-block { flex:1 1 0; width:auto; min-width:0; }
+.ap-edit.ap-pick { flex-direction:column; align-items:stretch; }
+.access-pop .sel-enh-trigger { padding:.35rem .55rem; font-size:.76rem; }
+.plans-note { margin-top:1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
+.plans-note > summary { display:flex; align-items:center; gap:.5rem; padding:.65rem .9rem; cursor:pointer; font-size:.8rem; font-weight:700; color:var(--text-1); list-style:none; }
+.plans-note > summary::-webkit-details-marker { display:none; }
+.plans-note > summary i { color:var(--accent); }
+.plans-note .pn-hint { margin-left:.2rem; color:var(--text-3); font-size:.72rem; font-weight:500; }
+.plans-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:.7rem; padding:0 .9rem .8rem; }
+.plan-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.7rem .8rem; }
+.plan-card .pc-head { display:flex; align-items:center; gap:.4rem; margin-bottom:.35rem; }
+.plan-card .pc-default { color:var(--text-3); font-size:.66rem; font-weight:600; }
+.plan-card .pc-sub { color:var(--text-3); font-size:.7rem; margin-bottom:.25rem; }
+.plan-card ul { margin:0; padding-left:1.05rem; font-size:.76rem; color:var(--text-2); }
+.plan-card .pc-limit { color:var(--text-3); font-size:.7rem; }
+.pn-text { margin:0; padding:0 .9rem .85rem; font-size:.74rem; line-height:1.6; color:var(--text-2); }
+.pn-text strong { color:var(--text-1); }
+
 /* ── Status Badges — text-only pill + subtle dot, same convention as
    templates/admin/exams.html's .status-badge (upcoming/ongoing/completed):
    no clock/tick/cross icon, just color + uppercase label communicating
@@ -541,7 +593,7 @@
   </div>
 
   {# ── TAB 3: User Management (FULLY AJAX — no Jinja data) ── #}
-  <div id="pane-users" class="tab-pane">
+  <div id="pane-users" class="tab-pane{{ '' if can_manage_access else ' no-manage' }}">
 
     <div class="user-stats">
       <span class="ustat"><i class="fas fa-users" style="color:var(--accent)"></i>Total: <strong id="umTotal">—</strong></span>
@@ -550,6 +602,9 @@
       <span class="ustat"><i class="fas fa-user-plus" style="color:var(--accent)"></i>Both: <strong id="umBoth">—</strong></span>
     </div>
 
+    {% if not can_manage_access %}
+    <div class="access-note"><i class="fas fa-lock"></i><span>You can see users and their plans. Changing a role, plan or admin access needs <strong>Access control management</strong>.</span></div>
+    {% endif %}
     <div class="um-controls">
       <span class="um-label">Filter:</span>
       <select class="um-select" id="umRoleFilter" style="min-width:130px" onchange="umFetch(1)">
@@ -583,18 +638,42 @@
             <th style="width:44px">
               <input type="checkbox" id="selectAllChk" class="e-checkbox" onchange="handleSelectAll(this)">
             </th>
-            <th>User</th><th>Email</th><th>Current Role</th>
+            <th>User</th><th>Email</th><th>Role</th><th>Plan</th><th>Admin Access</th><th>Special Access</th>
             <th>New Role</th><th>Update</th><th class="col-updated">Last Updated</th>
           </tr>
         </thead>
         <tbody id="usersTbody">
-          <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
-          <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:80%"></div></td></tr>
-          <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="width:65%"></div></td></tr>
+          <tr class="skeleton-row"><td colspan="10"><div class="skeleton"></div></td></tr>
+          <tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="width:80%"></div></td></tr>
+          <tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="width:65%"></div></td></tr>
         </tbody>
       </table>
     </div>
     <div class="paginator-wrap" id="usersPaginator"></div>
+
+    {% if plans %}
+    {% from 'partials/_plan_badge.html' import plan_badge %}
+    <details class="plans-note">
+      <summary><i class="fas fa-layer-group"></i>Plans &amp; Access<span class="pn-hint">how plans, admin roles and custom access differ</span></summary>
+      <div class="plans-grid">
+        {% for p in plans.plans %}
+        <div class="plan-card">
+          <div class="pc-head">{{ plan_badge(p.label, p.tone, p.icon, 'md') }}{% if p.is_default %}<span class="pc-default">Default plan</span>{% endif %}</div>
+          <div class="pc-sub">{% if p.inherits_label %}Everything in {{ p.inherits_label }}, plus:{% else %}Includes:{% endif %}</div>
+          <ul>{% for a in p.adds %}<li>{{ a.label }}{% if a.limits %} <span class="pc-limit">({{ a.limits|join(', ') }})</span>{% endif %}</li>{% endfor %}</ul>
+        </div>
+        {% endfor %}
+      </div>
+      {% set gated = plans.student_features|selectattr('enforced')|list|length %}
+      <p class="pn-text">
+        <strong>Plan</strong> decides which student features a user gets, and the server enforces it; it never makes anyone an admin.
+        An account with no plan set is on <strong>{% for p in plans.plans if p.is_default %}{{ p.label }}{% endfor %}</strong> automatically, so nobody has to be set up for it.
+        <strong>Role</strong> is the separate Role column: an Elite student is not an admin, and an admin on Free has no paid student features.
+        <strong>Special Access</strong> marks a user with a grant or deny on top of their plan; click the plan badge to see or change it.
+        {% if gated < plans.student_features|length %}{{ plans.student_features|length - gated }} of {{ plans.student_features|length }} student features are not enforced yet (see <code>config/entitlements.json</code>).{% endif %}
+      </p>
+    </details>
+    {% endif %}
   </div>
 </div>
 
@@ -1021,7 +1100,7 @@ function umFetch(page) {
   const role = document.getElementById('umRoleFilter')?.value || '';
   const tbody = document.getElementById('usersTbody');
 
-  tbody.innerHTML = skeletonRows(7);
+  tbody.innerHTML = skeletonRows(10);
 
   const params = new URLSearchParams({page, q, role});
   fetch(`/api/v01/admin/users/search?${params}`)
@@ -1035,7 +1114,7 @@ function umFetch(page) {
       );
     })
     .catch(() => {
-      tbody.innerHTML = errRow(7, "Couldn't load users.", `umFetch(${JSON.stringify(page)})`);
+      tbody.innerHTML = errRow(10, "Couldn't load users.", `umFetch(${JSON.stringify(page)})`);
     });
 }
 
@@ -1056,7 +1135,7 @@ function _fmtTs(raw) {
 function renderUsers(users) {
   const tbody = document.getElementById('usersTbody');
   if (!users.length) {
-    tbody.innerHTML = `<tr><td colspan="7">${emptyState('fa-users','No Users Found','Try a different search or filter.')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">${emptyState('fa-users','No Users Found','Try a different search or filter.')}</td></tr>`;
     return;
   }
   const roleMap = {
@@ -1085,8 +1164,11 @@ function renderUsers(users) {
       </td>
       <td><span style="font-size:.8rem;color:var(--text-3)" class="uemail">${u.email||''}</span></td>
       <td><span class="access-badge ${rcls} cur-role" data-role="${u.role}"><i class="fas ${rico}"></i>${rlbl}</span></td>
+      <td class="plan-cell">${planCell(u)}</td>
+      <td>${adminAccessCell(u)}</td>
+      <td>${specialCell(u)}</td>
       <td>
-        <select class="um-select role-sel" data-uid="${u.id}" style="min-width:150px" onchange="onRoleChange(this)">
+        <select class="um-select role-sel" data-uid="${u.id}" style="min-width:150px" onchange="onRoleChange(this)" ${CAN_MANAGE_ACCESS ? '' : 'disabled'}>
           <option value="">Keep Current</option>
           ${opts}
         </select>
@@ -1110,6 +1192,255 @@ function renderUsers(users) {
     if (wrap && wrap.classList.contains('sel-enh')) wrap.style.minWidth = '150px';
   });
   syncSelectAll();
+}
+
+/* The Users tab shows four separate things: the ROLE (User / Admin), the PLAN, the ADMIN ACCESS (which admin features an
+   administrator has been granted) and the SPECIAL ACCESS (grants or denials of user features). Only someone with Access
+   control management can open the card and change them; the server checks every change again. */
+const CAN_MANAGE_ACCESS = {{ can_manage_access|tojson }};
+
+function _hasAdminRole(u) { return String(u.role || '').includes('admin'); }
+
+function planCell(u) {
+  if (!u.plan) return '<span class="cell-none">-</span>';
+  const attrs = `class="plan-badge pb-md" data-tone="${escHtml(u.plan_tone || 'neutral')}" data-uid="${u.id}"`;
+  const inner = `<i class="fas ${escHtml(u.plan_icon || 'fa-star')}" aria-hidden="true"></i><span class="pb-text">${escHtml(u.plan_label || u.plan)}</span>`;
+  return CAN_MANAGE_ACCESS
+    ? `<button type="button" ${attrs} onclick="openAccess(this)" title="Plan and access details">${inner}</button>`
+    : `<span ${attrs}>${inner}</span>`;
+}
+
+function adminAccessCell(u) {
+  if (!_hasAdminRole(u)) return '<span class="cell-none">-</span>';
+  const n = u.admin_access || 0;
+  const cls = n ? 'admin-chip' : 'admin-chip none';
+  const label = n ? `${n} admin feature${n === 1 ? '' : 's'}` : 'No admin features';
+  const icon = n ? 'fa-user-shield' : 'fa-exclamation-triangle';
+  return CAN_MANAGE_ACCESS
+    ? `<button type="button" class="${cls}" data-uid="${u.id}" onclick="openAccess(this)" title="Admin access details"><i class="fas ${icon}"></i>${label}</button>`
+    : `<span class="${cls}"><i class="fas ${icon}"></i>${label}</span>`;
+}
+
+function specialCell(u) {
+  if (!u.plan) return '<span class="cell-none">-</span>';
+  if (!u.custom_access) return '<span class="cell-none">None</span>';
+  const inner = '<i class="fas fa-sliders-h"></i>Custom Access';
+  return CAN_MANAGE_ACCESS
+    ? `<button type="button" class="custom-chip" data-uid="${u.id}" onclick="openAccess(this)" title="This user has access beyond their plan">${inner}</button>`
+    : `<span class="custom-chip">${inner}</span>`;
+}
+
+/* ── The details card: a FloatingPanel (static/admin/select-enhance.js), filled when a badge is clicked ── */
+const PLAN_OPTIONS = {{ ((plans.plans if plans else [])|map(attribute='key')|list)|tojson }};
+const PLAN_LABELS = {{ ((plans.plans if plans else [])|map(attribute='label')|list)|tojson }};
+const STUDENT_FEATURES = [{% if plans %}{% for f in plans.student_features %}{ key: {{ f.key|tojson }}, label: {{ f.label|tojson }} },{% endfor %}{% endif %}];
+const ADMIN_FEATURES = [{% if plans %}{% for f in plans.admin_features %}{ key: {{ f.key|tojson }}, label: {{ f.label|tojson }}, privileged: {{ f.privileged|tojson }}, limits: {{ f.limits|tojson }} },{% endfor %}{% endif %}];
+let _accessPop = null;
+
+function _mk(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function _planBadge(label, tone, icon, size) {
+  const badge = _mk('span', 'plan-badge pb-' + (size || 'md'));
+  badge.dataset.tone = tone || 'neutral';
+  const ic = _mk('i', 'fas ' + (icon || 'fa-star'));
+  ic.setAttribute('aria-hidden', 'true');
+  badge.appendChild(ic);
+  badge.appendChild(_mk('span', 'pb-text', label));
+  return badge;
+}
+
+function _accessRow(key, ...children) {
+  const val = _mk('div', 'ap-val');
+  children.forEach(c => c && val.appendChild(c));
+  const row = _mk('div', 'ap-row');
+  row.appendChild(_mk('div', 'ap-key', key));
+  row.appendChild(val);
+  return row;
+}
+
+function _fmtDay(iso) {
+  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function _themedSelect(options, selected) {
+  const sel = _mk('select');
+  options.forEach(([value, label]) => {
+    const opt = _mk('option', null, label);
+    opt.value = value;
+    opt.selected = value === selected;
+    sel.appendChild(opt);
+  });
+  return sel;
+}
+
+function _entryLine(o, d, pop, removable) {
+  const line = _mk('div', 'ap-ov' + (o.active ? '' : ' expired'));
+  line.appendChild(_mk('span', 'ap-tag ' + o.effect, o.effect === 'grant' ? 'Granted' : 'Denied'));
+  line.appendChild(_mk('span', null, o.label));
+  (o.limit_text || []).forEach(t => line.appendChild(_mk('span', 'ap-lim', t)));
+  line.appendChild(_mk('span', 'ap-note', !o.active ? 'expired' : (o.expires_at ? 'until ' + _fmtDay(o.expires_at) : 'no expiry')));
+  if (o.reason) line.appendChild(_mk('span', 'ap-note', '- ' + o.reason));
+  if (removable) {
+    const rm = _mk('button', 'ap-x', '×');
+    rm.type = 'button';
+    rm.title = 'Remove';
+    rm.onclick = () => changeAccess(d.user_id, 'DELETE', o.feature, null, pop);
+    line.appendChild(rm);
+  }
+  return line;
+}
+
+/* a grant form: a feature (only those the viewer may hand out), the limits that feature declares, days, reason */
+function _grantForm(d, pop, features, withEffect, toEnhance) {
+  const featureSel = _themedSelect(features.map(f => [f.key, f.label + (f.privileged ? ' (privileged)' : '')]), features[0].key);
+  const effectSel = withEffect ? _themedSelect([['grant', 'Grant'], ['deny', 'Deny']], 'grant') : null;
+  const limitBox = _mk('div', 'ap-limits');
+  const syncLimits = () => {
+    limitBox.replaceChildren();
+    const f = features.find(x => x.key === featureSel.value);
+    ((f && f.limits) || []).forEach(l => {
+      const input = _mk('input');
+      input.type = 'number'; input.min = '0'; input.placeholder = l.label + ' (blank = unlimited)'; input.dataset.limit = l.key;
+      limitBox.appendChild(input);
+    });
+  };
+  featureSel.addEventListener('change', syncLimits);
+  syncLimits();
+  const days = _mk('input');
+  days.type = 'number'; days.min = '1'; days.placeholder = 'Days (blank = no expiry)';
+  const why = _mk('input');
+  why.type = 'text'; why.maxLength = 200; why.placeholder = 'Reason (optional)';
+  const add = _mk('button', 'btn-flat primary sm', 'Add');
+  add.type = 'button';
+  add.onclick = () => {
+    const limits = {};
+    limitBox.querySelectorAll('input').forEach(i => { if (i.value !== '') limits[i.dataset.limit] = Number(i.value); });
+    changeAccess(d.user_id, 'PUT', featureSel.value, {
+      effect: effectSel ? effectSel.value : 'grant', days: days.value ? Number(days.value) : null, reason: why.value,
+      limits: Object.keys(limits).length ? limits : undefined
+    }, pop);
+  };
+  const form = _mk('div', 'ap-form');
+  if (effectSel) form.appendChild(effectSel);
+  form.appendChild(featureSel);
+  form.appendChild(limitBox);
+  form.appendChild(why);
+  const when = _mk('div', 'ap-edit');
+  when.appendChild(days);
+  when.appendChild(add);
+  form.appendChild(when);
+  if (effectSel) toEnhance.push([effectSel, 'fas fa-toggle-on']);
+  toEnhance.push([featureSel, 'fas fa-puzzle-piece']);
+  return form;
+}
+
+function renderAccess(pop, d) {
+  const keep = pop.scrollTop;                                   // a change must not throw the reader back to the top
+  const caps = d.capabilities || {};
+  const toEnhance = [];
+  pop.replaceChildren();
+  pop.appendChild(_mk('div', 'ap-title', d.username));
+  pop.appendChild(_mk('div', 'ap-sub', 'Plan, role, admin access and special access are four separate things'));
+
+  // PLAN: what the user gets in the student portal
+  const planVal = [_planBadge(d.plan_label, d.tone, d.icon, 'md')];
+  if (d.plan_expires_at) planVal.push(_mk('div', 'ap-note', 'Until ' + _fmtDay(d.plan_expires_at) + ', then the default plan.'));
+  pop.appendChild(_accessRow('Plan', ...planVal));
+
+  // ROLE: only eligibility for the Admin Portal
+  pop.appendChild(_accessRow('Role', _mk('div', null, d.is_admin ? 'Admin' : 'User (not an admin)'),
+    _mk('div', 'ap-note', 'The Admin role only lets a person into the Admin Portal. It grants no admin feature and no plan.')));
+
+  // ADMIN ACCESS: which admin features this administrator has been granted (and any limits on them)
+  if (d.is_admin || d.admin_access.length) {
+    const grantable = ADMIN_FEATURES.filter(f => (caps.admin_features || []).includes(f.key));
+    const items = d.admin_access.length
+      ? d.admin_access.map(o => _entryLine(o, d, pop, (caps.admin_features || []).includes(o.feature)))
+      : [_mk('div', 'ap-note', 'None. This administrator can open the portal but no admin feature.')];
+    if (!d.is_admin) items.push(_mk('div', 'ap-note', 'Not an admin yet: these take effect once the Admin role is set.'));
+    if (grantable.length) items.push(_grantForm(d, pop, grantable, false, toEnhance));
+    pop.appendChild(_accessRow('Admin access', ...items));
+  }
+
+  // SPECIAL ACCESS: grants or denials of user features on top of the plan
+  const special = d.special.length ? d.special.map(o => _entryLine(o, d, pop, caps.special_access))
+                                   : [_mk('div', 'ap-note', 'None. This user has exactly what their plan gives.')];
+  if (caps.special_access && STUDENT_FEATURES.length) special.push(_grantForm(d, pop, STUDENT_FEATURES, true, toEnhance));
+  pop.appendChild(_accessRow('Special access', ...special));
+
+  // CHANGE PLAN
+  if (caps.plan) {
+    const planSel = _themedSelect(PLAN_OPTIONS.map((key, i) => [key, PLAN_LABELS[i]]), d.plan);
+    const save = _mk('button', 'btn-flat primary sm', 'Save');
+    save.type = 'button';
+    // The plan can be given for a number of days; blank = it does not expire. When it lapses the user is back on the default plan.
+    const days = _mk('input');
+    days.type = 'number'; days.min = '1'; days.placeholder = 'Days (blank = no expiry)';
+    save.onclick = () => saveUserPlan(d.user_id, planSel.value, days.value, save, pop);
+    const when = _mk('div', 'ap-edit');
+    when.appendChild(days);
+    when.appendChild(save);
+    const edit = _mk('div', 'ap-form');
+    edit.appendChild(planSel);
+    edit.appendChild(when);
+    pop.appendChild(_accessRow('Change plan', edit));
+    toEnhance.push([planSel, 'fas fa-layer-group']);
+  }
+  if (caps.reason) pop.appendChild(_mk('div', 'ap-lock', caps.reason));
+
+  // the project's themed dropdown, not the browser's native list (they must be in the page before they are enhanced)
+  toEnhance.forEach(([sel, icon]) => enhanceSelect(sel, { icon, block: true }));
+  pop.scrollTop = keep;
+  FloatingPanel.reposition();
+}
+
+function changeAccess(uid, method, feature, body, pop) {
+  fetch(`/api/v01/admin/access/users/${uid}/overrides/${encodeURIComponent(feature)}`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined
+  }).then(r => r.json()).then(d => {
+    if (!d.success) { toast(d.message || 'Could not change access.', 'error'); return; }
+    toast(d.message || 'Access updated.');
+    if (_accessPop === pop) renderAccess(pop, d);
+    umFetch(_umPage);
+  }).catch(() => toast('Could not change access.', 'error'));
+}
+
+function saveUserPlan(uid, plan, days, btn, pop) {
+  btn.disabled = true;
+  fetch(`/api/v01/admin/access/users/${uid}/plan`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, days: days ? Number(days) : null })
+  }).then(r => r.json()).then(d => {
+    if (!d.success) { toast(d.message || 'Could not change the plan.', 'error'); btn.disabled = false; return; }
+    toast('Plan updated.');
+    if (_accessPop === pop) renderAccess(pop, d);
+    umFetch(_umPage);
+  }).catch(() => { toast('Could not change the plan.', 'error'); btn.disabled = false; });
+}
+
+function openAccess(anchor) {
+  if (!CAN_MANAGE_ACCESS) return;
+  const uid = anchor.dataset.uid;
+  const shown = FloatingPanel.current();
+  if (shown && shown.dataset.uid === uid) { FloatingPanel.close(); return; }        // the same badge again closes it
+  const pop = _mk('div', 'access-pop');
+  pop.dataset.uid = uid;
+  pop.appendChild(_mk('div', 'ap-note', 'Loading...'));
+  _accessPop = pop;
+  FloatingPanel.open(anchor, pop, {
+    resolve: () => document.querySelector(`td.plan-cell .plan-badge[data-uid="${uid}"]`),      // the table re-renders after every change
+    onClose: () => { if (_accessPop === pop) _accessPop = null; }
+  });
+  fetch(`/api/v01/admin/access/users/${uid}`).then(r => r.json()).then(d => {
+    if (_accessPop !== pop) return;
+    if (!d.success) { pop.replaceChildren(_mk('div', 'ap-note', d.message || "Couldn't load access details.")); FloatingPanel.reposition(); return; }
+    renderAccess(pop, d);
+  }).catch(() => { if (_accessPop === pop) { pop.replaceChildren(_mk('div', 'ap-note', "Couldn't load access details.")); FloatingPanel.reposition(); } });
 }
 
 function umLoadStats() {

@@ -215,8 +215,75 @@ def list_notebooks_shared_by_owner(owner_id: int, limit: int = 20, offset: int =
     )
 
 
-def create_notebook(owner_id: int, notebook: Dict[str, Any]) -> Dict[str, Any]:
-    return insert_returning("notes_notebooks", {"owner_id": owner_id, **notebook})
+# ── Plan limits ─────────────────────────────────────────────────────────────────────────────────────────────────
+# A limit is only real if the count and the insert cannot be separated: two tabs (or two API calls) that both read "1 of 2"
+# and then both insert would end at 3. Every creation that a limit applies to therefore runs in ONE transaction that first
+# takes a Postgres advisory lock for that owner (notebooks) or that notebook (pages); the second request waits for the
+# first to commit, then counts again and is refused. `check(used)` is supplied by the service (it asks the entitlement
+# limit checker) and raises to refuse; the raise rolls the transaction back. The counts use the existing partial indexes
+# (owner_id ... WHERE deleted_at IS NULL, and notebook_id + position), so nothing is loaded into Python to be counted.
+
+def _lock(cur, key: str) -> None:
+    """Serialise writers on `key` until this transaction ends (commit or rollback releases it)."""
+    cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (key,))
+
+
+def _insert(cur, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    cols = list(data.keys())
+    cur.execute(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) RETURNING *", [data[c] for c in cols])
+    return _normalize_row(dict(cur.fetchone()))
+
+
+def _count_active_notebooks(cur, owner_id: int) -> int:
+    cur.execute("SELECT COUNT(*) AS n FROM notes_notebooks WHERE owner_id=%s AND deleted_at IS NULL", (owner_id,))
+    return int(cur.fetchone()["n"])
+
+
+def count_owned_notebooks(owner_id: int) -> int:
+    """Notebooks the user owns that count toward their plan (created and imported; not the ones in Trash)."""
+    row = fetch_one("SELECT COUNT(*) AS n FROM notes_notebooks WHERE owner_id=%s AND deleted_at IS NULL", (int(owner_id),))
+    return int(row["n"]) if row else 0
+
+
+def count_pages(notebook_id: str) -> int:
+    row = fetch_one("SELECT COUNT(*) AS n FROM notes_pages WHERE notebook_id=%s", (notebook_id,))
+    return int(row["n"]) if row else 0
+
+
+def create_notebook_checked(owner_id: int, notebook: Dict[str, Any], first_page_title: Optional[str], check) -> Dict[str, Any]:
+    """Create a notebook (and, when given, its first page) unless `check(active_notebook_count)` refuses. Atomic per owner."""
+    owner_id = int(owner_id)
+    with transaction() as cur:
+        _lock(cur, f"notes:notebooks:{owner_id}")
+        check(_count_active_notebooks(cur, owner_id))
+        created = _insert(cur, "notes_notebooks", {"owner_id": owner_id, **notebook})
+        if first_page_title is not None:
+            _insert(cur, "notes_pages", {"notebook_id": created["id"], "title": first_page_title, "position": 0})
+    return created
+
+
+def restore_owned_notebook_checked(notebook_id: str, owner_id: int, check) -> Optional[Dict[str, Any]]:
+    """Take a notebook out of Trash unless that would put the owner over their notebook limit."""
+    owner_id = int(owner_id)
+    with transaction() as cur:
+        _lock(cur, f"notes:notebooks:{owner_id}")
+        cur.execute("SELECT 1 AS ok FROM notes_notebooks WHERE id=%s AND owner_id=%s AND deleted_at IS NOT NULL", (notebook_id, owner_id))
+        if not cur.fetchone():
+            return None
+        check(_count_active_notebooks(cur, owner_id))
+        cur.execute("UPDATE notes_notebooks SET deleted_at=NULL WHERE id=%s AND owner_id=%s RETURNING *", (notebook_id, owner_id))
+        return _normalize_row(dict(cur.fetchone()))
+
+
+def create_page_checked(notebook_id: str, title: str, check) -> Dict[str, Any]:
+    """Add a page at the end of a notebook unless `check(page_count)` refuses. Atomic per notebook; the position is taken
+    inside the lock too, so two tabs can no longer collide on the (notebook_id, position) unique key."""
+    with transaction() as cur:
+        _lock(cur, f"notes:pages:{notebook_id}")
+        cur.execute("SELECT COUNT(*) AS n, COALESCE(MAX(position), -1) + 1 AS next_position FROM notes_pages WHERE notebook_id=%s", (notebook_id,))
+        row = cur.fetchone()
+        check(int(row["n"]))
+        return _insert(cur, "notes_pages", {"notebook_id": notebook_id, "title": title, "position": int(row["next_position"])})
 
 
 def update_owned_notebook(notebook_id: str, owner_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -234,14 +301,6 @@ def soft_delete_owned_notebook(notebook_id: str, owner_id: int) -> bool:
         (datetime.now(timezone.utc).isoformat(), notebook_id, owner_id),
     )
     return bool(rows)
-
-
-def restore_owned_notebook(notebook_id: str, owner_id: int) -> Optional[Dict[str, Any]]:
-    rows = execute_returning(
-        "UPDATE notes_notebooks SET deleted_at=NULL WHERE id=%s AND owner_id=%s AND deleted_at IS NOT NULL RETURNING *",
-        (notebook_id, owner_id),
-    )
-    return rows[0] if rows else None
 
 
 def list_pages(notebook_id: str) -> List[Dict[str, Any]]:

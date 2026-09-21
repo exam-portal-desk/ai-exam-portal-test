@@ -40,7 +40,7 @@ import pandas as pd
 from flask import request, jsonify, render_template_string
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_exam_by_id
 from app.db.questions import (
     get_question_by_id, get_questions_by_exam, get_questions_by_exam_page,
@@ -59,7 +59,7 @@ _QUESTION_ROWS_TPL = (
 
 
 @admin_api_bp.route("/questions", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def api_questions_list():
     """PERFORMANCE: backs Manage Questions' search box, Type/Image filters,
     "Show N entries" and pagination controls — every one of those now
@@ -97,7 +97,7 @@ def api_questions_list():
 
 
 @admin_api_bp.route("/questions", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def add_question_ajax():
     d = request.form.to_dict()
     result = create_question({
@@ -121,7 +121,7 @@ def add_question_ajax():
 
 
 @admin_api_bp.route("/questions/<int:question_id>", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def get_question_ajax(question_id):
     q = get_question_by_id(question_id)
     if not q:
@@ -130,7 +130,7 @@ def get_question_ajax(question_id):
 
 
 @admin_api_bp.route("/questions/<int:question_id>", methods=["PATCH"])
-@require_admin_role
+@require_admin_permission("question_management")
 def edit_question_ajax(question_id):
     q = get_question_by_id(question_id)
     if not q:
@@ -175,7 +175,7 @@ def edit_question_ajax(question_id):
 
 
 @admin_api_bp.route("/questions/delete-multiple", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def delete_multiple_questions():
     payload = request.get_json(force=True) or {}
     ids = [int(i) for i in (payload.get("ids") or []) if str(i).strip()]
@@ -186,7 +186,7 @@ def delete_multiple_questions():
 
 
 @admin_api_bp.route("/questions/batch-add", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def questions_batch_add():
     payload = request.get_json(force=True) or {}
     exam_id = int(payload.get("exam_id",0))
@@ -221,7 +221,7 @@ def questions_batch_add():
 
 
 @admin_api_bp.route("/questions/bulk-update", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def questions_bulk_update():
     payload  = request.get_json(force=True) or {}
     exam_id  = payload.get("exam_id")
@@ -246,7 +246,7 @@ def questions_bulk_update():
 
 
 @admin_api_bp.route("/questions/import-csv", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def import_questions_csv():
     if "csv_file" not in request.files:
         return jsonify({"success": False, "message": "No file uploaded"}), 400

@@ -1,0 +1,90 @@
+{
+  "_about": "SmartAIExam plans and feature access (configuration only). How to edit it: config/ENTITLEMENTS.md",
+  "schema_version": 1,
+  "default_plan": "free",
+
+  "features": {
+    "exams":                 { "category": "student", "label": "Exams",                    "description": "Take exams.", "enforced": true },
+    "results":               { "category": "student", "label": "Results",                  "description": "View exam results and leaderboards.", "enforced": true },
+    "responses":             { "category": "student", "label": "Responses",                "description": "Review submitted answers question by question.", "enforced": true },
+    "result_history":        { "category": "student", "label": "Result history",           "description": "Browse all past results.", "enforced": true },
+    "analytics":             { "category": "student", "label": "Analytics",                "description": "Personal performance analytics.", "enforced": true },
+    "discussion":            { "category": "student", "label": "Question discussion",      "description": "Comment threads between students on a question.", "enforced": true },
+    "chat":                  { "category": "student", "label": "Student chat",             "description": "Friends and group messaging between students.", "enforced": true },
+    "ai_assistant": {
+      "category": "student", "label": "AI Assistant", "description": "Study chat with the AI Assistant.", "enforced": true,
+      "limits": {
+        "requests_per_day":         { "label": "Requests per day",          "per": "day" },
+        "messages_per_conversation": { "label": "Messages per conversation", "per": "conversation" }
+      }
+    },
+    "response_ai_discussion": { "category": "student", "label": "Discuss with AI",        "description": "Discuss a reviewed question with the AI Assistant from the Response page.", "enforced": true },
+    "ai_explanation": {
+      "category": "student", "label": "AI Explanation", "description": "Step-by-step AI explanation of a wrongly answered question.", "enforced": true,
+      "limits": {
+        "per_day":      { "label": "Explanations per day",              "per": "day" },
+        "per_question": { "label": "Explanations per question per day", "per": "question" }
+      }
+    },
+    "notebook": {
+      "category": "student", "label": "Notebook", "description": "Notebooks and pages, sharing and the public library.", "enforced": true,
+      "limits": {
+        "notebooks":          { "label": "Notebooks",           "per": "account" },
+        "pages_per_notebook": { "label": "Pages per notebook",  "per": "notebook" }
+      }
+    },
+
+    "admin.category_management": { "category": "admin", "label": "Category management",   "description": "Manage categories and subcategories.", "admin_scope": "granted", "enforced": true },
+    "admin.exam_management":     { "category": "admin", "label": "Exam management",       "description": "Create, edit and publish exams.", "admin_scope": "granted", "enforced": true },
+    "admin.subject_management":  { "category": "admin", "label": "Subject management",    "description": "Manage subjects.", "admin_scope": "granted", "enforced": true },
+    "admin.question_management": { "category": "admin", "label": "Question management",   "description": "Manage questions, question images, image mapping, the LaTeX editor and discussion moderation.", "admin_scope": "granted", "enforced": true },
+    "admin.question_generation": {
+      "category": "admin", "label": "Question generation", "description": "AI Command Centre question extraction and generation.", "admin_scope": "granted", "enforced": true,
+      "limits": { "generations_per_day": { "label": "Generations per 24 hours", "per": "day" } }
+    },
+    "admin.storage_management":  { "category": "admin", "label": "Storage management",    "description": "Object Storage dashboard.", "admin_scope": "granted", "enforced": true },
+    "admin.attempt_management":  { "category": "admin", "label": "Attempt management",    "description": "Manage exam attempts.", "admin_scope": "granted", "enforced": true },
+    "admin.user_analytics":      { "category": "admin", "label": "User analytics",        "description": "Users analytics and results.", "admin_scope": "granted", "enforced": true },
+    "admin.user_management":     { "category": "admin", "label": "User management",       "description": "See users, their plans and access requests, and deny requests. Changing a role or access needs Access control management.", "admin_scope": "granted", "enforced": true },
+    "admin.ai_configuration":    { "category": "admin", "label": "AI configuration",      "description": "Choose the AI model behind each AI feature.", "admin_scope": "granted", "enforced": true },
+    "admin.access_control":      { "category": "admin", "label": "Access control management", "description": "Change plans, roles and permissions of ordinary users, and grant or revoke admin features.", "admin_scope": "granted", "enforced": true, "privileged": true, "granted_by": "admin.root" },
+    "admin.root":                { "category": "admin", "label": "Root administration",   "description": "Manage other privileged administrators and grant or revoke Access control management. Set only in the database.", "admin_scope": "granted", "enforced": true, "privileged": true, "granted_by": "none" }
+  },
+
+  "plans": {
+    "free": {
+      "label": "Free",
+      "tone": "dark",
+      "icon": "fa-leaf",
+      "features": {
+        "exams": {},
+        "results": {},
+        "responses": {},
+        "result_history": {},
+        "analytics": {}
+      }
+    },
+    "pro": {
+      "label": "Pro",
+      "tone": "royal",
+      "icon": "fa-bolt",
+      "inherits": "free",
+      "features": {
+        "ai_assistant": { "limits": { "requests_per_day": 50, "messages_per_conversation": 100 } },
+        "chat": {},
+        "discussion": {}
+      }
+    },
+    "elite": {
+      "label": "Elite",
+      "tone": "crimson",
+      "icon": "fa-crown",
+      "inherits": "pro",
+      "features": {
+        "response_ai_discussion": {},
+        "ai_explanation": { "limits": { "per_day": 50, "per_question": 3 } },
+        "notebook": {}
+      }
+    }
+  }
+}

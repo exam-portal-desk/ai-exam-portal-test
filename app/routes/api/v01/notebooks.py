@@ -19,13 +19,15 @@ from flask import Blueprint, jsonify, request, session, Response
 import json
 
 from app.db.users import set_view_pref
+from app.entitlements.guard import gate_blueprint
 from app.middleware.session_guard import require_user_role
 from app.services import notes_service
 from app.services import notes_storage_service
-from app.utils.notes_validation import NotesValidationError, NotesPermissionError, validate_notebook_id
+from app.utils.notes_validation import NotesLimitError, NotesValidationError, NotesPermissionError, validate_notebook_id
 
 
 notes_api_bp = Blueprint("notes_api", __name__, url_prefix="/api/v01")
+gate_blueprint(notes_api_bp, "notebook")
 
 # ── Notebook import job store ────────────────────────────────────────────
 # Same in-memory job + background-thread + polling pattern already used by
@@ -67,6 +69,12 @@ def _api_error(message: str, status: int = 400):
     return jsonify({"success": False, "message": message}), status
 
 
+def _limit_error(exc: NotesLimitError):
+    """A plan limit stopped a creation: the message is ready to show, the rest lets a page react (which limit, how many)."""
+    return jsonify({"success": False, "message": str(exc), "limit_reached": True, "limit_key": exc.limit_key,
+                    "limit": exc.limit, "used": exc.used, "plan": exc.plan_label}), 429
+
+
 def _safe_export_filename(title: str | None) -> str:
     """Same sanitization export_notebook_pdf_api already used for its PDF filename —
     shared here so PDF and JSON exports (private and public) always name the downloaded
@@ -106,6 +114,8 @@ def create_notebook_api():
     try:
         notebook = notes_service.create_notebook(session["user_id"], _payload())
         return jsonify({"success": True, "notebook": notebook}), 201
+    except NotesLimitError as exc:
+        return _limit_error(exc)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -147,6 +157,8 @@ def restore_notebook_api(notebook_id: str):
         if not notebook:
             return _api_error("Notebook not found in Trash.", 404)
         return jsonify({"success": True, "notebook": notebook, "message": "Notebook restored."})
+    except NotesLimitError as exc:
+        return _limit_error(exc)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:
@@ -250,6 +262,8 @@ def pages_api(notebook_id: str):
         return jsonify({"success": True, "page": page}), 201
     except NotesPermissionError as exc:
         return _api_error(str(exc), 403)
+    except NotesLimitError as exc:
+        return _limit_error(exc)
     except (NotesValidationError, ValueError) as exc:
         return _api_error(str(exc))
     except Exception:

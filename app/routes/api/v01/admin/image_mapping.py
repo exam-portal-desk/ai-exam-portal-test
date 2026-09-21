@@ -29,13 +29,12 @@ introducing a parallel image/question listing system:
 from flask import request, jsonify
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_exam_by_id
 from app.db.misc import get_subjects_page, get_subject_by_name
 from app.db.questions import (
     get_questions_by_exam_page, get_questions_by_ids, get_question_ids_for_exam, bulk_set_image_paths,
 )
-from app.utils.sanitize import sanitize_html
 from app.storage import get_storage
 from app.services.image_storage_service import resolve_question_image_urls_bulk
 
@@ -51,7 +50,7 @@ _MAX_MAPPINGS_PER_SAVE = 300
 _SUBJECT_COUNT_MAX_OBJECTS = 2000
 _SUBJECT_COUNT_PAGE_LIMIT = 1000
 
-_QUESTION_TEXT_PREVIEW_LEN = 140
+_QUESTION_TEXT_MAX_LEN = 5000
 
 
 def _count_subject_images(storage, subject_name: str) -> dict:
@@ -73,7 +72,7 @@ def _count_subject_images(storage, subject_name: str) -> dict:
 
 
 @admin_api_bp.route("/image-mapping/subjects", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def image_mapping_subjects():
     q = (request.args.get("q") or "").strip()
     page = request.args.get("page", 1, type=int)
@@ -118,9 +117,11 @@ def _serialize_questions(rows, image_status_filter=""):
             status = "attached" if has_image else "broken"
         if image_status_filter in ("attached", "broken") and status != image_status_filter:
             continue
-        text = sanitize_html(r.get("question_text", ""))
-        if len(text) > _QUESTION_TEXT_PREVIEW_LEN:
-            text = text[:_QUESTION_TEXT_PREVIEW_LEN].rstrip() + "…"
+        # The FULL raw text (the page escapes it itself and shows the one-line preview with CSS, so a formula is
+        # never cut in half and a long question can be read in full on hover). Bounded only against a pathological row.
+        text = str(r.get("question_text") or "").replace("\r\n", "\n").replace("\r", "\n")
+        if len(text) > _QUESTION_TEXT_MAX_LEN:
+            text = text[:_QUESTION_TEXT_MAX_LEN].rstrip() + "…"
         out.append({
             "id": r["id"],
             "row_no": r["row_no"],
@@ -134,7 +135,7 @@ def _serialize_questions(rows, image_status_filter=""):
 
 
 @admin_api_bp.route("/image-mapping/questions", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def image_mapping_questions():
     exam_id = request.args.get("exam_id", type=int)
     if not exam_id:
@@ -180,7 +181,7 @@ def image_mapping_questions():
 
 
 @admin_api_bp.route("/image-mapping/questions/select-all", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def image_mapping_select_all_ids():
     """Every question id matching the current search/type/image filters
     (not just the visible page) — backs "Select all matching". Capped at
@@ -214,7 +215,7 @@ def image_mapping_select_all_ids():
 
 
 @admin_api_bp.route("/image-mapping/save", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def image_mapping_save():
     payload = request.get_json(force=True, silent=True) or {}
     exam_id = payload.get("exam_id")

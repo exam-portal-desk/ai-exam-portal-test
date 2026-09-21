@@ -10,12 +10,12 @@ Storage listing endpoint for the image library itself).
 from flask import render_template
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_exams_for_selector
 
 
 @admin_bp.route("/image-mapping", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def image_mapping_page():
     # Same lightweight, one-round-trip exam list Manage Questions' own
     # exam picker uses — no question/image data loaded until the admin

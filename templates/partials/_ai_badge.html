@@ -1,0 +1,29 @@
+{#
+  The AI provider + model badge — the one reusable component for "which AI is this feature using right now".
+
+    {% from 'partials/_ai_badge.html' import ai_model_badge %}
+    {{ ai_model_badge('assistant_chat') }}
+    {{ ai_model_badge('question_generation_text', label='Text') }}
+
+  Everything shown comes from the central AI registry (feature -> its current assignment -> provider + model), via
+  the `ai_identity` template helper, so it changes the moment the configuration or an Admin choice changes. Nothing
+  is written here by hand. Provider and model each show their OWN logo (a model with no logo shows none — it never
+  borrows the provider's). Nothing sensitive is available to this template: no keys, no setting names.
+#}
+{% macro ai_model_badge(feature, label=None) %}
+{%- set ai = ai_identity(feature) -%}
+{%- if ai and ai.provider and ai.model -%}
+<span class="ai-badge{{ ' is-unavailable' if not ai.available }}" data-ai-feature="{{ feature }}">
+  {%- if label %}<span class="ai-badge-label">{{ label }}</span>{% endif -%}
+  <span class="ai-badge-part{{ '' if ai.provider.logo else ' no-mark' }}" title="Provider: {{ ai.provider.name }}">
+    {%- if ai.provider.logo %}<img class="ai-badge-logo" src="{{ ai.provider.logo }}" alt="" loading="lazy">{% endif -%}
+    <span class="ai-badge-name">{{ ai.provider.name }}</span>
+  </span>
+  <span class="ai-badge-sep" aria-hidden="true">&middot;</span>
+  <span class="ai-badge-part{{ '' if ai.model.logo else ' no-mark' }}" title="Model: {{ ai.model.name }}">
+    {%- if ai.model.logo %}<img class="ai-badge-logo" src="{{ ai.model.logo }}" alt="" loading="lazy">{% endif -%}
+    <span class="ai-badge-name">{{ ai.model.name }}</span>
+  </span>
+</span>
+{%- endif -%}
+{% endmacro %}

@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, jsonify, session, Response, url_fo
 import os
 import mimetypes
 
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_role, require_admin_permission
 import app.config as config
 
 misc_bp = Blueprint("misc", __name__)
@@ -87,7 +87,7 @@ for _name, _path in [
 
 
 @misc_bp.route("/debug/env-check")
-@require_admin_role
+@require_admin_permission("root")
 def debug_env_check():
     import app.config as config
 
@@ -103,7 +103,7 @@ def debug_env_check():
 
 
 @misc_bp.route("/debug/service-status")
-@require_admin_role
+@require_admin_permission("root")
 def debug_service_status():
     import app.config as config
     status = _storage_health()

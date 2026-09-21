@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from app import entitlements
 from app.db import notes as notes_db
 from app.services import notes_storage_service
 from app.utils.notes_validation import (
@@ -13,8 +14,43 @@ from app.utils.notes_validation import (
     validate_share_permission,
     IMPORT_TITLE_PREFIX,
     MAX_TITLE_LENGTH,
+    NotesLimitError,
     NotesPermissionError,
 )
+
+# Plan limits for notebooks (config/entitlements.json, feature "notebook"): `notebooks` = how many a user owns at once,
+# `pages_per_notebook` = pages in one notebook. Both are optional per plan; a limit that is not configured is unlimited.
+# The count and the insert happen in one transaction in app/db/notes.py; the decision comes from the one entitlement limit
+# checker, and these helpers only turn a refusal into a message the front end can show.
+_ENTITLEMENT_KEY = "notebook"
+
+
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
+def _plan_label(user_id: int) -> str:
+    return entitlements.user_plan(int(user_id))["plan_label"]
+
+
+def _enforce_notebooks(user_id: int, used: int) -> None:
+    status = entitlements.check_limit(int(user_id), _ENTITLEMENT_KEY, "notebooks", int(used))
+    if status.allowed:
+        return
+    plan = _plan_label(user_id)
+    message = (f"Your {plan} plan allows up to {_plural(status.limit, 'notebook')}." if status.limit is not None
+               else f"Notebooks are not part of your {plan} plan.")
+    raise NotesLimitError(message, limit_key="notebooks", limit=status.limit, used=int(used), plan_label=plan)
+
+
+def _enforce_pages(owner_id: int, used: int) -> None:
+    """The notebook OWNER's plan decides how many pages it may hold, whoever is adding the page (an Editor included)."""
+    status = entitlements.check_limit(int(owner_id), _ENTITLEMENT_KEY, "pages_per_notebook", int(used))
+    if status.allowed:
+        return
+    limit = f" ({_plural(status.limit, 'page')})" if status.limit is not None else ""
+    raise NotesLimitError(f"You have reached the maximum number of pages allowed in this notebook{limit}.",
+                          limit_key="pages_per_notebook", limit=status.limit, used=int(used), plan_label=_plan_label(owner_id))
 
 
 def assert_can_edit(notebook: Dict[str, Any]) -> None:
@@ -213,9 +249,7 @@ def get_my_trash(user_id: int) -> List[Dict[str, Any]]:
 
 def create_notebook(user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
     notebook = normalize_notebook_payload(payload)
-    created = notes_db.create_notebook(int(user_id), notebook)
-    notes_db.create_page(created["id"], "Untitled page", 0)
-    return created
+    return notes_db.create_notebook_checked(int(user_id), notebook, "Untitled page", lambda used: _enforce_notebooks(user_id, used))
 
 
 def update_notebook(user_id: int, notebook_id: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -327,6 +361,11 @@ def import_notebook(user_id: int, raw_payload: Dict[str, Any], progress=None) ->
     clean = validate_notebook_import(raw_payload)
 
     pages = clean["pages"]
+    pages_limit = entitlements.limit_for(int(user_id), _ENTITLEMENT_KEY, "pages_per_notebook")
+    if pages_limit is not None and len(pages) > pages_limit:
+        plan = _plan_label(user_id)
+        raise NotesLimitError(f"This file has {_plural(len(pages), 'page')}, but your {plan} plan allows up to {_plural(pages_limit, 'page')} in a notebook.",
+                              limit_key="pages_per_notebook", limit=pages_limit, used=len(pages), plan_label=plan)
     total_objects = sum(len(page["objects"]) for page in pages)
     needed_asset_ids = {
         obj["original_asset_id"] for page in pages for obj in page["objects"]
@@ -350,7 +389,7 @@ def import_notebook(user_id: int, raw_payload: Dict[str, Any], progress=None) ->
         "visibility": "private",  # imported notebooks are always private, regardless of the source's visibility
         "is_imported": True,
     }
-    created = notes_db.create_notebook(int(user_id), notebook_fields)
+    created = notes_db.create_notebook_checked(int(user_id), notebook_fields, None, lambda used: _enforce_notebooks(user_id, used))
     notebook_id = created["id"]
     _tick("creating_notebook", "Notebook created")
     copied_assets_by_original_id: Dict[str, Dict[str, Any]] = {}
@@ -443,7 +482,8 @@ def delete_notebook(user_id: int, notebook_id: str) -> bool:
 
 
 def restore_notebook(user_id: int, notebook_id: str) -> Optional[Dict[str, Any]]:
-    return notes_db.restore_owned_notebook(validate_notebook_id(notebook_id), int(user_id))
+    # Restoring brings a notebook back into the count, so it is held to the same limit as creating one.
+    return notes_db.restore_owned_notebook_checked(validate_notebook_id(notebook_id), int(user_id), lambda used: _enforce_notebooks(user_id, used))
 
 
 def get_editor_notebook(user_id: int, notebook_id: str) -> Optional[Dict[str, Any]]:
@@ -485,9 +525,8 @@ def create_page(user_id: int, notebook_id: str, title: Optional[str] = None) -> 
         raise ValueError("Page titles must contain 1–160 characters.")
     elif notes_db.page_name_exists(notebook["id"], title):
         raise ValueError("A page with this name already exists in this notebook.")
-    pages = notes_db.list_pages(notebook["id"])
-    next_position = max((int(page.get("position") or 0) for page in pages), default=-1) + 1
-    return notes_db.create_page(notebook["id"], title, next_position)
+    owner_id = int(notebook["owner_id"])
+    return notes_db.create_page_checked(notebook["id"], title, lambda used: _enforce_pages(owner_id, used))
 
 
 def update_page(user_id: int, notebook_id: str, page_id: str, title: str) -> Optional[Dict[str, Any]]:

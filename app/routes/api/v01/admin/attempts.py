@@ -21,13 +21,13 @@ mechanical, low-risk change that can't alter which rows are affected.
 """
 from flask import request, jsonify
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db import fetch_all, execute, insert_many
 from app.utils.datetime_service import now_utc_naive
 
 
 @admin_api_bp.route("/attempts/search")
-@require_admin_role
+@require_admin_permission("attempt_management")
 def api_attempts_search():
     """
     Query params:
@@ -206,7 +206,7 @@ def _apply_attempt_action(student_id: str, exam_id: str, action: str, amount: in
 
 # ── Single modify ────────────────────────────────────────────────────────
 @admin_api_bp.route("/attempts/modify", methods=["POST"])
-@require_admin_role
+@require_admin_permission("attempt_management")
 def attempts_modify():
     p          = request.get_json(force=True) or {}
     student_id = str(p.get("student_id", ""))
@@ -222,7 +222,7 @@ def attempts_modify():
 
 # ── Bulk modify ──────────────────────────────────────────────────────────
 @admin_api_bp.route("/attempts/bulk-modify", methods=["POST"])
-@require_admin_role
+@require_admin_permission("attempt_management")
 def attempts_bulk_modify():
     data   = request.get_json() or {}
     items  = data.get("items", [])

@@ -1,0 +1,192 @@
+/* static/shared/ai-explain.css
+ * How an AI Explanation looks (rendered by static/shared/ai-explain.js) and its generating / failed states.
+ * Theme tokens only. Same visual language as the AI Assistant's replies (section labels, numbered steps).
+ *
+ * Nothing in here scrolls vertically: the explanation grows with its content and the PAGE scrolls. Only a formula, a
+ * table or a code block that is genuinely wider than the card scrolls sideways, inside its own box.
+ */
+
+/* ── the explanation ─────────────────────────────────────────────────────────────────────────────────────────── */
+.aix {
+  position: relative;               /* contains KaTeX's hidden accessibility layer (position:absolute), which would otherwise stretch the page */
+  min-width: 0; color: var(--text-1); font-size: .86rem; line-height: 1.65;
+  overflow: visible;                /* deliberately: no inner scrollbar, ever */
+}
+.aix p, .aix li { overflow-wrap: break-word; }
+.aix p { margin: 0 0 .55rem; }
+.aix strong { color: var(--text-1); font-weight: 700; }
+.aix code { background: var(--surface-2); color: var(--accent); padding: .1rem .35rem; border-radius: 4px; font-size: .8rem; }
+.aix-pre { margin-bottom: .9rem; }
+.aix-pre > :last-child, .aix-body > :last-child { margin-bottom: 0; }
+
+/* sections: one small labelled block per "## heading" */
+.aix-sec { margin: 0 0 1rem; }
+.aix-sec:last-child { margin-bottom: 0; }
+.aix-h {
+  display: inline-flex; align-items: center; gap: .4rem; max-width: 100%;
+  margin: 0 0 .5rem; padding: .18rem .6rem; border-radius: 6px;
+  font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; line-height: 1.35;
+  background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
+}
+.aix-ico { font-size: .72rem; }
+.aix-sec--wrong      > .aix-h { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
+.aix-sec--given      > .aix-h { background: var(--info-bg);    color: var(--info-text);    border-color: var(--info-border); }
+.aix-sec--solution   > .aix-h { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.aix-sec--concept    > .aix-h { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+.aix-sec--tip        > .aix-h { background: var(--info-bg);    color: var(--info-text);    border-color: var(--info-border); }
+.aix-sec--note       > .aix-h { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+.aix-sec--answer     > .aix-h { background: var(--success); color: var(--text-on-dark); border-color: var(--success); }   /* solid: the conclusion, not the working */
+
+/* The solution is GREEN from its label down: a rail runs along the whole section, so it is obvious where it starts and
+   ends, and the steps inside are numbered in the same green. */
+.aix-sec--solution > .aix-body { margin-left: .4rem; padding-left: .9rem; border-left: 3px solid var(--success); }
+.aix-sec--solution .aix-steps > li { border-color: var(--success-border); }
+.aix-sec--solution .aix-steps > li::before { background: var(--success); color: var(--text-on-dark); }
+.aix-sec--solution .aix-h3--step { color: var(--success-text); border-top-color: var(--success-border); }
+.aix-sec--solution .aix-list li::marker { color: var(--success); }
+
+/* the few sections that get a body treatment (everything else stays plain text: no card per paragraph) */
+.aix-sec--given .aix-body, .aix-sec--concept .aix-body, .aix-sec--tip .aix-body, .aix-sec--answer .aix-body, .aix-sec--note .aix-body {
+  padding: .6rem .8rem; border-radius: var(--radius); border: 1px solid var(--border); border-left-width: 3px;
+}
+.aix-sec--given   .aix-body { background: var(--surface-2); border-left-color: var(--info); }
+.aix-sec--concept .aix-body { background: var(--warning-bg); border-color: var(--warning-border); border-left-color: var(--warning); }
+.aix-sec--tip     .aix-body { background: var(--info-bg); border-color: var(--info-border); border-left-color: var(--info); }
+.aix-sec--note    .aix-body { background: var(--warning-bg); border-color: var(--warning-border); border-left-color: var(--warning); }
+.aix-sec--answer  .aix-body { background: var(--success-bg); border-color: var(--success-border); border-left-color: var(--success); font-weight: 600; }
+.aix-sec--given .aix-list { margin: 0; }
+
+/* sub-headings ("### Step 3: ...") */
+.aix-h3 { margin: .8rem 0 .3rem; font-size: .84rem; font-weight: 700; color: var(--text-1); line-height: 1.4; }
+.aix-h3--step { padding-top: .55rem; border-top: 1px dashed var(--border); color: var(--accent); }   /* (block, not flex: inline formulas must stay in the sentence) */
+.aix-body > .aix-h3:first-child { margin-top: .1rem; }
+.aix-body > .aix-h3--step:first-child { padding-top: 0; border-top: 0; }
+
+/* labelled paragraphs ("Note: ...", "Final Answer: ...") */
+.aix-callout { padding: .45rem .7rem; border-radius: var(--radius); border: 1px solid var(--border); border-left-width: 3px; }
+.aix-callout--answer  { background: var(--success-bg); border-color: var(--success-border); border-left-color: var(--success); font-weight: 600; }
+.aix-callout--note    { background: var(--info-bg); border-color: var(--info-border); border-left-color: var(--info); }
+.aix-callout--warning { background: var(--warning-bg); border-color: var(--warning-border); border-left-color: var(--warning); }
+
+/* steps: a numbered list becomes a column of compact step cards (the number comes from the text itself) */
+.aix-steps { list-style: none; margin: .4rem 0 .6rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.aix-steps > li {
+  position: relative; min-width: 0; padding: .55rem .75rem .55rem 2.6rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.aix-steps > li::before {
+  content: attr(data-n); position: absolute; left: .7rem; top: .62rem;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-on);
+  display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 700;
+}
+.aix-steps > li > :last-child { margin-bottom: 0; }
+.aix-list { margin: .3rem 0 .6rem; padding-left: 1.15rem; }
+.aix-list li { margin-bottom: .25rem; padding-left: .1rem; }
+.aix-list li::marker { color: var(--accent); }
+.aix-list .aix-list { margin: .25rem 0 .1rem; }
+
+/* equations: comfortable spacing; a formula wider than the card scrolls sideways in its own box, never vertically */
+.aix-eq {
+  display: block; max-width: 100%; margin: .5rem 0; padding: .2rem 0 .3rem;
+  overflow-x: auto; overflow-y: hidden; text-align: center;
+  scrollbar-width: thin;
+}
+.aix-eq .katex-display { margin: 0; overflow: visible; }
+/* ONE formula size for the whole explanation. (The model's own \Large / \small are removed by the renderer, so nothing can
+   make one equation bigger than the next.) A fallback MathJax formula is scaled to sit at the same size. */
+.aix .katex { max-width: none; font-size: 1.12em; }
+.aix mjx-container[jax="CHTML"] { font-size: 118%; }
+.aix .katex.aix-wide { display: block; max-width: 100%; margin: .2rem 0; overflow-x: auto; overflow-y: hidden; }   /* an inline formula wider than its line (see fitWide) */
+.aix-mj { display: inline; }
+.aix-mj:not(.aix-mj-ready) { visibility: hidden; }       /* raw TeX is never shown while MathJax finishes a formula */
+.aix-mj--display { display: block; margin: .5rem 0; overflow-x: auto; overflow-y: hidden; text-align: center; }
+.aix-mj mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+.aix-badmath { font-size: .74rem; color: var(--text-3); background: var(--surface-2); border: 1px dashed var(--border); }   /* a formula neither engine could draw */
+.aix-cut {                                                 /* where a generation stopped in the middle of a formula */
+  display: block; margin: .5rem 0 0; padding: .4rem .7rem; font-size: .76rem; font-style: italic; color: var(--text-3);
+  background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--radius);
+}
+.aix-cut i { margin-right: .3rem; font-style: normal; }
+
+/* tables, code, quotes, rules */
+.aix-table-wrap { max-width: 100%; overflow-x: auto; overflow-y: hidden; margin: .5rem 0; border: 1px solid var(--border); border-radius: var(--radius); }
+.aix-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.aix-table th, .aix-table td { padding: .4rem .65rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.aix-table th { background: var(--surface-2); font-weight: 700; color: var(--text-1); white-space: nowrap; }
+.aix-table tr:last-child td { border-bottom: 0; }
+.aix-code { margin: .5rem 0; padding: .65rem .8rem; overflow-x: auto; overflow-y: hidden; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: .8rem; line-height: 1.5; }
+.aix-code code { padding: 0; background: none; color: var(--text-1); white-space: pre; }
+.aix-quote { margin: .5rem 0; padding: .1rem .8rem; border-left: 3px solid var(--border); color: var(--text-2); }
+.aix-hr { border: 0; border-top: 1px solid var(--border); margin: .8rem 0; }
+
+@media (max-width: 575.98px) {
+  .aix { font-size: .84rem; }
+  .aix-steps > li { padding: .5rem .6rem .5rem 2.3rem; }
+  .aix-steps > li::before { left: .55rem; }
+  .aix-sec--given .aix-body, .aix-sec--concept .aix-body, .aix-sec--tip .aix-body, .aix-sec--answer .aix-body, .aix-sec--note .aix-body { padding: .5rem .65rem; }
+}
+
+/* ── generating ──────────────────────────────────────────────────────────────────────────────────────────────── */
+.aix-loading {
+  display: flex; flex-direction: column; gap: .75rem; padding: .9rem 1rem; margin: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.aix-loading-head { display: flex; align-items: center; gap: .75rem; }
+.aix-orb {
+  position: relative; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-subtle); color: var(--accent); font-size: .9rem;
+}
+.aix-orb::after {                       /* a soft ring that breathes while the model is working */
+  content: ""; position: absolute; inset: -4px; border-radius: 13px; border: 2px solid var(--accent); opacity: 0;
+  animation: aixBreathe 1.8s ease-out infinite;
+}
+.aix-loading-title { font-size: .84rem; font-weight: 700; color: var(--text-1); }
+.aix-dots::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: aixDots 1.4s steps(4, end) infinite; }
+.aix-loading-sub { font-size: .73rem; color: var(--text-3); margin-top: .1rem; }
+.aix-skel { display: flex; flex-direction: column; gap: .5rem; }
+.aix-skel span {
+  display: block; height: 10px; border-radius: 5px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%;
+  animation: aixShimmer 1.4s linear infinite;
+}
+.aix-skel span:nth-child(1) { width: 38%; height: 12px; }
+.aix-skel span:nth-child(2) { width: 92%; }
+.aix-skel span:nth-child(3) { width: 78%; }
+.aix-skel span:nth-child(4) { width: 55%; }
+@keyframes aixBreathe { 0% { transform: scale(.9); opacity: .55; } 100% { transform: scale(1.25); opacity: 0; } }
+@keyframes aixShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes aixDots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+@media (prefers-reduced-motion: reduce) {
+  .aix-orb::after, .aix-skel span, .aix-dots::after { animation: none; }
+  .aix-dots::after { content: "..."; }
+}
+
+/* ── failed ──────────────────────────────────────────────────────────────────────────────────────────────────── */
+.aix-error {
+  display: flex; align-items: flex-start; gap: .75rem; padding: .8rem 1rem; margin: 0;
+  background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); color: var(--danger-text);
+}
+.aix-error--info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
+.aix-error > i { flex: 0 0 auto; margin-top: .15rem; font-size: .95rem; }
+.aix-error-main { flex: 1 1 auto; min-width: 0; }
+.aix-error-title { font-size: .82rem; font-weight: 700; }
+.aix-error-msg { font-size: .76rem; margin-top: .15rem; line-height: 1.5; overflow-wrap: break-word; }
+.aix-error-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .55rem; }
+.aix-btn {
+  display: inline-flex; align-items: center; gap: .4rem; padding: .32rem .8rem; border-radius: var(--radius);
+  font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer;
+  background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
+}
+.aix-btn:hover { border-color: var(--accent); color: var(--accent); }
+.aix-btn--primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+.aix-btn--primary:hover { background: var(--accent-hover); color: var(--accent-on); border-color: var(--accent-hover); }
+.aix-btn:focus-visible { outline: 2px solid var(--border-focus, var(--accent)); outline-offset: 2px; }
+.aix-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+
+/* an explanation that could not be saved: still shown, and marked */
+.aix-unsaved {
+  display: flex; align-items: flex-start; gap: .55rem; margin: 0 0 .8rem; padding: .55rem .8rem; font-size: .76rem; line-height: 1.5;
+  background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); border-radius: var(--radius);
+}
+.aix-unsaved i { margin-top: .15rem; }

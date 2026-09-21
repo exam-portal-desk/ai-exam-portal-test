@@ -17,7 +17,7 @@ from urllib.parse import quote
 from flask import jsonify, request, Response
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.storage import get_storage
 from app.services.image_storage_service import resolve_object_url
 from app.utils.datetime_service import format_display
@@ -125,7 +125,7 @@ def _scan_prefix_stats(storage, prefix: str, max_objects: int = _SCAN_MAX_OBJECT
 
 
 @admin_api_bp.route("/storage/objects", methods=["GET"])
-@require_admin_role
+@require_admin_permission("storage_management")
 def list_storage_objects():
     storage = get_storage()
     prefix = request.args.get("prefix", "") or ""
@@ -180,7 +180,7 @@ def list_storage_objects():
 
 
 @admin_api_bp.route("/storage/stats", methods=["GET"])
-@require_admin_role
+@require_admin_permission("storage_management")
 def storage_stats():
     """On-demand full scan for total object count + total bytes under
     `prefix` (bucket-wide if omitted). Not computed on every page load —
@@ -193,7 +193,7 @@ def storage_stats():
 
 
 @admin_api_bp.route("/storage/objects", methods=["DELETE"])
-@require_admin_role
+@require_admin_permission("storage_management")
 def delete_storage_objects():
     data = request.get_json(silent=True) or {}
     keys = [k for k in (data.get("keys") or []) if isinstance(k, str) and k.strip()]
@@ -211,7 +211,7 @@ def delete_storage_objects():
 
 
 @admin_api_bp.route("/storage/download", methods=["GET"])
-@require_admin_role
+@require_admin_permission("storage_management")
 def download_storage_object():
     """Single-object download — streams the real bytes through the same
     provider-agnostic get_storage().download() every other handler here
@@ -235,7 +235,7 @@ def download_storage_object():
 
 
 @admin_api_bp.route("/storage/download-zip", methods=["POST"])
-@require_admin_role
+@require_admin_permission("storage_management")
 def download_storage_objects_zip():
     """Bulk download — bundles the selected objects into one ZIP, built
     entirely server-side (the browser makes one request and gets back one

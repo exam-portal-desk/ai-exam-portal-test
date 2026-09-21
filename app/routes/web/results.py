@@ -13,12 +13,14 @@ from flask import (
 )
 
 from app.middleware.session_guard import require_user_role
+from app.entitlements.guard import require_feature
 from app.db.exams import get_exam_by_id
 from app.db.questions import get_questions_by_exam
 from app.db.results import (
     get_result_by_id, get_latest_result_by_user_exam, get_responses_by_result,
 )
 from app.services.result_service import can_user_see_result
+from app.services.question_access import check_result_access, resolve_result
 from app.services.ranking_service import build_exam_performance, get_more_leaderboard_rows
 from app.db.dashboard_events import mark_event_seen
 
@@ -32,6 +34,7 @@ result_bp = Blueprint("result", __name__)
 @result_bp.route("/result/<int:exam_id>", defaults={"result_id": None})
 @result_bp.route("/result/<int:exam_id>/<int:result_id>")
 @require_user_role
+@require_feature("results")
 def result(exam_id, result_id):
     user_id  = session["user_id"]
     exam     = get_exam_by_id(exam_id)
@@ -64,6 +67,7 @@ def result(exam_id, result_id):
 
 @result_bp.route("/result/<int:exam_id>/leaderboard")
 @require_user_role
+@require_feature("results")
 def leaderboard_more(exam_id):
     user_id = session["user_id"]
 
@@ -97,6 +101,7 @@ def leaderboard_more(exam_id):
 @result_bp.route("/response/<int:exam_id>", defaults={"result_id": None})
 @result_bp.route("/response/<int:exam_id>/<int:result_id>")
 @require_user_role
+@require_feature("responses")
 def response_page(exam_id, result_id):
     user_id      = session["user_id"]
     from_history = request.args.get("from_history","0") == "1"
@@ -111,11 +116,16 @@ def response_page(exam_id, result_id):
         flash("Result not found.", "error")
         return redirect(url_for("dashboard.results_history"))
 
-    visible, reason = can_user_see_result(exam, result_data)
-    if not visible:
-        return render_template("result_pending.html", exam=exam,
-                               reason=reason, result_id=result_data["id"],
-                               from_history=from_history)
+    # The same rule every feature that shows an answer key uses (app/services/question_access.py): the result is the
+    # student's own, it is visible (unchanged: instant / released / delay), and no attempt of this exam is in progress.
+    access = check_result_access(user_id, exam, result_data)
+    if not access.allowed:
+        if access.reason == "result_hidden":
+            return render_template("result_pending.html", exam=exam,
+                                   reason=access.message, result_id=result_data["id"],
+                                   from_history=from_history)
+        flash(access.message, "warning")
+        return redirect(url_for("dashboard.results_history"))
 
     rid       = int(result_data["id"])
     responses = get_responses_by_result(rid)
@@ -197,6 +207,7 @@ def response_page(exam_id, result_id):
 @result_bp.route("/result-pending/<int:exam_id>", defaults={"result_id": None})
 @result_bp.route("/result-pending/<int:exam_id>/<int:result_id>")
 @require_user_role
+@require_feature("results")
 def result_pending(exam_id, result_id):
     user_id = session["user_id"]
     exam    = get_exam_by_id(exam_id)
@@ -231,6 +242,7 @@ def result_pending(exam_id, result_id):
 
 @result_bp.route("/response-pdf/<int:exam_id>")
 @require_user_role
+@require_feature("responses")
 def response_pdf(exam_id):
     from app.services.pdf_service import build_student_response_pdf
 
@@ -249,9 +261,9 @@ def response_pdf(exam_id):
     # the same result_mode='manual'/'delayed' gate every other result/
     # response view enforces (result(), response_page(), leaderboard_more()
     # above). Same can_user_see_result() check, same reason for existing.
-    visible, _ = can_user_see_result(exam, result_data)
-    if not visible:
-        flash("This result has not been released yet.", "warning")
+    access = check_result_access(user_id, exam, result_data)
+    if not access.allowed:
+        flash("This result has not been released yet." if access.reason == "result_hidden" else access.message, "warning")
         return redirect(url_for("dashboard.results_history"))
 
     responses = get_responses_by_result(int(result_data["id"]))
@@ -280,21 +292,6 @@ def response_pdf(exam_id):
 # ─────────────────────────────────────────────
 
 def _resolve_result(user_id, exam_id, result_id):
-    """Find the right result record for a user+exam, trying multiple strategies."""
-    if result_id:
-        r = get_result_by_id(result_id)
-        if r and int(r.get("student_id",0)) == user_id:
-            return r
-        return None
-
-    # Try session
-    sid = session.get("latest_result_id")
-    if sid:
-        r = get_result_by_id(sid)
-        if r and int(r.get("exam_id",0)) == exam_id and int(r.get("student_id",0)) == user_id:
-            return r
-
-    # Fallback: most recent result for this user+exam — scoped/sorted/limited
-    # in SQL instead of fetching the user's entire result history and
-    # filtering/sorting it in Python.
-    return get_latest_result_by_user_exam(user_id, exam_id)
+    """Find the right result record for a user+exam. The rule itself now lives in app/services/question_access.py so the
+    response page, the Explanation endpoints and the Assistant all resolve a student's result the same way."""
+    return resolve_result(user_id, exam_id, result_id, session.get("latest_result_id"))

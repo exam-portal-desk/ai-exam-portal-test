@@ -15,6 +15,7 @@ import logging
 from flask import Blueprint, url_for, session, request, jsonify
 
 from app.middleware.session_guard import require_user_role
+from app.entitlements.guard import require_feature
 from app.db.exams import get_exam_by_id
 from app.db.attempts import (
     get_active_attempt, get_completed_attempts_count,
@@ -37,6 +38,7 @@ ping_api_bp = Blueprint("ping_api", __name__, url_prefix="/api/v01")
 
 @exam_api_bp.route("/<int:exam_id>/start", methods=["POST"])
 @require_user_role
+@require_feature("exams")
 def start_exam(exam_id):
     user_id = session["user_id"]
 

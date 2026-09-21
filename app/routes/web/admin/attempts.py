@@ -8,12 +8,12 @@ app/routes/api/v01/admin/attempts.py.
 from flask import render_template
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_all_exams
 
 
 @admin_bp.route("/attempts")
-@require_admin_role
+@require_admin_permission("attempt_management")
 def attempts():
     exams = get_all_exams()   # small list, always fine
     return render_template("admin/attempts.html", exams=exams, rows=[])

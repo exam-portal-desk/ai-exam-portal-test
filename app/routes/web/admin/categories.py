@@ -8,7 +8,7 @@ in app/routes/api/v01/admin/categories.py.
 from flask import render_template
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.categories import get_categories_page
 from app.services.image_storage_service import resolve_category_image_url
 import app.config as config
@@ -17,7 +17,7 @@ CATEGORIES_PAGE_SIZE = 20
 
 
 @admin_bp.route("/categories")
-@require_admin_role
+@require_admin_permission("category_management")
 def categories():
     page_data = get_categories_page(page=1, per_page=CATEGORIES_PAGE_SIZE)
     for cat in page_data["categories"]:

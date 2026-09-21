@@ -10,6 +10,8 @@
  * icon is optional, shown before the current label. block (default false)
  * makes it a full-width form field matching .form-control/.form-select,
  * for a select sitting in a form grid rather than a compact filter toolbar.
+ *
+ * Also exposes FloatingPanel (below): the same open/close rules for a larger popover.
  */
 (function (global) {
   let _openWrap = null; // only one enhanced dropdown open at a time, page-wide
@@ -151,6 +153,88 @@
     render();
     return { refresh: render };
   }
+
+
+  /* FloatingPanel — the same interaction rules as the dropdown menus above, for a larger popover (e.g. a user's plan card)
+   *
+   *   FloatingPanel.open(anchor, panel, { resolve, onClose })   panel is an element with class "floating-panel"
+   *   FloatingPanel.reposition() / FloatingPanel.close() / FloatingPanel.current()
+   *
+   * One is open at a time, page-wide. It closes on Escape and on a press OUTSIDE it (pointerdown, so a drag on its own
+   * scrollbar or a touch inside it never counts as outside). Scrolling INSIDE it is never treated as the page moving, and
+   * select-enhance.css stops the scroll from chaining to the page (overscroll-behavior). When the PAGE scrolls or resizes
+   * the panel follows its anchor (fixed coordinates, so no parent container can clip it) and closes only if the anchor has
+   * left the screen. `resolve` returns the anchor again when the page re-rendered it; on a narrow screen it becomes a sheet.
+   */
+  const FloatingPanel = (function () {
+    let cur = null;   // { anchor, panel, opts, frame }
+
+    function anchorEl() {
+      if (!cur) return null;
+      if (cur.anchor && cur.anchor.isConnected) return cur.anchor;
+      const found = cur.opts.resolve ? cur.opts.resolve() : null;
+      if (found) cur.anchor = found;
+      return found;
+    }
+
+    function place() {
+      if (!cur) return;
+      const anchor = anchorEl();
+      const panel = cur.panel;
+      if (!anchor) return;                                   // the page is re-rendering it right now: stay where the panel is
+      const r = anchor.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) { close(); return; }
+      const sheet = window.innerWidth <= 640;
+      panel.classList.toggle('is-sheet', sheet);
+      if (sheet) { panel.style.left = panel.style.top = ''; return; }
+      const w = panel.offsetWidth, h = panel.offsetHeight;
+      panel.style.left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8)) + 'px';
+      let top = r.bottom + 6;
+      if (top + h > window.innerHeight - 8) {
+        const above = r.top - h - 6;
+        top = above >= 8 ? above : Math.max(8, window.innerHeight - h - 8);
+      }
+      panel.style.top = top + 'px';
+    }
+
+    function schedule() {
+      if (!cur || cur.frame) return;
+      cur.frame = requestAnimationFrame(() => { if (cur) { cur.frame = 0; place(); } });
+    }
+
+    function close() {
+      if (!cur) return;
+      const { panel, opts, frame } = cur;
+      cur = null;
+      if (frame) cancelAnimationFrame(frame);
+      panel.remove();
+      if (opts.onClose) opts.onClose();
+    }
+
+    function open(anchor, panel, opts) {
+      close();
+      cur = { anchor, panel, opts: opts || {}, frame: 0 };
+      panel.classList.add('floating-panel');
+      document.body.appendChild(panel);
+      place();
+    }
+
+    document.addEventListener('pointerdown', e => {
+      if (!cur || cur.panel.contains(e.target)) return;
+      const anchor = anchorEl();
+      if (anchor && anchor.contains(e.target)) return;      // the anchor's own click decides (open again / close)
+      close();
+    }, true);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    window.addEventListener('scroll', e => {
+      if (!cur || (e.target && typeof e.target.contains === 'function' && cur.panel.contains(e.target))) return;
+      schedule();
+    }, true);
+    window.addEventListener('resize', schedule);
+
+    return { open, close, reposition: schedule, current: () => (cur ? cur.panel : null) };
+  })();
+  global.FloatingPanel = FloatingPanel;
 
   global.enhanceSelect = enhanceSelect;
 })(window);

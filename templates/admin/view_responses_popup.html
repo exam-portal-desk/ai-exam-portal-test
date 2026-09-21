@@ -7,6 +7,8 @@
    (this page extends it) — a second, independently-configured MathJax
    instance used to load here on top of that one, and the two competed over
    window.MathJax, which is why rendering was inconsistent/blank. #}
+{# Floating Page Up / Page Down (shared with the student Response page). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/page-nav.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -678,6 +680,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='shared/page-nav.js') }}"></script>
 <script nonce="{{ csp_nonce() if csp_nonce is defined else '' }}">
 //<![CDATA[
 function openImageModal(src, title) {
@@ -1483,6 +1486,11 @@ document.addEventListener('DOMContentLoaded', discWrapMath);
   } catch(e) { badges.forEach(b => b.textContent = '0'); }
 })();
 
+
+// Floating Page Up / Page Down (static/shared/page-nav.js): pages the whole document, question by question.
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PageNav) PageNav.init({ sections: '.question-response-card', offset: 24 });
+});
 
 //]]>
 </script>

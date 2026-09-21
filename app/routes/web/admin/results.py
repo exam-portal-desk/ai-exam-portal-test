@@ -9,7 +9,7 @@ app/routes/api/v01/admin/analytics.py.
 from flask import render_template, request, abort, send_file
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_all_exams, get_exam_by_id
 from app.db.users import get_user_by_id, get_users_by_ids, get_all_users
 from app.db.results import get_result_by_id, get_responses_by_result
@@ -35,7 +35,7 @@ def _display_full_name(user: dict) -> str:
 # ── Analytics dashboard ───────────────────────────────────────────────────
 
 @admin_bp.route("/users-analytics")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics():
     exams = get_all_exams()
     exams_list = [{"id": int(e["id"]), "name": e.get("name","")} for e in exams]
@@ -92,7 +92,7 @@ def users_analytics():
 
 
 @admin_bp.route("/users-analytics/results")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics_results():
     """
     AJAX-paginated results with working date filter.
@@ -225,14 +225,14 @@ def users_analytics_results():
 
 
 @admin_bp.route("/users-analytics/analytics")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics_analytics():
     exams = [{"id": int(e["id"]), "name": e.get("name","")} for e in get_all_exams()]
     return render_template("admin/users_analytics_analytics.html", exams=exams)
 
 
 @admin_bp.route("/users-analytics/view-result/<int:result_id>/<int:exam_id>")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics_view_result(result_id, exam_id):
     result = get_result_by_id(result_id)
     if not result: abort(404)
@@ -248,7 +248,7 @@ def users_analytics_view_result(result_id, exam_id):
 
 
 @admin_bp.route("/users-analytics/view-responses/<int:result_id>/<int:exam_id>")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics_view_responses(result_id, exam_id):
     import json as _json
     from app.services.image_storage_service import resolve_question_image_urls_bulk
@@ -332,7 +332,7 @@ def users_analytics_view_responses(result_id, exam_id):
 
 
 @admin_bp.route("/users-analytics/download-result/<int:result_id>")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics_download_result(result_id):
     from io import BytesIO
     from app.services.pdf_service import build_student_response_pdf

@@ -214,8 +214,16 @@
   <p>Here's what's happening today.</p>
 </div>
 
+{% if no_admin_features %}
+<div style="background:var(--warning-bg);color:var(--warning-text);border:1px solid var(--warning-border);border-radius:10px;padding:.85rem 1.1rem;margin-bottom:1.25rem;font-size:.85rem">
+  <i class="fas fa-info-circle"></i> Your account is an administrator, but no admin features have been granted to it yet. Ask an Access control administrator to grant the ones you need.
+</div>
+{% endif %}
+
 <!-- ── Primary KPIs ── -->
+{% if show.exams or show.users %}
 <div class="dash-stats">
+  {% if show.exams %}
   <div class="dash-stat" style="--stat-c:var(--info-text)">
     <div class="dash-stat-icon dsi-blue"><i class="fas fa-file-alt"></i></div>
     <div class="dash-stat-body">
@@ -223,6 +231,8 @@
       <div class="dash-stat-label">Total Exams</div>
     </div>
   </div>
+  {% endif %}
+  {% if show.users %}
   <div class="dash-stat" style="--stat-c:var(--success-text)">
     <div class="dash-stat-icon dsi-green"><i class="fas fa-users"></i></div>
     <div class="dash-stat-body">
@@ -246,61 +256,81 @@
       <div class="dash-stat-label">Student Accounts</div>
     </div>
   </div>
+  {% endif %}
 </div>
+{% endif %}
 
 <!-- ── Analytics ── -->
+{% if show.library or show.users or show.question_types or show.attempts or show.requests or show.exams %}
 <div class="dash-section-title">Analytics</div>
 <div class="dash-charts">
 
+  {% if show.library %}
   <div class="dash-chart-card span2" style="--chart-c:var(--info-text)">
     <div class="dash-chart-hdr">Content Library</div>
     <div class="dash-chart-sub">Categories, subjects, exams and questions on the portal</div>
     <div class="dash-chart-body"><canvas id="chartContentLibrary"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.users %}
   <div class="dash-chart-card" style="--chart-c:var(--accent)">
     <div class="dash-chart-hdr">Users</div>
     <div class="dash-chart-sub">Admins vs. students</div>
     <div class="dash-chart-body"><canvas id="chartUserRoles"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.question_types %}
   <div class="dash-chart-card" style="--chart-c:#7c3aed">
     <div class="dash-chart-hdr">Questions by Type</div>
     <div class="dash-chart-sub">Across all exams</div>
     <div class="dash-chart-body"><canvas id="chartQuestionTypes"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.attempts %}
   <div class="dash-chart-card" style="--chart-c:var(--success-text)">
     <div class="dash-chart-hdr">Exam Attempts</div>
     <div class="dash-chart-sub">By status</div>
     <div class="dash-chart-body"><canvas id="chartAttempts"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.requests %}
   <div class="dash-chart-card" style="--chart-c:var(--warning-text)">
     <div class="dash-chart-hdr">Access Requests</div>
     <div class="dash-chart-sub">By status</div>
     <div class="dash-chart-body"><canvas id="chartRequests"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.exams %}
   <div class="dash-chart-card" style="--chart-c:#0891b2">
     <div class="dash-chart-hdr">Exams per Category</div>
     <div class="dash-chart-sub">Where exams are concentrated</div>
     <div class="dash-chart-body tall"><canvas id="chartExamsPerCategory"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.attempts %}
   <div class="dash-chart-card" style="--chart-c:var(--info-text)">
     <div class="dash-chart-hdr">Most Attempted Exams</div>
     <div class="dash-chart-sub">Top 5 by attempt count</div>
     <div class="dash-chart-body tall"><canvas id="chartTopAttempted"></canvas></div>
   </div>
+  {% endif %}
 
+  {% if show.exams %}
   <div class="dash-chart-card" style="--chart-c:var(--danger-text)">
     <div class="dash-chart-hdr">Largest Exams</div>
     <div class="dash-chart-sub">Top 5 by question count</div>
     <div class="dash-chart-body tall"><canvas id="chartTopQuestions"></canvas></div>
   </div>
+  {% endif %}
 
 </div>
+{% endif %}
 
 <!-- ── Apps / Quick Actions ── -->
 <div class="dash-section-title" style="margin-top:2rem">Apps</div>

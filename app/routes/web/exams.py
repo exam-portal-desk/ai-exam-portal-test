@@ -31,6 +31,7 @@ from flask import (
 )
 
 from app.middleware.session_guard import require_user_role
+from app.entitlements.guard import require_feature
 from app.db.exams import get_exam_by_id
 from app.db.questions import get_questions_by_exam, get_question_type_summary_for_exam
 from app.db.results import get_result_by_attempt_id
@@ -269,6 +270,7 @@ def _exam_action_context(exam_id):
 
 @exam_bp.route("/exam-instructions/<int:exam_id>")
 @require_user_role
+@require_feature("exams")
 def exam_instructions(exam_id):
     ctx = _exam_action_context(exam_id)
     if ctx is None:

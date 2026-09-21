@@ -113,6 +113,71 @@ def create_app() -> Flask:
     from app.utils.instructions_formatter import render_exam_instructions
     app.jinja_env.filters["format_instructions"] = render_exam_instructions
 
+    # {{ ai_identity("assistant_chat") }} — which provider + model a feature uses right now, from the central
+    # AI registry (safe display data only). Used by templates/partials/_ai_badge.html. A problem in the AI
+    # configuration must never break the page that merely wants to label itself, so failures give None.
+    def _ai_identity(feature):
+        try:
+            from app.services.ai import public_identity
+            return public_identity(feature)
+        except Exception as e:
+            print(f"[ai] identity unavailable for '{feature}': {type(e).__name__}")
+            return None
+
+    app.jinja_env.globals["ai_identity"] = _ai_identity
+
+    # {{ user_plan() }} and {{ user_can("notebook") }}: the signed-in student's plan and what it allows, from app.entitlements (the
+    # very source the routes enforce), computed once per request. A visitor or an admin-portal session has no student plan:
+    # user_plan() is None and user_can() is True (nothing to lock).
+    from flask import g as _g, session as _session
+    from app import entitlements
+
+    def _user_plan():
+        uid = _session.get("user_id")
+        if not uid or _session.get("admin_id"):
+            return None
+        if not hasattr(_g, "plan_view"):
+            try:
+                _g.plan_view = entitlements.user_plan(int(uid))
+            except Exception as e:
+                print(f"[entitlements] plan unavailable for this page: {type(e).__name__}: {e}")
+                _g.plan_view = None
+        return _g.plan_view
+
+    def _user_can(feature):
+        view = _user_plan()
+        return True if view is None else any(f["key"] == feature and f["allowed"] for f in view["features"])
+
+    app.jinja_env.globals["user_plan"] = _user_plan
+    app.jinja_env.globals["user_can"] = _user_can
+
+    # {{ admin_can("exam_management") }}: whether the signed-in administrator has been granted that admin feature (menus and
+    # dashboard tiles only; the routes enforce it on the server). Computed once per request per feature.
+    def _admin_can(permission):
+        uid = _session.get("user_id")
+        if not uid or not _session.get("admin_id"):
+            return False
+        if not hasattr(_g, "admin_can_cache"):
+            _g.admin_can_cache = {}
+        cache = _g.admin_can_cache
+        if permission not in cache:
+            try:
+                cache[permission] = entitlements.has_admin_permission(int(uid), permission)
+            except Exception as e:
+                print(f"[entitlements] admin permission check failed for the menu: {type(e).__name__}: {e}")
+                cache[permission] = False
+        return cache[permission]
+
+    app.jinja_env.globals["admin_can"] = _admin_can
+
+    # {{ admin_feature_label("exam_management") }} -> "Exam management": the name from config/entitlements.json, for menus.
+    def _admin_feature_label(permission):
+        from app.entitlements.catalog import get_catalog
+        definition = get_catalog().features.get(f"admin.{permission}")
+        return definition.label if definition else permission
+
+    app.jinja_env.globals["admin_feature_label"] = _admin_feature_label
+
     @app.context_processor
     def inject_globals():
         from flask import session
@@ -124,7 +189,6 @@ def create_app() -> Flask:
         return {"CURRENT_YEAR": now_app_tz().year, "DISPLAY_DATE_FORMAT": config.DISPLAY_DATE_FORMAT,
                 "DISPLAY_DATETIME_FORMAT": config.DISPLAY_DATETIME_FORMAT,
                 "NAV_AVATAR_URL": nav_avatar_url,
-                "MAX_MESSAGES_PER_CONVERSATION": config.MAX_MESSAGES_PER_CONVERSATION,
                 "BASE_URL": config.BASE_URL,
                 # Public contact/footer info — see app/config.py for the
                 # "blank means hide, never fabricate" convention every
@@ -192,6 +256,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.api.v01.chat import chat_api_bp
     from app.routes.api.v01.admin import admin_api_bp
     from app.routes.api.v01.profile import profile_api_bp
+    from app.routes.api.v01.plan import plan_api_bp
     from app.routes.api.v01.dashboard import dashboard_api_bp
     from app.routes.api.v01.portal import portal_bp
 
@@ -208,6 +273,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(chat_api_bp)
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(profile_api_bp)
+    app.register_blueprint(plan_api_bp)
     app.register_blueprint(dashboard_api_bp)
     app.register_blueprint(portal_bp)
 

@@ -3,6 +3,9 @@
 {% block title %}Response Analysis - SmartAIExam{% endblock %}
 
 {% block content %}
+{# How an AI Explanation is drawn (shared with nothing else yet) and the floating Page Up / Page Down #}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/ai-explain.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/page-nav.css') }}">
 <style>
 /* response.html — all colors via var(--token) */
 .container { width:100%; padding:1.5rem 1.5rem; }
@@ -144,11 +147,21 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .btn-close { filter:var(--btn-close-filter, none); }
 [data-theme="dark"] .btn-close,[data-theme="midnight"] .btn-close,[data-theme="emerald"] .btn-close { filter:brightness(0) invert(1); opacity:.5; }
 
+/* Discuss with AI */
+.ai-discuss-row { margin-top:1rem; display:flex; align-items:center; flex-wrap:wrap; gap:.4rem .8rem; }
+.btn-discuss {
+  display:inline-flex; align-items:center; gap:.45rem; padding:.42rem .95rem; border-radius:var(--radius);
+  background:var(--accent-subtle); color:var(--accent); border:1px solid var(--border);
+  font-size:.8rem; font-weight:700; text-decoration:none; transition:background .15s,color .15s;
+}
+.btn-discuss:hover { background:var(--accent); color:var(--accent-on); }
+.ai-discuss-hint { font-size:.72rem; color:var(--text-3); }
+
 /* AI Explanation */
 .ai-explain-section {
   margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;
 }
-.ai-explain-trigger { margin-bottom:.6rem; }
+.ai-explain-trigger { margin-bottom:.6rem; display:flex; align-items:center; flex-wrap:wrap; gap:.5rem .85rem; }
 .btn-explain {
   display:inline-flex; align-items:center; gap:.5rem;
   padding:.48rem 1rem; border-radius:var(--radius);
@@ -159,15 +172,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 }
 .btn-explain:hover { background:var(--accent); color:var(--accent-on); }
 .btn-explain:disabled { opacity:.75; cursor:not-allowed; }
-.btn-explain.loading .explain-btn-icon {
-  display:inline-block;
-  animation:explainSwing .6s ease-in-out infinite alternate;
-}
-@keyframes explainSwing {
-  from { transform:rotate(-20deg) scale(1.1); }
-  to   { transform:rotate(20deg)  scale(1.1); }
-}
-.explain-btn-icon { font-size:.8rem; }
+.explain-btn-icon { font-size:.85rem; }
 .explain-usage-badge {
   background:var(--surface-2); color:var(--text-3);
   border-radius:20px; padding:.12rem .45rem;
@@ -187,8 +192,12 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
   border-bottom:1px solid var(--border); cursor:pointer;
   user-select:none;
 }
-.explain-panel-title { font-size:.78rem; font-weight:700; color:var(--accent); }
-.expl-card-chevron { color:var(--text-3); font-size:.7rem; transition:transform .15s; }
+.explain-panel-header:focus-visible { outline:2px solid var(--border-focus, var(--accent)); outline-offset:-2px; }
+.explain-panel-title { display:inline-flex; align-items:center; gap:.45rem; font-size:.78rem; font-weight:700; color:var(--accent); }
+.explain-panel-title > i { font-size:.8rem; }
+.explain-count { font-size:.66rem; font-weight:700; color:var(--text-3); background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:.05rem .45rem; }
+.explain-count:empty { display:none; }
+.expl-card-chevron { color:var(--text-3); font-size:.65rem; transition:transform .18s ease; }
 .expl-card-chevron.open { transform:rotate(180deg); }
 
 .explain-ai-disclaimer {
@@ -198,7 +207,11 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
   line-height:1.45;
 }
 .explain-disclaimer-icon { flex-shrink:0; margin-top:.05rem; }
-.explain-history-container { padding:.6rem .9rem; }
+.explain-body { padding:.6rem .9rem; }
+.explain-body[hidden] { display:none; }
+.explain-history-container:empty { display:none; }
+.explain-status:not(:empty) { margin-top:.6rem; }
+.explain-history-container:empty + .explain-status:not(:empty) { margin-top:0; }
 .explain-panel-footer {
   display:none; padding:.45rem .9rem;
   border-top:1px solid var(--border);
@@ -221,6 +234,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .expl-card-label { font-size:.78rem; font-weight:700; color:var(--text-1); flex:1; display:flex; align-items:center; gap:.4rem; }
 .expl-card-num { width:20px; height:20px; border-radius:50%; background:var(--accent); color:var(--accent-on); display:flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:700; flex-shrink:0; }
 .expl-card-meta { font-size:.68rem; color:var(--text-3); white-space:nowrap; }
+.expl-card-unsaved { color:var(--warning-text); font-weight:700; }
 .expl-card-delete {
   display:flex; align-items:center; justify-content:center;
   width:24px; height:24px; padding:0; margin-left:.15rem;
@@ -229,52 +243,20 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 }
 .expl-card-delete:hover { background:var(--danger-bg); color:var(--danger-text); }
 .expl-card-deleting { opacity:.5; pointer-events:none; }
-.expl-card-chevron { color:var(--text-3); font-size:.65rem; transition:transform .15s; }
-.expl-card-chevron.open { transform:rotate(90deg); }
-.expl-card-body { }
-.expl-card-content {
-  padding:.85rem .9rem;
-  overflow-x:auto;      /* long equations/LaTeX/chemistry scroll horizontally instead of breaking the page */
-  overflow-y:visible;   /* vertical scrolling stays the normal page scroll — unaffected */
-  max-width:100%;
-}
-/* Everything that can legitimately grow wider than the card (rendered KaTeX/MathJax
-   output, code blocks, tables) scrolls within the card instead of overflowing it;
-   normal text keeps wrapping naturally since word-wrap only kicks in on these. */
-.explain-panel-body mjx-container,
-.explain-panel-body .katex-display,
-.explain-panel-body pre,
-.explain-panel-body table {
-  max-width:100%;
-  overflow-x:auto;
-}
-.explain-panel-body p,
-.explain-panel-body li {
-  overflow-wrap:break-word;
-}
-.explain-panel-body p  { color:var(--text-1); font-size:.84rem; line-height:1.6; margin-bottom:.5rem; }
-.explain-panel-body ul { color:var(--text-1); font-size:.84rem; padding-left:1.2rem; margin-bottom:.5rem; }
-.explain-panel-body li { margin-bottom:.25rem; line-height:1.5; }
-.explain-panel-body h2,.explain-panel-body h3 { color:var(--text-1); font-size:.9rem; font-weight:700; margin:.65rem 0 .35rem; }
-.explain-panel-body code { background:var(--surface-2); color:var(--accent); padding:.1rem .35rem; border-radius:4px; font-size:.8rem; }
-.explain-panel-body strong { color:var(--text-1); }
-.explain-panel-body hr { border-color:var(--border); margin:.75rem 0; }
-
-/* Skeleton */
-.explain-skeleton { padding:.85rem .9rem; }
-.explain-skeleton-line {
-  height:10px; background:var(--surface-2); border-radius:4px;
-  margin-bottom:.5rem; animation:skpulse 1.2s ease-in-out infinite;
-}
-@keyframes skpulse{0%,100%{opacity:.4}50%{opacity:.85}}
-.explain-error {
-  display:flex; align-items:center; gap:.5rem;
-  background:var(--danger-bg); border:1px solid var(--danger-border);
-  color:var(--danger-text); border-radius:var(--radius);
-  padding:.6rem .9rem; font-size:.78rem; margin:.5rem 0;
+.expl-card-header:focus-visible { outline:2px solid var(--border-focus, var(--accent)); outline-offset:-2px; }
+/* The explanation itself is drawn by static/shared/ai-explain.{js,css}. It has NO scroll box of its own: the card grows
+   with the text and the page scrolls; only a formula/table wider than the card scrolls sideways, inside its own box. */
+.expl-card-content { padding:.85rem .9rem; }
+@media (max-width:575.98px) {          /* a phone is narrow: give the text back the padding the nested boxes take */
+  .explain-panel-header { padding:.55rem .7rem; }
+  .explain-body { padding:.5rem .45rem; }
+  .expl-card-header { padding:.5rem .65rem; gap:.4rem; }
+  .expl-card-meta { font-size:.62rem; }
+  .expl-card-content { padding:.7rem .6rem; }
 }
 
 /* Discussion section */
+.disc-section[hidden] { display:none; }
 .disc-section {
   margin-top:1rem; border:1px solid var(--border);
   border-radius:var(--radius); overflow:visible;
@@ -527,7 +509,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
       <div id="responseContent">
         {% if responses %}
           {% for response in responses %}
-          <div class="card mb-4 question-response-card">
+          <div class="card mb-4 question-response-card" id="rq-{{ response.question.id }}">
             <div class="card-header
               {% if not response.is_attempted %}bg-secondary
               {% elif response.is_correct %}bg-success
@@ -719,35 +701,52 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
                 </div>
               {% endif %}
 
+              {# Discuss with AI: every question (correct, incorrect or skipped) of a result the student may see — this page
+                 is only ever rendered for one. It opens the Assistant on this question; the server decides again on every
+                 message. Hidden in the popup layout, which is what the Assistant itself opens for "View Question". #}
+              {% if not standalone and user_can('response_ai_discussion') %}
+              <div class="ai-discuss-row">
+                <a class="btn-discuss" href="{{ url_for('ai.ai_assistant') }}?q={{ response.question.id }}&amp;r={{ result.id }}"
+                   target="_blank" rel="noopener" data-discuss-qid="{{ response.question.id }}">
+                  <i class="fas fa-comments"></i> Discuss with AI
+                </a>
+                <span class="ai-discuss-hint">Ask follow-up questions about this question</span>
+              </div>
+              {% endif %}
+
               <!-- ── AI Explanation Panel ─────────────────────────────── -->
-              {% if not response.is_correct %}
+              {% if not response.is_correct and user_can('ai_explanation') %}
               <div class="ai-explain-section" id="explain-section-{{ response.question.id }}"
                    data-explain-qid="{{ response.question.id }}">
 
                 <!-- Trigger button -->
                 <div class="ai-explain-trigger">
-                                    <button
+                  {% from 'partials/_ai_badge.html' import ai_model_badge %}
+                  {# The answer the explanation is about comes from the server (the result), not from this page. #}
+                  <button
                     type="button"
                     class="btn-explain"
                     id="explain-btn-{{ response.question.id }}"
-                    data-qid="{{ response.question.id }}"
-                    data-qtype='{{ response.question.question_type | tojson }}'
-                    data-answer='{{ (response.given_answer if response.given_answer and response.given_answer != "Not Answered" else "") | tojson }}'>
-                    <span class="explain-btn-icon">✧ ⌬ ✧</span>
+                    data-qid="{{ response.question.id }}">
+                    <i class="fas fa-wand-magic-sparkles explain-btn-icon" aria-hidden="true"></i>
                     <span class="explain-btn-text">Get AI Explanation</span>
                     <span class="explain-usage-badge" id="explain-usage-{{ response.question.id }}"></span>
                   </button>
+                  {# Which model writes this explanation: the image model for questions with a picture, else the text model. #}
+                  {{ ai_model_badge('explanation_vision' if (response.question.has_image and response.question.image_url) else 'explanation_text', label='Powered by') }}
                 </div>
 
                 <!-- Explanation panel — shown when history exists or after generation -->
-                <div class="ai-explain-panel" id="explain-panel-{{ response.question.id }}" style="display:none;">
+                <div class="ai-explain-panel" id="explain-panel-{{ response.question.id }}" hidden>
 
-                  <!-- Panel header -->
-                  <div class="explain-panel-header" onclick="explainPanelBodyToggle({{ response.question.id }})">
+                  <!-- Panel header: one compact icon, the title, how many are saved, and the fold/unfold arrow -->
+                  <div class="explain-panel-header" id="explain-panel-head-{{ response.question.id }}" role="button" tabindex="0"
+                       aria-expanded="false" aria-controls="explain-body-{{ response.question.id }}" data-explain-panel="{{ response.question.id }}">
                     <span class="explain-panel-title">
-                      <span style="color:#a78bfa;">✧ ⌬ ✧</span> AI Step-by-Step Explanations
+                      <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> AI Step-by-Step Explanations
+                      <span class="explain-count" id="explain-count-{{ response.question.id }}"></span>
                     </span>
-                    <span class="expl-card-chevron" id="explain-panel-chevron-{{ response.question.id }}">▼</span>
+                    <i class="fas fa-chevron-down expl-card-chevron" id="explain-panel-chevron-{{ response.question.id }}" aria-hidden="true"></i>
                   </div>
 
                   <!-- AI Disclaimer -->
@@ -756,14 +755,13 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
                     <span>AI explanations may contain errors. Always verify with your textbook or teacher. Use this as a learning aid, not a final answer.</span>
                   </div>
 
-                  <!-- History container — each generation is a collapsible card -->
-                  <div class="explain-history-container" id="explain-history-{{ response.question.id }}">
-                    <!-- Cards injected by JS -->
-                  </div>
-
-                  <!-- Footer: reset time info -->
-                  <div class="explain-panel-footer" id="explain-footer-{{ response.question.id }}" style="display:none;">
-                    <span class="explain-reset-time" id="explain-reset-{{ response.question.id }}"></span>
+                  <!-- Body: saved explanations (each a collapsible card), then the generating / failed state, then the footer -->
+                  <div class="explain-body" id="explain-body-{{ response.question.id }}" hidden>
+                    <div class="explain-history-container" id="explain-history-{{ response.question.id }}"></div>
+                    <div class="explain-status" id="explain-status-{{ response.question.id }}"></div>
+                    <div class="explain-panel-footer" id="explain-footer-{{ response.question.id }}" style="display:none;">
+                      <span class="explain-reset-time" id="explain-reset-{{ response.question.id }}"></span>
+                    </div>
                   </div>
 
                 </div>
@@ -772,7 +770,7 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
               {% endif %}
               <!-- ── End AI Explanation Panel ──────────────────────────── -->
 
-              <div class="disc-section">
+              <div class="disc-section"{% if not user_can('discussion') %} hidden{% endif %}>
                 <div class="disc-header" onclick="discToggle({{ response.question.id }}, {{ exam.id }})">
                   <i class="fas fa-comments" style="color:#667eea;font-size:.9rem;"></i>
                   <h6>Discussion <span class="disc-count-badge" id="disc-cnt-{{ response.question.id }}">•••</span></h6>
@@ -839,6 +837,9 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 {% endblock %}
 
 {% block scripts %}
+{# The explanation renderer (a module: runs after KaTeX/MathJax from base.html, before DOMContentLoaded) and Page Up / Page Down. #}
+<script type="module" src="{{ url_for('static', filename='shared/ai-explain.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/page-nav.js') }}"></script>
 <script nonce="{{ csp_nonce() if csp_nonce is defined else '' }}">
 //<![CDATA[
 function openImageModal(src, title) {
@@ -1646,7 +1647,7 @@ document.addEventListener('DOMContentLoaded', discWrapMath);
 (async function discInitCounts() {
   const badges = document.querySelectorAll('[id^="disc-cnt-"]');
   const qids   = [...badges].map(b => parseInt(b.id.replace('disc-cnt-','')));
-  if (!qids.length) return;
+  if (!qids.length || !{{ user_can('discussion') | tojson }}) return;
   const badgeFor = q => document.getElementById(`disc-cnt-${q}`);
   // /api/v01/discussions/counts caps question_ids at 100 per request — an
   // exam with hundreds of questions needs several batches, fired in
@@ -1669,152 +1670,389 @@ document.addEventListener('DOMContentLoaded', discWrapMath);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AI EXPLANATION SYSTEM
-// Features:
-//   - On page load: fetches saved history from DB (no API call)
-//   - Generate button: calls POST /api/v01/explanations/<qid> → saves + returns history
-//   - Each generation shown as a collapsible card below the previous
-//   - In-memory cache prevents redundant DB calls within same page session
-//   - Reset time shown from server (IST-based, exact countdown)
+// What each question's explanation area shows is decided in ONE place, _explainRender(qid): the saved explanations
+// (cards) and, below them, at most one status (generating, or failed). Every change (a response arriving late, a
+// delete, a reload) goes through it, so the loader can neither get stuck nor be wiped by another update.
+//   - a question's saved explanations are fetched when it comes near the screen, not all at page load
+//   - the loader ends when the server answers. If this page did not send the request (a reload, a second tab, a dropped
+//     connection) it ends when the server reports that the generation has finished. Never on a timer.
+//   - an explanation is drawn once, complete, by static/shared/ai-explain.js, the first time its card is opened
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Per-question cache: { qid: { history: [], dailyRemaining, questionRemaining, resetTime, loaded } }
+// The result this page shows. Sent with every explanation request so the server checks access against THIS result
+// (a student can have several attempts); the server re-checks it and never trusts it for anything else.
+const _explainResultId = {{ result.id | tojson }};
+
+// qid -> { history, dailyRemaining, questionRemaining, resetTime, loaded, loading, phase: idle|generating|error,
+//          error, startedAt, expanded, open: Set(explanation ids), awaiting, statusKey }
 const _explainState = {};
-// Extra defense-in-depth beyond btn.disabled: tracks which questions have a
-// generation request currently in flight, so explainToggle can never fire a
-// second request for the same question even if invoked from somewhere other
-// than the button's own click handler.
+// Questions with a generation request that THIS page sent and has not heard back from (a second click can never start another).
 const _explainInFlight = new Set();
+const _explainDrawn = new Set();                      // explanation ids whose card body has been drawn
+let _explainTicker = null;
+const _EXPLAIN_POLL_MS = [2500, 3000, 4000, 5000, 6000];   // how often to ask while waiting for a generation this page did not start
 
-/**
- * Called on page load for each wrong-answer question.
- * Fetches saved history silently — no loading flash, no API hit.
- */
+function _explainSt(qid) {
+  return _explainState[qid] || (_explainState[qid] = {
+    history: [], dailyRemaining: undefined, questionRemaining: undefined, resetTime: '', loaded: false, loading: false,
+    phase: 'idle', error: null, startedAt: 0, expanded: false, open: new Set(), awaiting: false, statusKey: '',
+  });
+}
+const _eid = (kind, qid) => document.getElementById(`explain-${kind}-${qid}`);
+
+function _explainApplyLimits(st, data) {
+  if (data.daily_remaining !== undefined) st.dailyRemaining = data.daily_remaining;
+  if (data.question_remaining !== undefined) st.questionRemaining = data.question_remaining;
+  if (data.reset_time) st.resetTime = data.reset_time;
+}
+
+const _explainGetUrl = (qid) => `/api/v01/explanations/${qid}?result_id=${_explainResultId}`;
+
+// ── loading what is already saved ──────────────────────────────────────────────────────────────────────────
 async function explainLoadHistory(qid) {
+  const st = _explainSt(qid);
+  if (st.loaded || st.loading) return;
+  st.loading = true;
   try {
-    const resp = await fetch(`/api/v01/explanations/${qid}`);
+    const resp = await fetch(_explainGetUrl(qid));
     const data = await resp.json();
-    if (!data.success) return;
-
-    _explainState[qid] = {
-      history:           data.history || [],
-      dailyRemaining:    data.daily_remaining,
-      questionRemaining: data.question_remaining,
-      resetTime:         data.reset_time || "",
-      loaded:            true,
-    };
-
-    if (data.history && data.history.length > 0) {
-      _explainRenderHistory(qid);
-      _explainShowPanel(qid);
-    }
-
-    _explainUpdateButtonState(qid);
+    if (!data.success) return;                        // not available (locked...): the server refuses anything else too
+    _explainApplyLimits(st, data);
+    st.loaded = true;
+    if (!_explainInFlight.has(qid)) st.history = data.history || [];
+    // a generation that was started before this page loaded (a reload, or another tab): show it, and pick the result up
+    if (data.generating && !_explainInFlight.has(qid)) _explainBeginWaiting(qid);
+    else _explainRender(qid);
   } catch (e) {
-    // Silently ignore — button stays active, user can still try generating
-    console.warn("[explain] History load failed for q" + qid, e);
+    console.warn('[explain] history load failed for q' + qid, e);        // the button still works
+  } finally {
+    st.loading = false;
   }
 }
 
-/**
- * Main toggle — called when student clicks "Get AI Explanation".
- * If limit reached: show message. Otherwise: generate new explanation.
- */
-async function explainToggle(qid, qtype, givenAnswer) {
-  const state = _explainState[qid] || {};
-
-  // If question limit reached, do nothing (button should already be disabled)
-  if (state.questionRemaining === 0) return;
-
-  // Belt-and-suspenders duplicate-request guard, on top of btn.disabled:
-  // refuse to start a second generation for this question while one is
-  // already in flight.
-  if (_explainInFlight.has(qid)) return;
+// ── generating ─────────────────────────────────────────────────────────────────────────────────────────────
+async function explainToggle(qid) {
+  const st = _explainSt(qid);
+  if (st.questionRemaining === 0 || st.dailyRemaining === 0) return;
+  if (_explainInFlight.has(qid) || st.phase === 'generating') return;          // one generation per question at a time
   _explainInFlight.add(qid);
-
-  const btn = document.getElementById(`explain-btn-${qid}`);
-  _explainSetBtnLoading(btn, true);
-  _explainShowPanel(qid);
-
-  // Show skeleton at bottom of existing history
-  _explainAppendSkeleton(qid);
-
+  const before = new Set(st.history.map(h => h.id));
+  st.phase = 'generating'; st.error = null; st.startedAt = Date.now(); st.expanded = true;
+  _explainRender(qid); _explainTick();
+  _explainAnnounce('Generating your AI explanation.');
   try {
-    const body = {};
-    if (givenAnswer) body.given_answer = givenAnswer;
-
     const resp = await fetch(`/api/v01/explanations/${qid}`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ result_id: _explainResultId }),   // the answer comes from the server, not from this page
     });
-    const data = await resp.json();
-
-    if (data.success) {
-      // Update local state
-      _explainState[qid] = {
-        history:           data.history || [],
-        dailyRemaining:    data.daily_remaining,
-        questionRemaining: data.question_remaining,
-        resetTime:         data.reset_time || "",
-        loaded:            true,
-      };
-      _explainRenderHistory(qid);   // re-render all (skeleton replaced)
-      _explainScrollToLatest(qid);
-    } else {
-      _explainRemoveSkeleton(qid);
-      _explainShowError(qid, data.message, data.reset_time);
+    let data = null;
+    try { data = await resp.json(); } catch (_) { /* not JSON: handled below */ }
+    if (data && data.success) {
+      _explainApplyLimits(st, data); st.history = data.history || [];
+      _explainFinish(qid, before);
+    } else if (data && (data.limit_reached || data.locked)) {
+      _explainApplyLimits(st, data);
+      _explainFail(qid, data.message, { retry: false, info: true, reset: data.reset_time });
+    } else if (!(await _explainCheckElsewhere(qid, before))) {
+      // not a limit, and nobody else is generating it: a real failure. Say what the server said, if it said anything.
+      _explainFail(qid, (data && data.message) || 'The server did not answer properly. Please try again.', { retry: true });
     }
   } catch (err) {
-    _explainRemoveSkeleton(qid);
-    _explainShowError(qid, "Network error — please check your connection.", "");
+    // The request may or may not have reached the server: ask, rather than claiming it failed.
+    if (!(await _explainCheckElsewhere(qid, before))) {
+      _explainFail(qid, 'We couldn’t reach the server. Check your connection and try again.', { retry: true });
+    }
+  } finally {
+    _explainInFlight.delete(qid);
+    _explainUpdateButtonState(qid);
   }
+}
 
-  _explainInFlight.delete(qid);
-  _explainSetBtnLoading(btn, false);
+// Is this explanation being generated (by another tab / an earlier page), or already finished? Resolves true if so
+// (and takes over showing it), false if there is nothing going on and the caller should report a failure.
+async function _explainCheckElsewhere(qid, before) {
+  const st = _explainSt(qid);
+  try {
+    const resp = await fetch(_explainGetUrl(qid));
+    const data = await resp.json();
+    if (!data.success) return false;
+    _explainApplyLimits(st, data);
+    if (data.generating) { st.history = data.history || st.history; _explainBeginWaiting(qid); return true; }
+    if ((data.history || []).some(h => !before.has(h.id))) { st.history = data.history; _explainFinish(qid, before); return true; }
+  } catch (e) { /* offline: the caller reports it */ }
+  return false;
+}
+
+function _explainBeginWaiting(qid) {
+  const st = _explainSt(qid);
+  st.phase = 'generating'; st.error = null; st.expanded = true;
+  if (!st.startedAt) st.startedAt = Date.now();
+  _explainRender(qid); _explainTick();
+  if (st.awaiting) return;
+  st.awaiting = true;
+  _explainPoll(qid, new Set(st.history.map(h => h.id)), 0, 0);
+}
+
+async function _explainPoll(qid, before, round, misses) {
+  const st = _explainSt(qid);
+  await new Promise(r => setTimeout(r, _EXPLAIN_POLL_MS[Math.min(round, _EXPLAIN_POLL_MS.length - 1)]));
+  let data = null;
+  try { data = await (await fetch(_explainGetUrl(qid))).json(); } catch (e) { data = null; }
+  if (!data || !data.success) {
+    if (misses >= 2) {                                                     // cannot tell any more: say so, let the student re-check
+      st.awaiting = false;
+      _explainFail(qid, 'We lost touch with the server, so we can’t tell whether your explanation is ready. Check your connection, then check again.', { retry: false, recheck: true });
+      return;
+    }
+    return _explainPoll(qid, before, round + 1, misses + 1);
+  }
+  _explainApplyLimits(st, data);
+  if (data.generating) return _explainPoll(qid, before, round + 1, 0);       // still running: keep the loader, ask again
+  st.awaiting = false;
+  st.history = data.history || [];
+  if (st.history.some(h => !before.has(h.id))) _explainFinish(qid, before);
+  else _explainFail(qid, 'The explanation could not be completed. Please try again.', { retry: true });
+}
+
+function _explainFinish(qid, before) {
+  const st = _explainSt(qid);
+  st.phase = 'idle'; st.error = null; st.expanded = true;
+  const fresh = st.history.filter(h => !before.has(h.id));
+  const newest = fresh[fresh.length - 1] || st.history[st.history.length - 1];
+  if (newest) st.open.add(newest.id);                                     // the new one opens by itself: nothing to click
+  _explainRender(qid);
+  if (newest) _explainReveal(document.getElementById(`expl-card-${newest.id}`));
+  _explainAnnounce('Your AI explanation is ready.');
+}
+
+function _explainFail(qid, message, opts) {
+  const st = _explainSt(qid);
+  opts = opts || {};
+  st.phase = 'error'; st.expanded = true;
+  st.error = { message: message || 'Something went wrong. Please try again.', retry: opts.retry !== false && !opts.recheck, recheck: !!opts.recheck, info: !!opts.info, reset: opts.reset || '' };
+  _explainRender(qid);
+  _explainAnnounce(opts.info ? st.error.message : 'The AI explanation could not be generated. ' + st.error.message);
+}
+
+// While anything is generating, a once-a-second ticker only updates the reassurance line under the title.
+function _explainTick() {
+  if (_explainTicker) return;
+  _explainTicker = setInterval(() => {
+    let any = false;
+    for (const qid in _explainState) {
+      const st = _explainState[qid];
+      if (st.phase !== 'generating') continue;
+      any = true;
+      const hint = document.querySelector(`#explain-status-${qid} [data-explain-hint]`);
+      if (hint) hint.textContent = _explainHint(Math.floor((Date.now() - st.startedAt) / 1000));
+    }
+    if (!any) { clearInterval(_explainTicker); _explainTicker = null; }
+  }, 1000);
+}
+function _explainHint(sec) {
+  if (sec < 8) return 'Reading the question and your answer…';
+  if (sec < 25) return 'Working through the solution step by step…';
+  if (sec < 70) return 'Still working — longer questions can take up to a minute. It will appear here by itself.';
+  return 'The AI service is busy, so this is taking longer than usual. We are still on it, and it will appear here by itself.';
+}
+
+// ── drawing ────────────────────────────────────────────────────────────────────────────────────────────────
+function _explainRender(qid) {
+  const st = _explainSt(qid);
+  const panel = _eid('panel', qid), body = _eid('body', qid), hist = _eid('history', qid);
+  if (!panel || !body || !hist) return;
+  const show = st.history.length > 0 || st.phase !== 'idle';
+  panel.hidden = !show;
+  panel.setAttribute('aria-busy', String(st.phase === 'generating'));
+  if (show) {
+    body.hidden = !st.expanded;
+    _eid('panel-head', qid)?.setAttribute('aria-expanded', String(st.expanded));
+    _eid('panel-chevron', qid)?.classList.toggle('open', st.expanded);
+    const count = _eid('count', qid);
+    if (count) count.textContent = st.history.length ? `${st.history.length} saved` : '';
+    _explainSyncCards(qid, st, hist);
+    _explainRenderStatus(qid, st);
+  }
   _explainUpdateButtonState(qid);
 }
 
-/** Toggle the explanation panel body (history + footer) — header stays visible. */
+function _explainSyncCards(qid, st, hist) {
+  const ids = new Set(st.history.map(h => String(h.id)));
+  Array.from(hist.children).forEach(ch => { if (!ids.has(ch.dataset.id)) ch.remove(); });        // (a deleted explanation)
+  st.history.forEach((item, idx) => {
+    let card = document.getElementById(`expl-card-${item.id}`);
+    if (!card) card = _explainCardEl(qid, item);
+    if (hist.children[idx] !== card) hist.insertBefore(card, hist.children[idx] || null);
+    card.querySelector('.expl-card-label-text').textContent = st.history.length === 1 ? 'AI Explanation' : `Explanation ${idx + 1} of ${st.history.length}`;
+    card.querySelector('.expl-card-num').textContent = String(idx + 1);
+    _explainSetCardOpen(card, item, st.open.has(item.id));
+  });
+}
+
+function _explainCardEl(qid, item) {
+  const card = document.createElement('div');
+  card.className = 'expl-card'; card.id = `expl-card-${item.id}`;
+  card.dataset.id = String(item.id); card.dataset.qid = String(qid);
+  card.innerHTML = `
+    <div class="expl-card-header" role="button" tabindex="0" aria-expanded="false" data-explain-card="${item.id}">
+      <span class="expl-card-label"><span class="expl-card-num"></span><span class="expl-card-label-text"></span></span>
+      ${item.unsaved
+        ? '<span class="expl-card-meta expl-card-unsaved" title="This explanation could not be saved to your history">Not saved</span>'
+        : `<span class="expl-card-meta">${_escHtml(_explainFormatDate(item.generated_at))}</span>
+      <button type="button" class="expl-card-delete" title="Delete this explanation" aria-label="Delete this explanation" data-explain-del="${item.id}">
+        <i class="fas fa-trash-alt" aria-hidden="true"></i>
+      </button>`}
+      <i class="fas fa-chevron-down expl-card-chevron" aria-hidden="true"></i>
+    </div>
+    <div class="expl-card-body" hidden><div class="expl-card-content" id="expl-rendered-${item.id}"></div></div>`;
+  return card;
+}
+
+function _explainSetCardOpen(card, item, open) {
+  const body = card.querySelector('.expl-card-body');
+  body.hidden = !open;
+  card.querySelector('.expl-card-header').setAttribute('aria-expanded', String(open));
+  card.querySelector('.expl-card-chevron').classList.toggle('open', open);
+  if (open && !_explainDrawn.has(item.id)) {                                  // drawn once, complete, the first time it is opened
+    _explainDraw(body.querySelector('.expl-card-content'), item);
+    _explainDrawn.add(item.id);
+  }
+}
+
+function _explainDraw(box, item) {
+  try {
+    const out = window.AiExplain.render(item.explanation);
+    box.innerHTML = out.html;                                                  // finished HTML: formulas are already drawn
+    if (item.unsaved) {                                                        // the student still gets it, and is told it will not be kept
+      box.insertAdjacentHTML('afterbegin', '<div class="aix-unsaved" role="status"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i>' +
+        '<span>This explanation could not be saved to your history, so it will be gone when you leave this page. Copy anything you need now.</span></div>');
+    }
+    window.AiExplain.fitWide(box);                                             // (visible by now: a too-wide inline formula scrolls in its own box)
+    if (out.fallbacks) window.AiExplain.typesetFallbacks(box);                 // the rare formula KaTeX could not draw
+  } catch (e) {
+    console.error('[explain] could not draw explanation ' + item.id, e);
+    box.innerHTML = '<div class="aix"><p></p></div>';
+    box.querySelector('p').textContent = String(item.explanation || '');      // never blank: the text itself
+  }
+}
+
+function _explainRenderStatus(qid, st) {
+  const box = _eid('status', qid);
+  if (!box) return;
+  const e = st.error;
+  const key = st.phase + '|' + (e ? [e.message, e.retry, e.recheck, e.info, e.reset].join('|') : '');
+  if (key === st.statusKey) return;                                            // unchanged: leave the DOM (and its animation) alone
+  st.statusKey = key;
+  if (st.phase === 'generating') {
+    box.innerHTML = `
+      <div class="aix-loading">
+        <div class="aix-loading-head">
+          <span class="aix-orb"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+          <div>
+            <div class="aix-loading-title">Generating AI Explanation<span class="aix-dots" aria-hidden="true"></span></div>
+            <div class="aix-loading-sub" data-explain-hint>${_escHtml(_explainHint(Math.floor((Date.now() - st.startedAt) / 1000)))}</div>
+          </div>
+        </div>
+        <div class="aix-skel" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>`;
+  } else if (st.phase === 'error' && e) {
+    box.innerHTML = `
+      <div class="aix-error${e.info ? ' aix-error--info' : ''}" role="alert">
+        <i class="fas ${e.info ? 'fa-circle-info' : 'fa-triangle-exclamation'}" aria-hidden="true"></i>
+        <div class="aix-error-main">
+          <div class="aix-error-title">${e.info ? 'Explanation not available' : 'Couldn’t generate the explanation'}</div>
+          <div class="aix-error-msg">${_escHtml(e.message)}${e.reset ? ' <em>' + _escHtml(e.reset) + '</em>' : ''}</div>
+          <div class="aix-error-actions">
+            ${e.retry ? '<button type="button" class="aix-btn aix-btn--primary" data-explain-act="retry"><i class="fas fa-rotate-right" aria-hidden="true"></i> Retry</button>' : ''}
+            ${e.recheck ? '<button type="button" class="aix-btn aix-btn--primary" data-explain-act="recheck"><i class="fas fa-rotate" aria-hidden="true"></i> Check again</button>' : ''}
+            <button type="button" class="aix-btn" data-explain-act="dismiss">Dismiss</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    box.innerHTML = '';
+  }
+}
+
+// Show a newly arrived explanation only if it is not already comfortably in view; never yank the page around.
+function _explainReveal(el) {
+  if (!el) return;
+  const top = el.getBoundingClientRect().top;
+  if (top >= 64 && top <= window.innerHeight * 0.6) return;
+  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: window.scrollY + top - 76, behavior: calm ? 'auto' : 'smooth' });
+}
+
+function _explainAnnounce(text) {                                              // one polite screen-reader line (start / ready / failed)
+  let live = document.getElementById('explainLive');
+  if (!live) {
+    live = document.createElement('div');
+    live.id = 'explainLive'; live.className = 'aix-sr'; live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(live);
+  }
+  live.textContent = text;
+}
+
+// ── the button ─────────────────────────────────────────────────────────────────────────────────────────────
+function _explainSetBtnLoading(btn, isLoading) {
+  btn.classList.toggle('loading', isLoading);
+  btn.setAttribute('aria-busy', String(isLoading));
+  btn.disabled = isLoading;
+  const text = btn.querySelector('.explain-btn-text'), icon = btn.querySelector('.explain-btn-icon');
+  if (text) text.textContent = isLoading ? 'Generating…' : 'Get AI Explanation';
+  if (icon) icon.className = 'fas explain-btn-icon ' + (isLoading ? 'fa-circle-notch fa-spin' : 'fa-wand-magic-sparkles');
+}
+
+function _explainUpdateButtonState(qid) {
+  const btn = _eid('btn', qid), badge = _eid('usage', qid), st = _explainState[qid];
+  if (!btn || !st) return;
+  _explainSetBtnLoading(btn, st.phase === 'generating');
+  if (st.phase === 'generating') return;
+  const qRem = st.questionRemaining, dRem = st.dailyRemaining;
+  if (qRem === undefined || dRem === undefined) return;                        // limits not known yet: the server enforces them anyway
+  if (qRem !== null && qRem <= 0) {                                            // null = no limit
+    btn.disabled = true;
+    btn.title = `No more explanations for this question today. ${st.resetTime}`;
+    if (badge) { badge.textContent = 'Limit reached'; badge.classList.add('visible', 'limit'); }
+  } else if (dRem !== null && dRem <= 0) {
+    btn.disabled = true;
+    btn.title = `Daily limit reached. ${st.resetTime}`;
+    if (badge) { badge.textContent = 'Daily limit'; badge.classList.add('visible', 'limit'); }
+  } else {
+    btn.disabled = false;
+    const left = qRem !== null ? qRem : dRem;
+    if (badge) {
+      badge.classList.remove('limit');
+      if (left === null) badge.classList.remove('visible');
+      else { badge.textContent = `${left} left today`; badge.classList.add('visible'); }
+    }
+  }
+  const footer = _eid('footer', qid), reset = _eid('reset', qid);
+  if (footer && st.history.length) { footer.style.display = 'flex'; }
+  if (reset && st.resetTime) reset.textContent = st.resetTime;
+}
+
+// ── folding ────────────────────────────────────────────────────────────────────────────────────────────────
 function explainPanelBodyToggle(qid) {
-  const historyEl = document.getElementById(`explain-history-${qid}`);
-  const footerEl  = document.getElementById(`explain-footer-${qid}`);
-  const chevron   = document.getElementById(`explain-panel-chevron-${qid}`);
-  if (!historyEl) return;
-
-  const isOpen = historyEl.style.display !== "none";
-  historyEl.style.display = isOpen ? "none" : "block";
-  if (footerEl) footerEl.style.display = isOpen ? "none" : (footerEl.dataset.hasContent === "1" ? "flex" : "none");
-  if (chevron) {
-    chevron.textContent = isOpen ? "▶" : "▼";
-    chevron.classList.toggle("open", !isOpen);
-  }
+  const st = _explainSt(qid);
+  st.expanded = !st.expanded;
+  // opening the panel shows the newest explanation straight away instead of another row to click
+  if (st.expanded && st.history.length && !st.history.some(h => st.open.has(h.id))) st.open.add(st.history[st.history.length - 1].id);
+  _explainRender(qid);
 }
 
-/** Reopen the panel if history exists. */
-function explainOpen(qid) {
-  const state = _explainState[qid];
-  if (state && state.history && state.history.length > 0) {
-    _explainShowPanel(qid);
-  }
+function explainCollapseToggle(explanationId) {
+  const card = document.getElementById(`expl-card-${explanationId}`);
+  if (!card) return;
+  const st = _explainSt(parseInt(card.dataset.qid, 10));
+  const item = st.history.find(h => h.id === explanationId);
+  if (!item) return;
+  if (st.open.has(explanationId)) st.open.delete(explanationId); else st.open.add(explanationId);
+  _explainSetCardOpen(card, item, st.open.has(explanationId));
 }
 
-// ── Collapse / expand individual explanation cards ─────────────────────────
-
-function explainCollapseToggle(historyId) {
-  const body   = document.getElementById(`expl-card-body-${historyId}`);
-  const icon   = document.getElementById(`expl-card-icon-${historyId}`);
-  if (!body) return;
-  const isOpen = body.style.display !== "none";
-  body.style.display = isOpen ? "none" : "block";
-  if (icon) {
-    icon.textContent = isOpen ? "▶" : "▼";
-    icon.classList.toggle("open", !isOpen);
-  }
-}
-
-/** Delete ONE generated explanation. Only removes that explanation record —
- *  the question, the student's answer, correctness, and other explanations
- *  (this question's or any other question's) are untouched. */
+/** Delete ONE generated explanation. Only removes that explanation record — the question, the student's answer,
+ *  correctness, and other explanations (this question's or any other question's) are untouched. */
 function explainDeleteOne(qid, explanationId) {
   const overlay = document.createElement('div');
   overlay.className = 'disc-confirm-overlay';
@@ -1834,301 +2072,108 @@ function explainDeleteOne(qid, explanationId) {
     overlay.remove();
     const card = document.getElementById(`expl-card-${explanationId}`);
     card?.classList.add('expl-card-deleting');
+    const fail = (msg) => { card?.classList.remove('expl-card-deleting'); discToast(msg, 'warn'); };
     try {
       const resp = await fetch(`/api/v01/explanations/${qid}/${explanationId}`, { method: 'DELETE' });
-
       if (!resp.ok) {
-        // Distinguish "route unreachable" (404/405 — a wiring problem, not
-        // a real delete failure) from a real server-side error, since both
-        // would otherwise look identical to the user.
-        card?.classList.remove('expl-card-deleting');
+        // "route unreachable" (404/405, a wiring problem) reads differently from a real server-side error
         console.error(`[explain] DELETE /api/v01/explanations/${qid}/${explanationId} -> HTTP ${resp.status}`);
-        const msg = (resp.status === 404 || resp.status === 405)
-          ? 'Delete isn\u2019t available right now (endpoint not found). Please contact support.'
-          : 'Could not delete this explanation. Please try again.';
-        _explainShowError(qid, msg, '');
+        fail((resp.status === 404 || resp.status === 405) ? 'Delete isn’t available right now (endpoint not found). Please contact support.' : 'Could not delete this explanation. Please try again.');
         return;
       }
-
       const data = await resp.json();
-      if (!data.success) {
-        card?.classList.remove('expl-card-deleting');
-        _explainShowError(qid, data.message || 'Could not delete this explanation.', '');
-        return;
-      }
-
-      const state = _explainState[qid] || {};
-      state.history = data.history || [];
-      _explainState[qid] = state;
-
-      _explainRenderHistory(qid);
-
-      // No explanations left for this question — return to the initial state.
-      if (!state.history.length) {
-        const panel = document.getElementById(`explain-panel-${qid}`);
-        if (panel) panel.style.display = 'none';
-      }
+      if (!data.success) { fail(data.message || 'Could not delete this explanation.'); return; }
+      const st = _explainSt(qid);
+      st.history = data.history || [];
+      st.open.delete(explanationId); _explainDrawn.delete(explanationId);
+      _explainRender(qid);
     } catch (err) {
-      card?.classList.remove('expl-card-deleting');
       console.error('[explain] delete request failed:', err);
-      _explainShowError(qid, 'Network error — please check your connection.', '');
+      fail('Network error — please check your connection.');
     }
   };
 }
 
-// ── Internal helpers ───────────────────────────────────────────────────────
-
-function _explainShowPanel(qid) {
-  const panel     = document.getElementById(`explain-panel-${qid}`);
-  const historyEl = document.getElementById(`explain-history-${qid}`);
-  const chevron   = document.getElementById(`explain-panel-chevron-${qid}`);
-  if (panel) panel.style.display = "block";
-  // Body starts collapsed — user must click header to expand
-  if (historyEl) historyEl.style.display = "none";
-  if (chevron) { chevron.textContent = "▶"; chevron.classList.remove("open"); }
-}
-
-function _explainSetBtnLoading(btn, isLoading) {
-  if (!btn) return;
-  btn.disabled = isLoading;
-  btn.classList.toggle("loading", isLoading);
-  const textEl = btn.querySelector(".explain-btn-text");
-  const iconEl = btn.querySelector(".explain-btn-icon");
-  if (textEl) textEl.textContent = isLoading ? "Generating..." : "Get AI Explanation";
-  if (iconEl) iconEl.textContent = isLoading ? "✧ ⧖ ✧" : "✧ ⌬ ✧";
-}
-
-function _explainUpdateButtonState(qid) {
-  const btn   = document.getElementById(`explain-btn-${qid}`);
-  const badge = document.getElementById(`explain-usage-${qid}`);
-  const state = _explainState[qid];
-  if (!btn || !state) return;
-
-  const qRem = state.questionRemaining;
-  const dRem = state.dailyRemaining;
-
-  if (qRem <= 0) {
-    btn.disabled = true;
-    btn.title    = `No more explanations for this question today. ${state.resetTime}`;
-    if (badge) { badge.textContent = "Limit reached"; badge.classList.add("visible", "limit"); }
-  } else if (dRem <= 0) {
-    btn.disabled = true;
-    btn.title    = `Daily limit reached. ${state.resetTime}`;
-    if (badge) { badge.textContent = "Daily limit"; badge.classList.add("visible", "limit"); }
-  } else {
-    btn.disabled = false;
-    const label  = `${qRem} of ${qRem + (2 - qRem)} left`;
-    if (badge) {
-      badge.textContent = `${qRem} left today`;
-      badge.classList.add("visible");
-      badge.classList.remove("limit");
-    }
-  }
-
-  // Update footer reset time
-  const footer = document.getElementById(`explain-footer-${qid}`);
-  const rtEl   = document.getElementById(`explain-reset-${qid}`);
-  if (footer && state.history && state.history.length > 0) {
-    footer.dataset.hasContent = "1";
-    // Only show footer if panel body is currently expanded
-    const historyEl = document.getElementById(`explain-history-${qid}`);
-    if (historyEl && historyEl.style.display !== "none") {
-      footer.style.display = "flex";
-    }
-  }
-  if (rtEl && state.resetTime) {
-    rtEl.textContent = state.resetTime;
-  }
-}
-
-function _explainRenderHistory(qid) {
-  const container = document.getElementById(`explain-history-${qid}`);
-  if (!container) return;
-
-  const state   = _explainState[qid];
-  const history = (state && state.history) || [];
-
-  if (history.length === 0) {
-    container.innerHTML = "";
-    return;
-  }
-
-  container.innerHTML = history.map((item, idx) => {
-    const label    = history.length === 1 ? "AI Explanation" : `Explanation ${idx + 1} of ${history.length}`;
-    const dateStr  = _explainFormatDate(item.generated_at);
-    const htmlBody = _explainMarkdownToHtml(item.explanation);
-    const startOpen = false;  // always collapsed by default
-
-    return `
-      <div class="expl-card" id="expl-card-${item.id}">
-        <div class="expl-card-header" onclick="explainCollapseToggle(${item.id})">
-          <span class="expl-card-label">
-            <span class="expl-card-num">${idx + 1}</span>
-            ${label}
-          </span>
-          <span class="expl-card-meta">${dateStr}</span>
-          <button type="button" class="expl-card-delete" title="Delete this explanation"
-                  onclick="event.stopPropagation(); explainDeleteOne(${qid}, ${item.id});">
-            <i class="fas fa-trash-alt"></i>
-          </button>
-          <span class="expl-card-chevron" id="expl-card-icon-${item.id}">${startOpen ? "▼" : "▶"}</span>
-        </div>
-        <div class="expl-card-body" id="expl-card-body-${item.id}" style="display:${startOpen ? "block" : "none"}">
-          <div class="expl-card-content explain-panel-body" id="expl-rendered-${item.id}">
-            ${htmlBody}
-          </div>
-        </div>
-      </div>`;
-  }).join("");
-
-  // Typeset MathJax on all new content — queued (see _mjTypeset above) so
-  // this can never race with another in-flight typeset call.
-  _mjTypeset([container]);
-}
-
-function _explainAppendSkeleton(qid) {
-  const container = document.getElementById(`explain-history-${qid}`);
-  if (!container) return;
-  const el = document.createElement("div");
-  el.id = `explain-skeleton-${qid}`;
-  el.className = "expl-card";
-  el.innerHTML = `
-    <div class="expl-card-header">
-      <span class="expl-card-label"><span class="expl-card-num">…</span> Generating…</span>
-    </div>
-    <div class="expl-card-body" style="display:block;">
-      <div class="explain-skeleton">
-        <div class="explain-skeleton-line" style="width:60%"></div>
-        <div class="explain-skeleton-line" style="width:90%"></div>
-        <div class="explain-skeleton-line" style="width:75%"></div>
-        <div class="explain-skeleton-line" style="width:40%"></div>
-        <div class="explain-skeleton-line" style="width:82%"></div>
-      </div>
-    </div>`;
-  container.appendChild(el);
-}
-
-function _explainRemoveSkeleton(qid) {
-  const el = document.getElementById(`explain-skeleton-${qid}`);
-  if (el) el.remove();
-}
-
-function _explainShowError(qid, message, resetTime) {
-  const container = document.getElementById(`explain-history-${qid}`);
-  if (!container) return;
-  const el = document.createElement("div");
-  el.className = "explain-error";
-  el.innerHTML = `
-    <i class="fas fa-exclamation-triangle"></i>
-    <span>${_escHtml(message)}${resetTime ? " <em>" + _escHtml(resetTime) + "</em>" : ""}</span>`;
-  container.appendChild(el);
-  setTimeout(() => el.remove(), 8000);
-}
-
-function _explainScrollToLatest(qid) {
-  const container = document.getElementById(`explain-history-${qid}`);
-  if (!container) return;
-  const last = container.lastElementChild;
-  if (last) setTimeout(() => last.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
-}
-
 function _explainFormatDate(isoStr) {
-  if (!isoStr) return "";
+  if (!isoStr) return '';
   try {
-    const d = new Date(isoStr + (isoStr.endsWith("Z") ? "" : "Z"));
-    return d.toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-      day: "2-digit", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit", hour12: true,
+    const d = new Date(isoStr + (isoStr.endsWith('Z') ? '' : 'Z'));
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true,
     });
-  } catch { return ""; }
-}
-
-/**
- * Minimal Markdown → HTML converter with LaTeX protection.
- * Protects $$...$$, $...$, \[...\] and \(...\) (verbatim, delimiters
- * included) from Markdown processing, then restores them untouched so
- * subscripts/braces/mhchem syntax inside can never be corrupted by the
- * bold/italic/list regexes below.
- */
-function _explainMarkdownToHtml(markdown) {
-  const math = [];
-  const protectMath = (re) => (str) => str.replace(re, m => {
-    math.push(m);
-    return "\u0000MATH" + (math.length - 1) + "\u0000";
-  });
-
-  let s = String(markdown);
-  s = protectMath(/\$\$[\s\S]+?\$\$/g)(s);   // $$...$$ (checked first: greedier delimiter)
-  s = protectMath(/\\\[[\s\S]+?\\\]/g)(s);   // \[...\]
-  s = protectMath(/\$[^\n$]+?\$/g)(s);       // $...$  (single line only)
-  s = protectMath(/\\\([\s\S]+?\\\)/g)(s);   // \(...\)
-
-  s = s
-    .replace(/^## (.+)$/gm,   "<h2>$1</h2>")
-    .replace(/^### (.+)$/gm,  "<h3>$1</h3>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g,     "<em>$1</em>")
-    .replace(/`([^`]+)`/g,     "<code>$1</code>")
-    .replace(/^---+$/gm,       "<hr>")
-    .replace(/^\d+\.\s(.+)$/gm,"<li>$1</li>")
-    .replace(/^[-*]\s(.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => "<ul>" + m + "</ul>")
-    .replace(/\n{2,}/g, "</p><p>")
-    .replace(/^(?!<[huolpd])(.+)$/gm, "<p>$1</p>")
-    .replace(/<p><\/p>/g, "");
-
-  // Restore verbatim; escape < and > only so a stray "<=>" (mhchem
-  // equilibrium arrow) etc. can never be misread as an HTML tag.
-  s = s.replace(/\u0000MATH(\d+)\u0000/g, (_, i) =>
-    math[Number(i)].replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  );
-  return s;
+  } catch { return ''; }
 }
 
 function _escHtml(str) {
-  return String(str || "")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── Auto-load history for all wrong-answer questions on page load ──────────
-document.addEventListener("DOMContentLoaded", () => {
+// ── wiring (one delegated listener each: nothing to duplicate when cards are added or redrawn) ───────────────
+document.addEventListener('click', (e) => {
+  const generate = e.target.closest('.btn-explain');
+  if (generate) { e.preventDefault(); explainToggle(parseInt(generate.dataset.qid, 10)); return; }
 
-  document.querySelectorAll("[data-explain-qid]").forEach(el => {
-    const qid = parseInt(el.dataset.explainQid);
-    if (qid) explainLoadHistory(qid);
-  });
+  const del = e.target.closest('[data-explain-del]');
+  if (del) {
+    e.stopPropagation();
+    const card = del.closest('.expl-card');
+    explainDeleteOne(parseInt(card.dataset.qid, 10), parseInt(del.dataset.explainDel, 10));
+    return;
+  }
+  const act = e.target.closest('[data-explain-act]');
+  if (act) {
+    const qid = parseInt(act.closest('.ai-explain-section').dataset.explainQid, 10), st = _explainSt(qid);
+    if (act.dataset.explainAct === 'dismiss') { st.phase = 'idle'; st.error = null; _explainRender(qid); }
+    else if (act.dataset.explainAct === 'recheck') { _explainBeginWaiting(qid); }
+    else if (act.dataset.explainAct === 'retry') { st.phase = 'idle'; st.error = null; explainToggle(qid); }
+    return;
+  }
+  const card = e.target.closest('[data-explain-card]');
+  if (card) { explainCollapseToggle(parseInt(card.dataset.explainCard, 10)); return; }
+  const head = e.target.closest('[data-explain-panel]');
+  if (head) explainPanelBodyToggle(parseInt(head.dataset.explainPanel, 10));
+});
+document.addEventListener('keydown', (e) => {                                  // the two fold headers are buttons for the keyboard too
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-explain-card],[data-explain-panel]')) {
+    e.preventDefault(); e.target.click();
+  }
+});
 
-  document.querySelectorAll(".btn-explain").forEach(btn => {
+// Back/forward cache: a page restored mid-generation lost its request, so ask the server what became of it.
+window.addEventListener('pageshow', (ev) => {
+  if (!ev.persisted) return;
+  for (const qid in _explainState) {
+    const st = _explainState[qid];
+    if (st.phase === 'generating' && !st.awaiting) { _explainInFlight.delete(Number(qid)); _explainBeginWaiting(Number(qid)); }
+  }
+});
 
-    btn.addEventListener("click", async function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const qid = parseInt(this.dataset.qid);
-
-      let qtype = "";
-      let answer = "";
-
-      try {
-        qtype = JSON.parse(this.dataset.qtype || '""');
-      } catch (_) {}
-
-      try {
-        answer = JSON.parse(this.dataset.answer || '""');
-      } catch (_) {}
-
-      await explainToggle(qid, qtype, answer);
-    });
-
-  });
-
+document.addEventListener('DOMContentLoaded', () => {
+  const sections = Array.from(document.querySelectorAll('[data-explain-qid]'));
+  const load = (el) => { const qid = parseInt(el.dataset.explainQid, 10); if (qid) explainLoadHistory(qid); };
+  if ('IntersectionObserver' in window) {
+    // A long result has an explanation area under every wrong answer: ask about each one only when it is about to be seen.
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(en => { if (en.isIntersecting) { io.unobserve(en.target); load(en.target); } });
+    }, { rootMargin: '900px 0px' });
+    sections.forEach(el => io.observe(el));
+  } else {
+    sections.forEach(load);
+  }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // END AI EXPLANATION SYSTEM
 // ══════════════════════════════════════════════════════════════════════════════
+
+// Floating Page Up / Page Down (static/shared/page-nav.js): pages the whole document, question by question.
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PageNav) PageNav.init({ sections: '.question-response-card', offset: 64 });
+});
 
 //]]>
 </script>

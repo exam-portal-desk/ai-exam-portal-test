@@ -1,0 +1,26 @@
+{% extends "admin_base.html" %}
+{% block title %}Not allowed{% endblock %}
+
+{% block content %}
+<style>
+  .fb-wrap { max-width:560px; margin:3rem auto; padding:0 1rem; }
+  .fb-card { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 6px); box-shadow:var(--shadow-sm); padding:2rem 1.75rem; text-align:center; }
+  .fb-ic { width:3.4rem; height:3.4rem; margin:0 auto 1rem; border-radius:16px; display:flex; align-items:center; justify-content:center; background:var(--danger-bg); color:var(--danger-text); font-size:1.3rem; }
+  .fb-card h1 { font-size:1.15rem; font-weight:800; color:var(--text-1); margin:0 0 .5rem; }
+  .fb-card p { font-size:.85rem; color:var(--text-2); line-height:1.6; margin:0 0 .9rem; }
+  .fb-hint { font-size:.76rem !important; color:var(--text-3) !important; }
+  .fb-hint code { background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:.05rem .35rem; color:var(--accent); }
+  .fb-card a.btn-back { display:inline-block; font-size:.8rem; font-weight:700; text-decoration:none; padding:.5rem 1rem; border-radius:var(--radius); background:var(--accent); color:var(--accent-on); }
+</style>
+<div class="fb-wrap">
+  <div class="fb-card" role="alert">
+    <div class="fb-ic"><i class="fas fa-user-lock" aria-hidden="true"></i></div>
+    <h1>You don't have access to {{ info.label }}</h1>
+    <p>Your account is an administrator, but this admin feature has not been granted to you. The Admin role only lets you into the portal; each admin feature is granted separately by an Access control administrator.</p>
+    {% if info.no_root %}
+    <p class="fb-hint">No root administrator has been set up yet. Run <code>python scripts/grant_root.py &lt;username&gt;</code> or apply <code>migrations/20260924_admin_access.sql</code>, then sign in again.</p>
+    {% endif %}
+    <a class="btn-back" href="{{ url_for('admin.dashboard') }}">Back to dashboard</a>
+  </div>
+</div>
+{% endblock %}

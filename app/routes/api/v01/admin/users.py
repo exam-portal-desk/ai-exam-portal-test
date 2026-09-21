@@ -13,10 +13,11 @@ updates.
   POST /admin/users/bulk-update-roles -> POST /api/v01/admin/users/bulk-update-roles
 """
 from app.utils.datetime_service import now_utc_naive, format_display
-from flask import request, jsonify
+from flask import request, jsonify, session
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db import fetch_one, fetch_all, execute
+from app import entitlements
 
 # Ghost user identifiers — must match user_deletion_service.py
 GHOST_USER_ID       = -1
@@ -35,7 +36,7 @@ def _is_ghost(user_id=None, username=None, role=None):
 
 
 @admin_api_bp.route("/users/search")
-@require_admin_role
+@require_admin_permission("user_management")
 def api_users_search():
     q        = request.args.get("q", "").strip()
     role_f   = request.args.get("role", "").strip().lower()
@@ -68,9 +69,18 @@ def api_users_search():
             f"{where_sql} ORDER BY created_at DESC LIMIT %s OFFSET %s",
             params + [per_page, start],
         )
+        try:
+            access = entitlements.summaries_for([u["id"] for u in users])
+        except Exception as e:
+            print(f"[admin.users] plan summaries unavailable: {e}")
+            access = {}
         for u in users:
             u["created_at"] = format_display(u.get("created_at"))
             u["updated_at"] = format_display(u.get("updated_at"))
+            summary = access.get(u["id"])
+            if summary and not _is_ghost(user_id=u["id"], username=u.get("username"), role=u.get("role")):
+                u.update(plan=summary["plan"], plan_label=summary["plan_label"], plan_tone=summary["tone"], plan_icon=summary["icon"],
+                         custom_access=summary["custom"], admin_access=summary["admin_access"])
 
         return jsonify({
             "users":       users,
@@ -86,7 +96,7 @@ def api_users_search():
 
 
 @admin_api_bp.route("/users/stats")
-@require_admin_role
+@require_admin_permission("user_management")
 def api_users_stats():
     try:
         # Single query with FILTER clauses instead of 4 sequential COUNT
@@ -111,13 +121,19 @@ def api_users_stats():
 
 
 @admin_api_bp.route("/users/update-role", methods=["POST"])
-@require_admin_role
+@require_admin_permission("access_control")
 def update_user_role():
     data     = request.get_json() or {}
     user_id  = data.get("user_id")
     new_role = (data.get("new_role") or "").strip()
 
     if not user_id or new_role not in ("user", "admin", "user,admin"):
+        return jsonify({"success": False, "message": "Invalid data"}), 400
+    try:
+        entitlements.authorize_role_change(session.get("user_id"), int(user_id))
+    except entitlements.AccessDenied as e:
+        return jsonify({"success": False, "message": str(e)}), 403
+    except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Invalid data"}), 400
 
     # ── GHOST BLOCK ──────────────────────────────────────────────────────────
@@ -143,7 +159,7 @@ def update_user_role():
 
 
 @admin_api_bp.route("/users/bulk-update-roles", methods=["POST"])
-@require_admin_role
+@require_admin_permission("access_control")
 def bulk_update_user_roles():
     data    = request.get_json() or {}
     updates = data.get("updates", [])
@@ -153,6 +169,7 @@ def bulk_update_user_roles():
 
     updated = 0
     skipped = 0
+    denied  = 0
     errors  = []
 
     for upd in updates:
@@ -166,6 +183,16 @@ def bulk_update_user_roles():
         # ── GHOST BLOCK ──────────────────────────────────────────────────────
         if _is_ghost(user_id=uid):
             skipped += 1
+            continue
+
+        try:
+            entitlements.authorize_role_change(session.get("user_id"), int(uid))
+        except entitlements.AccessDenied as e:
+            denied += 1
+            errors.append(f"uid={uid}: {e}")
+            continue
+        except (TypeError, ValueError):
+            errors.append(f"Skipped invalid entry: {upd}")
             continue
 
         try:
@@ -190,4 +217,4 @@ def bulk_update_user_roles():
         "success": False,
         "message": "No updates applied",
         "errors":  errors,
-    }), 400
+    }), (403 if denied else 400)

@@ -8,18 +8,18 @@ in app/routes/api/v01/admin/ai_centre.py.
 from flask import render_template
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_all_exams, get_exams_for_selector
 
 
 @admin_bp.route("/ai-command-centre", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_generation")
 def ai_command_centre():
     return render_template("admin/ai_command_centre.html", exams=get_all_exams())
 
 
 @admin_bp.route("/ai-command-centre/csv-upload", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_generation")
 def csv_upload():
     """Standalone CSV Upload & Editor page (was a modal inside AI Command
     Centre) — parsing/preview/edit stays entirely client-side, this route

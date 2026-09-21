@@ -8,7 +8,7 @@ app/routes/api/v01/admin/exams.py.
 from flask import render_template, request, redirect, url_for, flash, session
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_exam_by_id, create_exam, update_exam, get_exams_page
 from app.db.attempts import get_exam_attempts_count
 from app.db.questions import get_questions_by_exam
@@ -58,7 +58,7 @@ def _parse_available_after_datetime(form, scheduled_mode: bool) -> bool:
 
 
 @admin_bp.route("/exams", methods=["GET", "POST"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def exams():
     categories = get_all_categories()
     if request.method == "POST":
@@ -125,7 +125,7 @@ def exams():
 
 
 @admin_bp.route("/exams/edit/<int:exam_id>", methods=["GET", "POST"])
-@require_admin_role
+@require_admin_permission("exam_management")
 def edit_exam(exam_id):
     categories=get_all_categories()
     exam = get_exam_by_id(exam_id)
@@ -233,7 +233,7 @@ def edit_exam(exam_id):
 
 
 @admin_bp.route("/exams/<int:exam_id>/preview")
-@require_admin_role
+@require_admin_permission("exam_management")
 def preview_exam(exam_id):
     """Admin-only "what will a student actually see" preview — reuses the
     real exam_page.html rendering logic (copied into its own template, see

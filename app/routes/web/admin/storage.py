@@ -8,12 +8,12 @@ this route only needs to report which backend is currently active.
 from flask import render_template
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 import app.config as config
 
 
 @admin_bp.route("/object-storage")
-@require_admin_role
+@require_admin_permission("storage_management")
 def object_storage():
     backend_label = {"local": "Local filesystem", "s3": "S3-compatible"}.get(
         config.STORAGE_BACKEND, config.STORAGE_BACKEND

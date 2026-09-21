@@ -215,6 +215,7 @@
   <a href="#gd-importexport">Import / Export</a>
   <a href="#gd-organize">Organizing Content</a>
   <a href="#gd-users">Users &amp; Admin Management</a>
+  <a href="#gd-plans">Plans &amp; Access</a>
 </div>
 
 <!-- ══ GETTING STARTED ══ -->
@@ -637,6 +638,91 @@
       <a href="{{ url_for('admin.attempts') }}"><i class="fas fa-list-ol"></i> Manage Attempts</a>
       <a href="{{ url_for('admin.users_analytics') }}"><i class="fas fa-chart-line"></i> Users Analytics</a>
     </div>
+  </div>
+</details>
+
+<!-- ══ PLANS & ACCESS ══ -->
+<details class="gd-section" id="gd-plans">
+  <summary>
+    <span class="gd-section-icon"><i class="fas fa-layer-group"></i></span>
+    <span style="flex:1">
+      <span class="gd-section-title">Plans &amp; Access</span>
+      <span class="gd-section-sub" style="display:block">What Free, Pro and Elite include, limits, admin permissions and special access</span>
+    </span>
+    <i class="fas fa-chevron-down gd-chevron"></i>
+  </summary>
+  <div class="gd-body">
+  {% if plans %}
+    <h4>What each plan adds</h4>
+    <ul>
+      {% for p in plans.plans %}
+      <li><strong>{{ p.label }}</strong>{% if p.is_default %} (the default plan, used by every account that has none set){% endif %}:
+        {% if p.inherits_label %}everything in {{ p.inherits_label }}, plus{% else %}includes{% endif %}
+        {% for a in p.adds %}{{ a.label }}{% if a.limits %} ({{ a.limits|join(', ') }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}.
+      </li>
+      {% endfor %}
+    </ul>
+
+    <h4>Student features by plan</h4>
+    <table class="gd-table">
+      <thead><tr><th>Feature</th>{% for p in plans.plans %}<th>{{ p.label }}</th>{% endfor %}<th>Plan applied</th></tr></thead>
+      <tbody>
+        {% for f in plans.student_features %}
+        <tr>
+          <td><strong>{{ f.label }}</strong><br><span style="font-size:.72rem">{{ f.description }}</span></td>
+          {% for p in plans.plans %}{% set cell = f.plans[p.key] %}
+          <td>{% if cell is none %}&mdash;{% else %}Included{% for l in cell %}<br><span style="font-size:.72rem">{{ l }}</span>{% endfor %}{% endif %}</td>
+          {% endfor %}
+          <td>{{ 'Yes' if f.enforced else 'Not yet' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p><strong>Limits.</strong> A limit is optional. A feature with no limit listed is unlimited and is not metered. A plan that lists a limit for a feature replaces the limit it would inherit.</p>
+    <p><strong>Plan applied.</strong> &ldquo;Yes&rdquo; means the server checks it: a student whose plan does not include the feature gets a locked page (or an error from the API) and the feature disappears from their portal. The limits shown are in force for the AI Assistant and AI Explanation, and they are set only here (not in the server settings).</p>
+    <h4>How a user gets a plan</h4>
+    <ul>
+      <li><strong>Everyone starts on the default plan, Free.</strong> An account with no plan set (every existing account, every new one) is Free automatically; you never have to set Free up. A plan that has expired also falls back to Free.</li>
+      <li>You give a user a higher plan in <a href="{{ url_for('admin.requests_dashboard') }}">Users &amp; Requests</a> &rarr; Users tab &rarr; click their plan badge &rarr; <em>Change plan</em>. A user cannot change their own plan.</li>
+      <li>Students see their plan in the sidebar and on their Profile page, together with what it includes and which plan unlocks each locked item.</li>
+    </ul>
+
+    <h4>Plan is not admin</h4>
+    <ul>
+      <li>A plan only decides which <em>student</em> features a user gets. Elite never makes anyone an admin, and an admin on Free has no paid student features.</li>
+      <li>Admin access is the <strong>Current Role</strong> in Users &amp; Requests. Admin permissions are a separate list, below, and are never part of a plan.</li>
+    </ul>
+    <table class="gd-table">
+      <thead><tr><th>Admin permission</th><th>Available to</th><th>Checked</th></tr></thead>
+      <tbody>
+        {% for f in plans.admin_features %}
+        <tr>
+          <td><strong>{{ f.label }}</strong><br><span style="font-size:.72rem">{{ f.description }}</span></td>
+          <td>{{ 'Every admin' if f.scope == 'all' else 'Only admins who are granted it' }}</td>
+          <td>{{ 'Yes' if f.enforced else 'Not yet' }}{% if f.step_up %} &middot; asks for a {{ f.step_up }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p>Only <em>AI configuration</em> and <em>Access control</em> are checked today; the others are listed so they can be restricted later without any redesign.</p>
+  {% endif %}
+
+    <h4>Changing a plan and special access</h4>
+    <ul>
+      <li><strong>Change a user&rsquo;s plan:</strong> in <a href="{{ url_for('admin.requests_dashboard') }}">Users &amp; Requests</a>, open the Users tab, click the plan chip next to the user, choose a plan and save.</li>
+      <li><strong>Custom Access:</strong> a user with a grant or a deny on top of their plan shows a <em>Custom Access</em> chip; click the plan or the chip to open the card. There you can see what was granted or denied and until when, remove it with the &times;, or <em>Add access</em>: choose Grant or Deny, the feature (admin permissions are listed as <em>Admin: &hellip;</em>), optionally a number of days and a reason. A grant can be temporary. A deny always wins over the plan, over an earlier grant and over the admin role (once the feature is enforced).</li>
+      <li>Every plan and access change is recorded in the audit log. The same actions are available from the Access Control API (<code>PUT /api/v01/admin/access/users/&lt;id&gt;/overrides/&lt;feature&gt;</code>, which can also set <code>limits</code>).</li>
+      <li>A plan can have an expiry; after it the user is back on the default plan automatically.</li>
+    </ul>
+
+    <h4>Access requests</h4>
+    <p>Requests for admin access work as before: approving one sets the user&rsquo;s role. Requests for a plan or a single feature are not built yet; when they are, approving one will create the same grant described above, with its own expiry.</p>
+
+    <h4>Sensitive admin actions and payments</h4>
+    <p>A feature can be marked in the configuration as needing a passkey (Windows Hello, fingerprint, phone or security key) for sensitive actions. The marker is recorded and reported with every access check, but passkey verification is not implemented, so no feature uses it yet. Payments and subscriptions are not implemented either: a future billing system will simply set a user&rsquo;s plan and expiry.</p>
+
+    <h4>Changing what a plan contains</h4>
+    <p>Plans, features and limits live in <code>config/entitlements.json</code>; the file&rsquo;s guide is <code>config/ENTITLEMENTS.md</code>. Moving a feature to another plan, changing a limit, or adding a plan is an edit to that one file: no code changes.</p>
   </div>
 </details>
 

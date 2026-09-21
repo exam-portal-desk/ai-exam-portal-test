@@ -295,6 +295,12 @@ window.MathJax = {
   <div>
     <h1><i class="fas fa-robot me-2" style="color:var(--accent)"></i>AI Command Centre</h1>
     <p>Generate high-quality exam questions using AI</p>
+    {# The models that will do the work, from the central AI registry (change them in AI Configuration). #}
+    {% from 'partials/_ai_badge.html' import ai_model_badge %}
+    <div class="d-flex flex-wrap gap-2 mt-1">
+      {{ ai_model_badge('question_generation_text', label='Text') }}
+      {{ ai_model_badge('question_generation_vision', label='Scanned PDFs') }}
+    </div>
   </div>
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <div class="status-badge"><span class="status-dot"></span>System Online</div>

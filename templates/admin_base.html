@@ -26,6 +26,8 @@
 
   <!-- ── CENTRALIZED THEME CSS ── -->
   <link href="{{ url_for('static', filename='theme.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='shared/ai-badge.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='shared/plan-badge.css') }}" rel="stylesheet">
 
   <!-- ── VENDOR ── -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
@@ -290,6 +292,10 @@
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
   .is-collapsed .sb-nav .nav-link { justify-content: center; padding: 6px 0; gap: 0; }
+  /* locked: listed but not granted to this admin. Dimmed, with a small lock; the click explains instead of navigating. */
+  .sb-nav .nav-link.locked .nav-icon, .sb-nav .nav-link.locked .nav-label { opacity: 0.5; }
+  .nav-lock { margin-left: auto; font-size: 0.62rem; opacity: 0.6; flex-shrink: 0; }
+  .is-collapsed .nav-lock { display: none; }
 
   /* Icon wrapper */
   .nav-icon {
@@ -479,6 +485,10 @@
     </div>
 
     <div class="sb-nav-wrap">
+      {# A feature this admin has not been granted stays listed, marked locked: the admin can see what exists and what they hold.
+         The lock is display only; the pages and APIs behind it refuse an admin without the grant, whatever the menu shows. #}
+      {% macro lock_attrs(perm) %}{% if not admin_can(perm) %} data-locked="{{ admin_feature_label(perm) }}" aria-disabled="true"{% endif %}{% endmacro %}
+      {% macro lock_icon(perm) %}{% if not admin_can(perm) %}<i class="fas fa-lock nav-lock" aria-hidden="true"></i>{% endif %}{% endmacro %}
       <ul class="sb-nav" role="list">
 
         <li>
@@ -492,93 +502,100 @@
         <li><span class="section-label">Content</span></li>
 
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.categories') %}active{% endif %}"
-             href="{{ url_for('admin.categories') }}" data-tooltip="Manage Categories" aria-label="Manage Categories">
+          <a class="nav-link{{ ' locked' if not admin_can('category_management') }} {% if request.endpoint and request.endpoint.startswith('admin.categories') %}active{% endif %}"
+             href="{{ url_for('admin.categories') }}" data-tooltip="Manage Categories"{{ lock_attrs('category_management') }} aria-label="Manage Categories">
             <span class="nav-icon"><i class="fas fa-layer-group"></i></span>
-            <span class="nav-label">Manage Categories</span>
+            <span class="nav-label">Manage Categories</span>{{ lock_icon('category_management') }}
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.exams') %}active{% endif %}"
-             href="{{ url_for('admin.exams') }}" data-tooltip="Manage Exams" aria-label="Manage Exams">
+          <a class="nav-link{{ ' locked' if not admin_can('exam_management') }} {% if request.endpoint and request.endpoint.startswith('admin.exams') %}active{% endif %}"
+             href="{{ url_for('admin.exams') }}" data-tooltip="Manage Exams"{{ lock_attrs('exam_management') }} aria-label="Manage Exams">
             <span class="nav-icon"><i class="fas fa-file-alt"></i></span>
-            <span class="nav-label">Manage Exams</span>
+            <span class="nav-label">Manage Exams</span>{{ lock_icon('exam_management') }}
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.subjects') %}active{% endif %}"
-             href="{{ url_for('admin.subjects') }}" data-tooltip="Manage Subjects" aria-label="Manage Subjects">
+          <a class="nav-link{{ ' locked' if not admin_can('subject_management') }} {% if request.endpoint and request.endpoint.startswith('admin.subjects') %}active{% endif %}"
+             href="{{ url_for('admin.subjects') }}" data-tooltip="Manage Subjects"{{ lock_attrs('subject_management') }} aria-label="Manage Subjects">
             <span class="nav-icon"><i class="fas fa-book"></i></span>
-            <span class="nav-label">Manage Subjects</span>
+            <span class="nav-label">Manage Subjects</span>{{ lock_icon('subject_management') }}
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.questions') or request.endpoint == 'admin.questions_index') %}active{% endif %}"
-             href="{{ url_for('admin.questions_index') }}" data-tooltip="Manage Questions" aria-label="Manage Questions">
+          <a class="nav-link{{ ' locked' if not admin_can('question_management') }} {% if request.endpoint and (request.endpoint.startswith('admin.questions') or request.endpoint == 'admin.questions_index') %}active{% endif %}"
+             href="{{ url_for('admin.questions_index') }}" data-tooltip="Manage Questions"{{ lock_attrs('question_management') }} aria-label="Manage Questions">
             <span class="nav-icon"><i class="fas fa-question-circle"></i></span>
-            <span class="nav-label">Manage Questions</span>
+            <span class="nav-label">Manage Questions</span>{{ lock_icon('question_management') }}
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.upload_images') %}active{% endif %}"
-             href="{{ url_for('admin.upload_images_page') }}" data-tooltip="Upload Images" aria-label="Upload Images">
+          <a class="nav-link{{ ' locked' if not admin_can('question_management') }} {% if request.endpoint and request.endpoint.startswith('admin.upload_images') %}active{% endif %}"
+             href="{{ url_for('admin.upload_images_page') }}" data-tooltip="Upload Images"{{ lock_attrs('question_management') }} aria-label="Upload Images">
             <span class="nav-icon"><i class="fas fa-images"></i></span>
-            <span class="nav-label">Upload Images</span>
+            <span class="nav-label">Upload Images</span>{{ lock_icon('question_management') }}
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.image_mapping') %}active{% endif %}"
-             href="{{ url_for('admin.image_mapping_page') }}" data-tooltip="Image Mapping" aria-label="Image Mapping">
+          <a class="nav-link{{ ' locked' if not admin_can('question_management') }} {% if request.endpoint and request.endpoint.startswith('admin.image_mapping') %}active{% endif %}"
+             href="{{ url_for('admin.image_mapping_page') }}" data-tooltip="Image Mapping"{{ lock_attrs('question_management') }} aria-label="Image Mapping">
             <span class="nav-icon"><i class="fas fa-link"></i></span>
-            <span class="nav-label">Image Mapping</span>
+            <span class="nav-label">Image Mapping</span>{{ lock_icon('question_management') }}
           </a>
         </li>
         <li>
-          <button id="open-latex-editor-admin-base" class="nav-link" data-tooltip="LaTeX Editor" aria-label="LaTeX Editor">
+          <button id="open-latex-editor-admin-base" class="nav-link{{ ' locked' if not admin_can('question_management') }}" data-tooltip="LaTeX Editor"{{ lock_attrs('question_management') }} aria-label="LaTeX Editor">
             <span class="nav-icon"><i class="fas fa-square-root-alt"></i></span>
-            <span class="nav-label">LaTeX Editor</span>
+            <span class="nav-label">LaTeX Editor</span>{{ lock_icon('question_management') }}
           </button>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.object_storage') %}active{% endif %}"
-             href="{{ url_for('admin.object_storage') }}" data-tooltip="Object Storage" aria-label="Object Storage">
+          <a class="nav-link{{ ' locked' if not admin_can('storage_management') }} {% if request.endpoint and request.endpoint.startswith('admin.object_storage') %}active{% endif %}"
+             href="{{ url_for('admin.object_storage') }}" data-tooltip="Object Storage"{{ lock_attrs('storage_management') }} aria-label="Object Storage">
             <span class="nav-icon"><i class="fas fa-hdd"></i></span>
-            <span class="nav-label">Object Storage</span>
+            <span class="nav-label">Object Storage</span>{{ lock_icon('storage_management') }}
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
-             href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre" aria-label="AI Command Centre">
+          <a class="nav-link{{ ' locked' if not admin_can('question_generation') }} {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
+             href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre"{{ lock_attrs('question_generation') }} aria-label="AI Command Centre">
             <span class="nav-icon"><i class="fas fa-robot"></i></span>
-            <span class="nav-label">AI Command Centre</span>
+            <span class="nav-label">AI Command Centre</span>{{ lock_icon('question_generation') }}
+          </a>
+        </li>
+        <li>
+          <a class="nav-link{{ ' locked' if not admin_can('ai_configuration') }} {% if request.endpoint and request.endpoint.startswith('admin.ai_configuration') %}active{% endif %}"
+             href="{{ url_for('admin.ai_configuration') }}" data-tooltip="AI Configuration"{{ lock_attrs('ai_configuration') }} aria-label="AI Configuration">
+            <span class="nav-icon"><i class="fas fa-sliders-h"></i></span>
+            <span class="nav-label">AI Configuration</span>{{ lock_icon('ai_configuration') }}
           </a>
         </li>
 
         <li><span class="section-label">Management</span></li>
 
         <li>
-          <a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.requests') or request.endpoint.startswith('admin.new_requests') or request.endpoint.startswith('admin.requests_history')) %}active{% endif %}"
-             href="{{ url_for('admin.requests_dashboard') }}" data-tooltip="Users & Requests" aria-label="Users & Requests">
+          <a class="nav-link{{ ' locked' if not admin_can('user_management') }} {% if request.endpoint and (request.endpoint.startswith('admin.requests') or request.endpoint.startswith('admin.new_requests') or request.endpoint.startswith('admin.requests_history')) %}active{% endif %}"
+             href="{{ url_for('admin.requests_dashboard') }}" data-tooltip="Users & Requests"{{ lock_attrs('user_management') }} aria-label="Users & Requests">
             <span class="nav-icon"><i class="fas fa-user-plus"></i></span>
-            <span class="nav-label">Users &amp; Requests</span>
+            <span class="nav-label">Users &amp; Requests</span>{{ lock_icon('user_management') }}
             <span class="nav-badge" id="requestsBadge" style="display:none">0</span>
           </a>
         </li>
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.attempts') %}active{% endif %}"
-             href="{{ url_for('admin.attempts') }}" data-tooltip="Manage Attempts" aria-label="Manage Attempts">
+          <a class="nav-link{{ ' locked' if not admin_can('attempt_management') }} {% if request.endpoint and request.endpoint.startswith('admin.attempts') %}active{% endif %}"
+             href="{{ url_for('admin.attempts') }}" data-tooltip="Manage Attempts"{{ lock_attrs('attempt_management') }} aria-label="Manage Attempts">
             <span class="nav-icon"><i class="fas fa-list-ol"></i></span>
-            <span class="nav-label">Manage Attempts</span>
+            <span class="nav-label">Manage Attempts</span>{{ lock_icon('attempt_management') }}
           </a>
         </li>
 
         <li><span class="section-label">Analytics</span></li>
 
         <li>
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.users_analytics') %}active{% endif %}"
-             href="{{ url_for('admin.users_analytics') }}" data-tooltip="Users Analytics" aria-label="Users Analytics">
+          <a class="nav-link{{ ' locked' if not admin_can('user_analytics') }} {% if request.endpoint and request.endpoint.startswith('admin.users_analytics') %}active{% endif %}"
+             href="{{ url_for('admin.users_analytics') }}" data-tooltip="Users Analytics"{{ lock_attrs('user_analytics') }} aria-label="Users Analytics">
             <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
-            <span class="nav-label">Users Analytics</span>
+            <span class="nav-label">Users Analytics</span>{{ lock_icon('user_analytics') }}
           </a>
         </li>
 
@@ -841,6 +858,7 @@
 </script>
 
 <!-- ══ REQUESTS BADGE ════════════════════════════════════ -->
+{% if admin_can('user_management') %}
 <script>
 (function(){
   function upd(){
@@ -855,6 +873,7 @@
   if(window.location.pathname.startsWith('/admin/')) setInterval(upd,30000);
 })();
 </script>
+{% endif %}
 
 <!-- ══ AUTO-DISMISS ALERTS ════════════════════════════════ -->
 <script>
@@ -879,7 +898,7 @@ document.addEventListener('DOMContentLoaded',function(){
     if (!sb.classList.contains('is-collapsed')) return;
     var label = el.getAttribute('data-tooltip');
     if (!label) return;
-    tip.textContent = label;
+    tip.textContent = label + (el.classList.contains('locked') ? ' \u00b7 locked' : '');
     var r=el.getBoundingClientRect(), sbR=sb.getBoundingClientRect();
     tip.style.top=Math.round(r.top+r.height/2)+'px';
     tip.style.left=Math.round(sbR.right+8)+'px';
@@ -976,7 +995,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ══ GLOBAL ADMIN TOAST ════════════════════════════════ -->
 <div id="adminToastContainer"></div>
 <script>
-window.adminToast = function(msg, type, sub) {
+window.adminToast = function(msg, type, sub, ms) {
+  ms = ms || 3000;
   type = type || 'success';
   var icons = { success: 'fa-check-circle', danger: 'fa-times-circle', warning: 'fa-exclamation-circle' };
   var el = document.createElement('div');
@@ -989,9 +1009,21 @@ window.adminToast = function(msg, type, sub) {
   var c = document.getElementById('adminToastContainer');
   if (!c) return;
   c.appendChild(el);
-  setTimeout(function() { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; }, 2700);
-  setTimeout(function() { el.remove(); }, 3000);
+  setTimeout(function() { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; }, ms - 300);
+  setTimeout(function() { el.remove(); }, ms);
 };
+
+/* A locked sidebar item explains itself instead of navigating. Purely a courtesy: the page and its API refuse this admin
+   on the server whatever the menu does. Capture phase + stopImmediatePropagation so no other handler (the LaTeX editor
+   popup button, for one) runs for a locked item. */
+document.addEventListener('click', function(e) {
+  var el = e.target.closest && e.target.closest('.sidebar .nav-link.locked');
+  if (!el) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  var esc = function(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  window.adminToast(esc(el.getAttribute('data-tooltip') || 'This feature') + ' is locked', 'warning',
+    'Your account does not have the ' + esc(el.getAttribute('data-locked') || 'required') + ' admin feature. Ask an Access control administrator to grant it.', 6500);
+}, true);
 </script>
 
 {# ══ NEW-WINDOW LOADING SCREEN ═══════════════════════════

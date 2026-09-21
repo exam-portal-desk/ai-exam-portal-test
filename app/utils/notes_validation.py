@@ -35,6 +35,15 @@ class NotesValidationError(ValueError):
     """Raised when Notes input is invalid."""
 
 
+class NotesLimitError(NotesValidationError):
+    """A plan limit (notebooks, pages per notebook) stops this creation. Carries what the front end needs to explain it;
+    routes answer 429 with limit_reached=true, distinct from a 400 (bad input) or a 403 (not allowed at all)."""
+
+    def __init__(self, message, *, limit_key, limit, used, plan_label=None):
+        super().__init__(message)
+        self.limit_key, self.limit, self.used, self.plan_label = limit_key, limit, used, plan_label
+
+
 class NotesPermissionError(NotesValidationError):
     """Raised when the acting user lacks sufficient permission for the
     requested action — kept distinct from NotesValidationError so routes can

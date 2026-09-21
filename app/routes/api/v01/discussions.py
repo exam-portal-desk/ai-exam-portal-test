@@ -33,12 +33,15 @@ migrations/20260821_discussion_thread_index.sql).
 
 from flask import Blueprint, request, jsonify, session
 from flask_socketio import join_room, leave_room
+from app import entitlements
+from app.entitlements.guard import gate_blueprint
 
 import threading
 import app.services.discussion_service as discussion_service
 from app.services.image_storage_service import profile_photo_url_from_key
 
 discussion_bp = Blueprint('discussion', __name__, url_prefix='/api/v01/discussions')
+gate_blueprint(discussion_bp, 'discussion')
 discussion_admin_bp = Blueprint('discussion_admin_api', __name__, url_prefix='/api/v01/admin/discussions')
 
 socketio = None
@@ -50,7 +53,8 @@ def init_socketio(sio):
 
 
 def _is_admin():
-    return 'admin' in str(session.get('role', ''))
+    """A moderator: an admin-portal session whose person has been granted Question management."""
+    return 'admin' in str(session.get('role', '')) and entitlements.has_admin_permission(session.get('user_id'), 'question_management')
 
 
 @discussion_bp.route('/<int:question_id>/comments', methods=['GET'])
@@ -203,7 +207,7 @@ def admin_best(comment_id):
 def register_socketio_events(sio):
     @sio.on('join_discussion')
     def on_join(data):
-        if 'user_id' not in session:
+        if 'user_id' not in session or not entitlements.has_access(int(session['user_id']), 'discussion'):
             return
         qid = data.get('question_id')
         if qid:

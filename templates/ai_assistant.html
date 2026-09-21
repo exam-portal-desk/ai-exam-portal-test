@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% set active_nav = 'ai' %}
 {% block title %}AI Assistant - SmartAIExam{% endblock %}
+{# The Assistant is an application screen: the page itself never scrolls (see .ai-fit in chat.css). #}
+{% block body_class %}ai-fit{% endblock %}
 
 {% block content %}
+{% from 'partials/_ai_badge.html' import ai_model_badge %}
 <link rel="stylesheet" href="{{ url_for('static', filename='ai_assistant/chat.css') }}">
 
 <div class="ai-shell">
@@ -35,8 +38,10 @@
         <div class="ai-avatar"><i class="fas fa-robot"></i></div>
         <div style="min-width:0">
           <div class="ai-header-title" id="aiHeaderTitle">AI Study Assistant</div>
-          <div class="ai-header-sub" style="display:flex;align-items:center;gap:.35rem">
-            <div class="ai-status-dot"></div> Online &amp; Ready
+          <div class="ai-header-sub">
+            <span class="ai-status"><span class="ai-status-dot"></span> Online &amp; Ready</span>
+            {# Which provider + model answers here right now: read from the central AI registry, never typed in. #}
+            {{ ai_model_badge('assistant_chat', label='Powered by') }}
           </div>
         </div>
       </div>
@@ -56,9 +61,33 @@
       <button type="button" onclick="assistant.newChat()"><i class="fas fa-plus"></i> New Chat</button>
     </div>
 
-    <div class="ai-messages" id="chatMessages"></div>
+    {# "Discuss with AI": which question this chat is about. References and labels only — the question itself is
+       never copied here; "View Question" opens the existing response page on it. Filled in by chat.js. #}
+    <div class="ai-context" id="aiContext" hidden>
+      <div class="ai-context-icon"><i class="fas fa-circle-question"></i></div>
+      <div class="ai-context-main">
+        <div class="ai-context-title" id="aiContextTitle"></div>
+        <div class="ai-context-meta" id="aiContextMeta"></div>
+      </div>
+      <div class="ai-context-actions">
+        <a class="ai-context-view" id="aiContextView" href="#" target="_blank" rel="noopener">
+          <i class="fas fa-up-right-from-square"></i><span>View Question</span>
+        </a>
+        <button type="button" class="ai-context-close" id="aiContextClose" title="Remove question context" aria-label="Remove question context">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="ai-messages-wrap">
+      <div class="ai-messages" id="chatMessages" tabindex="-1"></div>
+      <button type="button" class="ai-jump-latest" id="jumpLatestBtn" hidden>
+        <i class="fas fa-arrow-down"></i> New messages
+      </button>
+    </div>
 
     <div class="ai-input-area">
+      <div class="ai-chips" id="aiChips" hidden></div>
       <div class="ai-input-row">
         <textarea class="chat-input" id="chatInput" placeholder="Ask me anything about your studies…" rows="1"></textarea>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()">
@@ -90,6 +119,21 @@
   </div>
 </div>
 
+{# Remove question context confirmation (the × on the context bar). Same shell as the modals above. #}
+<div class="confirmation-modal" id="contextModal" role="dialog" aria-modal="true" aria-labelledby="contextModalTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-icon info"><i class="fas fa-circle-question"></i></div>
+      <div class="modal-title" id="contextModalTitle">Remove Question Context?</div>
+    </div>
+    <div class="modal-body">Removing the question context will switch this conversation back to general study mode. Your existing conversation messages will not be deleted.</div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" id="contextModalKeep" type="button">Keep Context</button>
+      <button class="modal-btn primary" id="contextModalRemove" type="button">Remove Context</button>
+    </div>
+  </div>
+</div>
+
 {# Rename modal #}
 <div class="confirmation-modal" id="renameModal">
   <div class="modal-content">
@@ -108,7 +152,6 @@
 <script>
 window.AI_ASSISTANT_USER_INITIAL = {{ (session.get("full_name","U")[:1])|tojson }};
 window.AI_ASSISTANT_AVATAR_URL = {{ (NAV_AVATAR_URL or none)|tojson }};
-window.AI_MAX_MESSAGES_PER_CONVERSATION = {{ MAX_MESSAGES_PER_CONVERSATION }};
 </script>
 {% endblock %}
 

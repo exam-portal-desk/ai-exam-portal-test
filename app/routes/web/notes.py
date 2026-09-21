@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, render_template, request, session, Respons
 import app.config as config
 
 from app.db.users import get_notes_view_mode
+from app.entitlements.guard import gate_blueprint
 from app.middleware.session_guard import require_user_role
 from app.services import notes_service
 from app.storage import get_storage
@@ -20,6 +21,7 @@ from app.db.dashboard_events import mark_event_seen
 
 
 notes_bp = Blueprint("notes", __name__)
+gate_blueprint(notes_bp, "notebook")
 
 
 def _api_error(message: str, status: int = 400):

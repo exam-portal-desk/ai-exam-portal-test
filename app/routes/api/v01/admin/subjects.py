@@ -7,7 +7,7 @@ edit/delete stay on the plain-form web routes in app/routes/web/admin/subjects.p
 from flask import jsonify, request, render_template_string
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.misc import get_subjects_page
 
 _ROWS_TPL = (
@@ -19,7 +19,7 @@ _ROWS_TPL = (
 
 
 @admin_api_bp.route("/subjects", methods=["GET"])
-@require_admin_role
+@require_admin_permission("subject_management")
 def api_subjects_list():
     result = get_subjects_page(
         search=request.args.get("q", "").strip(),

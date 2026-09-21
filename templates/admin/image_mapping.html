@@ -79,6 +79,10 @@
 .qtype.MSQ { background:var(--accent-subtle); color:var(--accent); border-color:var(--border); }
 .qtype.NUMERIC { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
 .imap-qrow .qtext { flex:1; min-width:0; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Full question text on hover (one floating card, filled by JS only when the one-line text is actually cut off) */
+.imap-qtip { position:fixed; left:0; top:0; z-index:10070; max-width:min(560px, calc(100vw - 16px)); max-height:55vh; overflow:hidden; padding:.7rem .9rem; background:var(--surface); color:var(--text-1); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); font-size:.82rem; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; pointer-events:none; opacity:0; visibility:hidden; transition:opacity .12s; }
+.imap-qtip.show { opacity:1; visibility:visible; }
+.qtext mjx-container { margin:0 !important; }
 .imap-qrow .qstatus { flex-shrink:0; font-size:.68rem; font-weight:700; padding:.15rem .55rem; border-radius:20px; white-space:nowrap; }
 .qstatus.none    { background:var(--surface-2); color:var(--text-3); border:1px solid var(--border); }
 .qstatus.attached{ background:var(--success-bg); color:var(--success-text); border:1px solid var(--success-border); }
@@ -404,6 +408,51 @@
   }
   function debounce(fn, ms){ let t; return function(...a){ clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
 
+  // ── question text: formulas drawn (MathJax), one line in the lists, the full text on hover ──
+  // formulas are drawn by the ONE shared MathJax that admin_base.html sets up (never a second copy on this page)
+  function typesetIn(el){ return window.mathJaxTypeset([el]); }
+  const qTexts = new Map();   // question id -> full raw text
+  // real newlines and the stored literal "\n" become `sep`, but never inside a $...$ / $$...$$ formula (\neq, \nu ...)
+  function flatText(text, sep){
+    return String(text || '').split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/).map((p, i) => i % 2 ? p : p.replace(/\\n|\n/g, sep)).join('');
+  }
+  function qTextSpan(q, fallback){
+    qTexts.set(q.id, q.question_text || '');
+    return '<span class="qtext" data-qid="' + q.id + '">' + escapeHtml(flatText(q.question_text, ' ').replace(/\s+/g, ' ').trim() || fallback) + '</span>';
+  }
+
+  const qTip = document.createElement('div');
+  qTip.className = 'imap-qtip'; qTip.setAttribute('role', 'tooltip');
+  document.body.appendChild(qTip);
+  let qTipEl = null, qTipTimer = 0;
+  function placeQTip(){
+    if (!qTipEl) return;
+    const r = qTipEl.getBoundingClientRect(), w = qTip.offsetWidth, h = qTip.offsetHeight;
+    const x = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
+    let y = r.bottom + 6;
+    if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+    qTip.style.left = x + 'px'; qTip.style.top = y + 'px';
+  }
+  function showQTip(el){
+    if (el.scrollWidth <= el.clientWidth + 1) return;   // the whole text is already visible: nothing to add
+    qTipEl = el;
+    qTip.innerHTML = escapeHtml(flatText(qTexts.get(parseInt(el.dataset.qid, 10)), '\n').trim());
+    qTip.classList.add('show');
+    placeQTip();
+    typesetIn(qTip).then(() => { if (qTipEl === el) placeQTip(); });
+  }
+  function hideQTip(){ clearTimeout(qTipTimer); qTipEl = null; qTip.classList.remove('show'); }
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest ? e.target.closest('.qtext[data-qid]') : null;
+    if (el && el === qTipEl) return;
+    hideQTip();
+    if (el) qTipTimer = setTimeout(() => showQTip(el), 250);
+  });
+  document.documentElement.addEventListener('mouseleave', hideQTip);
+  document.addEventListener('scroll', hideQTip, true);
+  document.addEventListener('mousedown', hideQTip);
+  document.addEventListener('dragstart', hideQTip);
+
   function toast(msg, type){
     const t = document.createElement('div');
     t.className = 'imap-toast ' + (type || 'success');
@@ -693,10 +742,11 @@
         '<input type="checkbox" class="q-row-cb" data-id="' + q.id + '" ' + (state.selectedIds.has(q.id) ? 'checked' : '') + '>' +
         '<span class="qno">Q' + q.row_no + '</span>' +
         '<span class="qtype ' + q.question_type + '">' + q.question_type + '</span>' +
-        '<span class="qtext">' + escapeHtml(q.question_text || '(empty)') + '</span>' +
+        qTextSpan(q, '(empty)') +
         '<span class="qstatus ' + q.image_status + '">' + statusLabel[q.image_status] + '</span>' +
       '</div>'
     ).join('');
+    typesetIn(listEl);
     listEl.querySelectorAll('.q-row-cb').forEach(cb => cb.addEventListener('change', function(){
       const id = parseInt(this.dataset.id, 10);
       if (this.checked) state.selectedIds.add(id); else state.selectedIds.delete(id);
@@ -856,6 +906,7 @@
       if (thumb) thumb.addEventListener('click', ev => { ev.stopPropagation(); openPreview(thumb.src, thumb.dataset.name || ''); });
     });
     updateActiveTargetHighlight();
+    typesetIn(body);
   }
 
   function renderQuestionCardHtml(q){
@@ -887,7 +938,7 @@
       actionsHtml = '<button class="act-replace">Choose Image</button>';
     }
     return '<div class="imap-qcard" data-qid="' + q.id + '">' +
-      '<div class="imap-qcard-head"><div class="imap-qcard-title"><span class="qno">Q' + q.row_no + '</span><span class="qtext">' + escapeHtml(q.question_text || '') + '</span></div>' +
+      '<div class="imap-qcard-head"><div class="imap-qcard-title"><span class="qno">Q' + q.row_no + '</span>' + qTextSpan(q, '') + '</div>' +
         '<span class="qtype ' + q.question_type + '">' + q.question_type + '</span></div>' +
       '<div class="imap-qcard-body">' + thumbHtml +
         '<div class="imap-qcard-info"><div class="imap-qcard-fname">' + fnameHtml + '</div>' + badgeHtml + '</div>' +

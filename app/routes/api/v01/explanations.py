@@ -13,19 +13,36 @@ Endpoints:
 All endpoints require a valid user session (@require_user_role).
 """
 
-import app.config as config
 from flask import Blueprint, jsonify, session, request
 
+from app.entitlements.guard import gate_blueprint
 from app.middleware.session_guard import require_user_role
-from app.db.questions import get_question_by_id
 from app.services.explanation_service import (
     check_rate_limits,
     generate_explanation,
     fetch_history,
     delete_explanation,
+    is_generating,
 )
+from app.services.question_access import check_question_access
+from app.services.question_context import clean_given_answer
 
 explanation_bp = Blueprint("explanation", __name__, url_prefix="/api/v01/explanations")
+gate_blueprint(explanation_bp, "ai_explanation")
+
+
+def _result_id(raw):
+    """The result the page was showing (optional). Only ever used to ask the access policy about it."""
+    try:
+        return int(raw) if raw not in (None, "", 0, "0") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _locked(access):
+    """Reading or generating an explanation reveals the answer key, so it needs the same access as the response page:
+    the student's own, released result for this question, and no attempt in progress on that exam."""
+    return jsonify({"success": False, "message": access.message, "locked": True}), 403
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -51,8 +68,8 @@ def api_explain_limits(question_id: int):
         "daily_remaining":    limits["daily_remaining"],
         "question_used":      limits["question_used"],
         "question_remaining": limits["question_remaining"],
-        "daily_limit":        config.EXPLANATION_DAILY_LIMIT,
-        "per_question_limit": config.EXPLANATION_PER_QUESTION_LIMIT,
+        "daily_limit":        limits.get("daily_limit"),
+        "per_question_limit": limits.get("per_question_limit"),
     })
 
 
@@ -80,6 +97,10 @@ def api_explain_history(question_id: int):
         }
     """
     user_id = session["user_id"]
+    access = check_question_access(user_id, question_id, _result_id(request.args.get("result_id")))
+    if not access.allowed:
+        return _locked(access)
+
     history = fetch_history(user_id, question_id)
     limits  = check_rate_limits(user_id, question_id)
 
@@ -90,6 +111,7 @@ def api_explain_history(question_id: int):
         "daily_remaining":    limits["daily_remaining"],
         "reset_time":         limits.get("reset_time", ""),
         "allowed":            limits["allowed"],
+        "generating":         is_generating(user_id, question_id),
     })
 
 
@@ -104,7 +126,7 @@ def api_generate_explanation(question_id: int):
     Generate a new step-by-step AI explanation, save it, return it + history.
 
     Request JSON (optional):
-        { "given_answer": "B" }
+        { "result_id": 55 }     <- which of the student's results the page is showing (default: their latest)
 
     Response 200:
         {
@@ -121,12 +143,15 @@ def api_generate_explanation(question_id: int):
     """
     user_id  = session["user_id"]
 
-    question = get_question_by_id(question_id)
-    if not question:
-        return jsonify({"success": False, "message": "Question not found."}), 404
+    body   = request.get_json(silent=True) or {}
+    access = check_question_access(user_id, question_id, _result_id(body.get("result_id")))
+    if not access.allowed:
+        return _locked(access)
 
-    body         = request.get_json(silent=True) or {}
-    given_answer = str(body.get("given_answer", "") or "").strip()
+    # The question and the student's answer come from the database, through the same check: a browser can no
+    # longer ask for the explanation of a question it may not see, nor claim a different given answer.
+    question = dict(access.question)
+    given_answer = clean_given_answer((access.response or {}).get("given_answer"))
     if given_answer:
         question["given_answer"] = given_answer
 

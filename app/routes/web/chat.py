@@ -9,9 +9,11 @@ app/db/chat.py.
 from flask import Blueprint, session, render_template, redirect, url_for
 
 from app.db.users import get_user_by_id
+from app.entitlements.guard import gate_blueprint
 from app.services.image_storage_service import chat_background_url_from_key
 
 chat_bp = Blueprint('chat', __name__)
+gate_blueprint(chat_bp, 'chat')
 
 
 @chat_bp.route('/chat')

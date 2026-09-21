@@ -16,7 +16,7 @@ bulk image upload API).
 from flask import render_template, request, redirect, url_for, flash
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.misc import get_subject_by_id, create_subject, update_subject, delete_subject, get_subjects_page
 from app.utils.datetime_service import now_utc_naive
 
@@ -24,7 +24,7 @@ SUBJECTS_PAGE_SIZE = 25
 
 
 @admin_bp.route("/subjects", methods=["GET", "POST"])
-@require_admin_role
+@require_admin_permission("subject_management")
 def subjects():
     if request.method == "POST":
         name = request.form.get("subject_name","").strip()
@@ -55,7 +55,7 @@ def subjects():
 
 
 @admin_bp.route("/subjects/edit/<int:subject_id>", methods=["POST"])
-@require_admin_role
+@require_admin_permission("subject_management")
 def edit_subject(subject_id):
     # Single-row lookup instead of fetching every subject and scanning in
     # Python for the one we need (flagged in the architecture audit).
@@ -80,7 +80,7 @@ def edit_subject(subject_id):
 
 
 @admin_bp.route("/subjects/delete/<int:subject_id>", methods=["POST"])
-@require_admin_role
+@require_admin_permission("subject_management")
 def delete_subject_route(subject_id):
     # Single-row lookup instead of fetching every subject and scanning in
     # Python for the one we need (flagged in the architecture audit).

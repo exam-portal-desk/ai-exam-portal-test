@@ -1,0 +1,778 @@
+{% extends "admin_base.html" %}
+{% block title %}AI Configuration{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='admin/ai-guide.css') }}">{% endblock %}
+
+{% block content %}
+
+<style>
+.page-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;
+}
+.page-top h1 {
+  font-size: 1.25rem; font-weight: 700; color: var(--text-1);
+  margin: 0 0 .25rem; display: flex; align-items: center; gap: .55rem;
+}
+.page-top p { font-size: .82rem; color: var(--text-3); margin: 0; }
+
+.btn-flat {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem 1rem; border-radius: var(--radius);
+  font-size: .8rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; border: none;
+  transition: background .12s, color .12s, transform .1s;
+  text-decoration: none; white-space: nowrap;
+}
+.btn-flat.primary { background: var(--accent); color: var(--accent-on); }
+.btn-flat.primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-flat.secondary { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+.btn-flat.secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-flat.sm { padding: .35rem .75rem; font-size: .75rem; }
+.btn-flat:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── banners ── */
+.ai-banner {
+  border-radius: var(--radius); padding: .75rem 1rem; margin-bottom: .75rem;
+  font-size: .8rem; line-height: 1.5; border: 1px solid;
+}
+.ai-banner.warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+.ai-banner.danger  { background: var(--danger-bg);  border-color: var(--danger-border);  color: var(--danger-text); }
+.ai-banner ul { margin: .35rem 0 0; padding-left: 1.1rem; }
+.ai-banner code { font-size: .75rem; }
+
+/* ── overview tiles ── */
+.ai-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+.ai-stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px); padding: .8rem 1rem; box-shadow: var(--shadow-sm);
+}
+.ai-stat-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); }
+.ai-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text-1); line-height: 1.2; margin-top: .1rem; }
+.ai-stat-sub { font-size: .75rem; color: var(--text-3); margin-top: .1rem; }
+.ai-stat.attn .ai-stat-value { color: var(--danger-text); }
+
+/* ── provider mark (logo → icon → monogram) ── */
+.ai-mark {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 800; color: #fff; overflow: hidden;
+  background: var(--text-3);
+}
+.ai-mark img { width: 100%; height: 100%; object-fit: contain; background: #fff; padding: 3px; }
+/* A logo keeps its own proportions at the tile's height, so wide wordmarks stay legible
+   (square marks still get a square tile). */
+.ai-mark.has-logo, .ai-mark.has-logo.sm, .ai-mark.has-logo.md, .ai-mark.has-logo.lg { width: auto; max-width: 128px; }
+.ai-mark.has-logo { min-width: 28px; }
+.ai-mark.has-logo img { width: auto; max-width: 122px; }
+.ai-mark.lg { width: 38px; height: 38px; font-size: .85rem; border-radius: 10px; }
+.ai-mark.sm { width: 22px; height: 22px; font-size: .6rem; border-radius: 6px; }
+.ai-mark.sm.has-logo { min-width: 22px; }
+.ai-mark.lg.has-logo { min-width: 38px; }
+
+/* ── section titles ── */
+.ai-section-title {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-3); margin: 1.5rem 0 .65rem; display: flex; align-items: center; gap: .5rem;
+}
+
+/* ── panels: one for each provider (its models) and one for each group of features ──
+   A panel is sized by how many cards it holds (--n): the basis decides when panels wrap onto a new row, and flex-grow then
+   makes every row fill the whole width, so a provider with one model sits beside one with four instead of leaving a wide
+   empty box. Cards stretch to fill their panel. */
+.ai-panels { display: flex; flex-wrap: wrap; gap: 1rem; align-items: stretch; }
+.ai-panel {
+  flex: var(--n, 1) 1 calc(var(--n, 1) * 225px + 2.3rem); min-width: min(100%, 290px);
+  background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow-sm); overflow: hidden; display: flex; flex-direction: column;
+}
+.ai-panel-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .7rem;
+  padding: .75rem 1rem; border-bottom: 1px solid var(--border);
+}
+.ai-panel-head > .ai-mark, .ai-panel-icon { flex-shrink: 0; }
+.ai-panel-icon {
+  width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-subtle); color: var(--accent); font-size: .85rem;
+}
+.ai-panel-title { display: flex; flex-direction: column; min-width: 0; }
+.ai-panel-title h3 { font-size: .98rem; font-weight: 700; color: var(--text-1); margin: 0; line-height: 1.25; }
+.ai-panel-sub { font-size: .74rem; color: var(--text-3); line-height: 1.35; }
+.ai-panel-tags { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .5rem; }   /* right beside the name, not at the far edge */
+.ai-panel-count { font-size: .74rem; color: var(--text-3); font-weight: 600; white-space: nowrap; }
+.ai-panel-body { padding: .85rem 1rem 1rem; background: var(--surface-2); flex: 1; }
+.ai-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: .75rem; }
+.ai-grid > :only-child { max-width: 480px; }
+
+/* ── cards (a model, or a feature) ── */
+.ai-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .8rem .9rem; display: flex; flex-direction: column; gap: .55rem; min-width: 0;
+}
+.ai-card.clickable { cursor: pointer; transition: border-color .12s, transform .1s, box-shadow .12s; }
+.ai-card.clickable:hover, .ai-card.clickable:focus-visible { border-color: var(--accent); box-shadow: var(--shadow-sm); transform: translateY(-1px); outline: none; }
+.ai-card.has-error { border-color: var(--danger-border); }
+.ai-card.is-off { opacity: .72; }
+.ai-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; }
+.ai-card-title { font-size: .9rem; font-weight: 700; color: var(--text-1); margin: 0; line-height: 1.3; }
+.ai-card-desc { font-size: .74rem; color: var(--text-3); margin: .15rem 0 0; line-height: 1.4; }
+
+.ai-model-row { display: flex; align-items: center; gap: .7rem; }
+.ai-identity { display: flex; flex-direction: column; gap: .35rem; }
+.ai-id-provider { display: flex; align-items: center; gap: .5rem; font-size: .74rem; font-weight: 600; color: var(--text-3); }
+.ai-id-model { display: flex; align-items: center; gap: .6rem; }
+.ai-mark.md { width: 30px; height: 30px; border-radius: 8px; }
+.ai-mark.md.has-logo { min-width: 30px; }
+.ai-model-provider { font-size: .72rem; color: var(--text-3); font-weight: 600; }
+.ai-model-name { font-size: .95rem; font-weight: 700; color: var(--text-1); }
+.ai-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .74rem; color: var(--text-3); word-break: break-all; }
+
+.ai-caps { display: flex; flex-wrap: wrap; gap: .35rem; }
+.ai-cap {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: .7rem; font-weight: 600; padding: .18rem .55rem; border-radius: 999px;
+  background: var(--accent-subtle); color: var(--accent);
+}
+.ai-cap.plain { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+
+.ai-pill {
+  display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap;
+  font-size: .68rem; font-weight: 700; padding: .2rem .6rem; border-radius: 999px; border: 1px solid;
+}
+.ai-pill.ok   { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.ai-pill.bad  { background: var(--danger-bg);  color: var(--danger-text);  border-color: var(--danger-border); }
+.ai-pill.warn { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+.ai-pill.mute { background: var(--surface-2);  color: var(--text-3);       border-color: var(--border); }
+
+.ai-meta { display: flex; flex-wrap: wrap; gap: .5rem 1rem; font-size: .74rem; color: var(--text-3); }
+.ai-meta b { color: var(--text-2); font-weight: 600; }
+.ai-limits { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; font-size: .72rem; color: var(--text-3); }
+.ai-limits b { color: var(--text-2); font-weight: 600; }
+.ai-limit-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .7rem; font-weight: 600;
+  padding: .12rem .45rem; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+}
+.ai-limit-chip small { font-family: inherit; font-weight: 500; color: var(--text-3); margin-left: .2rem; }
+.ai-card .ai-caps { gap: .15rem .85rem; }
+.ai-card .ai-cap { background: none; border-radius: 0; padding: 0; font-size: .72rem; color: var(--text-2); }
+.ai-card .ai-cap i { color: var(--accent); }
+/* specs (size + rate limits) grouped in one quiet block */
+.ai-specs { display: flex; flex-direction: column; gap: .3rem; padding: .5rem 0; border-top: 1px solid var(--border); font-size: .73rem; color: var(--text-3); }
+.ai-specs-row { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .9rem; }
+.ai-specs-row > span > b { color: var(--text-3); font-weight: 600; margin-right: .3rem; }
+.ai-specs-row > span > i { font-style: normal; color: var(--text-1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ai-limit-table { border-collapse: collapse; margin-bottom: .4rem; }
+.ai-limit-table td { padding: .12rem 1.1rem .12rem 0; font-size: .8rem; }
+.ai-limit-table td:first-child { color: var(--text-3); }
+.ai-limit-table td:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ai-top-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.ai-error { font-size: .76rem; color: var(--danger-text); background: var(--danger-bg); border: 1px solid var(--danger-border);
+  border-radius: 8px; padding: .5rem .7rem; }
+.ai-card-foot { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: auto; flex-wrap: wrap; }
+
+/* ── card footers ── */
+.ai-card-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem .8rem; margin-top: auto; flex-wrap: wrap; padding-top: .1rem; }
+.ai-card-foot.actions .btn-flat { flex: 1 1 0; justify-content: center; }
+.ai-used { font-size: .74rem; color: var(--text-3); min-width: 0; overflow-wrap: anywhere; }
+.ai-used b { color: var(--text-2); font-weight: 600; }
+.ai-more { font-size: .72rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.ai-meta { padding-top: .45rem; border-top: 1px solid var(--border); }
+
+@media (max-width: 640px) {
+  .ai-panel { flex-basis: 100%; }
+  .ai-panel-head { padding: .65rem .8rem; }
+  .ai-panel-tags { margin-left: 0; width: 100%; }
+  .ai-panel-body { padding: .7rem .75rem .85rem; }
+  .ai-grid { grid-template-columns: 1fr; }
+}
+
+/* ── modals ── */
+.ai-opt {
+  display: flex; gap: .75rem; align-items: flex-start; padding: .75rem .85rem; margin-bottom: .55rem;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer;
+}
+.ai-opt:hover { border-color: var(--accent); }
+.ai-opt.selected { border-color: var(--accent); background: var(--accent-subtle); }
+.ai-opt.disabled { opacity: .55; cursor: not-allowed; }
+.ai-opt.disabled:hover { border-color: var(--border); }
+.ai-opt input { margin-top: .35rem; accent-color: var(--accent); }
+.ai-opt-body { flex: 1; min-width: 0; }
+.ai-opt-reason { font-size: .72rem; color: var(--warning-text); margin-top: .3rem; }
+.ai-detail-grid { display: grid; grid-template-columns: 130px 1fr; gap: .7rem 1rem; font-size: .82rem; }
+.ai-detail-grid dt { color: var(--text-3); font-weight: 600; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; padding-top: .1rem; }
+.ai-detail-grid dd { margin: 0; color: var(--text-1); }
+.ai-empty { padding: 2.5rem 1rem; text-align: center; color: var(--text-3); }
+@media (max-width: 520px) { .ai-detail-grid { grid-template-columns: 1fr; gap: .2rem; } .ai-detail-grid dt { margin-top: .5rem; } }
+</style>
+
+<div class="page-top">
+  <div>
+    <h1><i class="fas fa-sliders-h" style="color:var(--accent)"></i>AI Configuration</h1>
+    <p>Where AI is used across the portal, which model powers each feature, and which models are available.</p>
+  </div>
+  <div class="ai-top-actions">
+    <button class="btn-flat secondary" id="aiGuideBtn" aria-haspopup="dialog">
+      <i class="fas fa-book-open"></i> Guide
+    </button>
+    <button class="btn-flat secondary" id="aiReload" title="Re-read the AI registry file now">
+      <i class="fas fa-sync-alt"></i> Reload configuration
+    </button>
+  </div>
+</div>
+
+<div id="aiBanners"></div>
+<div class="ai-stats" id="aiStats"></div>
+
+<div class="ai-section-title"><i class="fas fa-project-diagram"></i> Where AI is used</div>
+<div id="aiFeatures"><div class="ai-empty"><i class="fas fa-spinner fa-spin"></i> Loading…</div></div>
+
+<div class="ai-section-title"><i class="fas fa-cubes"></i> Available models</div>
+<div id="aiModels"></div>
+
+<!-- Change model modal -->
+<div class="modal fade" id="aiChangeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:560px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-size:.95rem;font-weight:700" id="aiChangeTitle">Change model</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="aiChangeIntro" style="font-size:.8rem;color:var(--text-3);margin-bottom:.9rem"></p>
+        <div id="aiChangeOptions"></div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between">
+        <button class="btn-flat secondary" id="aiResetDefault"><i class="fas fa-undo"></i> Reset to default</button>
+        <span style="display:flex;gap:.5rem">
+          <button class="btn-flat secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn-flat primary" id="aiSaveModel" disabled><i class="fas fa-check"></i> Save Configuration</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Model details modal -->
+<div class="modal fade" id="aiDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:560px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-size:.95rem;font-weight:700" id="aiDetailTitle">Model details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="aiDetailBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Guide popup: shows the separate guide document (config/AI_MODELS.md), fetched from the server.
+     Layout, rendering, copy buttons, search and section tracking live in static/admin/ai-guide.js -->
+<div class="modal fade" id="aiGuideModal" tabindex="-1" aria-labelledby="aiGuideTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered ai-guide-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-size:.95rem;font-weight:700" id="aiGuideTitle">AI Configuration Guide</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body"><div id="aiGuideRoot"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='admin/ai-guide.js') }}"></script>
+<script>
+(function () {
+  'use strict';
+
+  var OVERVIEW_URL = '{{ url_for("admin_api.api_ai_config_overview") }}';
+  var RELOAD_URL = '{{ url_for("admin_api.api_ai_config_reload") }}';
+  var FEATURE_MODEL_URL = '{{ url_for("admin_api.api_ai_config_set_feature_model", feature_key="__KEY__") }}';
+
+  var state = null;           // last overview payload from the server
+  var modelsByRef = {};
+  var changeModal, detailModal;
+  var changing = { feature: null, selected: null };
+
+  // ── tiny DOM helper: every string goes through textContent, so nothing
+  //    that comes from the config file can inject markup. ──
+  function h(tag, attrs, kids) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'text') node.textContent = attrs[k];
+      else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) node.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) {
+      if (c === null || c === undefined || c === false) return;
+      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); return node; }
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return { success: false, message: 'Unexpected server response.' }; })
+        .then(function (j) { j._status = r.status; return j; });
+    });
+  }
+
+  function setState(data) {
+    state = data;
+    modelsByRef = {};
+    state.models.forEach(function (m) { modelsByRef[m.ref] = m; });
+  }
+
+  // ── brand mark for ONE entity, taken only from that entity's own `ui`:
+  //    logo image → icon class → initials (only if that entity supplies `monogram`,
+  //    which providers do and models do not) → nothing at all.
+  //    A model's mark is never borrowed from its provider, or vice versa. ──
+  function mark(ui, size) {
+    ui = ui || {};
+    if (!ui.logo && !ui.icon && !ui.monogram) return null;
+    var box = h('span', { 'class': 'ai-mark' + (size ? ' ' + size : '') + (ui.logo ? ' has-logo' : ''), 'aria-hidden': 'true' });
+    function icon() { clear(box); box.appendChild(h('i', { 'class': ui.icon })); box.style.background = ui.color || ''; }
+    function monogram() { clear(box); box.textContent = ui.monogram; box.style.background = ui.color || ''; }
+    function next(triedIcon) {
+      box.classList.remove('has-logo');
+      if (ui.icon && !triedIcon) return icon();
+      if (ui.monogram) return monogram();
+      box.style.display = 'none';       // logo failed to load and nothing else of its own to show
+    }
+    if (ui.logo) {
+      var img = h('img', { src: ui.logo, alt: '', loading: 'lazy' });
+      img.addEventListener('error', function () { next(false); });
+      box.appendChild(img);
+      box.style.background = 'transparent';
+    } else if (ui.icon) {
+      icon();
+    } else {
+      monogram();
+    }
+    return box;
+  }
+
+  // ── "[provider logo] Provider" over "[model logo] Model": each logo comes from its own entity ──
+  function identity(m) {
+    return h('div', { 'class': 'ai-identity' }, [
+      h('div', { 'class': 'ai-id-provider' }, [mark(providerUi(m.provider), 'sm'), h('span', { text: m.provider_name })]),
+      h('div', { 'class': 'ai-id-model' }, [mark(m.ui, 'md'), h('span', { 'class': 'ai-model-name', text: m.display_name })])
+    ]);
+  }
+
+  function capChips(caps) {
+    var wrap = h('div', { 'class': 'ai-caps' });
+    (caps || []).forEach(function (c) {
+      var spec = (state.capabilities || {})[c] || { label: c };
+      wrap.appendChild(h('span', { 'class': 'ai-cap' }, [
+        spec.icon ? h('i', { 'class': 'fas ' + spec.icon }) : null,
+        spec.label
+      ]));
+    });
+    return wrap;
+  }
+
+  function capLabels(keys) {
+    return (keys || []).map(function (k) { return ((state.capabilities || {})[k] || { label: k }).label; }).join(' + ');
+  }
+
+  // 250000 -> "250K", 1000 -> "1K", 1048576 -> "1,048,576"; "unlimited" stays a word.
+  function fmtLimit(v) {
+    if (v === 'unlimited') return 'Unlimited';
+    var n = Number(v);
+    if (n >= 1000000 && n % 1000000 === 0) return (n / 1000000) + 'M';
+    if (n >= 1000 && n < 1000000 && n % 1000 === 0) return (n / 1000) + 'K';
+    return n.toLocaleString();
+  }
+
+  // Compact "Context … · Max output …" + rate-limit chips for one model. Only fields the
+  // model actually has are shown; a model with no recorded quotas says so instead of guessing.
+  function limitsBlock(m) {
+    var box = h('div', { 'class': 'ai-limits' });
+    var lim = m.limits || {};
+    var size = [];
+    if (lim.context_tokens) size.push(h('span', {}, [h('b', { text: 'Context ' }), Number(lim.context_tokens).toLocaleString()]));
+    if (lim.max_output_tokens) size.push(h('span', {}, [h('b', { text: 'Max output ' }), Number(lim.max_output_tokens).toLocaleString()]));
+    size.forEach(function (s) { box.appendChild(s); });
+    if (m.rate_limits) {
+      box.appendChild(h('span', {}, [h('b', { text: 'Rate limits' })]));
+      m.rate_limits.limits.forEach(function (r) {
+        box.appendChild(h('span', { 'class': 'ai-limit-chip', title: r.label }, [fmtLimit(r.value), h('small', { text: r.abbr })]));
+      });
+    } else {
+      box.appendChild(h('span', { text: 'Rate limits: not published' }));
+    }
+    return box;
+  }
+
+  function keyPill(status) {
+    if (status === 'configured') return h('span', { 'class': 'ai-pill ok' }, [h('i', { 'class': 'fas fa-check' }), 'API key configured']);
+    if (status === 'feature_scoped') return h('span', { 'class': 'ai-pill ok' }, [h('i', { 'class': 'fas fa-key' }), 'Dedicated keys set']);
+    return h('span', { 'class': 'ai-pill bad' }, [h('i', { 'class': 'fas fa-exclamation-triangle' }), 'API key not configured']);
+  }
+
+  function providerUi(key) {
+    var p = state.providers.filter(function (x) { return x.key === key; })[0];
+    return p ? p.ui : {};
+  }
+
+  function featureName(key) {
+    var f = state.features.filter(function (x) { return x.key === key; })[0];
+    return f ? f.display_name : key;
+  }
+
+  // ── banners ──
+  function renderBanners() {
+    var box = clear(document.getElementById('aiBanners'));
+    if (state.reload_error) {
+      box.appendChild(h('div', { 'class': 'ai-banner warning' }, [
+        h('b', { text: 'ai_models.json changed but did not validate. ' }),
+        'The previous configuration is still active. ', state.reload_error
+      ]));
+    }
+    if (state.overrides_error) {
+      box.appendChild(h('div', { 'class': 'ai-banner warning' }, [
+        h('b', { text: 'Admin model selections could not be read from the database. ' }),
+        'Features are using their last known or default models. If this is a new deployment, run the pending AI-configuration database migration.'
+      ]));
+    }
+    var problems = (state.issues || []);
+    if (problems.length) {
+      var ul = h('ul');
+      problems.forEach(function (i) { ul.appendChild(h('li', { text: i.message })); });
+      box.appendChild(h('div', { 'class': 'ai-banner ' + (problems.some(function (i) { return i.level === 'error'; }) ? 'danger' : 'warning') },
+        [h('b', { text: 'Configuration ' + (problems.length === 1 ? 'issue' : 'issues') + ' in ' + state.config_file }), ul]));
+    }
+  }
+
+  // ── overview tiles ──
+  function renderStats() {
+    var s = state.summary;
+    var box = clear(document.getElementById('aiStats'));
+    function tile(label, value, sub, cls) {
+      box.appendChild(h('div', { 'class': 'ai-stat ' + (cls || '') }, [
+        h('div', { 'class': 'ai-stat-label', text: label }),
+        h('div', { 'class': 'ai-stat-value', text: String(value) }),
+        h('div', { 'class': 'ai-stat-sub', text: sub })
+      ]));
+    }
+    tile('AI Features', s.features, 'configured AI features');
+    tile('Active Models', s.active_models, 'models currently in use');
+    tile('Providers', s.providers_in_use + ' / ' + s.providers, 'in use / configured');
+    tile('Needs Attention', s.issues, s.issues ? 'configuration problems' : 'everything is healthy', s.issues ? 'attn' : '');
+  }
+
+  // Size and rate limits of one model, grouped in one quiet block (the cards). limitsBlock() stays as it was for the modals.
+  function specsBlock(m) {
+    var lim = m.limits || {};
+    var box = h('div', { 'class': 'ai-specs' });
+    var size = [];
+    if (lim.context_tokens) size.push(h('span', {}, [h('b', { text: 'Context' }), h('i', { text: Number(lim.context_tokens).toLocaleString() })]));
+    if (lim.max_output_tokens) size.push(h('span', {}, [h('b', { text: 'Max output' }), h('i', { text: Number(lim.max_output_tokens).toLocaleString() })]));
+    if (size.length) box.appendChild(h('div', { 'class': 'ai-specs-row' }, size));
+    var rates = [];
+    if (m.rate_limits) {
+      rates.push(h('span', {}, [h('b', { text: 'Rate limits' })]));
+      m.rate_limits.limits.forEach(function (r) {
+        rates.push(h('span', { 'class': 'ai-limit-chip', title: r.label }, [fmtLimit(r.value), h('small', { text: r.abbr })]));
+      });
+    } else {
+      rates.push(h('span', { text: 'Rate limits: not published' }));
+    }
+    box.appendChild(h('div', { 'class': 'ai-specs-row' }, rates));
+    return box;
+  }
+
+  // "Used by: Assistant Chat Replies, Explanation (image questions)" — by name, not a count.
+  function usedBy(m) {
+    var names = (m.used_by || []).map(featureName);
+    return h('span', { 'class': 'ai-used' }, names.length ? [h('b', { text: 'Used by: ' }), names.join(', ')] : ['Not in use']);
+  }
+
+  // A panel is one provider (with its models) or one group of features (with its features): a header, then its cards.
+  function panel(head, cards, count) {
+    var grid = h('div', { 'class': 'ai-grid' });
+    cards.forEach(function (c) { grid.appendChild(c); });
+    var box = h('section', { 'class': 'ai-panel' }, [head, h('div', { 'class': 'ai-panel-body' }, [grid])]);
+    box.style.setProperty('--n', String(Math.max(1, Math.min(count, 4))));
+    return box;
+  }
+
+  // ── feature cards, one panel per group ──
+  function featureCard(f) {
+    var m = f.active_model ? modelsByRef[f.active_model] : null;
+    var card = h('div', { 'class': 'ai-card' + (f.error ? ' has-error' : '') });
+
+    card.appendChild(h('div', { 'class': 'ai-card-top' }, [
+      h('div', {}, [
+        h('h4', { 'class': 'ai-card-title', text: f.display_name }),
+        f.description ? h('p', { 'class': 'ai-card-desc', text: f.description }) : null
+      ]),
+      f.error ? h('span', { 'class': 'ai-pill bad' }, [h('i', { 'class': 'fas fa-exclamation-circle' }), 'Attention'])
+              : h('span', { 'class': 'ai-pill ok' }, [h('i', { 'class': 'fas fa-check' }), 'Active'])
+    ]));
+
+    if (m) {
+      card.appendChild(identity(m));
+      card.appendChild(capChips(m.capabilities));
+      card.appendChild(specsBlock(m));
+    } else {
+      card.appendChild(h('div', { 'class': 'ai-model-name', text: 'No model selected' }));
+    }
+
+    if (f.error) card.appendChild(h('div', { 'class': 'ai-error', text: f.error }));
+
+    card.appendChild(h('div', { 'class': 'ai-meta' }, [
+      h('span', {}, [h('b', { text: 'Needs: ' }), capLabels(f.requires)]),
+      h('span', {}, [h('b', { text: 'Source: ' }), f.source_label || '—']),
+      f.key_configured === null ? null
+        : h('span', {}, [h('b', { text: 'API key: ' }), f.key_configured ? 'Configured ✓' : 'Not configured'])
+    ]));
+
+    card.appendChild(h('div', { 'class': 'ai-card-foot actions' }, [
+      m ? h('button', { 'class': 'btn-flat secondary sm', onclick: function () { openDetails(m.ref); } },
+            [h('i', { 'class': 'fas fa-info-circle' }), 'Model details']) : h('span'),
+      h('button', { 'class': 'btn-flat primary sm', onclick: function () { openChange(f.key); } },
+        [h('i', { 'class': 'fas fa-exchange-alt' }), 'Change Model'])
+    ]));
+    return card;
+  }
+
+  function renderFeatures() {
+    var box = clear(document.getElementById('aiFeatures'));
+    var byGroup = {};
+    state.features.forEach(function (f) { (byGroup[f.group || ''] = byGroup[f.group || ''] || []).push(f); });
+    var groups = state.groups.slice();
+    if (byGroup['']) groups.push({ key: '', display_name: 'Other', description: '', icon: 'fa-robot' });
+    var wrap = h('div', { 'class': 'ai-panels' });
+    groups.forEach(function (g) {
+      var feats = byGroup[g.key] || [];
+      if (!feats.length) return;
+      var head = h('div', { 'class': 'ai-panel-head' }, [
+        h('span', { 'class': 'ai-panel-icon' }, [h('i', { 'class': 'fas ' + (g.icon || 'fa-robot') })]),
+        h('div', { 'class': 'ai-panel-title' }, [h('h3', { text: g.display_name }), g.description ? h('span', { 'class': 'ai-panel-sub', text: g.description }) : null])
+      ]);
+      wrap.appendChild(panel(head, feats.map(featureCard), feats.length));
+    });
+    if (wrap.firstChild) box.appendChild(wrap);
+    else box.appendChild(h('div', { 'class': 'ai-empty', text: 'No AI features are defined in ' + state.config_file + '.' }));
+  }
+
+  // ── available models: one panel per provider, its models inside it ──
+  function modelCard(m, p) {
+    var card = h('div', { 'class': 'ai-card clickable' + (m.error ? ' has-error' : '') + (m.enabled ? '' : ' is-off'), tabindex: '0', role: 'button',
+      'aria-label': 'Details for ' + m.display_name, onclick: function () { openDetails(m.ref); },
+      onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails(m.ref); } } });
+    card.appendChild(h('div', { 'class': 'ai-card-top' }, [
+      h('div', { 'class': 'ai-id-model' }, [
+        mark(m.ui, 'md'),
+        h('div', {}, [h('h4', { 'class': 'ai-card-title', text: m.display_name }), h('div', { 'class': 'ai-mono', text: m.model_id })])
+      ]),
+      m.enabled ? h('span', { 'class': 'ai-pill ok', text: 'Enabled' }) : h('span', { 'class': 'ai-pill mute', text: 'Disabled' })
+    ]));
+    card.appendChild(capChips(m.capabilities));
+    card.appendChild(specsBlock(m));
+    if (m.error) card.appendChild(h('div', { 'class': 'ai-error', text: m.error }));
+    card.appendChild(h('div', { 'class': 'ai-card-foot' }, [
+      usedBy(m),
+      // the provider's key status is shown once, in its header; a model only repeats it when it differs (or is a problem)
+      m.key_status !== p.key_status ? keyPill(m.key_status) : h('span', { 'class': 'ai-more' }, ['Details ', h('i', { 'class': 'fas fa-chevron-right' })])
+    ]));
+    return card;
+  }
+
+  function renderModels() {
+    var box = clear(document.getElementById('aiModels'));
+    var protocolLabel = {};
+    state.protocols.forEach(function (p) { protocolLabel[p.key] = p.label; });
+    var wrap = h('div', { 'class': 'ai-panels' });
+    state.providers.forEach(function (p) {
+      var models = state.models.filter(function (m) { return m.provider === p.key; });
+      var cards = models.map(function (m) { return modelCard(m, p); });
+      if (!models.length) cards.push(h('div', { 'class': 'ai-empty', text: 'No models configured for this provider.' }));
+      var head = h('div', { 'class': 'ai-panel-head' }, [
+        mark(p.ui, 'lg'),
+        h('div', { 'class': 'ai-panel-title' }, [h('h3', { text: p.display_name }), h('span', { 'class': 'ai-panel-sub', text: protocolLabel[p.protocol] || p.protocol || 'unknown protocol' })]),
+        h('div', { 'class': 'ai-panel-tags' }, [
+          keyPill(p.key_status),
+          !p.enabled ? h('span', { 'class': 'ai-pill mute', text: 'Provider disabled' }) : null,
+          h('span', { 'class': 'ai-panel-count', text: models.length + (models.length === 1 ? ' model' : ' models') + (p.in_use ? ' · in use' : '') })
+        ])
+      ]);
+      wrap.appendChild(panel(head, cards, models.length));
+    });
+    box.appendChild(wrap);
+  }
+
+  function renderAll() {
+    renderBanners(); renderStats(); renderFeatures(); renderModels();
+  }
+
+  // ── model details ──
+  function fmtNum(n) { return n ? Number(n).toLocaleString() : null; }
+
+  function rateLimitDetail(rl) {
+    if (!rl) return h('span', { 'class': 'ai-mono', text: 'Not published for this model.' });
+    var table = h('table', { 'class': 'ai-limit-table' });
+    rl.limits.forEach(function (r) {
+      table.appendChild(h('tr', {}, [h('td', { text: r.label + ' (' + r.abbr + ')' }), h('td', { text: fmtLimit(r.value), title: r.value === 'unlimited' ? '' : Number(r.value).toLocaleString() })]));
+    });
+    var meta = [rl.tier, rl.scope ? 'per ' + rl.scope : null, rl.as_of ? 'as of ' + rl.as_of : null].filter(Boolean).join(' · ');
+    var src = rl.source || '';
+    var srcNode = /^https:\/\//.test(src)
+      ? h('a', { href: src, target: '_blank', rel: 'noopener noreferrer', text: src })
+      : (src ? h('span', { text: src }) : null);
+    return h('div', {}, [
+      table,
+      meta ? h('div', { 'class': 'ai-mono', text: meta }) : null,
+      srcNode ? h('div', { 'class': 'ai-mono' }, ['Source: ', srcNode]) : null,
+      rl.note ? h('div', { 'class': 'ai-mono', text: rl.note }) : null
+    ]);
+  }
+
+  function openDetails(ref) {
+    var m = modelsByRef[ref];
+    if (!m) return;
+    var protocolLabel = (state.protocols.filter(function (p) { return p.key === m.protocol; })[0] || {}).label || m.protocol;
+    document.getElementById('aiDetailTitle').textContent = m.display_name;
+
+    var keyText = { configured: 'Configured ✓', feature_scoped: 'Configured through per-feature keys ✓', missing: 'Not configured' }[m.key_status];
+    var keyLines = [h('div', { text: keyText })];
+    keyLines.push(h('div', { 'class': 'ai-mono', text: 'Provider-wide key: ' + (m.key_default_configured ? 'configured ✓' : 'not configured') }));
+    (m.feature_keys || []).forEach(function (fk) {
+      keyLines.push(h('div', { 'class': 'ai-mono', text: featureName(fk.feature) + ': ' + (fk.configured ? 'dedicated key configured ✓' : 'dedicated key not configured') }));
+    });
+
+    var sizes = [];
+    if (fmtNum(m.limits.context_tokens)) sizes.push(fmtNum(m.limits.context_tokens) + ' token context');
+    if (fmtNum(m.limits.max_output_tokens)) sizes.push(fmtNum(m.limits.max_output_tokens) + ' max output tokens');
+
+    var dl = h('dl', { 'class': 'ai-detail-grid' });
+    function row(label, content) { dl.appendChild(h('dt', { text: label })); dl.appendChild(h('dd', {}, [].concat(content))); }
+    row('Provider', h('span', { 'class': 'ai-model-row' }, [mark(providerUi(m.provider), 'sm'), m.provider_name]));
+    row('Model', h('span', { 'class': 'ai-model-row' }, [mark(m.ui, 'sm'), m.display_name]));
+    row('Model ID', h('span', { 'class': 'ai-mono', text: m.model_id }));
+    row('Capabilities', capChips(m.capabilities));
+    row('Accepts / returns', (m.modalities.input.join(', ') || '—') + '  →  ' + (m.modalities.output.join(', ') || '—'));
+    row('Protocol', protocolLabel || '—');
+    row('Status', m.enabled ? h('span', { 'class': 'ai-pill ok', text: 'Enabled' }) : h('span', { 'class': 'ai-pill mute', text: 'Disabled' }));
+    row('API key', keyLines);
+    row('Used by', m.used_by.length
+      ? h('ul', { style: 'margin:0;padding-left:1.1rem' }, m.used_by.map(function (k) { return h('li', { text: featureName(k) }); }))
+      : 'Not currently used by any feature');
+    if (sizes.length) row('Model limits', sizes.join(' · '));
+    row('Rate limits', rateLimitDetail(m.rate_limits));
+    if (m.aliases.length) row('Legacy names', h('span', { 'class': 'ai-mono', text: m.aliases.join(', ') }));
+    if (m.description) row('About', m.description);
+    row('Configuration', h('span', { 'class': 'ai-mono', text: state.config_file + ' → models["' + m.model + '"] · offerings["' + m.provider + '"]["' + m.model + '"]' }));
+    if (m.error) row('Problem', h('span', { 'class': 'ai-error', text: m.error }));
+
+    clear(document.getElementById('aiDetailBody')).appendChild(dl);
+    detailModal.show();
+  }
+
+  // ── change model ──
+  function openChange(featureKey) {
+    var f = state.features.filter(function (x) { return x.key === featureKey; })[0];
+    if (!f) return;
+    changing = { feature: f.key, selected: f.active_model };
+    document.getElementById('aiChangeTitle').textContent = 'Change model — ' + f.display_name;
+    document.getElementById('aiChangeIntro').textContent =
+      'Only models that support ' + capLabels(f.requires) + ' are listed. This changes “' + f.display_name +
+      '” only — no other AI feature is affected.';
+    document.getElementById('aiResetDefault').style.display = f.has_override ? '' : 'none';
+
+    var box = clear(document.getElementById('aiChangeOptions'));
+    if (!f.options.length) box.appendChild(h('div', { 'class': 'ai-empty', text: 'No configured model supports this feature.' }));
+    f.options.forEach(function (o) {
+      var m = modelsByRef[o.ref];
+      var input = h('input', { type: 'radio', name: 'aiModelChoice', value: o.ref, disabled: !o.selectable, checked: o.ref === f.active_model });
+      var label = h('label', { 'class': 'ai-opt' + (o.selectable ? '' : ' disabled') + (o.ref === f.active_model ? ' selected' : '') }, [
+        input,
+        h('div', { 'class': 'ai-opt-body' }, [
+          identity(m),
+          o.ref === f.active_model ? h('div', { 'class': 'ai-mono', text: '(current)' }) : null,
+          capChips(m.capabilities),
+          limitsBlock(m),
+          (!o.selectable && o.reason) ? h('div', { 'class': 'ai-opt-reason', text: o.reason }) : null
+        ])
+      ]);
+      input.addEventListener('change', function () {
+        changing.selected = o.ref;
+        Array.prototype.forEach.call(box.querySelectorAll('.ai-opt'), function (n) { n.classList.remove('selected'); });
+        label.classList.add('selected');
+        document.getElementById('aiSaveModel').disabled = (changing.selected === f.active_model);
+      });
+      box.appendChild(label);
+    });
+    document.getElementById('aiSaveModel').disabled = true;
+    changeModal.show();
+  }
+
+  function featureUrl(key) { return FEATURE_MODEL_URL.replace('__KEY__', encodeURIComponent(key)); }
+
+  function applyResult(res, okMessage, okSub) {
+    if (res.success) {
+      setState(res.data); renderAll();
+      window.adminToast(okMessage, 'success', okSub);
+      return true;
+    }
+    window.adminToast(res.message || 'Request failed.', 'danger');
+    return false;
+  }
+
+  function saveModel() {
+    var btn = document.getElementById('aiSaveModel');
+    btn.disabled = true;
+    var feature = changing.feature, ref = changing.selected;
+    api('PUT', featureUrl(feature), { model: ref }).then(function (res) {
+      if (applyResult(res, 'Model updated', featureName(feature) + ' → ' + (modelsByRef[ref] || {}).display_name)) changeModal.hide();
+      else btn.disabled = false;
+    });
+  }
+
+  function resetDefault() {
+    var feature = changing.feature;
+    api('DELETE', featureUrl(feature)).then(function (res) {
+      if (applyResult(res, 'Reset to default', featureName(feature))) changeModal.hide();
+    });
+  }
+
+  function reloadConfig() {
+    var btn = document.getElementById('aiReload');
+    btn.disabled = true;
+    api('POST', RELOAD_URL).then(function (res) {
+      btn.disabled = false;
+      applyResult(res, 'Configuration reloaded', state && state.config_file);
+    });
+  }
+
+  function load() {
+    api('GET', OVERVIEW_URL).then(function (res) {
+      if (!res.success) {
+        clear(document.getElementById('aiFeatures')).appendChild(
+          h('div', { 'class': 'ai-banner danger', text: res.message || 'Could not load AI configuration.' }));
+        return;
+      }
+      setState(res.data); renderAll();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    changeModal = new bootstrap.Modal(document.getElementById('aiChangeModal'));
+    detailModal = new bootstrap.Modal(document.getElementById('aiDetailModal'));
+    AIGuide.init({ url: '{{ url_for("admin_api.api_ai_config_guide") }}', modalId: 'aiGuideModal', buttonId: 'aiGuideBtn' });
+    document.getElementById('aiSaveModel').addEventListener('click', saveModel);
+    document.getElementById('aiResetDefault').addEventListener('click', resetDefault);
+    document.getElementById('aiReload').addEventListener('click', reloadConfig);
+    load();
+  });
+})();
+</script>
+
+{% endblock %}

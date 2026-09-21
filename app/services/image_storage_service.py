@@ -11,6 +11,8 @@ Existing DB references keep their current shape and meaning:
     this service.
 """
 
+import base64
+import mimetypes
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
@@ -55,6 +57,71 @@ def resolve_question_image_url(image_path: str) -> Tuple[bool, Optional[str]]:
         print(f"[image_storage_service] storage lookup error for {key}: {e}")
 
     return False, None
+
+
+_MODEL_IMAGE_MAX_BYTES = 4 * 1024 * 1024
+
+
+class QuestionImageError(Exception):
+    """A question's image could not be prepared for a model. `reason` is a short machine-readable code and `detail`
+    the technical cause; both are for server logs only, never for the student."""
+
+    def __init__(self, reason: str, detail: str = ""):
+        super().__init__(f"{reason}: {detail}" if detail else reason)
+        self.reason = reason
+        self.detail = detail
+
+
+# A question's image is immutable in practice, and a chat about it re-sends it with every message: keep the prepared
+# bytes briefly in the existing in-process cache instead of asking the storage backend each time. Only bytes are
+# cached, keyed by the storage key; whether a student may use them is decided by the caller on every request.
+_IMAGE_CACHE_PREFIX = "qimg::"
+_IMAGE_CACHE_MAX_CHARS = 2_000_000          # bigger images are still sent, just not kept in memory
+
+
+def fetch_question_image(image_path: str, cache_seconds: int = 0) -> Tuple[str, str]:
+    """(base64, mime_type) of a question's image, ready for a vision model. Raises QuestionImageError, saying why.
+
+    Read IN-PROCESS through the storage abstraction (local or S3): no HTTP request, no URL, no credentials leave the
+    server, nothing is copied or stored. The caller must already have decided the student may see this question
+    (see app/services/question_access.py); this only fetches the bytes. `image_path` must be the value read from the
+    question row, never something a browser sent."""
+    if not image_path or str(image_path).strip().lower() in ("", "nan", "none"):
+        raise QuestionImageError("no_image")
+    key = str(image_path).strip()
+    if cache_seconds:
+        from app.utils import cache
+        hit = cache.get(_IMAGE_CACHE_PREFIX + key, ttl=cache_seconds)
+        if hit:
+            return hit
+    try:
+        data = get_storage().download(key)
+    except Exception as e:
+        raise QuestionImageError("unreadable", f"{key}: {type(e).__name__}: {str(e)[:300]}") from e
+    if not data:
+        raise QuestionImageError("empty", key)
+    if len(data) > _MODEL_IMAGE_MAX_BYTES:
+        raise QuestionImageError("too_large", f"{key}: {len(data)} bytes (limit {_MODEL_IMAGE_MAX_BYTES})")
+    mime = mimetypes.guess_type(key)[0] or "image/jpeg"
+    if not mime.startswith("image/"):
+        raise QuestionImageError("not_an_image", f"{key}: {mime}")
+    prepared = (base64.b64encode(data).decode("ascii"), mime)
+    if cache_seconds and len(prepared[0]) <= _IMAGE_CACHE_MAX_CHARS:
+        from app.utils import cache
+        cache.set(_IMAGE_CACHE_PREFIX + key, prepared, ttl=cache_seconds)
+    return prepared
+
+
+def load_question_image(image_path: str) -> Optional[Tuple[str, str]]:
+    """fetch_question_image(), but None instead of an exception: for a caller that may go on without the image
+    (AI Explanation falls back to text-only). None when there is no image, it cannot be read, it is larger than 4 MB,
+    or it is not an image."""
+    try:
+        return fetch_question_image(image_path)
+    except QuestionImageError as e:
+        if e.reason != "no_image":
+            print(f"[image_storage_service] load_question_image failed ({e.reason}): {e.detail}")
+        return None
 
 
 def resolve_question_image_urls_bulk(image_paths) -> Dict[str, Tuple[bool, Optional[str]]]:

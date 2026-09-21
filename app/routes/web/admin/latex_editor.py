@@ -10,10 +10,10 @@ no template or JS referenced the old endpoint name (only the literal URL
 
 from flask import render_template
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 
 
 @admin_bp.route('/latex_editor')
-@require_admin_role
+@require_admin_permission("question_management")
 def latex_editor():
     return render_template('admin/latex_editor.html')

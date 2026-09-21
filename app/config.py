@@ -80,24 +80,50 @@ GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 
 # ─────────────────────────────────────────────
-# AI — model registry (config/ai_models.json) selects provider/model/key;
-# these only pick which registry entry is active per flow.
+# AI — central registry (config/ai_models.json, schema in config/AI_MODELS.md)
+# defines providers, models, AI features and each feature's default model.
+# Admin > AI Configuration stores per-feature model overrides in the
+# ai_feature_assignments table. Which model a feature uses is resolved by
+# app/services/ai/registry.py from those two sources only — the environment
+# never chooses a model. The only env vars read there are API keys, named
+# by the registry file itself (key_env / credential_env).
+#
+# AI_CONFIG_CACHE_TTL_SECONDS bounds how long a worker keeps serving cached
+# registry/override state — it is how a model change made in one worker (or
+# a hand-edit of ai_models.json) reaches the others without a restart. The
+# worker that saves an Admin change applies it immediately.
 # ─────────────────────────────────────────────
-ASSISTANT_TEXT_MODEL = os.environ.get("ASSISTANT_TEXT_MODEL", "assistant-default")
-EXPLANATION_TEXT_MODEL = os.environ.get("EXPLANATION_TEXT_MODEL", "explanation-default")
-EXPLANATION_VISION_MODEL_NAME = os.environ.get("EXPLANATION_VISION_MODEL_NAME", "explanation-vision-default")
-QUESTION_GENERATOR_TEXT_MODEL = os.environ.get("QUESTION_GENERATOR_TEXT_MODEL", "question-generator-default")
-QUESTION_GENERATOR_VISION_MODEL = os.environ.get("QUESTION_GENERATOR_VISION_MODEL", "question-generator-vision-default")
+AI_MODELS_CONFIG_PATH = os.environ.get(
+    "AI_MODELS_CONFIG_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "ai_models.json"),
+)
+AI_CONFIG_CACHE_TTL_SECONDS = int(os.environ.get("AI_CONFIG_CACHE_TTL_SECONDS", 30))
 
-AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT_PER_STUDENT", 50))
+# Plans, feature access and limits (app/entitlements). Edited by hand; see config/ENTITLEMENTS.md.
+ENTITLEMENTS_CONFIG_PATH = os.environ.get(
+    "ENTITLEMENTS_CONFIG_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "entitlements.json"),
+)
+
+# Per-student limits (AI requests per day, messages per conversation, explanation quotas) are not settings: they belong to
+# the plans in config/entitlements.json, the single place they are defined.
 AI_MAX_MESSAGE_LENGTH = int(os.environ.get("AI_MAX_MESSAGE_LENGTH", 500))
-AI_REQUEST_TIMEOUT = int(os.environ.get("AI_REQUEST_TIMEOUT", 30))
+AI_REQUEST_TIMEOUT = int(os.environ.get("AI_REQUEST_TIMEOUT", 30))     # read timeout: wait for the reply (stream: between chunks)
+AI_CONNECT_TIMEOUT = int(os.environ.get("AI_CONNECT_TIMEOUT", 10))     # connecting to the provider
+AI_STREAM_TOTAL_TIMEOUT = int(os.environ.get("AI_STREAM_TOTAL_TIMEOUT", 120))   # ceiling for one whole streamed reply
+# Log level of the AI layer. The default only prints problems (a failed call, a bad configuration): a working system
+# writes nothing per request, however many requests there are. Set AI_LOG_LEVEL=INFO to also see one safe metadata line
+# per request and per reply (no keys, no prompts) while diagnosing.
+AI_LOG_LEVEL = os.environ.get("AI_LOG_LEVEL", "WARNING").upper()
 AI_CONTEXT_RECENT_MESSAGES = int(os.environ.get("AI_CONTEXT_RECENT_MESSAGES", 12))
-MAX_MESSAGES_PER_CONVERSATION = int(os.environ.get("MAX_MESSAGES_PER_CONVERSATION", 100))
 AI_TITLE_MAX_TOKENS = int(os.environ.get("AI_TITLE_MAX_TOKENS", 300))
 AI_TITLE_TEMPERATURE = float(os.environ.get("AI_TITLE_TEMPERATURE", 0.2))
-EXPLANATION_DAILY_LIMIT = int(os.environ.get("EXPLANATION_DAILY_LIMIT", 5))
-EXPLANATION_PER_QUESTION_LIMIT = int(os.environ.get("EXPLANATION_PER_QUESTION_LIMIT", 2))
+# AI Explanation calls are STREAMED, so a slow model (a big vision model writes ~10-20 tokens/s: a full worked solution takes
+# a minute or more) is fine as long as it keeps writing. Only silence times out, and only a hung attempt hits the ceiling.
+EXPLANATION_IDLE_TIMEOUT = int(os.environ.get("EXPLANATION_IDLE_TIMEOUT", 60))     # longest silence: before the first word, or between two pieces
+EXPLANATION_TOTAL_TIMEOUT = int(os.environ.get("EXPLANATION_TOTAL_TIMEOUT", 240))  # ceiling for ONE attempt
+EXPLANATION_TOTAL_BUDGET = int(os.environ.get("EXPLANATION_TOTAL_BUDGET", 420))    # ceiling for the whole request, retries included
+EXPLANATION_MAX_ATTEMPTS = int(os.environ.get("EXPLANATION_MAX_ATTEMPTS", 3))      # a transient failure (timeout, 5xx, dropped connection, 429) is retried
 
 # ─────────────────────────────────────────────
 # Email — generic HTTP email API, provider-independent (no vendor SDK).

@@ -8,13 +8,13 @@ POST /api/v01/admin/images in app/routes/api/v01/admin/images.py.
 from flask import render_template
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.misc import get_all_subjects
 import app.config as config
 
 
 @admin_bp.route("/upload-images", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def upload_images_page():
     subjects_list = [
         {

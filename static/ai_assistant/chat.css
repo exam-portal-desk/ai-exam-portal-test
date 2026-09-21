@@ -1,19 +1,28 @@
 /* static/ai_assistant/chat.css — all colors via var(--token) */
 
-/* Hide useless spacer (footer stays, but pushed below the initial
-   viewport by .ai-shell's own fixed height below — see next rule) */
-.page-main:has(.ai-page) > div[style*="flex:1"] {
-  display: none;
-}
+/* ── Page frame ────────────────────────────────────────────────────────────
+   The Assistant is an application screen, not a document: the browser window never scrolls here. The whole
+   page is exactly one viewport tall and split top to bottom like this, every level able to shrink:
 
-/* Fixed viewport-relative height (not height:100%, which depends on a
-   min-height:auto flex parent and gets squeezed by the footer's own
-   height — that footer reflows to several lines on narrow mobile
-   screens, which used to shrink the whole chat UI down to almost
-   nothing). Matches the same proven approach chat.html uses. */
+       body.ai-fit          100dvh column, no page scroll
+         .t-nav             48px site header
+         .app-shell         fills the rest
+           .page-main       column: [.ai-shell] [.app-footer]
+             .ai-shell      takes all remaining height   <- the chat lives here
+             .app-footer    natural height, always visible at the bottom
+
+   Only .ai-conv-list (chats) and .ai-messages (messages) scroll, each on its own. The `min-height: 0` on every
+   flex level is what lets those two shrink and scroll instead of growing the page. */
+body.ai-fit { height: 100vh; height: 100dvh; overflow: hidden; }
+body.ai-fit .app-shell { min-height: 0; }
+body.ai-fit .page-main { min-height: 0; overflow: hidden; }
+body.ai-fit .page-main > div[style*="flex:1"] { display: none; }     /* the layout's spacer: the chat itself now fills the space */
+body.ai-fit .app-footer { flex-shrink: 0; }
+
 .ai-shell {
-  display: flex; flex: none; min-height: 0; height: calc(100vh - 48px);
+  display: flex; flex: 1 1 0; min-height: 0; height: auto;
   background: var(--bg); overflow: hidden;
+  position: relative;          /* the containing block for anything absolutely positioned inside the chat */
 }
 
 /* Main chat column (right of the sidebar) */
@@ -36,7 +45,8 @@
   display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;
 }
 .ai-header-title { font-size: .9rem; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
-.ai-header-sub { font-size: .72rem; color: var(--text-3); }
+.ai-header-sub { font-size: .72rem; color: var(--text-3); display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .75rem; }
+.ai-status { display: inline-flex; align-items: center; gap: .35rem; }
 .ai-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex-shrink: 0; animation: pulse-dot 2s infinite; }
 @keyframes pulse-dot { 0%, 100% { opacity: 1 } 50% { opacity: .4 } }
 
@@ -57,13 +67,31 @@
 .ai-hbtn.danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
 .ai-hbtn.danger:hover { background: var(--danger); color: #fff; }
 
-/* Chat area */
+/* Chat area. `.ai-messages` is THE scroll container for the conversation, so:
+   - position: relative  makes it the containing block for absolutely positioned descendants. Without it the
+     hidden accessibility layer KaTeX adds to every formula (.katex-mathml, position:absolute) belongs to the
+     page instead, is not clipped by this box, and stretches the whole document: one long chat = thousands of
+     pixels of page height.
+   - min-height: 0 lets it shrink inside the flex column so it scrolls instead of growing.
+   - no scroll-behavior:smooth: programmatic scrolls (restoring the position after "Load older") must be exact. */
+.ai-messages-wrap { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .ai-messages {
-  flex: 1; overflow-y: auto; overflow-x: hidden; padding: 1.25rem 1.5rem;
+  position: relative; flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 1.25rem 1.5rem;
   display: flex; flex-direction: column; gap: .85rem; min-width: 0;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-  scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
+.ai-messages:focus { outline: none; }
+
+/* "New messages" pill: shown only when a reply arrives while the student has scrolled up to read */
+.ai-jump-latest {
+  position: absolute; left: 50%; bottom: .8rem; transform: translateX(-50%); z-index: 3;
+  display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .85rem;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--accent);
+  font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-md);
+}
+.ai-jump-latest:hover { background: var(--accent-subtle); }
+.ai-jump-latest[hidden] { display: none; }
 .ai-messages::-webkit-scrollbar { width: 4px; }
 .ai-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
@@ -95,7 +123,9 @@
    mid-expression) — without this, a wide formula overflows the bubble/viewport instead
    of scrolling within its own small box. */
 .message-bubble .katex-display { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
-.message-bubble .katex { max-width: 100%; }
+/* ONE formula size for every message (KaTeX's default is 1.21em; the model's own \Large / \small are removed in chat.js). */
+.message-bubble .katex { max-width: 100%; font-size: 1.1em; }
+.message-bubble .katex-display { margin: .5em 0; }
 .ai-bubble {
   background: var(--surface); border: 1px solid var(--border);
   color: var(--text-1); border-top-left-radius: 3px;
@@ -193,14 +223,14 @@
 .confirmation-modal.show { display: flex; }
 .confirmation-modal .modal-content {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: calc(var(--radius)+4px); padding: 1.4rem;
+  border-radius: calc(var(--radius) + 4px); padding: 1.4rem;
   max-width: 360px; width: 100%; box-shadow: var(--shadow-lg);
 }
-.confirmation-modal .modal-header { display: flex; align-items: center; gap: .6rem; margin-bottom: .75rem; }
+.confirmation-modal .modal-header { display: flex; align-items: center; justify-content: flex-start; gap: .7rem; padding: 0; border: 0; margin-bottom: .75rem; }
 .confirmation-modal .modal-icon { width: 32px; height: 32px; border-radius: 9px; background: var(--danger-bg); color: var(--danger-text); display: flex; align-items: center; justify-content: center; font-size: .85rem; flex-shrink: 0; }
 .confirmation-modal .modal-icon.info { background: var(--accent-subtle); color: var(--accent); }
-.confirmation-modal .modal-title { font-size: .9rem; font-weight: 700; color: var(--text-1); }
-.confirmation-modal .modal-body { font-size: .82rem; color: var(--text-2); margin-bottom: 1rem; line-height: 1.5; }
+.confirmation-modal .modal-title { font-size: .9rem; font-weight: 700; color: var(--text-1); text-align: left; line-height: 1.3; }
+.confirmation-modal .modal-body { padding: 0; font-size: .82rem; color: var(--text-2); margin-bottom: 1rem; line-height: 1.5; text-align: left; }
 .confirmation-modal .modal-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .modal-btn { padding: .4rem .9rem; border-radius: var(--radius); font-size: .78rem; font-weight: 600; font-family: inherit; border: none; cursor: pointer; transition: background .12s; }
 .modal-btn.cancel { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
@@ -284,7 +314,7 @@
 .ai-search-box input::placeholder { color: var(--text-3); }
 .ai-search-box input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-subtle); }
 
-.ai-conv-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 .5rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.ai-conv-list { flex: 1 1 0; min-height: 0; overscroll-behavior: contain; overflow-y: auto; overflow-x: hidden; padding: 0 .5rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .ai-conv-list::-webkit-scrollbar { width: 4px; }
 .ai-conv-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
@@ -418,6 +448,26 @@
   padding: .3rem .7rem; font-size: .74rem; font-weight: 700; font-family: inherit; cursor: pointer; flex-shrink: 0;
 }
 
+/* ── Streaming a reply (see stream-render.js) ────────────────────────────────────────────────────────
+   While a reply is arriving: a small "generating" indicator (the same dots as the typing indicator) below the text
+   written so far, and a short fade-in for each NEW block. Text that is still growing is never re-animated. */
+.stream-indicator { display: flex; align-items: center; gap: .3rem; margin-top: .4rem; min-height: 8px; }
+.stream-indicator .typing-dot { width: 5px; height: 5px; }
+.msg-section[data-new], .section-body > [data-new], .message-text > [data-new] { animation: streamIn .22s ease-out both; }
+@keyframes streamIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .msg-section[data-new], .section-body > [data-new], .message-text > [data-new] { animation: none; }
+  .typing-dot { animation: none; opacity: .7; }
+}
+
+/* a reply that was cut short: what arrived stays; this strip says so and offers Retry */
+.ai-stream-status {
+  display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-top: .6rem; padding: .45rem .65rem;
+  border-radius: var(--radius); background: var(--danger-bg); color: var(--danger-text);
+  border: 1px solid var(--danger-border); font-size: .76rem; line-height: 1.4;
+}
+.ai-stream-status .ai-stream-status-text { flex: 1 1 12rem; min-width: 0; }
+
 /* ── Rename modal input (reuses .confirmation-modal shell) ─────────────── */
 .ai-rename-input {
   width: 100%; padding: .5rem .7rem; background: var(--bg); border: 1px solid var(--border);
@@ -427,3 +477,64 @@
 .ai-rename-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-subtle); }
 
 [hidden] { display: none !important; }
+
+/* ── Small screens: keep the footer (inside the layout) but compact, so the chat keeps its room ─────────── */
+@media (max-width: 640px) {
+  body.ai-fit .app-footer { padding: .4rem .75rem; gap: .2rem .9rem; font-size: .68rem; }
+  body.ai-fit .app-footer-brand { display: none; }
+  body.ai-fit .app-footer-links { gap: .8rem; row-gap: .15rem; justify-content: center; }
+}
+
+/* ── "Discuss with AI": question context bar + starter actions ─────────────────────────────────────────────
+   Compact on purpose: labels only (question number, exam, topic, your result), never the question itself. */
+.ai-context {
+  display: flex; align-items: center; gap: .7rem; flex-shrink: 0; padding: .5rem 1.5rem;
+  background: var(--accent-subtle); border-bottom: 1px solid var(--border);
+}
+.ai-context[hidden] { display: none; }
+.ai-context-icon { color: var(--accent); font-size: 1rem; flex-shrink: 0; }
+.ai-context-main { flex: 1; min-width: 0; }
+.ai-context-title { font-size: .82rem; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-context-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .1rem .5rem; margin-top: .1rem; font-size: .7rem; color: var(--text-3); }
+.ai-context-meta:empty { display: none; }
+.ai-ctx-status { display: inline-flex; align-items: center; padding: .02rem .45rem; border-radius: 999px; font-weight: 700; border: 1px solid var(--border); background: var(--surface); }
+.ai-ctx-status[data-status="correct"]   { color: var(--success-text); background: var(--success-bg); border-color: var(--success-border); }
+.ai-ctx-status[data-status="incorrect"] { color: var(--danger-text);  background: var(--danger-bg);  border-color: var(--danger-border); }
+.ai-ctx-status[data-status="skipped"]   { color: var(--text-2); }
+.ai-context-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+.ai-context-view {
+  display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .65rem; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border); color: var(--accent);
+  font-size: .72rem; font-weight: 700; text-decoration: none;
+}
+.ai-context-view:hover { border-color: var(--accent); }
+.ai-context-close {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
+  background: transparent; border: none; color: var(--text-3); cursor: pointer; font-size: .8rem;
+}
+.ai-context-close:hover { background: var(--surface); color: var(--text-1); }
+/* the question is not available (result hidden, an attempt in progress, ...): say so, keep the chat usable */
+.ai-context.locked { background: var(--warning-bg); border-bottom-color: var(--warning-border); }
+.ai-context.locked .ai-context-icon { color: var(--warning-text); }
+.ai-context.locked .ai-context-title { white-space: normal; font-weight: 600; color: var(--warning-text); }
+.ai-context.locked .ai-context-view { display: none; }
+
+.ai-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .55rem; }
+.ai-chips[hidden] { display: none; }
+.ai-chip {
+  padding: .32rem .75rem; border-radius: 999px; background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border); font: inherit; font-size: .74rem; font-weight: 600; cursor: pointer; transition: all .12s;
+}
+.ai-chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+.ai-chip:disabled { opacity: .5; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  .ai-context { padding: .45rem 1rem; gap: .5rem; }
+  /* the chips scroll sideways instead of taking several rows of the small screen */
+  .ai-chips { flex-wrap: nowrap; overflow-x: auto; margin-left: -.15rem; padding-bottom: .15rem; scrollbar-width: none; }
+  .ai-chips::-webkit-scrollbar { display: none; }
+  .ai-chip { white-space: nowrap; flex-shrink: 0; }
+}
+@media (max-width: 480px) {
+  .ai-context-view span { display: none; }            /* icon only: the question stays one tap away */
+}

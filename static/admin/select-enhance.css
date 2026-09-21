@@ -56,3 +56,17 @@
   outline: none;
 }
 .sel-enh.sel-enh-block .sel-enh-menu { width: 100%; }
+
+/* FloatingPanel (select-enhance.js): a popover that follows its anchor with fixed coordinates, so no parent container can clip
+   it. It scrolls on its own and never hands the scroll on to the page; on a narrow screen it becomes a bottom sheet. */
+.floating-panel {
+  position: fixed; left: 0; top: 0; z-index: 10050;
+  max-width: calc(100vw - 16px); max-height: min(560px, calc(100vh - 16px));
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  background: var(--surface); color: var(--text-1);
+  border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); box-shadow: var(--shadow-lg);
+}
+.floating-panel::-webkit-scrollbar { width: 6px; }
+.floating-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+.floating-panel.is-sheet { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto !important; max-width: none; max-height: 82vh; }

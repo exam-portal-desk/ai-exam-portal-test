@@ -11,7 +11,7 @@ import pandas as pd
 from flask import render_template, request, redirect, url_for, flash, Response
 
 from app.routes.web.admin import admin_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db.exams import get_exam_by_id, get_exams_for_selector
 from app.db.questions import get_questions_by_exam, get_questions_by_exam_page, get_question_by_id, delete_question
 from app.utils.sanitize import sanitize_html
@@ -40,7 +40,7 @@ def _sanitize_question(q: dict) -> dict:
 
 
 @admin_bp.route("/questions", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_management")
 def questions_index():
     exams_list = get_exams_for_selector()
     selected   = request.args.get("exam_id", type=int)
@@ -66,7 +66,7 @@ def questions_index():
 
 
 @admin_bp.route("/questions/delete/<int:question_id>", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_management")
 def delete_question_route(question_id):
     q = get_question_by_id(question_id)
     exam_id = int(q["exam_id"]) if q else None
@@ -77,7 +77,7 @@ def delete_question_route(question_id):
 
 
 @admin_bp.route("/questions/export-csv/<int:exam_id>")
-@require_admin_role
+@require_admin_permission("question_management")
 def export_questions_csv(exam_id):
     exam = get_exam_by_id(exam_id)
     if not exam:

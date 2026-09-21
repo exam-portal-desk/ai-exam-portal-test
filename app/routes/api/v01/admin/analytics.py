@@ -17,7 +17,7 @@ than rewritten here.
 """
 from flask import request, jsonify
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 from app.db import fetch_one, fetch_all
 
 DELETED_USER_LABEL = "Deleted User"
@@ -32,7 +32,7 @@ def _display_full_name(user: dict) -> str:
 
 
 @admin_api_bp.route("/analytics/stats")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def api_users_analytics_stats():
     """
     One round trip (scalar subqueries) instead of 4 sequential COUNT
@@ -61,7 +61,7 @@ def api_users_analytics_stats():
 
 
 @admin_api_bp.route("/analytics/data")
-@require_admin_role
+@require_admin_permission("user_analytics")
 def users_analytics_data_api():
     from datetime import datetime as dt, timedelta
     from app.db.exams import get_all_exams

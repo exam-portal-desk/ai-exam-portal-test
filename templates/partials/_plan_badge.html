@@ -1,0 +1,5 @@
+{# One plan chip everywhere: icon + name, styled by static/shared/plan-badge.css. The label, tone and icon always come from the plan
+   configuration (config/entitlements.json) through app.entitlements; never type a plan name or colour into a page. #}
+{% macro plan_badge(label, tone, icon, size='md') -%}
+<span class="plan-badge pb-{{ size }}" data-tone="{{ tone }}"><i class="fas {{ icon }}" aria-hidden="true"></i><span class="pb-text">{{ label }}</span></span>
+{%- endmacro %}

@@ -15,7 +15,8 @@ from app.utils.datetime_service import now_utc_naive, format_display
 from flask import request, jsonify, session
 
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app import entitlements
+from app.middleware.session_guard import require_admin_permission
 from app.db.misc import update_request, soft_delete_request
 from app.db import fetch_one, fetch_all, execute
 from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
@@ -25,7 +26,7 @@ _VALID_STATUS = ("pending", "completed", "denied")
 
 
 @admin_api_bp.route("/access-requests")
-@require_admin_role
+@require_admin_permission("user_management")
 def api_requests_list():
     """Single paginated + filterable endpoint used by both the New Requests
     tab (status=pending, no other filters sent) and the History tab (any
@@ -112,12 +113,14 @@ def _fmt(r):
 
 
 @admin_api_bp.route("/access-requests/<int:request_id>/approve", methods=["POST"])
-@require_admin_role
+@require_admin_permission("user_management")
 def approve_request(request_id):
     data     = request.get_json() or {}
     approved = data.get("approved_access", "").strip()
     if not approved:
         return jsonify({"success": False, "message": "Please select an access level"}), 400
+    if approved not in _VALID_ROLES:
+        return jsonify({"success": False, "message": "Invalid access level"}), 400
 
     req = fetch_one(
         "SELECT * FROM requests_raised WHERE request_id=%s AND request_status=%s AND is_deleted=FALSE",
@@ -129,6 +132,12 @@ def approve_request(request_id):
     user_r = fetch_one("SELECT id FROM users WHERE username=%s AND email=%s", (req["username"], req["email"]))
     if not user_r:
         return jsonify({"success": False, "message": "User not found"}), 404
+
+    # Approving changes the person's role: that is Access control management, not just reading the request.
+    try:
+        entitlements.authorize_role_change(session.get("user_id"), int(user_r["id"]))
+    except entitlements.AccessDenied as e:
+        return jsonify({"success": False, "message": str(e)}), 403
 
     execute("UPDATE users SET role=%s, updated_at=%s WHERE id=%s", (approved, now_utc_naive().isoformat(), user_r["id"]))
 
@@ -142,7 +151,7 @@ def approve_request(request_id):
 
 
 @admin_api_bp.route("/access-requests/<int:request_id>/deny", methods=["POST"])
-@require_admin_role
+@require_admin_permission("user_management")
 def deny_request(request_id):
     data   = request.get_json() or {}
     reason = data.get("reason", "").strip()
@@ -166,7 +175,7 @@ def deny_request(request_id):
 
 
 @admin_api_bp.route("/access-requests/<int:request_id>", methods=["DELETE"])
-@require_admin_role
+@require_admin_permission("user_management")
 def delete_request(request_id):
     """Soft delete — hides the row from every list view but never touches
     users.role and never erases the row itself, so this can't be confused
@@ -185,7 +194,7 @@ def delete_request(request_id):
 
 
 @admin_api_bp.route("/access-requests/stats")
-@require_admin_role
+@require_admin_permission("user_management")
 def api_requests_stats():
     # Single grouped query instead of 3 sequential COUNT round trips
     # (flagged in the architecture audit).

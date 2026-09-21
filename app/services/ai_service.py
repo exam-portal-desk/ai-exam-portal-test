@@ -1,25 +1,31 @@
 """
 app/services/ai_service.py
 Business logic for the AI study assistant:
-  - Groq API call
+  - Model call via the central AI layer (app/services/ai) — provider/model
+    come from Admin > AI Configuration, never from this module
   - Daily limit tracking
   - Per-conversation chat history / context helpers
   - Domain guardrail + conversation title generation
 """
 
 import re
-from typing import List, Dict, Optional
+from typing import Iterator, List, Dict, Optional, Tuple
 
 import app.config as config
+from app.entitlements import limit_for
 from app.db.ai import (
     get_conversation_messages as db_get_messages,
     get_history_for_context as db_get_context,
     save_chat_message as db_save_message,
+    save_chat_exchange as db_save_exchange,
     get_today_usage,
 )
 from app.utils.helpers import strip_ai_reasoning
 from app.utils.datetime_service import today_app_date, format_display
-from app.services import ai_provider
+from app.services.ai import (
+    AIConfigError, AIError, AIProviderError, AIRequest, AIResponse, AITimeoutError, Message, Part, StreamChunk,
+    generate, log_problem, stream,
+)
 
 
 # ─────────────────────────────────────────────
@@ -90,11 +96,19 @@ Keep language simple and clear. Always use LaTeX for any number with a unit."""
 # Limit helpers
 # ─────────────────────────────────────────────
 
+def get_assistant_limits(user_id: int) -> Dict:
+    """The student's AI Assistant limits from their plan (config/entitlements.json); None means no limit."""
+    return {
+        "daily_limit": limit_for(user_id, "ai_assistant", "requests_per_day"),
+        "conversation_limit": limit_for(user_id, "ai_assistant", "messages_per_conversation"),
+    }
+
+
 def get_user_chat_limits(user_id: int) -> Dict:
     usage = get_today_usage(user_id)
     questions_used = int(usage.get("questions_used", 0)) if usage else 0
     return {
-        "daily_limit": config.AI_DAILY_LIMIT,
+        **get_assistant_limits(user_id),
         "questions_used": questions_used,
         "reset_date": today_app_date(),
     }
@@ -147,43 +161,33 @@ def derive_title_heuristic(first_message: str) -> str:
 def generate_title_via_model(first_message: str) -> Optional[str]:
     """Optional refinement via a short, cheap model call. Never raises;
     returns None on any failure so the caller keeps the heuristic title."""
-    import requests
-
-    model = ai_provider.get_model("text_models", config.ASSISTANT_TEXT_MODEL)
-    if not model["api_key"]:
-        return None
-
-    payload = {
-        "model": model["model"],
-        "messages": [
-            {"role": "system", "content": (
-                "Generate a short chat title (max 6 words, no punctuation at the end, "
-                "no quotes) that summarizes the student's question below. Reply with ONLY the title."
-            )},
-            {"role": "user", "content": first_message[:500]},
-        ],
-        "temperature": config.AI_TITLE_TEMPERATURE,
-        # The configured model is a reasoning model that spends tokens on an
+    request = AIRequest(
+        system_instruction=(
+            "Generate a short chat title (max 6 words, no punctuation at the end, "
+            "no quotes) that summarizes the student's question below. Reply with ONLY the title."
+        ),
+        messages=[Message.of("user", first_message[:500])],
+        temperature=config.AI_TITLE_TEMPERATURE,
+        # The configured model may be a reasoning model that spends tokens on an
         # internal "reasoning" field before the visible "content" — too small
         # a budget gets exhausted mid-thought with empty content and
         # finish_reason "length". AI_TITLE_MAX_TOKENS must leave enough room
         # for it to finish reasoning and still emit the short title itself.
-        "max_tokens": config.AI_TITLE_MAX_TOKENS,
-    }
+        max_tokens=config.AI_TITLE_MAX_TOKENS,
+    )
     try:
-        resp = requests.post(
-            model["endpoint"], headers=ai_provider.build_headers(model),
-            json=payload, timeout=config.AI_REQUEST_TIMEOUT,
-        )
-        if resp.status_code != 200:
-            return None
-        title = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip()
+        title = generate("assistant_title", request).text.strip().strip('"').strip()
         title = strip_ai_reasoning(title).strip()
         if not title:
             return None
         return title[:70]
+    except AIProviderError:
+        return None                                   # the client already logged the failed call
+    except AIError as e:
+        log_problem("title generation", e)
+        return None
     except Exception as e:
-        print(f"[ai_service] generate_title_via_model error: {e}")
+        log_problem("title generation", e)
         return None
 
 
@@ -210,18 +214,48 @@ def get_formatted_messages(conversation_id: int, user_id: int, limit: int = 30, 
     }
 
 
-def get_history_for_context(conversation_id: int, last_n: Optional[int] = None) -> List[Dict]:
-    """Return the last N messages of one conversation in Groq message format, oldest first."""
-    n = last_n or config.AI_CONTEXT_RECENT_MESSAGES
-    records = db_get_context(conversation_id, last_n=n)
-    records.sort(key=lambda x: x.get("id", 0))
-    return [
+# Texts older versions of the assistant saved as if they were the model's reply when a request failed. They
+# are not answers: they must never be sent back to the model as conversation context.
+_FAILURE_REPLIES = frozenset({
+    "AI service is currently unavailable. Please contact the administrator.",
+    "Request timed out. Please try asking your question again.",
+    "I'm having trouble connecting to my AI service. Please try again.",
+    "I encountered an error. Please try again.",
+})
+
+
+def _normalize_history(turns: List[Dict]) -> List[Dict]:
+    """Drop saved failure texts, make the conversation start with a student turn and merge back-to-back turns
+    of the same role, so what reaches any provider is a clean alternating conversation."""
+    out: List[Dict] = []
+    for t in turns:
+        if t["role"] == "assistant" and t["content"].strip() in _FAILURE_REPLIES:
+            continue
+        if not out and t["role"] == "assistant":
+            continue
+        if out and out[-1]["role"] == t["role"]:
+            out[-1] = {"role": t["role"], "content": out[-1]["content"] + "\n\n" + t["content"]}
+        else:
+            out.append(dict(t))
+    return out
+
+
+def history_from_rows(records: List[Dict]) -> List[Dict]:
+    """Saved message rows ({id, message, is_user}, any order) -> the clean alternating role/content turns the model gets."""
+    rows = sorted(records, key=lambda x: x.get("id", 0))
+    return _normalize_history([
         {
             "role": "user" if r.get("is_user") else "assistant",
             "content": r.get("message", ""),
         }
-        for r in records
-    ]
+        for r in rows
+    ])
+
+
+def get_history_for_context(conversation_id: int, last_n: Optional[int] = None) -> List[Dict]:
+    """Return the last N messages of one conversation as role/content dicts, oldest first."""
+    n = last_n or config.AI_CONTEXT_RECENT_MESSAGES
+    return history_from_rows(db_get_context(conversation_id, last_n=n))
 
 
 def save_user_message(user_id: int, conversation_id: int, message: str) -> None:
@@ -232,73 +266,85 @@ def save_ai_message(user_id: int, conversation_id: int, message: str) -> None:
     db_save_message(user_id, conversation_id, message, is_user=False)
 
 
+def save_exchange(user_id: int, conversation_id: int, user_message: str, ai_message: str) -> bool:
+    """Store a finished question + answer together (one database round trip)."""
+    return db_save_exchange(user_id, conversation_id, user_message, ai_message)
+
+
 # ─────────────────────────────────────────────
-# Groq API call
+# Assistant model call
 # ─────────────────────────────────────────────
+
+def build_assistant_request(user_message: str, context_history: Optional[List[Dict]] = None,
+                            focus_block: Optional[str] = None,
+                            images: Optional[List[Tuple[str, str]]] = None) -> AIRequest:
+    """The one place the assistant's prompt is assembled (used by the normal and the streaming call).
+
+    `focus_block` is the question-specific section for a chat opened with "Discuss with AI" (see
+    question_context.build_focus_block). Without it the prompt is exactly the general-chat prompt, unchanged.
+    `images` = [(base64, mime_type)] for that question's diagram(s), in order. They are attached to the student's
+    latest message (earlier turns are text only), so the model can look at them again on every follow-up; the
+    registry rejects the request if the assistant's model cannot take images (see AIRequest.required_capabilities)."""
+    turns = [dict(m) for m in (context_history or [])]
+    if turns and turns[-1]["role"] == "user":                       # an unanswered earlier question: keep turns alternating
+        turns[-1] = {"role": "user", "content": turns[-1]["content"] + "\n\n" + user_message}
+    else:
+        turns.append({"role": "user", "content": user_message})
+    messages = [Message.of(m["role"], m["content"]) for m in turns]
+    if images:
+        messages[-1].parts = [Part.of_image(data, mime) for data, mime in images] + messages[-1].parts
+    return AIRequest(
+        system_instruction=_SYSTEM_PROMPT if not focus_block else _SYSTEM_PROMPT + "\n\n" + focus_block,
+        messages=messages,
+        temperature=0.2,
+        max_tokens=4000,
+        top_p=0.95,
+        frequency_penalty=0.5,
+        presence_penalty=0.3,
+    )
+
+
+def ask_assistant(user_message: str, context_history: Optional[List[Dict]] = None,
+                  request: Optional[AIRequest] = None) -> AIResponse:
+    """Call the assistant's active model once. Raises AIConfigError / AIProviderError / AITimeoutError — the caller
+    decides what to show (see app.services.ai.public_error). Nothing is saved here. `request` lets a caller that
+    already built the prompt (to time it) pass it in."""
+    response = generate("assistant_chat", request or build_assistant_request(user_message, context_history))
+    response.text = strip_ai_reasoning(response.text)
+    return response
+
+
+def stream_assistant(user_message: str, context_history: Optional[List[Dict]] = None,
+                     request: Optional[AIRequest] = None) -> Iterator[StreamChunk]:
+    """Same call, delivered as the provider produces it. Raises exactly like ask_assistant()."""
+    return stream("assistant_chat", request or build_assistant_request(user_message, context_history))
+
 
 def get_groq_response(user_message: str, context_history: Optional[List[Dict]] = None) -> str:
     """
-    Call the assistant's active text model and return its reply text.
+    Call the assistant's active text model and return its reply text. (Name
+    kept for existing callers — the provider is whatever the "assistant_chat"
+    feature is currently configured to use.)
     Returns an error string (never raises) so callers stay clean.
     """
-    import requests
+    request = build_assistant_request(user_message, context_history)
 
-    model = ai_provider.get_model("text_models", config.ASSISTANT_TEXT_MODEL)
-    if not model["api_key"]:
-        return "AI service is currently unavailable. Please contact the administrator."
-
-    messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
-    if context_history:
-        messages.extend(context_history)
-    messages.append({"role": "user", "content": user_message})
-
-    base_payload = {
-        "model": model["model"],
-        "messages": messages,
-        "temperature": 0.2,
-        "max_tokens": 4000,
-        "top_p": 0.95,
-        "frequency_penalty": 0.5,
-        "presence_penalty": 0.3,
-    }
-
+    # Note: we intentionally do NOT ask for a reasoning_format. Speculatively
+    # sending it and retrying without it on a 400 doubles traffic on every
+    # single message whenever the configured model doesn't support the
+    # param — that's what caused 429 rate-limit errors on the explanation
+    # pipeline. strip_ai_reasoning() already scrubs any leaked chain-of-thought
+    # from the response regardless of model, and this makes exactly ONE
+    # request per call.
     try:
-        content = _post_groq_chat(model, base_payload)
-        if content is None:
-            return "I'm having trouble connecting to my AI service. Please try again."
-        return strip_ai_reasoning(content)
-
-    except requests.exceptions.Timeout:
+        return strip_ai_reasoning(generate("assistant_chat", request).text)
+    except AIConfigError as e:
+        log_problem("assistant model not usable", e)
+        return "AI service is currently unavailable. Please contact the administrator."
+    except AITimeoutError:
         return "Request timed out. Please try asking your question again."
+    except AIProviderError:
+        return "I'm having trouble connecting to my AI service. Please try again."     # (already logged by the client)
     except Exception as e:
-        print(f"[ai_service] get_groq_response error: {e}")
+        log_problem("assistant reply", e)
         return "I encountered an error. Please try again."
-
-
-def _post_groq_chat(model: Dict, payload: Dict) -> Optional[str]:
-    """
-    POST to the active text model's chat completions endpoint — exactly ONE
-    request per call. Returns the raw message content, or None on error.
-
-    Note: we intentionally do NOT send reasoning_format here. Speculatively
-    sending it and retrying without it on a 400 doubles traffic on every
-    single message whenever the configured model doesn't support the
-    param — that's what caused 429 rate-limit errors on the explanation
-    pipeline. strip_ai_reasoning() (applied by the caller) already scrubs
-    any leaked chain-of-thought from the response regardless of model, so
-    the extra round trip isn't needed.
-    """
-    import requests
-
-    resp = requests.post(
-        model["endpoint"],
-        headers=ai_provider.build_headers(model),
-        json=payload,
-        timeout=config.AI_REQUEST_TIMEOUT,
-    )
-
-    if resp.status_code == 200:
-        return resp.json()["choices"][0]["message"]["content"]
-
-    print(f"[ai_service] AI provider error {resp.status_code}: {resp.text[:200]}")
-    return None

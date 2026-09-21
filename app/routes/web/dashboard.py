@@ -6,6 +6,7 @@ User-facing dashboard, results history, and student analytics.
 from flask import Blueprint, render_template, redirect, url_for, flash, session
 
 from app.middleware.session_guard import require_user_role
+from app.entitlements.guard import require_feature
 from app.db.exams import get_all_exams
 from app.db.results import get_results_by_user
 from app.db.users import get_view_prefs
@@ -86,6 +87,7 @@ def dashboard():
 
 @dashboard_bp.route("/results_history")
 @require_user_role
+@require_feature("result_history")
 def results_history():
     from datetime import datetime
     user_id  = session["user_id"]
@@ -126,6 +128,7 @@ def results_history():
 
 @dashboard_bp.route("/analytics")
 @require_user_role
+@require_feature("analytics")
 def student_analytics():
     user_id = session["user_id"]
     results = get_results_by_user(user_id)

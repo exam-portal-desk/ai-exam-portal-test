@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from 'partials/_plan_badge.html' import plan_badge %}
+{% block title %}{{ info.feature_label }} - not in your plan{% endblock %}
+
+{% block content %}
+<style>
+  .lk-wrap { max-width:540px; margin:3rem auto; padding:0 1rem; width:100%; }
+  .lk-card { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 6px); box-shadow:var(--shadow-sm); padding:2rem 1.75rem; text-align:center; }
+  .lk-ic { width:3.4rem; height:3.4rem; margin:0 auto 1rem; border-radius:16px; display:flex; align-items:center; justify-content:center; background:var(--surface-2); color:var(--text-2); font-size:1.3rem; border:1px solid var(--border); }
+  .lk-card h1 { font-size:1.15rem; font-weight:800; color:var(--text-1); margin:0 0 .5rem; }
+  .lk-card p { font-size:.85rem; color:var(--text-2); line-height:1.6; margin:0 0 1.1rem; }
+  .lk-plans { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.6rem .8rem; margin:0 0 1.1rem; }
+  .lk-plans .lk-lbl { font-size:.68rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+  .lk-plans .lk-arrow { color:var(--text-3); font-size:.8rem; }
+  .lk-hint { font-size:.76rem !important; color:var(--text-3) !important; }
+  .lk-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:.6rem; }
+  .lk-actions a { font-size:.8rem; font-weight:700; text-decoration:none; padding:.5rem 1rem; border-radius:var(--radius); border:1px solid var(--border); color:var(--text-2); background:var(--surface-2); }
+  .lk-actions a.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-on); }
+  .lk-actions a:hover { border-color:var(--accent); }
+</style>
+
+<div class="lk-wrap">
+  <div class="lk-card" role="alert">
+    <div class="lk-ic"><i class="fas fa-lock" aria-hidden="true"></i></div>
+    <h1>{{ info.feature_label }} isn't part of your plan</h1>
+    <p>{{ message }}</p>
+    <div class="lk-plans">
+      <span class="lk-lbl">Your plan</span>
+      {{ plan_badge(info.plan_label, info.plan_tone, info.plan_icon, 'lg') }}
+      {% if info.required_plan %}
+      <i class="fas fa-arrow-right lk-arrow" aria-hidden="true"></i>
+      <span class="lk-lbl">Included in</span>
+      {{ plan_badge(info.required_plan, info.required_tone, info.required_icon, 'lg') }}
+      {% endif %}
+    </div>
+    <p class="lk-hint">Plans are assigned by an administrator.</p>
+    <div class="lk-actions">
+      <a class="primary" href="{{ url_for('dashboard.dashboard') }}">Back to dashboard</a>
+      <a href="{{ url_for('profile.my_profile') }}#plan">What my plan includes</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

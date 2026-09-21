@@ -43,8 +43,9 @@ import threading
 
 from flask import request, jsonify, session
 
+from app import entitlements
 from app.routes.api.v01.admin import admin_api_bp
-from app.middleware.session_guard import require_admin_role
+from app.middleware.session_guard import require_admin_permission
 
 # ── In-memory job store (fast path) ─────────────────────────────────────────
 _jobs: dict = {}
@@ -241,10 +242,12 @@ def _run_generation(job_id: str, mode: str, config_data: dict, pdf_path: str | N
 
 
 @admin_api_bp.route("/ai/generate", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_generation")
 def ai_generate_questions():
     try:
-        from app.db.ai import create_generation_job, delete_old_generation_jobs
+        from datetime import timedelta
+        from app.db.ai import count_generation_jobs_since, create_generation_job, delete_old_generation_jobs
+        from app.utils.datetime_service import now_utc_naive
         try:
             delete_old_generation_jobs()
         except Exception:
@@ -257,6 +260,16 @@ def ai_generate_questions():
         target_exam = get_exam_by_id(exam_id) if exam_id else None
         if not target_exam:
             return jsonify({"success": False, "message": "Select a valid exam first."}), 400
+
+        # The per-admin limit granted with Question generation (none configured = unlimited), checked where a generation
+        # starts. Rolling 24 hours, counted from the jobs table: nothing extra is stored.
+        budget = entitlements.check_limit(
+            session.get("user_id"), "admin.question_generation", "generations_per_day",
+            count_generation_jobs_since(session.get("user_id"), now_utc_naive() - timedelta(hours=24)))
+        if not budget.allowed:
+            return jsonify({"success": False, "limit_reached": True,
+                            "message": f"You have used your {budget.limit} question generations for the last 24 hours. "
+                                       "An Access control administrator can raise this limit."}), 429
 
         def _int(key, default):
             return int(request.form.get(key) or default)
@@ -360,7 +373,7 @@ def ai_generate_questions():
 
 
 @admin_api_bp.route("/ai/status/<job_id>", methods=["GET"])
-@require_admin_role
+@require_admin_permission("question_generation")
 def ai_generation_status(job_id: str):
     job = _job_snapshot(job_id)
     if not job:
@@ -397,7 +410,7 @@ def ai_generation_status(job_id: str):
 
 
 @admin_api_bp.route("/ai/retry/<job_id>", methods=["POST"])
-@require_admin_role
+@require_admin_permission("question_generation")
 def ai_retry_failed_batches(job_id: str):
     """Re-run ONLY the batches that failed, reusing the original run's
     already-extracted PDF text / already-uploaded file URI (never re-parses

@@ -1,12 +1,14 @@
 """
 app/services/explanation_service.py
-Groq-powered AI explanation generator with Chain-of-Thought (CoT) prompting.
+AI explanation generator with Chain-of-Thought (CoT) prompting.
 
 Flow:
   1. Check rate limits (daily + per-question).
   2. Build structured CoT prompt from question data.
-  3. Image present -> fetch Drive URL -> base64 -> vision model (llama-4-scout).
-     Text only    -> fast chat model (llama-3.3-70b-versatile).
+  3. Image present -> fetch image -> base64 -> the "explanation_vision" model.
+     Text only    -> the "explanation_text" model.
+     Which model each feature uses (and its provider) is set in
+     Admin > AI Configuration, resolved per request via app/services/ai.
   4. Save explanation to ai_explanation_history (persists across reloads).
   5. Increment usage counter only after successful generation.
   6. Return explanation + full history + remaining quota.
@@ -18,11 +20,13 @@ Public API:
   delete_explanation(user_id, question_id, explanation_id) -> dict
 """
 
-import base64
+import random
 import threading
-import requests as _requests
+import time
+from datetime import datetime, timezone
 
 import app.config as config
+from app.entitlements import limit_for
 from app.db.explanation import (
     get_explanation_usage,
     get_daily_total_usage,
@@ -32,8 +36,11 @@ from app.db.explanation import (
     delete_explanation as db_delete_explanation,
     get_reset_time_str,
 )
-from app.services.image_storage_service import resolve_question_image_url as get_image_url
-from app.services import ai_provider
+from app.services.image_storage_service import load_question_image
+from app.services.ai import (
+    AIConfigError, AIProviderError, AIRequest, Message, Part, log_problem, resolve, stream,
+)
+from app.services.question_context import build_options_block, clean_given_answer, question_has_image
 from app.utils.helpers import strip_ai_reasoning
 
 
@@ -41,11 +48,14 @@ from app.utils.helpers import strip_ai_reasoning
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
 
-_TEXT_MODEL   = ai_provider.get_model("text_models", config.EXPLANATION_TEXT_MODEL)
-_VISION_MODEL = ai_provider.get_model("vision_models", config.EXPLANATION_VISION_MODEL_NAME)
-_DAILY_LIMIT  = config.EXPLANATION_DAILY_LIMIT     # 5 per student per day
-_PER_Q_LIMIT  = config.EXPLANATION_PER_QUESTION_LIMIT  # 2 per question per day
-_TIMEOUT      = config.AI_REQUEST_TIMEOUT          # seconds
+_TEXT_FEATURE   = "explanation_text"
+_VISION_FEATURE = "explanation_vision"
+_ENTITLEMENT    = "ai_explanation"
+
+
+def _remaining(limit, used: int):
+    """What is left of a limit; None when there is no limit."""
+    return None if limit is None else max(0, limit - used)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -54,51 +64,46 @@ _TIMEOUT      = config.AI_REQUEST_TIMEOUT          # seconds
 
 def check_rate_limits(user_id: int, question_id: int) -> dict:
     """
-    Check both daily-total and per-question limits.
+    Check both daily-total and per-question limits. The limits come from the student's plan
+    (config/entitlements.json, feature "ai_explanation"); a limit that is not configured is None and never reached.
 
     Returns:
         {
             allowed: bool,
             reason: str | None,
             reset_time: str,          <- e.g. "Resets in 3h 12m at 12:00 AM IST"
+            daily_limit: int | None,
             daily_used: int,
-            daily_remaining: int,
+            daily_remaining: int | None,
+            per_question_limit: int | None,
             question_used: int,
-            question_remaining: int,
+            question_remaining: int | None,
         }
     """
+    daily_limit        = limit_for(user_id, _ENTITLEMENT, "per_day")
+    per_question_limit = limit_for(user_id, _ENTITLEMENT, "per_question")
     daily_used    = get_daily_total_usage(user_id)
     q_row         = get_explanation_usage(user_id, question_id)
     question_used = int(q_row.get("used_count", 0)) if q_row else 0
 
-    daily_remaining    = max(0, _DAILY_LIMIT - daily_used)
-    question_remaining = max(0, _PER_Q_LIMIT - question_used)
+    daily_remaining    = _remaining(daily_limit, daily_used)
+    question_remaining = _remaining(per_question_limit, question_used)
     reset_time         = get_reset_time_str()
-
-    if daily_used >= _DAILY_LIMIT:
-        return {
-            "allowed": False,
-            "reason":  f"Daily limit of {_DAILY_LIMIT} explanations reached. {reset_time}.",
-            "reset_time": reset_time,
-            "daily_used": daily_used, "daily_remaining": 0,
-            "question_used": question_used, "question_remaining": question_remaining,
-        }
-
-    if question_used >= _PER_Q_LIMIT:
-        return {
-            "allowed": False,
-            "reason":  f"You've used all {_PER_Q_LIMIT} explanations for this question today. {reset_time}.",
-            "reset_time": reset_time,
-            "daily_used": daily_used, "daily_remaining": daily_remaining,
-            "question_used": question_used, "question_remaining": 0,
-        }
-
-    return {
-        "allowed": True, "reason": None,
-        "reset_time": reset_time,
-        "daily_used": daily_used, "daily_remaining": daily_remaining,
-        "question_used": question_used, "question_remaining": question_remaining,
+    result = {
+        "allowed": True, "reason": None, "reset_time": reset_time,
+        "daily_limit": daily_limit, "daily_used": daily_used, "daily_remaining": daily_remaining,
+        "per_question_limit": per_question_limit, "question_used": question_used, "question_remaining": question_remaining,
     }
+
+    if daily_limit is not None and daily_used >= daily_limit:
+        return {**result, "allowed": False, "daily_remaining": 0,
+                "reason": f"Daily limit of {daily_limit} explanations reached. {reset_time}."}
+
+    if per_question_limit is not None and question_used >= per_question_limit:
+        return {**result, "allowed": False, "question_remaining": 0,
+                "reason": f"You've used all {per_question_limit} explanations for this question today. {reset_time}."}
+
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -175,9 +180,17 @@ _inflight_lock = threading.Lock()
 _inflight_requests: set = set()
 
 
+def is_generating(user_id: int, question_id: int) -> bool:
+    """True while an explanation for this student and question is being generated (the same in-flight set the duplicate
+    guard above uses). Read-only: lets a page that was reloaded, or opened in a second tab, show the generating state
+    and pick the result up instead of offering to start another one."""
+    with _inflight_lock:
+        return (int(user_id), int(question_id)) in _inflight_requests
+
+
 def generate_explanation(question: dict, user_id: int) -> dict:
     """
-    Generate a CoT explanation via Groq, save it, increment usage.
+    Generate a CoT explanation via the configured AI model, save it, increment usage.
 
     `question` must contain at minimum:
         id, question_text, correct_answer, question_type
@@ -245,58 +258,75 @@ def _generate_explanation_locked(question: dict, user_id: int, question_id: int)
     image_path = str(question.get("image_path") or "").strip()
     has_image  = image_path and image_path.lower() not in ("", "nan", "none")
     img_b64    = None
+    img_mime   = "image/jpeg"
 
     if has_image:
-        ok, img_url = get_image_url(image_path)
-        if ok and img_url:
-            img_b64 = _fetch_image_as_base64(img_url)
-        if not img_b64:
+        # Read straight through the storage abstraction. (This used to download the app's own relative image URL with
+        # `requests`, which can never work — "Invalid URL, no scheme" — so image questions were always text-only.)
+        loaded = load_question_image(image_path)
+        if loaded:
+            img_b64, img_mime = loaded
+        else:
             has_image = False   # fall back to text-only — don't block student
+            # the prompt must not claim a diagram is attached when the model is not getting one
+            question = {**question, "image_path": ""}
 
     # ── 3. Build CoT prompt ───────────────────────────────────────────────
     prompt = _build_cot_prompt(question)
 
-    # ── 4. Call Groq ──────────────────────────────────────────────────────
+    # ── 4. Call the AI model ──────────────────────────────────────────────
     try:
-        raw = _call_groq_vision(prompt, img_b64) if (has_image and img_b64) \
-              else _call_groq_text(prompt)
-    except _requests.exceptions.HTTPError as e:
-        status = e.response.status_code if e.response is not None else None
-        if status == 429:
-            print(f"[explanation_service] Groq rate limited (429): {e}")
+        raw = _call_ai_vision(prompt, img_b64, img_mime) if (has_image and img_b64) else _call_ai_text(prompt)
+    except AIConfigError as e:
+        log_problem("explanation model not usable", e)
+        return {"success": False, "message": "AI service temporarily unavailable. Please try again."}
+    except AIProviderError as e:                              # (already logged by the AI client, once per failed attempt)
+        if e.status_code == 429 or e.kind == "rate_limited":
             return {
                 "success": False,
                 "message": "The AI explanation service is busy right now. Please wait a moment and try again.",
             }
-        print(f"[explanation_service] Groq call failed: {e}")
+        if e.kind in ("timeout", "connect_timeout"):
+            return {"success": False, "message": "The AI is taking longer than usual right now. Please try again in a moment."}
         return {"success": False, "message": "AI service temporarily unavailable. Please try again."}
     except Exception as e:
-        print(f"[explanation_service] Groq call failed: {e}")
+        log_problem("explanation generation", e)
         return {"success": False, "message": "AI service temporarily unavailable. Please try again."}
 
     if not raw:
         return {"success": False, "message": "AI returned an empty response. Please try again."}
 
     # ── 5. Persist explanation ────────────────────────────────────────────
-    save_explanation(user_id, question_id, raw)
+    # The explanation exists now: the student gets it whatever happens to the database. (This result used to be ignored: when the
+    # save failed the count was still spent, the history came back without it, and the student saw nothing.)
+    saved = save_explanation(user_id, question_id, raw)
 
-    # ── 6. Increment usage counter ────────────────────────────────────────
-    increment_explanation_usage(user_id, question_id)
+    # ── 6. Count it: the AI call was made and its answer is delivered ─────
+    if not increment_explanation_usage(user_id, question_id):
+        log_problem("explanation usage not recorded", RuntimeError(f"user {user_id}, question {question_id}"))
 
     # ── 7. Recalculate remaining after increment ──────────────────────────
     new_daily_used = get_daily_total_usage(user_id)
     q_row          = get_explanation_usage(user_id, question_id)
     new_q_used     = int(q_row.get("used_count", 0)) if q_row else 0
 
-    daily_remaining    = max(0, _DAILY_LIMIT - new_daily_used)
-    question_remaining = max(0, _PER_Q_LIMIT - new_q_used)
+    daily_remaining    = _remaining(limits.get("daily_limit"), new_daily_used)
+    question_remaining = _remaining(limits.get("per_question_limit"), new_q_used)
 
     # ── 8. Return full history so frontend can render all generations ──────
     history = get_explanation_history(user_id, question_id)
+    if not saved:                                   # shown, but not kept: the page marks it "not saved" (see response.html)
+        history = list(history) + [{
+            "id": -int(time.time() * 1000),         # never a real id: negative, so it can never be deleted or confused with a saved one
+            "explanation": raw,
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+            "unsaved": True,
+        }]
 
     return {
         "success":            True,
         "explanation":        raw,
+        "saved":              bool(saved),
         "history":            history,
         "daily_remaining":    daily_remaining,
         "question_remaining": question_remaining,
@@ -314,52 +344,16 @@ def _build_cot_prompt(question: dict) -> str:
     Response format: Markdown with $...$ inline and $$...$$ block LaTeX.
     """
 
-    qtype       = str(question.get("question_type", "MCQ")).upper()
     qtext       = str(question.get("question_text", "")).strip()
     correct_ans = str(question.get("correct_answer", "")).strip()
-    given_ans   = str(question.get("given_answer", "") or "").strip()
-    image_path  = str(question.get("image_path") or "").strip()
+    given_ans   = clean_given_answer(question.get("given_answer"))
 
-    has_image = image_path and image_path.lower() not in ("", "nan", "none")
-
-    # Build options block (MCQ/MSQ only)
-    options_block = ""
-
-    if qtype in ("MCQ", "MSQ"):
-
-        opts = [
-            f"  ({k}) {v}"
-            for k in ("A", "B", "C", "D")
-            if (
-                v := str(
-                    question.get(f"option_{k.lower()}", "") or ""
-                ).strip()
-            )
-            and v.lower() not in ("nan", "none", "")
-        ]
-
-        if opts:
-            options_block = (
-                "**Options:**\n"
-                + "\n".join(opts)
-                + "\n\n"
-            )
-
-    wrong_line = (
-        f"**Student's Wrong Answer:** {given_ans}\n"
-        if given_ans
-        and given_ans.lower() not in (
-            "not answered",
-            "none",
-            "nan",
-            "",
-        )
-        else ""
-    )
-
+    # The options block and the image test are shared with the Assistant's focused mode (question_context.py).
+    options_block = build_options_block(question)
+    wrong_line = f"**Student's Wrong Answer:** {given_ans}\n" if given_ans else ""
     image_note = (
         "*(A diagram/image is attached — analyse it as part of the question.)*\n\n"
-        if has_image
+        if question_has_image(question)
         else ""
     )
 
@@ -424,12 +418,8 @@ answer is not acceptable at any length."""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Groq callers
+# Model callers
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _headers(model: dict) -> dict:
-    return ai_provider.build_headers(model)
-
 
 # Generous headroom for a full multi-step LaTeX/mhchem solution — the old
 # 1500-token cap was the actual root cause of explanations stopping midway
@@ -440,24 +430,70 @@ _CONTINUATION_MAX_TOKENS = 1200
 _MAX_CONTINUATIONS = 1  # hard cap: can never turn into an unbounded retry loop
 
 
-def _chat_completion(model: dict, messages: list, max_tokens: int) -> tuple[str, str]:
-    """Single call to the active model's endpoint. Returns (content, finish_reason)
-    — finish_reason is "length" when the model was cut off purely for hitting
-    max_tokens, as opposed to "stop" when it actually finished on its own."""
-    resp = _requests.post(
-        model["endpoint"],
-        headers=_headers(model),
-        json={"model": model["model"], "messages": messages, "max_tokens": max_tokens, "temperature": 0.3},
-        timeout=_TIMEOUT,
+# A failure that is the provider's or the network's momentary trouble, so trying again is worthwhile. Never a wrong key, a
+# rejected model, a bad request or a configuration problem: repeating those cannot help.
+_RETRY_KINDS = frozenset({"timeout", "connect_timeout", "unreachable", "server_error", "rate_limited", "malformed"})
+
+
+def _backoff_seconds(kind: str, attempt: int) -> float:
+    """How long to wait before attempt+1. A rate limit needs longer (the provider's window has to move on)."""
+    base = (6.0, 14.0) if kind == "rate_limited" else (2.0, 5.0)
+    return base[min(attempt - 1, len(base) - 1)] + random.uniform(0.0, 1.0)
+
+
+def _stream_once(feature: str, messages: list, max_tokens: int, low_reasoning: bool, total_timeout: float) -> tuple[str, str]:
+    """One STREAMED attempt: (text, finish_reason). Streaming is the point: with a plain request the whole reply has to arrive
+    inside one read timeout, and a big vision model writes a full solution far slower than that (~10-20 tokens/s). Here only
+    silence (EXPLANATION_IDLE_TIMEOUT: before the first word or between two pieces) and a ceiling for the attempt can time out."""
+    request = AIRequest(
+        messages=messages, max_tokens=max_tokens, temperature=0.3,
+        timeout=config.EXPLANATION_IDLE_TIMEOUT, total_timeout=total_timeout,
+        reasoning_effort="low" if low_reasoning else None,
     )
-    resp.raise_for_status()
-    choice = resp.json()["choices"][0]
-    content = choice["message"]["content"].strip()
-    finish_reason = choice.get("finish_reason", "stop")
-    return strip_ai_reasoning(content), finish_reason
+    pieces, finish = [], None
+    for chunk in stream(feature, request):
+        if chunk.text:
+            pieces.append(chunk.text)
+        if chunk.finish_reason:
+            finish = chunk.finish_reason
+    return strip_ai_reasoning("".join(pieces).strip()), finish or "stop"
 
 
-def _generate_complete(model: dict, messages: list) -> str:
+def _chat_completion(feature: str, messages: list, max_tokens: int, low_reasoning: bool = False,
+                     deadline: float | None = None) -> tuple[str, str]:
+    """Returns (content, finish_reason) — finish_reason is "length" when the model was cut off purely for hitting
+    max_tokens, as opposed to "stop" when it actually finished on its own.
+    `low_reasoning` asks a model that thinks before answering to think as little as it allows (ignored by any
+    model whose configuration does not say how; see AIRequest.reasoning_effort).
+
+    A transient failure (see _RETRY_KINDS) is retried, up to EXPLANATION_MAX_ATTEMPTS attempts, after a short pause, and
+    only while `deadline` (a time.monotonic() value: the whole request's budget) leaves room for another attempt. Each failed
+    attempt has already been logged, once, by the AI client; nothing is logged for a call that works."""
+    attempt = 0
+    while True:
+        attempt += 1
+        remaining = (deadline - time.monotonic()) if deadline is not None else config.EXPLANATION_TOTAL_TIMEOUT
+        try:
+            return _stream_once(feature, messages, max_tokens, low_reasoning,
+                                total_timeout=max(10.0, min(config.EXPLANATION_TOTAL_TIMEOUT, remaining)))
+        except AIProviderError as e:
+            if e.kind not in _RETRY_KINDS or attempt >= config.EXPLANATION_MAX_ATTEMPTS:
+                raise
+            wait = _backoff_seconds(e.kind, attempt)
+            if deadline is not None and deadline - time.monotonic() < wait + 20:      # no room left for a useful attempt
+                raise
+            time.sleep(wait)
+
+
+def _can_reduce_reasoning(feature: str) -> bool:
+    """Does this feature's current model have a way to be asked to think less? (options.low_reasoning_effort)"""
+    try:
+        return bool(resolve(feature).options.get("low_reasoning_effort"))
+    except Exception:
+        return False
+
+
+def _generate_complete(feature: str, messages: list) -> str:
     """
     Root-cause fix for incomplete explanations: the previous implementation
     always took whatever the model returned at face value, even when its own
@@ -472,58 +508,40 @@ def _generate_complete(model: dict, messages: list) -> str:
     a persistently-truncating response can never trigger unbounded calls or
     reintroduce the doubled-request issue from before — this only fires
     when a response is actually incomplete, not on every request.
+
+    A model that thinks before it answers (gpt-oss, ...) counts that hidden thinking against the same token budget.
+    On a hard question it can use ALL of it and write nothing: finish "length" with an empty reply. "Continue where you
+    left off" is meaningless then, so instead the question is asked once more with the model's low-reasoning setting
+    (when its configuration has one). Ordinary replies never take this path.
     """
-    content, finish_reason = _chat_completion(model, messages, _MAX_TOKENS)
+    can_think_less = _can_reduce_reasoning(feature)
+    deadline = time.monotonic() + config.EXPLANATION_TOTAL_BUDGET      # one budget for everything below, retries included
+    content, finish_reason = _chat_completion(feature, messages, _MAX_TOKENS, deadline=deadline)
+    if finish_reason == "length" and not content.strip() and can_think_less:
+        content, finish_reason = _chat_completion(feature, messages, _MAX_TOKENS, low_reasoning=True, deadline=deadline)
     continuations = 0
-    while finish_reason == "length" and continuations < _MAX_CONTINUATIONS:
+    while finish_reason == "length" and content.strip() and continuations < _MAX_CONTINUATIONS:
         continuations += 1
         follow_up_messages = messages + [
-            {"role": "assistant", "content": content},
-            {"role": "user", "content": (
+            Message.of("assistant", content),
+            Message.of("user", (
                 "Your previous reply was cut off before the solution was finished. "
                 "Continue writing EXACTLY where you left off — do not repeat any "
                 "earlier text, do not restart, do not add a new heading. Finish the "
                 "remaining steps and give the explicit final answer."
-            )},
+            )),
         ]
-        more, finish_reason = _chat_completion(model, follow_up_messages, _CONTINUATION_MAX_TOKENS)
+        more, finish_reason = _chat_completion(feature, follow_up_messages, _CONTINUATION_MAX_TOKENS,
+                                               low_reasoning=can_think_less, deadline=deadline)
         content = f"{content}{more}"
     return content
 
 
-def _call_groq_text(prompt: str) -> str:
-    return _generate_complete(_TEXT_MODEL, [{"role": "user", "content": prompt}])
+def _call_ai_text(prompt: str) -> str:
+    return _generate_complete(_TEXT_FEATURE, [Message.of("user", prompt)])
 
 
-def _call_groq_vision(prompt: str, img_b64: str) -> str:
-    return _generate_complete(_VISION_MODEL, [{
-        "role": "user",
-        "content": [
-            {"type": "image_url",
-             "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
-            {"type": "text", "text": prompt},
-        ],
-    }])
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Image fetcher
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _fetch_image_as_base64(url: str) -> str | None:
-    """Download image and return base64 string. Max 4 MB guard."""
-    _MAX_BYTES = 4 * 1024 * 1024
-    try:
-        resp   = _requests.get(url, timeout=15, stream=True)
-        resp.raise_for_status()
-        chunks, total = [], 0
-        for chunk in resp.iter_content(chunk_size=8192):
-            total += len(chunk)
-            if total > _MAX_BYTES:
-                print("[explanation_service] Image >4MB, skipping vision.")
-                return None
-            chunks.append(chunk)
-        return base64.b64encode(b"".join(chunks)).decode("utf-8")
-    except Exception as e:
-        print(f"[explanation_service] _fetch_image_as_base64 error: {e}")
-        return None
+def _call_ai_vision(prompt: str, img_b64: str, mime_type: str = "image/jpeg") -> str:
+    return _generate_complete(_VISION_FEATURE, [
+        Message.of("user", [Part.of_image(img_b64, mime_type), Part.of_text(prompt)]),
+    ])

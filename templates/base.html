@@ -16,6 +16,8 @@
   </script>
 
   <link href="{{ url_for('static', filename='theme.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='shared/ai-badge.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='shared/plan-badge.css') }}" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -305,9 +307,22 @@
     opacity:0; transition:opacity .12s;
   }
   #sb-tooltip.show { opacity:1; }
+  /* the same tooltip with more to say (your plan, a locked item): a title, a detail line and a hint */
+  #sb-tooltip.rich { white-space:normal; width:max-content; max-width:15rem; padding:.55rem .8rem; font-weight:400; line-height:1.35; }
+  #sb-tooltip.rich .tip-title { font-weight:700; font-size:.78rem; }
+  #sb-tooltip.rich .tip-sub { margin-top:.15rem; font-size:.72rem; color:var(--text-2); }
+  #sb-tooltip.rich .tip-hint { margin-top:.4rem; padding-top:.4rem; border-top:1px solid var(--border); font-size:.68rem; color:var(--text-3); }
 
   /* Logout */
   .sb-item.logout { color:var(--danger-text); }
+  .sb-plan { display:flex; padding:.35rem .5rem .55rem; text-decoration:none; }
+  .sb-plan .plan-badge { flex:0 0 auto; }
+  .sb.collapsed .sb-plan { justify-content:center; padding:.35rem 0 .55rem; }
+  .sb.collapsed .sb-plan .plan-badge { flex:0 0 auto; padding:.2rem; }
+  .sb.collapsed .sb-plan .pb-text { display:none; }
+  .sb-item.locked .sb-ic, .sb-item.locked .sb-lbl { opacity:.55; }
+  .sb-lock { font-size:.62rem; opacity:.7; margin-left:.3rem; flex-shrink:0; }
+  .sb.collapsed .sb-lock { display:none; }
   .sb-item.logout:hover { background:var(--danger-bg); }
 
   /* Footer area */
@@ -609,7 +624,7 @@
   @media(max-width:640px){ .app-footer{ justify-content:center; text-align:center; } }
   </style>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 
 {# ════════════════════════════════════════════════════════════
    TOP NAV — always shown when logged in (except exam pages)
@@ -709,45 +724,45 @@
 
     <span class="sb-sec">Performance</span>
 
-    <a class="sb-item {{ 'active' if active_nav == 'results' else '' }}"
+    <a class="sb-item {{ 'active' if active_nav == 'results' else '' }}{{ ' locked' if not user_can('result_history') }}"
        href="{{ url_for('dashboard.results_history') }}" data-tip="Results History">
       <span class="sb-ic"><i class="fas fa-history"></i></span>
-      <span class="sb-lbl">Results History</span>
+      <span class="sb-lbl">Results History</span>{% if not user_can('result_history') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
-    <a class="sb-item {{ 'active' if active_nav == 'analytics' else '' }}"
+    <a class="sb-item {{ 'active' if active_nav == 'analytics' else '' }}{{ ' locked' if not user_can('analytics') }}"
        href="{{ url_for('dashboard.student_analytics') }}" data-tip="Analytics">
       <span class="sb-ic"><i class="fas fa-chart-line"></i></span>
-      <span class="sb-lbl">Analytics</span>
+      <span class="sb-lbl">Analytics</span>{% if not user_can('analytics') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
     <span class="sb-sec">Tools</span>
 
-    <a class="sb-item {{ 'active' if active_nav == 'ai' else '' }}"
+    <a class="sb-item {{ 'active' if active_nav == 'ai' else '' }}{{ ' locked' if not user_can('ai_assistant') }}"
        href="{{ url_for('ai.ai_assistant') }}" data-tip="AI Assistant">
       <span class="sb-ic"><i class="fas fa-robot"></i></span>
-      <span class="sb-lbl">AI Assistant</span>
+      <span class="sb-lbl">AI Assistant</span>{% if not user_can('ai_assistant') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
-    <a class="sb-item {{ 'active' if active_nav == 'chat' else '' }}"
+    <a class="sb-item {{ 'active' if active_nav == 'chat' else '' }}{{ ' locked' if not user_can('chat') }}"
        href="{{ url_for('chat.chat_page') }}" data-tip="Chat">
       <span class="sb-ic">
         <i class="fas fa-comment-dots"></i>
         <span class="sb-badge" id="sbChatBadge" style="display:none">0</span>
       </span>
-      <span class="sb-lbl">Chat</span>
+      <span class="sb-lbl">Chat</span>{% if not user_can('chat') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
-    <a class="sb-item {{ 'active' if active_nav == 'notes' else '' }}"
+    <a class="sb-item {{ 'active' if active_nav == 'notes' else '' }}{{ ' locked' if not user_can('notebook') }}"
        href="{{ url_for('notes.my_notes') }}" data-tip="My Notes">
       <span class="sb-ic"><i class="fas fa-book-open"></i></span>
-      <span class="sb-lbl">My Notes</span>
+      <span class="sb-lbl">My Notes</span>{% if not user_can('notebook') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
-    <a class="sb-item {{ 'active' if active_nav == 'notes_library' else '' }}"
+    <a class="sb-item {{ 'active' if active_nav == 'notes_library' else '' }}{{ ' locked' if not user_can('notebook') }}"
        href="{{ url_for('notes.public_library_page') }}" data-tip="Public Notes Library">
       <span class="sb-ic"><i class="fas fa-globe"></i></span>
-      <span class="sb-lbl">Public Notes</span>
+      <span class="sb-lbl">Public Notes</span>{% if not user_can('notebook') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
     {# ── ADD NEW NAV ITEMS HERE — no other files need changing ── #}
@@ -755,6 +770,17 @@
   </nav>
 
   <div class="sb-foot">
+    {% from 'partials/_plan_badge.html' import plan_badge %}
+    {% set _plan = user_plan() %}
+    {% if _plan %}
+    {% set _ex = _plan.expiry %}
+    <a class="sb-plan" href="{{ url_for('profile.my_profile') }}#plan" aria-label="Your plan: {{ _plan.plan_label }}"
+       data-tip="{{ _plan.plan_label }} plan"
+       data-tip-sub="{% if _ex.state == 'expired' %}{{ _ex.expired_plan_label }} plan expired {{ _ex.expires_display }}{% elif _ex.state == 'active' %}Expires: {{ _ex.expires_display }}{% else %}No expiry{% endif %}"
+       data-tip-hint="View what your plan includes">
+      {{ plan_badge(_plan.plan_label, _plan.tone, _plan.icon, 'md') }}
+    </a>
+    {% endif %}
     <a class="sb-item {{ 'active' if active_nav == 'profile' else '' }}" href="{{ url_for('profile.my_profile') }}" data-tip="Profile &amp; Account">
       <span class="sb-ic"><i class="fas fa-user-circle"></i></span>
       <span class="sb-lbl">Profile &amp; Account</span>
@@ -972,20 +998,30 @@ document.addEventListener('click',function(e){
   tip.id = 'sb-tooltip';
   document.body.appendChild(tip);
   var tipTimer;
-  sb.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
-    el.addEventListener('mouseenter', function(){
-      if(!collapsed) return;
-      var r = el.getBoundingClientRect();
-      tip.textContent = el.getAttribute('data-tip');
-      tip.style.top = Math.round(r.top + r.height/2) + 'px';
-      tip.style.left = Math.round(r.right + 10) + 'px';
-      tip.style.transform = 'translateY(-50%)';
-      clearTimeout(tipTimer);
-      tip.classList.add('show');
-    });
-    el.addEventListener('mouseleave', function(){
-      tipTimer = setTimeout(function(){ tip.classList.remove('show'); }, 80);
-    });
+  function showTip(el){
+    var isPlan = el.classList.contains('sb-plan'), locked = el.classList.contains('locked');
+    // An expanded sidebar already shows every label; the plan badge and a locked item still have something to say.
+    if(!collapsed && !isPlan && !locked) return;
+    tip.textContent = '';
+    function line(cls, text){ if(!text) return; var d = document.createElement('div'); d.className = cls; d.textContent = text; tip.appendChild(d); }
+    line('tip-title', el.getAttribute('data-tip'));
+    line('tip-sub', locked ? 'Not in your plan' : el.getAttribute('data-tip-sub'));
+    line('tip-hint', el.getAttribute('data-tip-hint'));
+    tip.classList.toggle('rich', isPlan || locked);
+    var r = el.getBoundingClientRect();
+    tip.style.left = Math.round(r.right + 10) + 'px';
+    tip.style.transform = 'none';
+    var h = tip.offsetHeight;                                   // keep it on screen: the plan badge sits at the bottom of the sidebar
+    tip.style.top = Math.round(Math.max(8, Math.min(r.top + r.height/2 - h/2, window.innerHeight - h - 8))) + 'px';
+    clearTimeout(tipTimer);
+    tip.classList.add('show');
+  }
+  function hideTip(){ tipTimer = setTimeout(function(){ tip.classList.remove('show'); }, 80); }
+  sb.querySelectorAll('.sb-item[data-tip], .sb-plan[data-tip]').forEach(function(el){
+    el.addEventListener('mouseenter', function(){ showTip(el); });
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('focus', function(){ showTip(el); });
+    el.addEventListener('blur', hideTip);
   });
 })();
 
@@ -1095,7 +1131,7 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 {% endif %}
 
-{% if session.get('user_id') and not session.get('admin_id') %}
+{% if session.get('user_id') and not session.get('admin_id') and user_can('chat') %}
 <script>
 (function(){
   function poll(){
