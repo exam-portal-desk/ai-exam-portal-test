@@ -178,6 +178,17 @@ def create_app() -> Flask:
 
     app.jinja_env.globals["admin_feature_label"] = _admin_feature_label
 
+    # Every url_for('static', ...) gets ?v=<the file's modified time>, so a changed CSS/JS file is fetched again by browsers and
+    # CDNs instead of an old cached copy being used after a deploy (an unchanged file keeps the same URL and stays cached).
+    @app.url_defaults
+    def _version_static_urls(endpoint, values):
+        if endpoint != "static" or "v" in values or not values.get("filename"):
+            return
+        try:
+            values["v"] = int(os.path.getmtime(os.path.join(app.static_folder, values["filename"])))
+        except (OSError, TypeError, ValueError):
+            pass
+
     @app.context_processor
     def inject_globals():
         from flask import session

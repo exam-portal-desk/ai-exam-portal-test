@@ -524,10 +524,13 @@ window.MathJax = {
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">Select Exam</label>
+                {% from 'partials/_exam_meta.html' import exam_meta %}
+                {# the option's value is the exam id, which is what the form submits; the name/detail/search text is only for choosing #}
                 <select name="exam_id" id="aiExamSelect" class="form-select" required>
                   <option value="">Choose exam...</option>
                   {% for exam in exams %}
-                  <option value="{{ exam.id }}">{{ exam.name }}</option>
+                  <option value="{{ exam.id }}" data-meta="{{ exam_meta(exam) }}"
+                          data-search="{{ (exam.name ~ ' ' ~ (exam.category_name or '') ~ ' ' ~ (exam.subcategory_name or '')) | lower }}">{{ exam.name }}</option>
                   {% endfor %}
                 </select>
               </div>
@@ -759,7 +762,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // component used elsewhere in the admin UI (static/admin/select-enhance.js).
     // Doing this even while the modal is still hidden is fine — enhanceSelect()
     // only needs the element to exist, not be visible yet.
-    enhanceSelect(document.getElementById('aiExamSelect'), { icon: 'fas fa-graduation-cap', block: true });
+    enhanceSelect(document.getElementById('aiExamSelect'), { icon: 'fas fa-graduation-cap', block: true, search: true, searchPlaceholder: 'Search exams by name, category\u2026' });
     enhanceSelect(document.getElementById('aiDifficultySelect'), { icon: 'fas fa-gauge-high', block: true });
 });
 // ── Tips Panel toggle ────────────────────────────────────────────────────

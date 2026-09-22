@@ -32,6 +32,22 @@
 .sel-enh-item:hover { background: var(--surface-2); color: var(--text-1); }
 .sel-enh-item.active { background: var(--accent-subtle); color: var(--accent); font-weight: 700; }
 
+/* Rich menu (enhanceSelect(..., { search: true })): a search box on top and two-line rows, the same look as the exam pickers
+   on Image Mapping / Manage Questions (bold name, small detail line). */
+.sel-enh-menu.sel-enh-menu-rich { max-height: min(420px, 60vh); overscroll-behavior: contain; }
+.sel-enh-searchbar { position: sticky; top: -.3rem; z-index: 1; margin: -.3rem -.3rem .3rem; padding: .55rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.sel-enh-search { width: 100%; font-size: .8rem; font-family: inherit; padding: .4rem .6rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-1); }
+.sel-enh-search:focus { outline: none; border-color: var(--border-focus); }
+.sel-enh-item.rich { white-space: normal; padding: .55rem .65rem; margin-bottom: .15rem; }
+.sel-enh-name { display: block; font-size: .82rem; font-weight: 700; color: var(--text-1); overflow-wrap: anywhere; }
+.sel-enh-meta { display: block; margin-top: .2rem; font-size: .72rem; font-weight: 400; color: var(--text-3); overflow-wrap: anywhere; }
+.sel-enh-item.rich.active { background: var(--accent-subtle); }
+.sel-enh-item.rich.active .sel-enh-name { color: var(--accent); }
+.sel-enh-empty { padding: 1rem; text-align: center; font-size: .8rem; color: var(--text-3); }
+.sel-enh-trigger-rich .sel-enh-name, .sel-enh-trigger-rich .sel-enh-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sel-enh-trigger-rich .sel-enh-name { color: var(--text-1); }
+@media (max-width: 640px) { .sel-enh-search { font-size: 16px; } }      /* below 16px iOS zooms the page when the field is focused */
+
 /* Positioning (top/left/min-width) is computed and set inline by
    positionMenu() in select-enhance.js on every open, using the trigger's
    real screen coordinates — not fixed here — since the menu also switches

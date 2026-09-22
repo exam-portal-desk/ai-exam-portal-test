@@ -380,7 +380,7 @@
     .sidebar {
       position: fixed !important; top: 0; left: -100%;
       width: 260px !important; min-width: 260px !important;
-      height: 100vh; z-index: 1000; overflow: hidden !important;
+      height: 100vh; height: 100dvh; z-index: 1000; overflow-x: hidden !important; overflow-y: auto !important;
       transition: left 0.24s ease !important;
       border-radius: 0 12px 12px 0;
     }
@@ -403,6 +403,16 @@
   }
   @media (max-width: 576px) {
     .content-wrap { padding: 4rem 0.75rem 1rem; }
+  }
+
+  /* Small screens (a phone, or a phone held sideways): the WHOLE sidebar scrolls, not only the nav area between the header and
+     the bottom. dvh above is the visible height (100vh, the fallback, is taller than the screen while a phone's browser
+     toolbar is showing, which left the bottom items underneath it). The header stays on top while the list scrolls. */
+  @media (max-width: 768px), (max-height: 520px) {
+    .sidebar { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .sidebar::-webkit-scrollbar { display: none; }
+    .sb-header { position: sticky; top: 0; z-index: 2; background: var(--sb-bg); }
+    .sb-nav-wrap { flex: 1 0 auto; overflow: visible; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   }
 
   /* Account settings modal rows */

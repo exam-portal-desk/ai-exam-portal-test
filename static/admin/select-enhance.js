@@ -11,6 +11,12 @@
  * makes it a full-width form field matching .form-control/.form-select,
  * for a select sitting in a form grid rather than a compact filter toolbar.
  *
+ * search: true (optional, with searchPlaceholder) adds a search box to the menu and turns each option into a two-line row:
+ * its text, and under it the option's data-meta (e.g. <option data-meta="SSC JE · Surveying · 8 questions">). The box
+ * matches every word you type against the option's data-search, or its text when there is none. The chosen option shows
+ * its detail line in the button too, so two options with the same name can be told apart. The <select> stays the source
+ * of truth (its value, `required`, form submission), exactly as for a plain enhanced select.
+ *
  * Also exposes FloatingPanel (below): the same open/close rules for a larger popover.
  */
 (function (global) {
@@ -18,6 +24,12 @@
 
   function closeOpen() {
     if (_openWrap) { _openWrap.classList.remove('open'); _openWrap = null; }
+  }
+  // A search box inside the open menu has to survive what focusing it does on a phone: the on-screen keyboard resizes the
+  // window and the browser may scroll the page to bring the field into view. Neither should close the menu that owns it.
+  function searchHasFocus() {
+    const a = document.activeElement;
+    return !!(_openWrap && a && a.tagName === 'INPUT' && _openWrap.contains(a));
   }
   document.addEventListener('click', () => closeOpen());
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOpen(); });
@@ -35,9 +47,10 @@
   // scroll (the page, a modal body, etc.) still closes it as before.
   window.addEventListener('scroll', e => {
     if (_openWrap && e.target && typeof e.target.contains === 'function' && _openWrap.contains(e.target)) return;
+    if (searchHasFocus()) return;
     closeOpen();
   }, true);
-  window.addEventListener('resize', () => closeOpen());
+  window.addEventListener('resize', () => { if (!searchHasFocus()) closeOpen(); });
 
   function enhanceSelect(selectEl, opts) {
     if (!selectEl || selectEl._enhanced) return null;
@@ -62,13 +75,47 @@
     selectEl.insertAdjacentElement('afterend', wrap);
     selectEl.style.display = 'none';
 
+    const rich = !!opts.search;
+
+    // an option's name with its detail line under it (built with textContent, never as HTML)
+    function fillFace(el, opt) {
+      const name = document.createElement('span');
+      name.className = 'sel-enh-name';
+      name.textContent = opt.textContent;
+      el.appendChild(name);
+      if (opt.dataset.meta) {
+        const meta = document.createElement('span');
+        meta.className = 'sel-enh-meta';
+        meta.textContent = opt.dataset.meta;
+        el.appendChild(meta);
+      }
+    }
+
     function render() {
       menu.innerHTML = '';
+      menu.classList.toggle('sel-enh-menu-rich', rich);
+      let search = null;
+      if (rich) {
+        const bar = document.createElement('div');
+        bar.className = 'sel-enh-searchbar';
+        search = document.createElement('input');
+        search.type = 'text';
+        search.className = 'sel-enh-search';
+        search.autocomplete = 'off';
+        search.placeholder = opts.searchPlaceholder || 'Search…';
+        bar.appendChild(search);
+        menu.appendChild(bar);
+      }
+      menu._search = search;
+      const items = [];
       Array.from(selectEl.options).forEach(opt => {
         const item = document.createElement('button');
         item.type = 'button';
-        item.className = 'sel-enh-item' + (opt.value === selectEl.value ? ' active' : '');
-        item.textContent = opt.textContent;
+        item.className = 'sel-enh-item' + (opt.value === selectEl.value ? ' active' : '') + (rich ? ' rich' : '');
+        if (rich) fillFace(item, opt); else item.textContent = opt.textContent;
+        item.dataset.search = (opt.dataset.search || opt.textContent).toLowerCase();
+        item.dataset.blank = opt.value === '' ? '1' : '';
+        items.push(item);
         item.addEventListener('click', e => {
           e.stopPropagation();
           if (selectEl.value !== opt.value) {
@@ -79,8 +126,35 @@
         });
         menu.appendChild(item);
       });
+      if (rich) {
+        const empty = document.createElement('div');
+        empty.className = 'sel-enh-empty';
+        empty.textContent = 'Nothing matches your search.';
+        empty.style.display = 'none';
+        menu.appendChild(empty);
+        const firstMatch = () => items.find(it => it.style.display !== 'none' && it.dataset.blank !== '1');
+        search.addEventListener('input', () => {
+          const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+          items.forEach(it => {
+            // the empty "Choose..." row only makes sense with no search; every typed word must appear in a real row
+            it.style.display = !words.length || (it.dataset.blank !== '1' && words.every(w => it.dataset.search.indexOf(w) !== -1)) ? '' : 'none';
+          });
+          empty.style.display = words.length && !firstMatch() ? '' : 'none';
+        });
+        search.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); const first = firstMatch(); if (first) first.click(); }
+        });
+      }
       const current = Array.from(selectEl.options).find(o => o.value === selectEl.value);
-      trigger.querySelector('.sel-enh-label').textContent = current ? current.textContent : '';
+      const label = trigger.querySelector('.sel-enh-label');
+      label.textContent = '';
+      if (rich && current && current.dataset.meta) {
+        fillFace(label, current);
+        trigger.classList.add('sel-enh-trigger-rich');
+      } else {
+        label.textContent = current ? current.textContent : '';
+        trigger.classList.remove('sel-enh-trigger-rich');
+      }
     }
 
     // The menu is positioned with `fixed` coordinates computed here, not
@@ -126,6 +200,8 @@
         _openWrap = wrap;
         render();
         positionMenu();
+        // typing straight away is the point on a desktop; on a touch screen it would pop the keyboard over the list
+        if (menu._search && window.matchMedia('(hover: hover)').matches) menu._search.focus({ preventScroll: true });
       }
     });
     wrap.addEventListener('click', e => e.stopPropagation()); // clicks inside the open menu must not bubble to the page-level closer

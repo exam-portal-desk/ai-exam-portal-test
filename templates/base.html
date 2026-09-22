@@ -516,11 +516,22 @@
   .sb-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:99; }
 
   @media(max-width:768px){
-    .sb { position:fixed; top:48px; left:-220px; height:calc(100vh - 48px); transition:left .2s ease,width .2s ease; z-index:100; }
+    .sb { position:fixed; top:48px; left:-220px; height:calc(100vh - 48px); height:calc(100dvh - 48px); transition:left .2s ease,width .2s ease; z-index:100; }
     .sb.mobile-open { left:0; width:220px !important; }
     .sb.mobile-open .sb-brand-txt,.sb.mobile-open .sb-lbl,.sb.mobile-open .sb-sec,.sb.mobile-open .sb-badge { opacity:1 !important; width:auto !important; overflow:visible !important; padding:revert; height:auto !important; }
     .sb-overlay.open { display:block; }
     .mob-toggle { display:flex !important; }
+  }
+
+  /* Small screens (a phone, or a phone held sideways): the WHOLE rail scrolls, not only the middle list. Before, the header
+     and the footer (plan, Profile, Logout) were pinned and only the list between them scrolled, so on a short screen that
+     list shrank to almost nothing and the bottom items could not be reached. Now the list takes its natural height and the
+     rail itself scrolls; the header stays on top. */
+  @media(max-width:768px), (max-height:520px){
+    .sb { overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:env(safe-area-inset-bottom); }
+    .sb::-webkit-scrollbar { display:none; }
+    .sb-hdr { position:sticky; top:0; z-index:2; background:var(--surface); }
+    .sb-nav { flex:1 0 auto; overflow:visible; }
   }
 
   .mob-toggle {

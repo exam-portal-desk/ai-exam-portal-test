@@ -1,0 +1,7 @@
+{# "Category · Subcategory · 8 questions" for an exam row from app.db.exams.get_exams_for_selector(). A missing category or subcategory is
+   left out together with its separator. #}
+{% macro exam_meta(e) -%}
+{%- set parts = [e.category_name, e.subcategory_name] | select | list -%}
+{%- set _ = parts.append((e.question_count or 0) ~ ' question' ~ ('' if (e.question_count or 0) == 1 else 's')) -%}
+{{- parts | join(' · ') -}}
+{%- endmacro %}
