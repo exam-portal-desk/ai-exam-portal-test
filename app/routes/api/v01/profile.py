@@ -21,6 +21,7 @@ from app.db.misc import get_requests_by_user, create_request
 from app.middleware.session_guard import require_user_role
 from app.services import image_storage_service
 from app.utils.datetime_service import now_utc_naive
+from app.utils.helpers import join_full_name, split_full_name, validate_name_part
 import app.config as config
 
 profile_api_bp = Blueprint("profile_api", __name__, url_prefix="/api/v01/profile")
@@ -102,6 +103,36 @@ def remove_photo():
         image_storage_service.delete_profile_photo(old_key)
 
     return jsonify({"success": True})
+
+
+@profile_api_bp.route("/name", methods=["PUT"])
+@_require_login
+def update_name():
+    """Update the SIGNED-IN user's own first/last name (shared by both portals, like the photo endpoints above). The
+    user is always session["user_id"] — nothing else in the request can name a different account, so this can never
+    touch anyone else's profile. Stored as one users.full_name column (see app.utils.helpers.split_full_name/
+    join_full_name for why); a blank last name is fine, a blank first name is not."""
+    user_id = int(session["user_id"])
+    data = request.get_json(silent=True) or {}
+    first_name = data.get("first_name", "")
+    last_name = data.get("last_name", "")
+
+    error = validate_name_part(first_name, "First name", required=True) or validate_name_part(last_name, "Last name", required=False)
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+
+    full_name = join_full_name(first_name, last_name)
+    if not update_user(user_id, {"full_name": full_name}):
+        return jsonify({"success": False, "message": "Could not save your name. Please try again."}), 500
+
+    # Every display-name read in this app comes from users.full_name or, for the current request cycle, this session key
+    # (nav greeting, chat, discussions — see the grep in the session-guard docstring) — updating it here means the next
+    # page this session renders already shows the new name, with no separate cache to invalidate.
+    session["full_name"] = full_name
+    session.modified = True
+
+    clean_first, clean_last = split_full_name(full_name)
+    return jsonify({"success": True, "full_name": full_name, "first_name": clean_first, "last_name": clean_last})
 
 
 @profile_api_bp.route("/admin-access-request", methods=["POST"])

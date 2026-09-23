@@ -480,6 +480,25 @@ def import_notebook_status_api(job_id: str):
     return jsonify({"success": True, **job})
 
 
+@notes_api_bp.route("/notebooks/<notebook_id>/export-data")
+@require_user_role
+def notebook_export_data_api(notebook_id: str):
+    """Every page's objects for the client's PDF-export render loop, in ONE request instead of
+    one request per page — same owner-or-public rule as export-pdf below (and the same one route
+    for both; nothing here differs by visibility beyond which check let the caller in)."""
+    try:
+        pages = notes_service.get_pages_with_objects_for_export(session["user_id"], notebook_id)
+        if pages is None:
+            pages = notes_service.get_public_pages_with_objects_for_export(notebook_id)
+        if pages is None:
+            return _api_error("Notebook not found.", 404)
+        return jsonify({"success": True, "pages": [{"id": p["id"], "title": p["title"], "objects": p["objects"]} for p in pages]})
+    except (NotesValidationError, ValueError) as exc:
+        return _api_error(str(exc))
+    except Exception:
+        return _api_error("Unable to load this notebook. Please try again.", 500)
+
+
 @notes_api_bp.route("/notebooks/<notebook_id>/export-pdf", methods=["POST"])
 @require_user_role
 def export_notebook_pdf_api(notebook_id: str):

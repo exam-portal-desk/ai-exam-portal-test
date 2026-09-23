@@ -10,6 +10,7 @@ from app.db.users import get_user_profile_by_id
 from app.db.misc import get_requests_by_user
 from app.services.image_storage_service import resolve_profile_photo_url
 from app.db.dashboard_events import mark_event_seen
+from app.utils.helpers import split_full_name
 import app.config as config
 
 profile_bp = Blueprint("profile", __name__)
@@ -44,6 +45,7 @@ def my_profile():
     has_pending_access_request = any(r.get("request_status") == "pending" for r in access_requests)
     can_request_access = not has_admin_access and not has_pending_access_request
 
+    first_name, last_name = split_full_name(user.get("full_name"))
     return render_template(
         "profile.html", profile=user, photo_url=photo_url,
         max_photo_kb=config.MAX_PROFILE_PHOTO_SIZE_KB,
@@ -51,4 +53,5 @@ def my_profile():
         latest_access_request=latest_access_request,
         can_request_access=can_request_access,
         has_admin_access=has_admin_access,
+        first_name=first_name, last_name=last_name,
     )

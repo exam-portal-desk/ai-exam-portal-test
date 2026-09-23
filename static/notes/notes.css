@@ -15,11 +15,11 @@
    "Exporting PDF 42%" in-button treatment as the editor's #exportPdfBtn/#exportJsonBtn (see
    .editor-top-actions .sbtn.exporting:disabled in editor.css), just scoped to .library-actions
    since this card has no .editor-top-actions container. */
-.library-actions .sbtn.exporting:disabled{opacity:1;cursor:progress;white-space:nowrap;font-variant-numeric:tabular-nums}
+.library-actions .sbtn.exporting:disabled{opacity:1;cursor:default;white-space:nowrap;font-variant-numeric:tabular-nums}
 /* Same in-progress "Exporting PDF 42%" treatment as .library-actions above, applied inside My
    Notebooks' shared "⋮" dropdown (see notebooks.js: export actions deliberately don't call
    closeActionMenu(), so this panel stays open long enough to actually show progress). */
-.notebook-menu-panel button.exporting:disabled{opacity:1;cursor:progress;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--text-2)}
+.notebook-menu-panel button.exporting:disabled{opacity:1;cursor:default;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--text-2)}
 /* Notebook Import progress view (importNotebookModal) — replaces the plain "Importing..."
    button state with real, polled progress (see notebooks.js). The bar's width transitions
    smoothly between two REAL values only; the percent text always jumps straight to the exact

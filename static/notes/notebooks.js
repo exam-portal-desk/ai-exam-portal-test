@@ -1,4 +1,4 @@
-import { exportNotebookAsPdf, exportNotebookAsJson } from './notebook-export.js';
+import { exportNotebookAsPdf, exportNotebookAsJson, loadPagesFromExportDataUrl } from './notebook-export.js';
 
 const api = '/api/v01/notebooks';
 let selectedNotebookId = null;
@@ -65,8 +65,7 @@ document.getElementById('createNotebookForm')?.addEventListener('submit', async 
 function exportMyNotebookPdf(notebookId, btn) {
   return exportNotebookAsPdf({
     notebookId, btn, toast,
-    pagesUrl: id => `${api}/${id}/pages`,
-    objectsUrl: (id, pageId) => `${api}/${id}/pages/${pageId}/objects`,
+    loadPages: loadPagesFromExportDataUrl(`${api}/${notebookId}/export-data`),
     exportPdfUrl: id => `${api}/${id}/export-pdf`,
   });
 }

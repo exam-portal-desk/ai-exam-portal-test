@@ -554,22 +554,41 @@ def permanently_delete_expired_notebook(notebook_id: str) -> bool:
     return bool(rows)
 
 
+def attach_page_objects(pages: List[Dict[str, Any]]) -> None:
+    """Attach an `objects` list to every page dict IN PLACE, in one query for the whole notebook
+    instead of the one-query-per-page loop this replaced (the dominant cost of an export on a
+    notebook with many pages — was list_page_objects() called once per page, sequentially).
+    Shared by every export path (JSON: export_notebook below; PDF gather: notes_service.
+    get_pages_with_objects/get_public_pages_with_objects) so the legacy asset_id backfill below
+    only has to live in one place."""
+    page_ids = [p["id"] for p in pages]
+    if not page_ids:
+        return
+    rows = fetch_all(
+        "SELECT id,page_id,object_type,z_index,transform,payload,asset_id,version,updated_at "
+        "FROM notes_objects WHERE page_id = ANY(%s::uuid[]) ORDER BY page_id, z_index",
+        (page_ids,),
+    )
+    by_page: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        page_id = row.pop("page_id")
+        # Legacy rows saved before asset_id was backfilled onto every object only carry the
+        # reference inside payload.fabric.assetId. Recover it here so an export always stays
+        # importable by its own importer, mirroring the same fallback notes_service.
+        # _refresh_image_urls() already applies for the live editor's page-load path.
+        if row["object_type"] == "image" and not row.get("asset_id"):
+            fabric = (row.get("payload") or {}).get("fabric")
+            if isinstance(fabric, dict) and fabric.get("assetId"):
+                row["asset_id"] = fabric["assetId"]
+        by_page.setdefault(page_id, []).append(row)
+    for page in pages:
+        page["objects"] = by_page.get(page["id"], [])
+
+
 def export_notebook(notebook_id: str) -> Dict[str, Any]:
     notebook = fetch_one("SELECT * FROM notes_notebooks WHERE id=%s LIMIT 1", (notebook_id,))
     pages = list_pages(notebook_id)
-    for page in pages:
-        objects = list_page_objects(page["id"])
-        for obj in objects:
-            # Legacy rows saved before asset_id was backfilled onto every object
-            # only carry the reference inside payload.fabric.assetId. Recover it
-            # here so an export always stays importable by its own importer,
-            # mirroring the same fallback notes_service._refresh_image_urls()
-            # already applies for the live editor's page-load path.
-            if obj["object_type"] == "image" and not obj.get("asset_id"):
-                fabric = (obj.get("payload") or {}).get("fabric")
-                if isinstance(fabric, dict) and fabric.get("assetId"):
-                    obj["asset_id"] = fabric["assetId"]
-        page["objects"] = objects
+    attach_page_objects(pages)
     return {
         "format": "smartai-notes-export-v1",
         "exported_at": datetime.now(timezone.utc).isoformat(),

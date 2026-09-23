@@ -325,6 +325,32 @@ def get_public_page_objects(notebook_id: str, page_id: str) -> Optional[List[Dic
     return _refresh_image_urls(notes_db.list_page_objects(page_id))
 
 
+def get_pages_with_objects_for_export(user_id: int, notebook_id: str) -> Optional[List[Dict[str, Any]]]:
+    """Every page's objects for the PDF export gather step, in ONE batched query for the whole
+    notebook (notes_db.attach_page_objects) instead of the client fetching one page's objects at
+    a time — same owner-or-shared access rule as get_editor_notebook/get_page_objects, just
+    covering every page at once."""
+    notebook = get_editor_notebook(user_id, notebook_id)
+    if not notebook:
+        return None
+    pages = notes_db.list_pages(notebook["id"])
+    notes_db.attach_page_objects(pages)
+    for page in pages:
+        page["objects"] = _refresh_image_urls(page["objects"])
+    return pages
+
+
+def get_public_pages_with_objects_for_export(notebook_id: str) -> Optional[List[Dict[str, Any]]]:
+    notebook = public_notebook(notebook_id)
+    if not notebook:
+        return None
+    pages = notes_db.list_pages(notebook["id"])
+    notes_db.attach_page_objects(pages)
+    for page in pages:
+        page["objects"] = _refresh_image_urls(page["objects"])
+    return pages
+
+
 def export_public_notebook(notebook_id: str) -> Optional[Dict[str, Any]]:
     notebook = public_notebook(notebook_id)
     return notes_db.export_notebook(notebook["id"]) if notebook else None

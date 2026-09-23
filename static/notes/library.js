@@ -1,4 +1,4 @@
-import { exportNotebookAsPdf, exportNotebookAsJson } from './notebook-export.js';
+import { exportNotebookAsPdf, exportNotebookAsJson, loadPagesFromExportDataUrl } from './notebook-export.js';
 
 const toast=(m,t='success')=>{const r=document.getElementById('notesToastRegion'),e=document.createElement('div');e.className=`notes-toast ${t}`;e.textContent=m;r.append(e);setTimeout(()=>e.remove(),4000)};
 const libraryGrid=document.getElementById('libraryGrid');
@@ -19,16 +19,15 @@ async function handleLikeOrBookmark(button,group){
    same server endpoints as My Notebooks' export (see static/notes/notebook-export.js, shared by
    both so there's one implementation, not two): render each page's objects to a PNG on an
    off-screen Fabric canvas, POST them to the existing /export-pdf route (already accepts a
-   currently-public notebook, not just an owned one — see that route's own comment), and stream
-   the JSON export for real byte progress before handing the download off to the browser via
-   Content-Disposition. The library page has no live canvas/page cache to reuse directly (a card
-   is just metadata, not an open notebook), so this re-fetches each page's objects from the
-   public read API — only the URLs passed below differ from My Notebooks' wrapper. */
+   currently-public notebook, not just an owned one — see that route's own comment), and hand the
+   browser the exact bytes that request returned once they've fully arrived. The library page has
+   no live canvas/page cache to reuse directly (a card is just metadata, not an open notebook),
+   so this reads every page's objects from the same one export-data route My Notebooks uses —
+   it already accepts a currently-public notebook the same way export-pdf does. */
 function exportLibraryNotebookPdf(notebookId, btn) {
   return exportNotebookAsPdf({
     notebookId, btn, toast,
-    pagesUrl: id => `/api/v01/library/${id}/pages`,
-    objectsUrl: (id, pageId) => `/api/v01/library/${id}/pages/${pageId}/objects`,
+    loadPages: loadPagesFromExportDataUrl(`/api/v01/notebooks/${notebookId}/export-data`),
     exportPdfUrl: id => `/api/v01/notebooks/${id}/export-pdf`,
   });
 }

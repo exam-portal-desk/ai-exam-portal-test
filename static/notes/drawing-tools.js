@@ -33,7 +33,7 @@ setTimeout(() => {
      Each ink tool remembers its own stroke width independently, so switching tools never makes
      you re-pick a width (a highlighter needs to stay wide even after a thin pen stroke). */
   window.__notesInkTool = window.__notesInkTool || 'pen';
-  window.__notesInkSizes = window.__notesInkSizes || { pen: 6, pencil: 3, highlighter: 22 };
+  window.__notesInkSizes = window.__notesInkSizes || { pen: 6, pencil: 3, highlighter: 22, eraser: 22 };
   const hexToRgba = (hex, alpha) => { const v = hex.replace('#', ''); const full = v.length === 3 ? v.split('').map(c => c + c).join('') : v; const n = parseInt(full, 16); return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`; };
 
   /* ══════════════════════════════════════════════════════════════════════════════════
@@ -103,7 +103,8 @@ setTimeout(() => {
   const createColorControl = ({ key, title, ariaLabel, group, heading, getColor, applyColor, fallback, noFillSupport }) => {
     const btn = document.createElement('button');
     btn.type = 'button'; btn.title = title; btn.setAttribute('aria-label', ariaLabel);
-    btn.style.cssText = `width:28px;height:28px;padding:0;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:${fallback}`;
+    btn.className = 'notes-swatch-btn';
+    btn.style.background = fallback;
     btn.addEventListener('mousedown', event => event.preventDefault());
     insert(btn, group);
     const sync = () => { const value = getColor(); btn.style.background = value === null ? NO_FILL_SWATCH_BG : value; };
@@ -118,9 +119,10 @@ setTimeout(() => {
       const activeHex = isNoFill ? null : (toHexColor(rawColor) || fallback);
       const panel = document.createElement('div');
       panel.dataset.notesColorPopover = key;
+      panel.className = 'notes-popover';
       panel.setAttribute('role', 'dialog');
       panel.setAttribute('aria-label', heading);
-      panel.style.cssText = 'position:fixed;z-index:1100;width:242px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);font-size:.72rem';
+      panel.style.width = '242px';
       // Only stopPropagation on click (so interacting inside the popover doesn't bubble to the
       // document-level outside-click listener and immediately close it) — NOT mousedown:
       // nothing here needs to preserve focus on some other element, and preventDefault on
@@ -130,7 +132,7 @@ setTimeout(() => {
 
       const headingEl = document.createElement('div');
       headingEl.textContent = heading;
-      headingEl.style.cssText = 'font-weight:700;color:var(--text-1);margin-bottom:8px;font-size:.74rem';
+      headingEl.className = 'notes-popover-heading';
       panel.append(headingEl);
 
       if (noFillSupport) {
@@ -213,6 +215,96 @@ setTimeout(() => {
     btn.addEventListener('click', event => { event.stopPropagation(); open(); });
     sync();
     return { button: btn, sync };
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════════════════
+     CUSTOM DROPDOWN — a drop-in, duck-typed replacement for a native <select>: the returned
+     trigger element exposes the same `.value` get/set contract and fires a real 'change' event
+     on selection, so every existing call site below (fontSelect.value, .addEventListener
+     ('change', ...), etc.) keeps working completely unmodified — only the four `createElement
+     ('select')` construction sites change to call this instead. Built on the exact same
+     floating-panel portal (window.__notesPlaceFloatingPanel/__notesCloseFloatingPanels/
+     __notesGetActiveFloatingPanel) and .notes-popover shell the color controls above and the
+     shape library below already use — one shared dropdown implementation, not one per control. */
+  const createDropdown = ({ key, title, ariaLabel, group, options, value, width = 130, menuWidth, renderOption }) => {
+    const trigger = document.createElement('button');
+    trigger.type = 'button'; trigger.className = 'notes-dd'; trigger.title = title;
+    trigger.setAttribute('aria-label', ariaLabel);
+    trigger.setAttribute('aria-haspopup', 'listbox'); trigger.setAttribute('aria-expanded', 'false');
+    trigger.style.maxWidth = `${width}px`;
+    const labelEl = document.createElement('span'); labelEl.className = 'notes-dd-label';
+    const chevron = document.createElement('i'); chevron.className = 'fas fa-chevron-down notes-dd-chevron';
+    trigger.append(labelEl, chevron);
+    trigger.addEventListener('mousedown', event => event.preventDefault());
+
+    let current = value !== undefined ? value : options[0]?.value;
+    const findOption = v => options.find(o => String(o.value) === String(v));
+    const renderTrigger = () => {
+      const opt = findOption(current);
+      labelEl.textContent = opt ? (opt.short ?? opt.label) : '';
+      labelEl.style.cssText = opt?.previewStyle || '';
+    };
+    // A real accessor property (not a plain field) is what lets `fontSelect.value = x` — the
+    // exact same assignment a native <select> already accepted everywhere this is used — keep
+    // working verbatim on what is now a <button>. Matches native <select> semantics: setting
+    // .value programmatically updates the display but never fires 'change'.
+    Object.defineProperty(trigger, 'value', { get: () => current, set(v) { current = v; renderTrigger(); } });
+
+    const selectOption = opt => {
+      current = opt.value; renderTrigger();
+      trigger.setAttribute('aria-expanded', 'false');
+      window.__notesCloseFloatingPanels?.();
+      trigger.dispatchEvent(new Event('change'));
+    };
+    const open = () => {
+      if (window.__notesReadOnly) return;
+      const activePanel = window.__notesGetActiveFloatingPanel?.();
+      const alreadyOpen = activePanel?.dataset.notesDropdown === key;
+      window.__notesCloseFloatingPanels?.();
+      trigger.setAttribute('aria-expanded', 'false');
+      if (alreadyOpen) return;
+      const panel = document.createElement('div');
+      panel.dataset.notesDropdown = key;
+      panel.className = 'notes-popover notes-dd-menu';
+      panel.style.width = `${menuWidth || width}px`;
+      panel.setAttribute('role', 'listbox'); panel.setAttribute('aria-label', title);
+      panel.addEventListener('click', event => event.stopPropagation());
+      const rows = options.map(opt => {
+        const row = document.createElement('button');
+        row.type = 'button'; row.className = 'notes-dd-option'; row.setAttribute('role', 'option');
+        const isSelected = String(opt.value) === String(current);
+        row.classList.toggle('selected', isSelected);
+        row.setAttribute('aria-selected', String(isSelected));
+        const text = document.createElement('span'); text.className = 'notes-dd-option-label';
+        if (renderOption) renderOption(text, opt); else text.textContent = opt.label;
+        const check = document.createElement('i'); check.className = 'fas fa-check notes-dd-check';
+        row.append(text, check);
+        row.addEventListener('mousedown', event => event.preventDefault());
+        row.addEventListener('click', () => selectOption(opt));
+        panel.append(row);
+        return row;
+      });
+      // Roving keyboard focus across the option list — Up/Down/Home/End move real DOM focus
+      // between option buttons. Enter/Space are handled explicitly here (not left to each
+      // button's own native activation) so selection is driven by one deliberate code path,
+      // the same one the click handler uses. Escape/outside-click/scroll-out are already
+      // handled globally by the shared portal.
+      panel.addEventListener('keydown', event => {
+        const idx = rows.indexOf(document.activeElement);
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); rows[idx]?.click(); return; }
+        if (event.key === 'ArrowDown') { event.preventDefault(); (rows[idx + 1] || rows[0])?.focus(); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); (rows[idx - 1] || rows[rows.length - 1])?.focus(); }
+        else if (event.key === 'Home') { event.preventDefault(); rows[0]?.focus(); }
+        else if (event.key === 'End') { event.preventDefault(); rows[rows.length - 1]?.focus(); }
+      });
+      window.__notesPlaceFloatingPanel?.(panel, trigger);
+      trigger.setAttribute('aria-expanded', 'true');
+      (rows.find(r => r.classList.contains('selected')) || rows[0])?.focus({ preventScroll: true });
+    };
+    trigger.addEventListener('click', event => { event.stopPropagation(); open(); });
+    renderTrigger();
+    insert(trigger, group);
+    return trigger;
   };
 
   /* ── Text / Ink color ── multi-purpose, same as the old plain <input type=color> it
@@ -356,7 +448,11 @@ setTimeout(() => {
      apply path the popover's own preset grid uses; no separate source of truth. */
   const INK_SWATCHES = ['#1a1a1a', '#c0392b', '#e67e22', '#2980b9', '#27ae60', '#8e44ad'];
   const inkPalette = document.createElement('div'); inkPalette.title = 'Quick ink colors'; inkPalette.style.cssText = 'display:flex;gap:3px;align-items:center';
-  INK_SWATCHES.forEach(hex => { const swatch = document.createElement('button'); swatch.type = 'button'; swatch.title = hex; swatch.setAttribute('aria-label', `Ink color ${hex}`); swatch.style.cssText = `width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:${hex};padding:0;cursor:pointer`; swatch.addEventListener('mousedown', event => event.preventDefault()); swatch.addEventListener('click', () => { if (window.__notesReadOnly) return; applyInkColor(hex); inkColorControl.sync(); }); inkPalette.appendChild(swatch); }); insert(inkPalette, 'color');
+  // Quick pen-color picks live with the Drawing tools (Pen/Pencil/Highlighter/Eraser), not the
+  // text Colors group — they're a fast pick for what the pen draws next, not a text-formatting
+  // action. Actually inserted later, right after the ink tool buttons exist (see the explicit
+  // pen-group reorder near activateBrush/eraseAt below), so it lands after them, not before.
+  INK_SWATCHES.forEach(hex => { const swatch = document.createElement('button'); swatch.type = 'button'; swatch.title = hex; swatch.setAttribute('aria-label', `Ink color ${hex}`); swatch.style.cssText = `width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:${hex};padding:0;cursor:pointer`; swatch.addEventListener('mousedown', event => event.preventDefault()); swatch.addEventListener('click', () => { if (window.__notesReadOnly) return; applyInkColor(hex); inkColorControl.sync(); }); inkPalette.appendChild(swatch); }); insert(inkPalette, 'pen');
 
   /* ── Shape / Sticky Note fill color ── reads active.fill/backgroundColor on selection change
      (fixes "the toolbar color and the actual selected shape color do not always match" at its
@@ -461,7 +557,6 @@ setTimeout(() => {
   canvas.on('selection:created', borderColorControl.sync);
   canvas.on('selection:updated', borderColorControl.sync);
   canvas.on('selection:cleared', borderColorControl.sync);
-  const eraserSize = document.createElement('select'); eraserSize.title = 'Eraser size'; [['Small', 10], ['Medium', 22], ['Large', 38]].forEach(([name, value]) => eraserSize.add(new Option(name, value))); eraserSize.style.cssText = 'height:28px;max-width:76px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(eraserSize, 'pen');
   // Regular n-gon helper (radius r, first vertex pointing up) — used for Pentagon/Octagon/Star so
   // vertices are mathematically correct rather than hand-picked (Pentagon was previously lopsided).
   const ngon = (n, r, rotate = 0) => Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + rotate + i * (2 * Math.PI / n); return { x: Math.cos(a) * r, y: Math.sin(a) * r }; });
@@ -699,7 +794,7 @@ setTimeout(() => {
   let selectedShapeName = 'Rectangle';
   const shapePickerBtn = document.createElement('button');
   shapePickerBtn.type = 'button'; shapePickerBtn.title = 'Shape library'; shapePickerBtn.setAttribute('aria-label', 'Shape library');
-  shapePickerBtn.style.cssText = 'width:28px;height:28px;padding:0;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:var(--surface);color:var(--text-1);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center';
+  shapePickerBtn.className = 'notes-swatch-btn';
   shapePickerBtn.textContent = shapeGlyphs[selectedShapeName];
   shapePickerBtn.addEventListener('mousedown', event => event.preventDefault());
   insert(shapePickerBtn, 'shape');
@@ -711,13 +806,14 @@ setTimeout(() => {
     if (alreadyOpen) return;
     const panel = document.createElement('div');
     panel.dataset.notesShapePicker = '1';
+    panel.className = 'notes-popover';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Shape library');
-    panel.style.cssText = 'position:fixed;z-index:1100;width:288px;max-height:400px;overflow-y:auto;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);font-size:.72rem';
+    panel.style.cssText = 'width:288px;max-height:400px;overflow-y:auto';
     panel.addEventListener('click', event => event.stopPropagation());
-    SHAPE_CATEGORIES.forEach((category, i) => {
+    SHAPE_CATEGORIES.forEach(category => {
       const heading = document.createElement('div');
       heading.textContent = category.name;
-      heading.style.cssText = `font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;font-size:.62rem;margin:${i === 0 ? 0 : 12}px 0 6px`;
+      heading.className = 'notes-popover-group-label';
       panel.append(heading);
       const grid = document.createElement('div');
       grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:4px';
@@ -816,9 +912,15 @@ setTimeout(() => {
     'Century Gothic', 'Book Antiqua', 'Palatino Linotype', 'Courier New', 'Lucida Console',
     'Lucida Sans Unicode', 'Impact', 'Comic Sans MS', 'Franklin Gothic Medium', 'Rockwell',
     'Bookman Old Style', 'Gill Sans', 'Copperplate', 'Papyrus', 'Arial Black'];
-  const fontSelect = document.createElement('select'); fontSelect.title = 'Font family';
-  FONTS.forEach(name => { const option = new Option(name, name); option.style.fontFamily = name; fontSelect.add(option); });
-  fontSelect.style.cssText = 'height:28px;max-width:120px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(fontSelect, 'font');
+  // Each option renders in its own font family (live preview, e.g. Google Docs' font menu) —
+  // the trigger face mirrors that too, via previewStyle, so the current selection is instantly
+  // recognizable by its own face, not just its name.
+  const fontSelect = createDropdown({
+    key: 'font', title: 'Font family', ariaLabel: 'Font family', group: 'format', width: 128, menuWidth: 200,
+    value: window.__notesDefaultFont,
+    options: FONTS.map(name => ({ label: name, value: name, previewStyle: `font-family:'${name}'` })),
+    renderOption: (el, opt) => { el.textContent = opt.label; el.style.fontFamily = `'${opt.value}'`; },
+  });
   fontSelect.addEventListener('change', () => { window.__notesDefaultFont = fontSelect.value; updateText({ fontFamily: fontSelect.value }); });
 
   /* Integer size control — free typing, +/-1 steps, valid range only. TEXT SIZE ONLY —
@@ -831,7 +933,7 @@ setTimeout(() => {
   const sizeInput = document.createElement('input'); sizeInput.type = 'number'; sizeInput.min = String(SIZE_MIN); sizeInput.max = String(SIZE_MAX); sizeInput.step = '1'; sizeInput.value = String(window.__notesDefaultSize || 18); sizeInput.setAttribute('aria-label', 'Text size in pixels');
   const sizePlus = document.createElement('button'); sizePlus.type = 'button'; sizePlus.textContent = '+'; sizePlus.setAttribute('aria-label', 'Increase text size');
   const sizeUnit = document.createElement('span'); sizeUnit.className = 'notes-size-unit'; sizeUnit.textContent = 'px';
-  sizeStepper.append(sizeMinus, sizeInput, sizePlus, sizeUnit); insert(sizeStepper, 'font');
+  sizeStepper.append(sizeMinus, sizeInput, sizePlus, sizeUnit); insert(sizeStepper, 'format');
   const applySize = next => {
     if (window.__notesReadOnly) { sizeInput.value = String(window.__notesDefaultSize || 18); return; }
     const value = clampSize(next);
@@ -846,14 +948,20 @@ setTimeout(() => {
   sizeInput.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); applySize(sizeInput.value); } });
   /* Heading presets — reuses the same character-style mechanism as Bold/Italic (no
      block/structural model exists in this plain-text canvas architecture). */
-  const headingSelect = document.createElement('select'); headingSelect.title = 'Heading style';
   const HEADING_SIZES = { h1: 28, h2: 22, h3: 18 };
-  [['Normal', ''], ['Heading 1', 'h1'], ['Heading 2', 'h2'], ['Heading 3', 'h3']].forEach(([name, value]) => headingSelect.add(new Option(name, value)));
-  headingSelect.style.cssText = 'height:28px;max-width:104px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(headingSelect, 'format');
+  const headingSelect = createDropdown({
+    key: 'heading', title: 'Text style', ariaLabel: 'Text style', group: 'format', width: 108, value: '',
+    options: [['Normal', ''], ['Heading 1', 'h1'], ['Heading 2', 'h2'], ['Heading 3', 'h3']].map(([label, value]) => ({ label, value })),
+  });
   headingSelect.addEventListener('change', () => { const level = headingSelect.value; updateText({ fontSize: HEADING_SIZES[level] || window.__notesDefaultSize || 18, fontWeight: level ? 'bold' : 'normal' }); headingSelect.value = ''; });
+  // Style/Font/Size are built in that reading order above but created out of visual order
+  // (font+size exist before this dropdown does) — one explicit reorder here puts the "Text"
+  // section in its intended left-to-right order; Bold/Italic/Underline, created later, simply
+  // append after these three as normal.
+  document.querySelector('[data-group="format"]')?.append(headingSelect, fontSelect, sizeStepper);
   /* STROKE WIDTH — quick preset buttons, one row per ink tool (a highlighter needs a much
      wider range than a pencil), fully separate from text size (window.__notesDefaultSize). */
-  const WIDTH_PRESETS = { pen: [1, 2, 6, 12, 22], pencil: [1, 2, 4, 7], highlighter: [10, 18, 26, 36] };
+  const WIDTH_PRESETS = { pen: [1, 2, 6, 12, 22], pencil: [1, 2, 4, 7], highlighter: [10, 18, 26, 36], eraser: [10, 22, 38] };
   const widthRow = document.createElement('div'); widthRow.className = 'notes-width-row'; widthRow.title = 'Stroke width'; insert(widthRow, 'pen');
   const currentInkSize = () => window.__notesInkSizes[window.__notesInkTool] ?? 6;
   const setInkSize = value => {
@@ -867,15 +975,11 @@ setTimeout(() => {
   function refreshWidthButtons() {
     const presets = WIDTH_PRESETS[window.__notesInkTool] || WIDTH_PRESETS.pen;
     widthRow.innerHTML = '';
-    // ROOT CAUSE of "the toolbar jumps when the Eraser is selected": `widthRow.hidden = true` sets
-    // display:none, which pulls the whole control OUT of the toolbar's flex layout — every group
-    // after it (shape/other) then slides left/up to fill the gap. The Eraser has its own size
-    // control (eraserSize, the Small/Medium/Large <select> above) so the pen/pencil width presets
-    // genuinely aren't applicable here — but "not applicable" only needs to mean *inert*, not
-    // *gone*: visibility:hidden keeps the row's box (and therefore every later group's position)
-    // exactly where it always is, while still making the now-irrelevant preset dots unclickable.
-    widthRow.style.visibility = window.__notesInkTool === 'eraser' ? 'hidden' : '';
-    widthRow.style.pointerEvents = window.__notesInkTool === 'eraser' ? 'none' : '';
+    // This row is the ONE size control for every ink tool, Eraser included — it always stays
+    // visible and just re-renders with that tool's own preset values (WIDTH_PRESETS/
+    // __notesInkSizes both carry an 'eraser' entry), so switching tools never hides or replaces
+    // it with a different control.
+    widthRow.title = window.__notesInkTool === 'highlighter' ? 'Highlighter size' : window.__notesInkTool === 'eraser' ? 'Eraser size' : 'Stroke size';
     const active = currentInkSize();
     presets.forEach(value => {
       const dotBtn = document.createElement('button'); dotBtn.type = 'button'; dotBtn.title = `${value}px`; dotBtn.className = 'notes-width-btn';
@@ -979,7 +1083,7 @@ setTimeout(() => {
     refreshWidthButtons();
   };
   const eraseAt = pointer => {
-    const radius = Number(eraserSize.value) / 2;
+    const radius = currentInkSize() / 2;
     canvas.getObjects().filter(object => object.objectType === 'drawing').filter(object => {
       const box = object.getBoundingRect(true, true); const nearestX = Math.max(box.left, Math.min(pointer.x, box.left + box.width)); const nearestY = Math.max(box.top, Math.min(pointer.y, box.top + box.height)); return (pointer.x - nearestX) ** 2 + (pointer.y - nearestY) ** 2 <= radius ** 2;
     }).forEach(object => canvas.remove(object));
@@ -1342,15 +1446,16 @@ setTimeout(() => {
     italic: button('Italic selected text', 'fas fa-italic', () => { const text = selectedText(); if (text) updateText({ fontStyle: selectionHasFormat(text, 'fontStyle', 'italic') ? 'normal' : 'italic' }); }, 'format'),
     underline: button('Underline selected text', 'fas fa-underline', () => { const text = selectedText(); if (text) updateText({ underline: !selectionHasFormat(text, 'underline', true) }); }, 'format'),
   };
-  const bulletStyle = document.createElement('select'); bulletStyle.title = 'Bullet style';
-  [['•', '• '], ['◦', '◦ '], ['▪', '▪ '], ['–', '– '], ['✔', '✔ ']].forEach(([label, value]) => bulletStyle.add(new Option(label, value)));
-  bulletStyle.style.cssText = 'height:28px;max-width:44px;background:var(--surface);color:var(--text-1);border:1px solid var(--border);border-radius:7px'; insert(bulletStyle, 'format');
-  button('Bullet list', 'fas fa-list-ul', () => toggleLinePrefix(bulletStyle.value), 'format');
-  button('Numbered list', 'fas fa-list-ol', () => toggleLinePrefix('1. '), 'format');
-  button('Align left', 'fas fa-align-left', () => updateText({ textAlign: 'left' }), 'format');
-  button('Center text', 'fas fa-align-center', () => updateText({ textAlign: 'center' }), 'format');
-  button('Align right', 'fas fa-align-right', () => updateText({ textAlign: 'right' }), 'format');
-  button('Justify text', 'fas fa-align-justify', () => updateText({ textAlign: 'justify' }), 'format');
+  const bulletStyle = createDropdown({
+    key: 'bulletStyle', title: 'Bullet style', ariaLabel: 'Bullet style', group: 'paragraph', width: 52, value: '• ',
+    options: [['•', '• '], ['◦', '◦ '], ['▪', '▪ '], ['–', '– '], ['✔', '✔ ']].map(([label, value]) => ({ label, value })),
+  });
+  button('Bullet list', 'fas fa-list-ul', () => toggleLinePrefix(bulletStyle.value), 'paragraph');
+  button('Numbered list', 'fas fa-list-ol', () => toggleLinePrefix('1. '), 'paragraph');
+  button('Align left', 'fas fa-align-left', () => updateText({ textAlign: 'left' }), 'paragraph');
+  button('Center text', 'fas fa-align-center', () => updateText({ textAlign: 'center' }), 'paragraph');
+  button('Align right', 'fas fa-align-right', () => updateText({ textAlign: 'right' }), 'paragraph');
+  button('Justify text', 'fas fa-align-justify', () => updateText({ textAlign: 'justify' }), 'paragraph');
   button('Highlight selected text', 'fas fa-highlighter', applyHighlight, 'color');
   inkButtons = {
     pen: button('Pen', 'fas fa-pen', () => activateBrush('pen'), 'pen'),
@@ -1363,11 +1468,20 @@ setTimeout(() => {
     highlighter: button('Highlighter pen (draws over handwriting/drawings)', 'fas fa-marker', () => activateBrush('highlighter'), 'pen'),
     eraser: button('Eraser', 'fas fa-eraser', activateEraser, 'pen'),
   };
+  // The Drawing group's pieces are built at different points above (widthRow exists long
+  // before the tool buttons themselves do) — reorder once, now that everything in this group
+  // exists, into the intended left-to-right reading order: tool buttons, then
+  // whichever size control applies, then the quick color picks.
+  document.querySelector('[data-group="pen"]')?.append(inkButtons.pen, inkButtons.pencil, inkButtons.highlighter, inkButtons.eraser, widthRow, inkPalette);
   // Select is the true active tool at load (see the static "select" data-tool button in
   // editor.html) — no ink tool is actually engaged yet, so none of these show as active
   // until the user picks one. Only the width row needs an initial render.
   refreshWidthButtons();
   shapeButton = button('Draw shape (click-drag on canvas)', 'far fa-square', beginShapePlacement, 'shape');
+  // Shapes group reading order: pick a shape, draw it, then its Fill/Border/Width — the pieces
+  // are built in a different order above (Fill/Border exist before the shape picker does), so
+  // reorder once now that the whole group exists.
+  document.querySelector('[data-group="shape"]')?.append(shapePickerBtn, shapeButton, fillColorControl.button, borderColorControl.button, arrowHeadStepper, headsToggleBtn);
   // Text/ink, Highlight, and Fill/background colors' own apply paths (applyInkColor,
   // applyHighlightColor, applyShapeFillColor) and their selection-sync (…Control.sync) are all
   // wired up above, right where each swatch button/popover is built — see the "COLOR PICKER

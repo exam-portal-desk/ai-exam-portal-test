@@ -72,6 +72,48 @@ def safe_int(value, default: int = 0) -> int:
         return default
 
 
+# ─────────────────────────────────────────────
+# Name splitting for the Profile "Edit Name" form
+# ─────────────────────────────────────────────
+# users.full_name is one stored column (see database/full_database_clone.sql) — there is no first_name/last_name in the
+# schema, and registration already builds full_name the same way (`f"{first_name} {last_name}".strip()`, app/routes/web/
+# auth.py). Editing keeps that one column as the source of truth; these two functions are its only split/join point, used
+# by both portals' profile routes (to pre-fill the form) and by the profile API (to turn the form back into one string).
+MAX_NAME_PART_LENGTH = 60
+_NAME_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def split_full_name(full_name) -> tuple:
+    """One stored name -> (first, last) for pre-filling the edit form. Splits on the FIRST space only, so "Mary Jane
+    Watson" is ("Mary", "Jane Watson") and a single-word name like "Cher" is ("Cher", "") — never forced to have a last
+    name. Missing/blank input is ("", "")."""
+    text = str(full_name or "").strip()
+    if not text:
+        return "", ""
+    first, _, rest = text.partition(" ")
+    return first, rest.strip()
+
+
+def join_full_name(first_name, last_name) -> str:
+    """The inverse of split_full_name: one storable string. A blank last name keeps a single-word name single-word
+    (never "Cher " with a trailing space)."""
+    first_name, last_name = str(first_name or "").strip(), str(last_name or "").strip()
+    return f"{first_name} {last_name}" if last_name else first_name
+
+
+def validate_name_part(value, label: str, *, required: bool) -> "str | None":
+    """None when `value` is acceptable for a Profile name field, otherwise the message to show. Length and control-
+    character checks only — real names legitimately contain almost any script, punctuation or accents."""
+    text = str(value or "").strip()
+    if not text:
+        return f"{label} is required." if required else None
+    if len(text) > MAX_NAME_PART_LENGTH:
+        return f"{label} must be at most {MAX_NAME_PART_LENGTH} characters."
+    if _NAME_CONTROL_CHARS_RE.search(text):
+        return f"{label} contains characters that aren't allowed."
+    return None
+
+
 def generate_username(full_name: str, existing_usernames: set) -> str:
     """
     Generate a unique username in FirstName.LastName format.

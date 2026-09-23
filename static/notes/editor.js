@@ -1,3 +1,5 @@
+import { createExportProgress, exportNotebookAsPdf, exportNotebookAsJson, withExportSafeImageSrc } from './notebook-export.js';
+
 const root = document.getElementById('noteEditor');
 const notebookId = root.dataset.notebookId;
 // True for a currently-public notebook viewed read-only, AND for a
@@ -604,128 +606,30 @@ document.addEventListener('fullscreenchange', handleFullscreenChange);
 document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && root.classList.contains('fs-fallback')) applyFallbackFullscreen(false); });
 
-/* On-button export progress — shared by the PDF and JSON export buttons below.
-   A tick loop that only ever moves the shown percentage up by exactly 1 point at a time, and
-   never past `target`. `advance()` raises `target` as real work actually completes (bytes
-   received, pages rendered, server round-trip settled), so the bar is always chasing genuine
-   progress instead of running to 100% on an independent clock: if real progress stalls, the
-   shown percentage stalls with it instead of faking movement. `complete()` raises the target to
-   100 and resolves once the tick loop has visibly caught up to it, so callers can await the
-   on-screen "100%" before triggering the download/toast. */
-function createExportProgress(btn, label) {
-  let pct = 0, target = 0, timer = null, doneResolvers = [];
-  const render = () => { btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${label} ${pct}%`; };
-  function tick() {
-    if (pct >= target) return;
-    pct += 1; render();
-    if (pct >= 100) { doneResolvers.forEach(resolve => resolve()); doneResolvers = []; }
-  }
-  return {
-    start() { pct = 0; target = 0; render(); timer = setInterval(tick, 15); },
-    advance(value) { target = Math.max(target, Math.min(99, Math.round(value))); },
-    complete() { target = 100; return pct >= 100 ? Promise.resolve() : new Promise(resolve => doneResolvers.push(resolve)); },
-    stop() { if (timer) clearInterval(timer); timer = null; },
-  };
-}
-
 /* Export the notebook as JSON — same owner/public export route this button always used (see
    apiBase declaration at the top of this file; same JSON shape/endpoint pattern notebooks.js
-   uses for the "My Notes" list's Export JSON action), just fetched instead of navigated to so
-   the download can be held back until the response is actually fully in hand, with real
-   progress along the way when the server reports a Content-Length. */
-async function exportNotebookJson() {
-  const btn = document.getElementById('exportJsonBtn');
-  if (!btn || btn.disabled) return;
-  const originalHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.classList.add('exporting');
-  const progress = createExportProgress(btn, 'Exporting JSON');
-  progress.start();
-  try {
-    const exportUrl = `${apiBase}/${notebookId}/export`;
-    const res = await fetch(exportUrl, { credentials: 'same-origin' });
-    if (!res.ok) {
-      let message; try { message = (await res.json()).message; } catch (e) {}
-      throw new Error(message || 'Unable to export this notebook.');
-    }
-    // Body is only read here to drive real byte progress off Content-Length — the bytes
-    // themselves aren't kept. The actual download is triggered below through the same
-    // endpoint's Content-Disposition header instead of a client-side Blob, because a blob:
-    // URL carries no Content-Disposition of its own: it made the browser open/display the
-    // JSON in a tab rather than download it, the exact failure mode the PDF export's own
-    // hidden-iframe handoff (further down this file) already exists to avoid.
-    const total = Number(res.headers.get('Content-Length')) || 0;
-    const reader = res.body?.getReader();
-    let received = 0;
-    if (reader) {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        received += value.length;
-        if (total > 0) progress.advance((received / total) * 99);
-      }
-    } else {
-      await res.arrayBuffer();
-    }
-    await progress.complete();
-    let jsonFrame = document.getElementById('notesJsonExportFrame');
-    if (!jsonFrame) { jsonFrame = document.createElement('iframe'); jsonFrame.name = jsonFrame.id = 'notesJsonExportFrame'; jsonFrame.style.display = 'none'; document.body.appendChild(jsonFrame); }
-    // Cache-bust so re-exporting immediately after a previous one still reassigns a distinct
-    // src — browsers don't reload an iframe whose src is set to the exact same string it
-    // already has. The server ignores unknown query params, so this doesn't affect the export.
-    jsonFrame.src = `${exportUrl}${exportUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
-    toast('Notebook exported as JSON.');
-  } catch (error) {
-    toast(error.message || 'Unable to export this notebook.', 'error');
-  } finally {
-    progress.stop();
-    btn.disabled = false;
-    btn.classList.remove('exporting');
-    btn.innerHTML = originalHTML;
-  }
-}
-document.getElementById('exportJsonBtn')?.addEventListener('click', exportNotebookJson);
+   uses for the "My Notes" list's Export JSON action, and the exact same shared implementation
+   — see static/notes/notebook-export.js — so there's one export engine, not three). */
+document.getElementById('exportJsonBtn')?.addEventListener('click', () => exportNotebookAsJson({
+  notebookId, btn: document.getElementById('exportJsonBtn'), toast,
+  exportUrl: id => `${apiBase}/${id}/export`,
+}));
 
 document.getElementById('readModeBtn')?.addEventListener('click', () => setMode(currentMode === 'edit' ? 'read' : 'edit'));
 document.getElementById('fullscreenBtn')?.addEventListener('click', toggleFullscreen);
 document.getElementById('toolbarToggleBtn')?.addEventListener('click', () => { if (currentMode === 'read') return; setToolbarVisible(!toolbarVisible); });
 
-/* Export whole notebook as PDF — renders each page's objects (only the objects — see below) to
-   a PNG on a private off-screen StaticCanvas, never touching the live canvas/objects, then posts
-   the images to the server to be assembled into one multi-page PDF by the existing ReportLab-
-   based pdf_service (build_notebook_pdf) — reusing that service rather than re-implementing PDF
-   generation, while getting pixel-accurate content fidelity for free since Fabric itself does
-   the rendering. Every page is re-serialized via toObject(NOTES_PROPS) + enlivenObjects (the
-   same round-trip already used by save/undo), so this can't corrupt or leak live object
-   instances into another canvas.
-   Every page's export canvas is exactly PAGE_WIDTH x PAGE_HEIGHT (declared further up this
-   file) — the notebook's one canonical, fixed page size. This is a plain capture, not a fit: the
-   editor itself now enforces that fixed geometry (see constrainObjectToPage), so a page's
-   content can never actually exceed these bounds by the time it gets here — export doesn't need
-   to inspect content, compute a bounding box, or invent any page size of its own; it just
-   mirrors the one source of truth. Objects are exported at their real, unshifted notebook
-   coordinates, so every PDF page ends up the same fixed size with content at its true notebook
-   position/scale.
-   The dot-grid page background is deliberately NOT drawn into this raster — it's reproduced
-   once server-side as a reusable PDF vector resource (pdf_service.build_notebook_pdf) instead,
-   both because it's the "proper" way to represent a repeating vector pattern in a PDF, and
-   because baking a full-page dot pattern into every page's raster was the dominant cost behind
-   an oversized export: a mostly-transparent content-only PNG compresses far better than one
-   with a fine dot pattern covering the whole page. Only that live theme's colors need to travel
-   to the server (gridTheme below), so the PDF background still matches what was on screen. */
-// ROOT CAUSE of PDF export failing with "Tainted canvases may not be exported" whenever a page
-// has images: the export canvas below calls toDataURL(), which the browser refuses the instant
-// the canvas has ever drawn a cross-origin image — and this app's cloud storage backend hands
-// out direct signed URLs on the STORAGE PROVIDER'S OWN domain (not this app's), which is exactly
-// that cross-origin case, regardless of what CORS policy that bucket does or doesn't have.
-// Swapping each image's `src` to this app's own same-origin asset-file endpoint (see
-// asset_file_api in app/routes/notes.py — it streams the real bytes from whichever storage
-// backend is configured) removes the cross-origin condition entirely before the export canvas
-// ever loads the image, so it can never taint. Scoped to export prep only — the live canvas
-// keeps loading images from their normal (fast, freshly-signed) URLs everywhere else.
-function withExportSafeImageSrc(raw) {
-  return raw.map(entry => (entry.type === 'image' && entry.assetId) ? { ...entry, src: `/api/v01/assets/${entry.assetId}/file` } : entry);
-}
+/* Export whole notebook as PDF — same shared engine as My Notebooks/Public Library use (see
+   static/notes/notebook-export.js: one PDF export implementation, not three), just supplying
+   its own `loadPages` instead of the fetch-based default, since the editor already has every
+   page's objects in memory (the live canvas for the active page, a cache for others visited
+   this session, or one more request only for a page neither of those covers — see
+   getPageObjectsForExport below) and gains nothing from the bulk export-data route the other
+   two callers use. Rendering itself (each page's objects onto a private off-screen StaticCanvas,
+   assembled server-side by the existing ReportLab pdf_service) is unchanged — see that shared
+   module for why the dot-grid background is reproduced as a PDF vector resource instead of
+   being part of this raster, and why each image's `src` is rewritten to a same-origin URL
+   before this canvas ever loads it (a tainted canvas can't be exported). */
 async function getPageObjectsForExport(pageId) {
   if (pageId === activePageId) return withExportSafeImageSrc(canvas.getObjects().map(o => o.toObject(NOTES_PROPS)));
   const cached = pageObjectsCache.get(pageId);
@@ -733,106 +637,22 @@ async function getPageObjectsForExport(pageId) {
   const data = await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`);
   return withExportSafeImageSrc(data.objects.map(buildRawFabricEntry));
 }
-async function exportNotebookPdf() {
+document.getElementById('exportPdfBtn')?.addEventListener('click', () => {
   if (!pageCache.length) { toast('No pages to export.', 'error'); return; }
-  const btn = document.getElementById('exportPdfBtn');
-  if (!btn || btn.disabled) return;
-  const originalIcon = btn.innerHTML;
-  btn.disabled = true;
-  btn.classList.add('exporting');
-  const progress = createExportProgress(btn, 'Exporting PDF');
-  progress.start();
-  const offEl = document.createElement('canvas');
-  const offCanvas = new fabric.StaticCanvas(offEl, { renderOnAddRemove: false });
   // Raw --bg/--border custom-property text (may be '#rrggbb' or 'rgba(...)' depending on the
   // active theme — see theme.css) forwarded as-is; pdf_service parses either form server-side.
   const shellStyle = getComputedStyle(document.getElementById('canvasShell'));
-  const gridTheme = {
-    bg: shellStyle.getPropertyValue('--bg').trim(),
-    dot: shellStyle.getPropertyValue('--border').trim(),
-  };
-  try {
-    const rendered = [];
-    const totalPages = pageCache.length;
-    for (let i = 0; i < totalPages; i++) {
-      const page = pageCache[i];
-      const raw = await getPageObjectsForExport(page.id);
-      const objects = await new Promise((resolve, reject) => {
-        const result = fabric.util.enlivenObjects(raw, resolve);
-        if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
-      });
-      offCanvas.clear();
-      offCanvas.setDimensions({ width: PAGE_WIDTH, height: PAGE_HEIGHT });
-      // constrainObjectToPage here (not just live in the editor) is what keeps a page saved
-      // before this fixed-page architecture existed from exporting with clipped content the
-      // very first time it's exported without having been opened in the editor since — same
-      // safety net as object:added, applied here because this off-screen canvas is separate
-      // from the live one and never fires that event.
-      objects.forEach(o => { constrainObjectToPage(o); offCanvas.add(o); });
-      offCanvas.renderAll();
-      const image = offCanvas.toDataURL({ format: 'png', multiplier: 2 });
-      rendered.push({ title: page.title, image });
-      // Re-rasterizing every page's objects is the dominant, genuinely measurable cost of this
-      // export, so it drives the first 90% of the bar in direct proportion to pages actually
-      // rendered — not an arbitrary schedule.
-      progress.advance(((i + 1) / totalPages) * 90);
-    }
-    // Submitted as a real HTML form POST (into a hidden iframe) instead of fetch+Blob+
-    // createObjectURL — that path made Chrome open the PDF through a blob: URL, whose
-    // download could fail with "network error". A native form submission lets the browser
-    // handle the response as a direct file download itself, driven by the server's
-    // Content-Disposition header, with no blob: URL involved at any point.
-    let frame = document.getElementById('notesPdfExportFrame');
-    if (!frame) { frame = document.createElement('iframe'); frame.name = frame.id = 'notesPdfExportFrame'; frame.style.display = 'none'; document.body.appendChild(frame); }
-    const form = document.createElement('form');
+  const gridTheme = { bg: shellStyle.getPropertyValue('--bg').trim(), dot: shellStyle.getPropertyValue('--border').trim() };
+  exportNotebookAsPdf({
+    notebookId, btn: document.getElementById('exportPdfBtn'), toast, gridTheme,
+    loadPages: async () => Promise.all(pageCache.map(async page => ({ id: page.id, title: page.title, objects: await getPageObjectsForExport(page.id) }))),
     // Always the owner-path endpoint (not `apiBase`, which is /api/v01/library for a public
     // viewer) — there is exactly one export-pdf route/service; export_notebook_pdf_api accepts
     // either an owned or a currently-public notebook, so the public viewer reuses it as-is
     // instead of a second export implementation.
-    form.method = 'POST'; form.action = `/api/v01/notebooks/${notebookId}/export-pdf`; form.target = 'notesPdfExportFrame'; form.style.display = 'none';
-    const input = document.createElement('input');
-    input.type = 'hidden'; input.name = 'pages'; input.value = JSON.stringify(rendered);
-    form.appendChild(input);
-    const themeInput = document.createElement('input');
-    themeInput.type = 'hidden'; themeInput.name = 'gridTheme'; themeInput.value = JSON.stringify(gridTheme);
-    form.appendChild(themeInput);
-    // A successful download (Content-Disposition: attachment) never navigates the iframe, so
-    // no 'load' fires for it; an error response (JSON) does navigate it, and — being
-    // same-origin — its body is readable here, letting a real failure surface instead of
-    // always claiming success. This is the only completion signal this download mechanism
-    // gives back, so it's also what the progress bar's last stretch (91-99%) is paced against
-    // below, instead of racing to 100% on its own.
-    let settled = false;
-    let resolveSettle;
-    const settlePromise = new Promise(resolve => { resolveSettle = resolve; });
-    const settle = (ok, message) => { if (settled) return; settled = true; resolveSettle({ ok, message }); };
-    frame.onload = () => {
-      let text = ''; try { text = frame.contentDocument?.body?.innerText || ''; } catch (e) {}
-      if (text.trim()) { let message; try { message = JSON.parse(text).message; } catch (e) {} settle(false, message); }
-    };
-    document.body.append(form); form.submit(); form.remove();
-    const waitStart = Date.now();
-    const waitMs = 1200;
-    const waitTimer = setInterval(() => {
-      progress.advance(90 + Math.min(1, (Date.now() - waitStart) / waitMs) * 9);
-    }, 80);
-    setTimeout(() => settle(true), waitMs);
-    const result = await settlePromise;
-    clearInterval(waitTimer);
-    if (!result.ok) throw new Error(result.message || 'Unable to export this notebook.');
-    await progress.complete();
-    toast('Notebook exported as PDF.');
-  } catch (error) {
-    toast(error.message || 'Unable to export this notebook.', 'error');
-  } finally {
-    offCanvas.dispose();
-    progress.stop();
-    btn.disabled = false;
-    btn.classList.remove('exporting');
-    btn.innerHTML = originalIcon;
-  }
-}
-document.getElementById('exportPdfBtn')?.addEventListener('click', exportNotebookPdf);
+    exportPdfUrl: id => `/api/v01/notebooks/${id}/export-pdf`,
+  });
+});
 
 /* Pages sidebar — collapsible, independent of Mode/Screen/Toolbar state. Never destroys or
    recreates the Fabric canvas; just frees horizontal space and lets the existing resize()
@@ -1183,6 +1003,69 @@ function placeFloatingPanel(panel, trigger) {
 window.__notesPlaceFloatingPanel = placeFloatingPanel;
 window.__notesCloseFloatingPanels = closePageMenus;
 window.__notesGetActiveFloatingPanel = () => pageMenuPortal;
+
+/* ══════════════════════════════════════════════════════════════════════════════════
+   TOOLBAR TOOLTIPS — reuses the exact #sb-tooltip element/styles/show-hide behavior the
+   Admin/User sidebar already defines in base.html (same look, same theme, same fade), instead
+   of a second tooltip system. Only the position math differs (below/above a horizontal toolbar
+   button, not beside a vertical sidebar item) since the trigger layout is different. Delegated
+   on `root` so every existing `title="..."` across the header/object toolbar gets this for
+   free, with no per-button changes. */
+let tooltipTimer = null, tooltipTarget = null;
+function upgradeTipSource(el) {
+  if (!el.hasAttribute('title')) return;
+  const text = el.getAttribute('title').trim();
+  el.removeAttribute('title'); // the one thing that actually suppresses the native tooltip
+  if (text) el.dataset.tip = text;
+  else delete el.dataset.tip;
+  if (text && !el.hasAttribute('aria-label') && !el.getAttribute('aria-labelledby')) el.setAttribute('aria-label', text);
+}
+function showTooltip(el) {
+  const tip = document.getElementById('sb-tooltip');
+  if (!tip || !el.dataset.tip) return;
+  tip.classList.remove('rich');
+  tip.textContent = el.dataset.tip;
+  const rect = el.getBoundingClientRect(); const margin = 8;
+  tip.style.left = '0px'; tip.style.top = '0px';
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - tw / 2, window.innerWidth - tw - margin));
+  const above = rect.top - th - 8;
+  const top = above >= margin ? above : rect.bottom + 8;
+  tip.style.left = `${left}px`; tip.style.top = `${top}px`;
+  clearTimeout(tooltipTimer);
+  tip.classList.add('show');
+  tooltipTarget = el;
+}
+function hideTooltip() {
+  clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(() => { document.getElementById('sb-tooltip')?.classList.remove('show'); tooltipTarget = null; }, 80);
+}
+const TOOLTIP_DELAY = 400;
+function scheduleTooltip(el) {
+  clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(() => showTooltip(el), TOOLTIP_DELAY);
+}
+root.addEventListener('mouseover', event => {
+  const el = event.target.closest?.('[title],[data-tip]');
+  if (!el || !root.contains(el)) return;
+  upgradeTipSource(el);
+  scheduleTooltip(el);
+});
+root.addEventListener('mouseout', event => {
+  const el = event.target.closest?.('[data-tip]');
+  if (el && tooltipTarget === el) hideTooltip(); else clearTimeout(tooltipTimer);
+});
+root.addEventListener('focusin', event => {
+  const el = event.target.closest?.('[title],[data-tip]');
+  if (!el) return;
+  upgradeTipSource(el);
+  if (el.dataset.tip) showTooltip(el); // instant on keyboard focus — no hover delay to wait out
+});
+root.addEventListener('focusout', event => { const el = event.target.closest?.('[data-tip]'); if (el && tooltipTarget === el) hideTooltip(); });
+root.addEventListener('mousedown', hideTooltip);
+window.addEventListener('scroll', hideTooltip, true);
+window.addEventListener('resize', hideTooltip);
+
 function openPageMenu(page, titleElement, trigger) {
   if (currentMode === 'read') return;
   closePageMenus();
@@ -1533,10 +1416,6 @@ if (!isReadOnly) {
   const manualSaveButton = document.createElement('button'); manualSaveButton.type = 'button'; manualSaveButton.id = 'manualSaveBtn'; manualSaveButton.title = 'Save changes'; manualSaveButton.innerHTML = '<i class="fas fa-save"></i>'; manualSaveButton.addEventListener('click', () => { if (currentMode === 'read') return; save(); }); document.querySelector('[data-group="other"]').append(manualSaveButton);
   const autoSaveLabel = document.createElement('label'); autoSaveLabel.className = 'notes-auto-save'; autoSaveLabel.innerHTML = 'Auto Save <input type="checkbox" aria-label="Auto Save"><span></span>'; const autoSaveToggle = autoSaveLabel.querySelector('input'); autoSaveToggle.checked = autoSaveEnabled; autoSaveToggle.addEventListener('change', () => { if (currentMode === 'read') { autoSaveToggle.checked = autoSaveEnabled; return; } autoSaveEnabled = autoSaveToggle.checked; if (autoSaveEnabled && dirty) { clearTimeout(saveTimer); saveTimer = setTimeout(save, 1400); } }); document.querySelector('[data-group="other"]').append(autoSaveLabel);
 }
-const paletteColors = ['#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#d9d9d9', '#efefef', '#ffffff', '#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff', '#e06666', '#f6b26b', '#93c47d', '#76a5af'];
-const palette = document.createElement('div'); palette.className = 'notes-color-palette'; palette.title = 'Text color presets'; palette.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;max-width:150px;padding:2px 4px;align-items:center';
-paletteColors.forEach(hex => { const swatch = document.createElement('button'); swatch.type = 'button'; swatch.title = hex; swatch.setAttribute('aria-label', `Text color ${hex}`); swatch.style.cssText = `width:15px;height:15px;border-radius:3px;border:1px solid var(--border);background:${hex};padding:0;cursor:pointer`; swatch.addEventListener('click', () => applyTextColor(hex)); palette.appendChild(swatch); });
-document.querySelector('[data-group="color"]').append(palette);
 document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', async () => { if (currentMode === 'read') return; const t = b.dataset.tool; setTool(t); if (t === 'text') { activeTool='text'; } if (t === 'sticky') await createEditableText({ left: 180, top: 150, fontSize: window.__notesDefaultSize || 18, fill: token('--warning-text'), backgroundColor: window.__notesStickyBgColor || token('--warning-bg'), padding: 14, themeSticky: true }, 'sticky_note'); if (t === 'image') document.getElementById('imageInput').click(); }));
 document.getElementById('deleteObjectBtn').addEventListener('click', () => { if (currentMode === 'read') return; const selected = canvas.getActiveObjects(); if (!selected.length) return; selected.forEach(object => { const pairedId = object.shapeTextId || object.shapeTextFor; const paired = pairedId && canvas.getObjects().find(candidate => candidate.objectId === pairedId || candidate.objectId === object.shapeTextFor); canvas.remove(object); if (paired && paired !== object) canvas.remove(paired); }); canvas.discardActiveObject(); canvas.requestRenderAll(); });
 async function uploadImageFile(file) {

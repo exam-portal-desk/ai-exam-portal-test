@@ -9,6 +9,7 @@ from app.routes.web.admin import admin_bp
 from app.middleware.session_guard import require_admin_role
 from app.db.users import get_user_profile_by_id
 from app.services.image_storage_service import resolve_profile_photo_url
+from app.utils.helpers import split_full_name
 import app.config as config
 
 
@@ -24,8 +25,10 @@ def profile():
         last_login_display = session["last_login_display"]
     else:
         last_login_display = user.get("last_login")
+    first_name, last_name = split_full_name(user.get("full_name"))
     return render_template(
         "admin/profile.html", profile=user, photo_url=photo_url,
         max_photo_kb=config.MAX_PROFILE_PHOTO_SIZE_KB,
         last_login_display=last_login_display,
+        first_name=first_name, last_name=last_name,
     )
