@@ -24,11 +24,10 @@ async function handleLikeOrBookmark(button,group){
    no live canvas/page cache to reuse directly (a card is just metadata, not an open notebook),
    so this reads every page's objects from the same one export-data route My Notebooks uses —
    it already accepts a currently-public notebook the same way export-pdf does. */
-function exportLibraryNotebookPdf(notebookId, btn) {
+function exportLibraryNotebookPdf(notebookId, notebookTitle, btn) {
   return exportNotebookAsPdf({
-    notebookId, btn, toast,
+    notebookId, notebookTitle, btn, toast,
     loadPages: loadPagesFromExportDataUrl(`/api/v01/notebooks/${notebookId}/export-data`),
-    exportPdfUrl: id => `/api/v01/notebooks/${id}/export-pdf`,
   });
 }
 function exportLibraryNotebookJson(notebookId, btn) {
@@ -47,7 +46,11 @@ libraryGrid?.addEventListener('click', event => {
   if (!group) return;
   const action = button.dataset.action, id = group.dataset.id;
   if (action === 'like' || action === 'bookmark') { handleLikeOrBookmark(button, group); return; }
-  if (action === 'export-pdf') { exportLibraryNotebookPdf(id, button); return; }
+  if (action === 'export-pdf') {
+    const title = group.closest('.notebook-card')?.querySelector('h2')?.textContent || '';
+    exportLibraryNotebookPdf(id, title, button);
+    return;
+  }
   if (action === 'export-json') { exportLibraryNotebookJson(id, button); return; }
 });
 

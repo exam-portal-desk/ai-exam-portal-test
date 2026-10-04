@@ -102,6 +102,31 @@ def create_category(data: Dict) -> Optional[Dict]:
         return None
 
 
+def get_category_by_name(name: str) -> Optional[Dict]:
+    """Case-insensitive, whitespace-trimmed match — used by get_or_create_category so an
+    import doesn't create a near-duplicate ("Physics" vs "physics ") of a category that
+    already exists in a different case or with incidental padding."""
+    try:
+        return fetch_one("SELECT * FROM categories WHERE lower(trim(name)) = lower(trim(%s))", (name,))
+    except Exception as e:
+        print(f"[db.categories] get_category_by_name error: {e}")
+        return None
+
+
+def get_or_create_category(name: str) -> Optional[Dict]:
+    """Used by exam import (app/services/exam_export_service.py): a category named in the
+    import file that doesn't already exist (by the same case-insensitive match) is created on
+    the fly rather than blocking the import or requiring a manual mapping step — see that
+    module's own docstring for the reasoning."""
+    name = (name or "").strip()
+    if not name:
+        return None
+    existing = get_category_by_name(name)
+    if existing:
+        return existing
+    return create_category({"name": name})
+
+
 def update_category(cat_id: int, updates: Dict) -> bool:
     try:
         sc, params = set_clause(updates)

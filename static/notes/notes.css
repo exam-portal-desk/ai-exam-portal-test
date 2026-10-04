@@ -97,6 +97,34 @@
 .share-list{display:grid;gap:.4rem}
 .share-row{display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;background:var(--surface-2);border-radius:var(--radius);font-size:.78rem}
 .share-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-1);font-weight:600}
-.share-row select{flex-shrink:0;height:30px;padding:0 .4rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text-1);font:inherit;font-size:.72rem}
 .share-row-remove{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;background:transparent;color:var(--text-3);border-radius:7px;cursor:pointer}
 .share-row-remove:hover{background:var(--danger-bg);color:var(--danger-text)}
+
+/* Custom permission dropdown — replaces a native <select> so the open menu
+   matches the app's own styling instead of the browser's raw OS chrome
+   (same visual language as .share-search-result above). */
+.share-perm{position:relative;flex-shrink:0}
+.share-perm-btn{display:flex;align-items:center;gap:.4rem;height:30px;padding:0 .55rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text-1);font:inherit;font-size:.72rem;font-weight:600;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.share-perm-btn:hover{border-color:var(--accent)}
+.share-perm.open .share-perm-btn,.share-perm-btn:focus-visible{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-subtle);outline:none}
+.share-perm-btn i{font-size:.6rem;color:var(--text-3);transition:transform .15s}
+.share-perm.open .share-perm-btn i{transform:rotate(180deg)}
+.share-perm-menu{position:absolute;right:0;top:calc(100% + .3rem);z-index:20;min-width:112px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:.25rem}
+.share-perm-option{display:flex;align-items:center;justify-content:space-between;gap:.5rem;width:100%;padding:.42rem .55rem;border:0;background:transparent;border-radius:7px;color:var(--text-1);font:inherit;font-size:.75rem;text-align:left;cursor:pointer}
+.share-perm-option:hover{background:var(--surface-2)}
+.share-perm-option.active{color:var(--accent);font-weight:600}
+.share-perm-option i{font-size:.65rem;color:var(--accent)}
+
+/* Generic custom dropdown wrapping a native <select> (Visibility pickers) —
+   same idea as .share-perm above, but full width to match .input. */
+.ui-select{position:relative}
+.ui-select-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.6rem .9rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-1);font:inherit;font-size:.875rem;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.ui-select-btn:hover{border-color:var(--accent)}
+.ui-select.open .ui-select-btn,.ui-select-btn:focus-visible{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-subtle);outline:none}
+.ui-select-btn i{font-size:.7rem;color:var(--text-3);transition:transform .15s;flex-shrink:0}
+.ui-select.open .ui-select-btn i{transform:rotate(180deg)}
+.ui-select-menu{position:absolute;left:0;right:0;top:calc(100% + .3rem);z-index:20;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:.25rem}
+.ui-select-option{display:flex;align-items:center;justify-content:space-between;gap:.5rem;width:100%;padding:.55rem .65rem;border:0;background:transparent;border-radius:7px;color:var(--text-1);font:inherit;font-size:.8rem;text-align:left;cursor:pointer}
+.ui-select-option:hover{background:var(--surface-2)}
+.ui-select-option.active{color:var(--accent);font-weight:600}
+.ui-select-option i{font-size:.68rem;color:var(--accent)}

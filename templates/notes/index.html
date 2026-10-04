@@ -109,6 +109,20 @@
   </div>
 </div>
 
+<!-- Confirmation before revoking an existing share (see openRemoveAccessConfirm
+     in notebooks.js) — opened on top of shareNotebookModal, never fires the
+     DELETE directly from the row's X button. -->
+<div class="modal-bd" id="removeShareAccessModal" aria-hidden="true">
+  <div class="modal-box notes-modal">
+    <div class="modal-hdr notes-danger-head"><h5><i class="fas fa-user-times"></i> Remove access</h5><button class="modal-x" data-close-modal="removeShareAccessModal"><i class="fas fa-times"></i></button></div>
+    <div class="modal-bdy">
+      <p class="notes-confirm-text">Remove <strong id="removeShareAccessName"></strong>'s access to this notebook? They will no longer be able to view or edit it.</p>
+      <p class="notes-form-message" id="removeShareAccessMessage" role="status"></p>
+    </div>
+    <div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="removeShareAccessModal">Cancel</button><button class="sbtn sbtn-danger" id="confirmRemoveShareAccess" type="button"><i class="fas fa-user-times"></i> Remove access</button></div>
+  </div>
+</div>
+
 <div class="modal-bd" id="createNotebookModal" aria-hidden="true">
   <div class="modal-box notes-modal">
     <div class="modal-hdr"><h5><i class="fas fa-book" style="color:var(--accent)"></i> New notebook</h5><button class="modal-x" data-close-modal="createNotebookModal"><i class="fas fa-times"></i></button></div>
@@ -146,4 +160,4 @@
 
 <div class="notes-toast-region" id="notesToastRegion" aria-live="polite"></div>
 {% endblock %}
-{% block scripts %}<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script><script type="module" src="{{ url_for('static', filename='notes/notebooks.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><script type="module" src="{{ url_for('static', filename='notes/notebooks.js') }}"></script>{% endblock %}

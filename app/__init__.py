@@ -30,9 +30,13 @@ def create_app() -> Flask:
 
     # ── Core config ────────────────────────────────────────────────────────
     app.secret_key = config.SECRET_KEY
-    # Werkzeug caps in-memory form fields at 500KB by default; Notebook PDF export posts
-    # page images (base64) as a form field and was hitting that cap, surfacing as a 500.
-    app.config["MAX_FORM_MEMORY_SIZE"] = 50 * 1024 * 1024
+    # This used to be raised to 50MB because Notebook PDF export posted page images (base64) as
+    # a form field and was hitting Werkzeug's 500KB in-memory-form-field default, surfacing as a
+    # 500 — on a large notebook, that also meant buffering tens of MB of request body in the
+    # single Gunicorn worker this app runs on Render, which is what could OOM-crash the whole app.
+    # PDF export is now assembled entirely client-side (see static/notes/notebook-export.js) and
+    # posts nothing, so nothing in this app sends a large non-file form field anymore — left at
+    # Werkzeug's own default instead of carrying that raised cap forward as unused risk surface.
 
     # ── Server-side session ────────────────────────────────────────────────
     os.makedirs(config.SESSION_FILE_DIR, exist_ok=True)
@@ -357,6 +361,8 @@ def _start_periodic_cleanup() -> None:
                 cleanup_app_cache()
                 from app.services.notes_service import cleanup_expired_trash
                 cleanup_expired_trash()
+                from app.services.exam_export_service import cleanup_expired_exports
+                cleanup_expired_exports()
             except Exception as e:
                 print(f"[CLEANUP] Error: {e}")
 

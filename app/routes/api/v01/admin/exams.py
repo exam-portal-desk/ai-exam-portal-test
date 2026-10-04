@@ -7,7 +7,11 @@ app/routes/admin/exams.py.
   POST /admin/exams/<id>/release-results  -> POST   /api/v01/admin/exams/<id>/release-results
 """
 
-from flask import jsonify, flash, request, render_template_string
+import os
+import threading
+import uuid
+
+from flask import jsonify, flash, request, render_template_string, session, send_file
 
 from app.routes.api.v01.admin import admin_api_bp
 from app.middleware.session_guard import require_admin_permission
@@ -24,6 +28,7 @@ from app.utils.helpers import (
     parse_max_attempts, parse_passing_percentage, parse_instructions_field, parse_exam_date,
 )
 from app.services.exam_service import get_effective_status
+from app.services import exam_export_service
 
 _ROWS_TPL = (
     '{% from "admin/_exam_rows.html" import render_exam_row, render_exam_card, render_exam_edit_modal %}'
@@ -330,3 +335,153 @@ def bulk_update_exams_route():
         "changed_fields": sorted(fields.keys()),
         "warnings": warnings,
     })
+
+
+# ── Bulk exam export/import job store ───────────────────────────────────────
+# Same in-memory job + background-thread + polling pattern already used by Notes' notebook
+# import (app/routes/api/v01/notebooks.py) and AI question generation (admin/ai_centre.py) —
+# process-local, not shared across multiple worker processes, same known/accepted constraint;
+# see app/services/exam_export_service.py's own module docstring for why this is preferred over
+# introducing Celery/Redis for this app.
+_export_jobs: dict = {}
+_export_jobs_lock = threading.Lock()
+_import_jobs: dict = {}
+_import_jobs_lock = threading.Lock()
+
+
+def _job_update(store: dict, lock: threading.Lock, job_id: str, **kwargs) -> None:
+    with lock:
+        if job_id in store:
+            store[job_id].update(kwargs)
+
+
+def _run_export_job(job_id: str, exam_ids: list) -> None:
+    def on_progress(phase: str, message: str, percent: int):
+        _job_update(_export_jobs, _export_jobs_lock, job_id, phase=phase, message=message, percent=percent)
+
+    out_path = exam_export_service.export_out_path(job_id)
+    try:
+        summary = exam_export_service.run_export(exam_ids, out_path, progress=on_progress)
+        _job_update(_export_jobs, _export_jobs_lock, job_id, status="done", phase="complete",
+                    percent=100, message="Export complete", summary=summary, error=None)
+    except ValueError as exc:
+        _job_update(_export_jobs, _export_jobs_lock, job_id, status="failed", error=str(exc), message=str(exc))
+    except Exception:
+        import traceback; traceback.print_exc()
+        _job_update(_export_jobs, _export_jobs_lock, job_id, status="failed",
+                    error="Unable to export these exams. Please try again.",
+                    message="Unable to export these exams. Please try again.")
+
+
+def _run_import_job(job_id: str, zip_path: str) -> None:
+    def on_progress(phase: str, message: str, percent: int):
+        _job_update(_import_jobs, _import_jobs_lock, job_id, phase=phase, message=message, percent=percent)
+
+    try:
+        report = exam_export_service.run_import(zip_path, progress=on_progress)
+        _job_update(_import_jobs, _import_jobs_lock, job_id, status="done", phase="complete",
+                    percent=100, message="Import complete", report=report, error=None)
+    except ValueError as exc:
+        _job_update(_import_jobs, _import_jobs_lock, job_id, status="failed", error=str(exc), message=str(exc))
+    except Exception:
+        import traceback; traceback.print_exc()
+        _job_update(_import_jobs, _import_jobs_lock, job_id, status="failed",
+                    error="Unable to import this file. Please try again.",
+                    message="Unable to import this file. Please try again.")
+    finally:
+        try:
+            os.remove(zip_path)
+        except OSError:
+            pass
+
+
+@admin_api_bp.route("/exams/export", methods=["POST"])
+@require_admin_permission("exam_management")
+def start_exam_export():
+    """Starts a bulk export as a background job and returns immediately — progress (and, once
+    done, the download link) is tracked via GET /exams/export/status/<job_id> below. Mirrors
+    Notes' notebook-import job shape exactly (see notebooks.py's import_notebook_api)."""
+    body = request.get_json(silent=True) or {}
+    exam_ids_raw = body.get("exam_ids") or []
+    if not isinstance(exam_ids_raw, list) or not exam_ids_raw:
+        return jsonify({"success": False, "message": "No exams selected."}), 400
+    if len(exam_ids_raw) > 200:
+        return jsonify({"success": False, "message": "Too many exams selected (max 200 per export)."}), 400
+    try:
+        exam_ids = [int(x) for x in exam_ids_raw]
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid exam id in selection."}), 400
+
+    job_id = uuid.uuid4().hex[:12]
+    with _export_jobs_lock:
+        _export_jobs[job_id] = {
+            "status": "running", "phase": "preparing", "message": "Preparing export...",
+            "percent": 0, "summary": None, "error": None, "_owner_id": session["user_id"],
+        }
+    threading.Thread(target=_run_export_job, args=(job_id, exam_ids), daemon=True).start()
+    return jsonify({"success": True, "job_id": job_id})
+
+
+@admin_api_bp.route("/exams/export/status/<job_id>", methods=["GET"])
+@require_admin_permission("exam_management")
+def exam_export_status(job_id: str):
+    with _export_jobs_lock:
+        job = dict(_export_jobs.get(job_id, {}))
+    # Not-found and not-yours return the identical 404 — never confirm a job_id exists to anyone
+    # but the admin who started it (same privacy rule as the notebook-import status route).
+    if not job or job.get("_owner_id") != session["user_id"]:
+        return jsonify({"success": False, "message": "Export job not found."}), 404
+    job.pop("_owner_id", None)
+    if job.get("status") == "done":
+        job["download_url"] = f"/api/v01/admin/exams/export/download/{job_id}"
+    return jsonify({"success": True, "job": job})
+
+
+@admin_api_bp.route("/exams/export/download/<job_id>", methods=["GET"])
+@require_admin_permission("exam_management")
+def exam_export_download(job_id: str):
+    with _export_jobs_lock:
+        job = dict(_export_jobs.get(job_id, {}))
+    if not job or job.get("_owner_id") != session["user_id"] or job.get("status") != "done":
+        return jsonify({"success": False, "message": "Export not found or not ready."}), 404
+    path = exam_export_service.export_out_path(job_id)
+    if not os.path.isfile(path):
+        return jsonify({"success": False, "message": "Export file has expired. Please export again."}), 404
+    return send_file(path, mimetype="application/zip", as_attachment=True,
+                      download_name=f"exams-export-{job_id}.zip")
+
+
+@admin_api_bp.route("/exams/import", methods=["POST"])
+@require_admin_permission("exam_management")
+def start_exam_import():
+    """Starts a bulk import as a background job — same shape as the export job above. Only the
+    cheap file-presence check happens synchronously here; the file itself (manifest shape, every
+    exam/question row) is validated inside the job, same reasoning as Notes' notebook import."""
+    if "file" not in request.files:
+        return jsonify({"success": False, "message": "No file uploaded."}), 400
+    f = request.files["file"]
+    if not f.filename or not f.filename.lower().endswith(".zip"):
+        return jsonify({"success": False, "message": "File must be a .zip export."}), 400
+
+    job_id = uuid.uuid4().hex[:12]
+    zip_path = exam_export_service.import_in_path(job_id)
+    f.save(zip_path)
+
+    with _import_jobs_lock:
+        _import_jobs[job_id] = {
+            "status": "running", "phase": "validating", "message": "Reading export file...",
+            "percent": 0, "report": None, "error": None, "_owner_id": session["user_id"],
+        }
+    threading.Thread(target=_run_import_job, args=(job_id, zip_path), daemon=True).start()
+    return jsonify({"success": True, "job_id": job_id})
+
+
+@admin_api_bp.route("/exams/import/status/<job_id>", methods=["GET"])
+@require_admin_permission("exam_management")
+def exam_import_status(job_id: str):
+    with _import_jobs_lock:
+        job = dict(_import_jobs.get(job_id, {}))
+    if not job or job.get("_owner_id") != session["user_id"]:
+        return jsonify({"success": False, "message": "Import job not found."}), 404
+    job.pop("_owner_id", None)
+    return jsonify({"success": True, "job": job})

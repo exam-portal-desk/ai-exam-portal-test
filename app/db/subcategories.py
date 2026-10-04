@@ -64,6 +64,31 @@ def create_subcategory(data: Dict) -> Optional[Dict]:
         return None
 
 
+def get_subcategory_by_name(category_id: int, name: str) -> Optional[Dict]:
+    """Case-insensitive, whitespace-trimmed match scoped to one category — mirrors
+    get_category_by_name (app/db/categories.py); same reasoning."""
+    try:
+        return fetch_one(
+            "SELECT * FROM subcategories WHERE category_id=%s AND lower(trim(name)) = lower(trim(%s))",
+            (category_id, name),
+        )
+    except Exception as e:
+        print(f"[db.subcategories] get_subcategory_by_name error: {e}")
+        return None
+
+
+def get_or_create_subcategory(category_id: int, name: str) -> Optional[Dict]:
+    """Used by exam import (app/services/exam_export_service.py) — same on-the-fly creation
+    as get_or_create_category, scoped under the already-resolved category."""
+    name = (name or "").strip()
+    if not name:
+        return None
+    existing = get_subcategory_by_name(category_id, name)
+    if existing:
+        return existing
+    return create_subcategory({"category_id": category_id, "name": name})
+
+
 def update_subcategory(subcat_id: int, updates: Dict) -> bool:
     try:
         sc, params = set_clause(updates)

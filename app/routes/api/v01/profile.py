@@ -17,7 +17,7 @@ from flask import request, jsonify, session, Blueprint
 from werkzeug.utils import secure_filename
 
 from app.db.users import get_user_by_id, update_user
-from app.db.misc import get_requests_by_user, create_request
+from app.db.misc import get_requests_by_user, create_request, available_role_requests
 from app.middleware.session_guard import require_user_role
 from app.services import image_storage_service
 from app.utils.datetime_service import now_utc_naive
@@ -138,13 +138,13 @@ def update_name():
 @profile_api_bp.route("/admin-access-request", methods=["POST"])
 @require_user_role
 def submit_admin_access_request():
-    """Submit a new admin-access request from the logged-in user's own
-    Profile page. Reuses the exact same requests_raised table/DB helpers and
-    one-pending-request rule as the old public form (app/routes/api/v01/
-    access_requests.py's api_submit_access_request) — the only real
-    difference is identity: username/email/current role come from the
-    session, not from client-supplied fields, since we now have a real
-    logged-in user instead of a re-typed username+email pair."""
+    """Submit a new access request from the logged-in user's own Profile page — same
+    requests_raised table/DB helpers and one-pending-request rule as the old public form
+    (app/routes/api/v01/access_requests.py's api_submit_access_request), and now the same
+    available_role_requests() rule too (app/db/misc.py), instead of always hardcoding "admin":
+    a user-only account can ask for admin-only or both; a dual-role account can ask to drop back
+    to user-only. Identity (username/email/current role) still comes from the session, not from
+    client-supplied fields, since we have a real logged-in user instead of a re-typed pair."""
     user = get_user_by_id(int(session["user_id"]))
     if not user:
         return jsonify({"success": False, "message": "Account not found."}), 404
@@ -157,10 +157,11 @@ def submit_admin_access_request():
     username = user["username"]
     email = user["email"]
     current_access = str(user.get("role") or "user").strip().lower()
-    requested_access = "admin"
+    available = available_role_requests(current_access)
+    requested_access = str(data.get("requested_access", "")).strip().lower()
 
-    if "admin" in current_access.split(","):
-        return jsonify({"success": False, "message": "You already have admin access."}), 400
+    if requested_access not in available:
+        return jsonify({"success": False, "message": "That access change isn't available for your account."}), 400
 
     pending = [r for r in get_requests_by_user(username, email) if r.get("request_status") == "pending"]
     if pending:

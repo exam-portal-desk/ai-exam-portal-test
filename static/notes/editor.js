@@ -625,11 +625,11 @@ document.getElementById('toolbarToggleBtn')?.addEventListener('click', () => { i
    page's objects in memory (the live canvas for the active page, a cache for others visited
    this session, or one more request only for a page neither of those covers — see
    getPageObjectsForExport below) and gains nothing from the bulk export-data route the other
-   two callers use. Rendering itself (each page's objects onto a private off-screen StaticCanvas,
-   assembled server-side by the existing ReportLab pdf_service) is unchanged — see that shared
-   module for why the dot-grid background is reproduced as a PDF vector resource instead of
-   being part of this raster, and why each image's `src` is rewritten to a same-origin URL
-   before this canvas ever loads it (a tainted canvas can't be exported). */
+   two callers use. Rendering itself (each page's objects onto a private off-screen StaticCanvas)
+   is unchanged — the resulting PDF is now assembled entirely client-side via jsPDF (see that
+   shared module for why the dot-grid background is reproduced as a small reusable canvas raster
+   instead of being part of this per-page raster), and why each image's `src` is rewritten to a
+   same-origin URL before this canvas ever loads it (a tainted canvas can't be exported). */
 async function getPageObjectsForExport(pageId) {
   if (pageId === activePageId) return withExportSafeImageSrc(canvas.getObjects().map(o => o.toObject(NOTES_PROPS)));
   const cached = pageObjectsCache.get(pageId);
@@ -644,13 +644,8 @@ document.getElementById('exportPdfBtn')?.addEventListener('click', () => {
   const shellStyle = getComputedStyle(document.getElementById('canvasShell'));
   const gridTheme = { bg: shellStyle.getPropertyValue('--bg').trim(), dot: shellStyle.getPropertyValue('--border').trim() };
   exportNotebookAsPdf({
-    notebookId, btn: document.getElementById('exportPdfBtn'), toast, gridTheme,
+    notebookId, notebookTitle: document.getElementById('notebookTitle')?.value, btn: document.getElementById('exportPdfBtn'), toast, gridTheme,
     loadPages: async () => Promise.all(pageCache.map(async page => ({ id: page.id, title: page.title, objects: await getPageObjectsForExport(page.id) }))),
-    // Always the owner-path endpoint (not `apiBase`, which is /api/v01/library for a public
-    // viewer) — there is exactly one export-pdf route/service; export_notebook_pdf_api accepts
-    // either an owned or a currently-public notebook, so the public viewer reuses it as-is
-    // instead of a second export implementation.
-    exportPdfUrl: id => `/api/v01/notebooks/${id}/export-pdf`,
   });
 });
 
@@ -1173,7 +1168,12 @@ function renderPages(pages, selectedId = null, shouldLoad = true) {
     open.addEventListener('click', () => { if (activePageId !== page.id) showUnsavedChangesDialog(() => loadPage(page.id)); });
     title.addEventListener('dblclick', event => { if (currentMode === 'read') return; event.preventDefault(); event.stopPropagation(); startInlineRename(page, title); });
     const dots = document.createElement('button'); dots.type = 'button'; dots.title = 'Page actions'; dots.className = 'page-dots-btn'; dots.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
-    dots.style.cssText = 'width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:var(--text-3);cursor:pointer;position:absolute;right:4px';
+    // A normal flex sibling of .page-item (flex-shrink:0, fixed size), not position:absolute —
+    // absolute positioning left it floating on top of the row regardless of title length, so a
+    // long title's text ran straight underneath the icon instead of the row's flex layout ever
+    // reserving space for it (see .page-item's own comment in editor.css for the other half of
+    // this fix).
+    dots.style.cssText = 'width:26px;height:26px;flex-shrink:0;border:0;border-radius:6px;background:transparent;color:var(--text-3);cursor:pointer';
     dots.addEventListener('click', event => { event.stopPropagation(); if (currentMode === 'read') return; const isSameMenu = pageMenuPortal?.dataset.triggerPageId === page.id; closePageMenus(); if (!isSameMenu) openPageMenu(page, title, dots); });
     row.append(open, dots); list.appendChild(row);
   });

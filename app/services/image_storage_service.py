@@ -232,6 +232,27 @@ def profile_photo_url_from_key(profile_photo_key: Optional[str]) -> Optional[str
     return _url_for_key(profile_photo_key)
 
 
+def admin_user_photo_url(user_id: int, profile_photo_key: Optional[str]) -> Optional[str]:
+    """URL for the admin-only thumbnail route (app/routes/api/v01/admin/users.py's
+    admin_user_photo) — used by Requests & User Management's three tabs, never the app-wide
+    /api/v01/images/asset/<key> route _url_for_key builds above (see that route's own comment
+    for why: this page can show any user in the system to an admin, not just people they'd
+    already legitimately see an avatar for through some other authenticated-any-user feature).
+
+    The `v=` query string is a pure client-cache-busting stamp, not anything the server
+    validates — the route resolves the CURRENT key server-side from user_id on every call
+    regardless of what's in the query string. It just lets the browser (and the server's own
+    thumbnail cache) treat this URL as content-addressed: a short hash of the key, which
+    changes to a brand-new value whenever the person re-uploads a new photo (a fresh key is
+    generated each upload — see profile.py), so a stale cached image is never possible and this
+    can safely be cached as aggressively/long as a client wants without a manual bust step."""
+    if not profile_photo_key:
+        return None
+    import hashlib
+    v = hashlib.sha1(profile_photo_key.encode()).hexdigest()[:10]
+    return f"/api/v01/admin/users/{user_id}/photo?v={v}"
+
+
 def delete_profile_photo(key: str) -> None:
     delete_image(key)
 

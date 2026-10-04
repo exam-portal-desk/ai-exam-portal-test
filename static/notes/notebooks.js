@@ -27,6 +27,14 @@ async function request(url, options = {}) {
 
 document.querySelectorAll('[data-open-modal]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.openModal)));
 
+/* Visibility <select>s get the same custom-dropdown treatment as the
+   Viewer/Editor permission picker (see enhanceSelect below) instead of the
+   browser's native option list. visibilityNotebookRepaint is called wherever
+   #visibilityNotebookValue's .value is set programmatically, since that
+   doesn't fire a 'change' event the enhanced UI could listen for. */
+enhanceSelect(document.querySelector('#createNotebookForm select[name="visibility"]'));
+const visibilityNotebookRepaint = enhanceSelect(document.getElementById('visibilityNotebookValue'));
+
 /* Mirrors the Add Page modal's existing pageModalSaving guard: a modal whose
    action is currently in flight cannot be dismissed via its Cancel/X button
    or a backdrop click until that action finishes (success or failure). */
@@ -36,7 +44,8 @@ function isModalSaving(modalId) {
     || (modalId === 'importNotebookModal' && importNotebookSaving)
     || (modalId === 'visibilityNotebookModal' && visibilityNotebookSaving)
     || (modalId === 'deleteNotebookModal' && deleteNotebookSaving)
-    || (modalId === 'shareNotebookModal' && shareSubmitSaving);
+    || (modalId === 'shareNotebookModal' && shareSubmitSaving)
+    || (modalId === 'removeShareAccessModal' && removeShareAccessSaving);
 }
 document.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', () => { if (!isModalSaving(button.dataset.closeModal)) closeModal(button.dataset.closeModal); }));
 document.querySelectorAll('.modal-bd').forEach(modal => modal.addEventListener('click', event => { if (event.target === modal && !isModalSaving(modal.id)) closeModal(modal.id); }));
@@ -62,11 +71,10 @@ document.getElementById('createNotebookForm')?.addEventListener('submit', async 
 /* PDF/JSON export for a My Notebooks card — same shared implementation Public Notebooks uses
    (static/notes/notebook-export.js), just pointed at the owner read/export API instead of the
    public one; see that module for the real (non-fake) progress driver and download behavior. */
-function exportMyNotebookPdf(notebookId, btn) {
+function exportMyNotebookPdf(notebookId, notebookTitle, btn) {
   return exportNotebookAsPdf({
-    notebookId, btn, toast,
+    notebookId, notebookTitle, btn, toast,
     loadPages: loadPagesFromExportDataUrl(`${api}/${notebookId}/export-data`),
-    exportPdfUrl: id => `${api}/${id}/export-pdf`,
   });
 }
 function exportMyNotebookJson(notebookId, btn) {
@@ -156,7 +164,7 @@ actionMenu?.addEventListener('click', event => {
   // keep the menu open so that's visible, matching the previous per-card
   // dropdown's behavior. Edit/Visibility/Delete open a modal, so close it.
   if (actionBtn.dataset.action === 'export-json') { exportMyNotebookJson(id, actionBtn); return; }
-  if (actionBtn.dataset.action === 'export-pdf') { exportMyNotebookPdf(id, actionBtn); return; }
+  if (actionBtn.dataset.action === 'export-pdf') { exportMyNotebookPdf(id, title, actionBtn); return; }
   if (actionBtn.dataset.action === 'edit') {
     document.getElementById('editNotebookTitle').value = title;
     document.getElementById('editNotebookDescription').value = description;
@@ -164,6 +172,7 @@ actionMenu?.addEventListener('click', event => {
   }
   if (actionBtn.dataset.action === 'visibility') {
     document.getElementById('visibilityNotebookValue').value = visibility;
+    visibilityNotebookRepaint();
     message('visibilityNotebookMessage'); openModal('visibilityNotebookModal');
   }
   if (actionBtn.dataset.action === 'delete') { message('deleteNotebookMessage'); openModal('deleteNotebookModal'); }
@@ -517,6 +526,132 @@ let shareNotebookId = null;
 let sharePending = new Map(); // user_id -> { id, name, permission }
 let shareSubmitSaving = false;
 
+const SHARE_PERMISSIONS = [['viewer', 'Viewer'], ['editor', 'Editor']];
+
+/* Closes every open custom dropdown (permission picker or visibility select)
+   except (optionally) the one being toggled open — mirrors the outside-click
+   handling already used for shareEls.results below. Both dropdown flavors
+   share the .ui-dropdown marker class so one handler covers all of them. */
+function closeAllDropdowns(exceptWrap) {
+  document.querySelectorAll('.ui-dropdown.open').forEach(wrap => {
+    if (wrap === exceptWrap) return;
+    wrap.classList.remove('open');
+    const menu = wrap.querySelector('[role="listbox"]');
+    const btn = wrap.querySelector('button[aria-haspopup="listbox"]');
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+document.addEventListener('click', event => { if (!event.target.closest('.ui-dropdown')) closeAllDropdowns(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeAllDropdowns(); });
+
+/* Custom Viewer/Editor dropdown for a share row — a styled button + menu
+   instead of a native <select>, so the open list matches the app's own
+   design instead of the browser's raw OS dropdown chrome. */
+function createPermissionControl(name, permission, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'share-perm ui-dropdown';
+  let current = permission;
+
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'share-perm-btn';
+  btn.setAttribute('aria-haspopup', 'listbox');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-label', `Permission for ${name}`);
+  const labelEl = document.createElement('span');
+  labelEl.className = 'share-perm-label';
+  btn.append(labelEl, Object.assign(document.createElement('i'), { className: 'fas fa-chevron-down' }));
+
+  const menu = document.createElement('div');
+  menu.className = 'share-perm-menu'; menu.setAttribute('role', 'listbox'); menu.hidden = true;
+
+  function paintLabel() { labelEl.textContent = SHARE_PERMISSIONS.find(([value]) => value === current)?.[1] || current; }
+  function paintOptions() {
+    menu.innerHTML = '';
+    SHARE_PERMISSIONS.forEach(([value, label]) => {
+      const opt = document.createElement('button');
+      opt.type = 'button'; opt.className = 'share-perm-option'; opt.setAttribute('role', 'option');
+      opt.setAttribute('aria-selected', String(value === current));
+      if (value === current) opt.classList.add('active');
+      opt.innerHTML = `<span>${label}</span>`;
+      if (value === current) opt.insertAdjacentHTML('beforeend', '<i class="fas fa-check"></i>');
+      opt.addEventListener('click', () => {
+        if (value !== current) { current = value; onChange(value); paintLabel(); paintOptions(); }
+        closeAllDropdowns();
+      });
+      menu.appendChild(opt);
+    });
+  }
+  btn.addEventListener('click', event => {
+    event.stopPropagation();
+    const isOpen = wrap.classList.contains('open');
+    closeAllDropdowns(wrap);
+    if (!isOpen) { wrap.classList.add('open'); menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+    else { wrap.classList.remove('open'); menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+  });
+
+  paintLabel(); paintOptions();
+  wrap.append(btn, menu);
+  return wrap;
+}
+
+/* Generic custom dropdown that wraps a native <select> in place — used for
+   the Visibility pickers so the open list matches the app's own design
+   instead of the browser's raw OS dropdown chrome. The original <select> is
+   kept in the DOM (just visually hidden) so existing FormData-based submits,
+   and code that reads/sets .value directly, keep working unchanged; call the
+   returned repaint() after setting .value programmatically elsewhere. */
+function enhanceSelect(selectEl) {
+  if (!selectEl || selectEl.dataset.enhanced) return () => {};
+  selectEl.dataset.enhanced = 'true';
+  selectEl.style.display = 'none';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ui-select ui-dropdown';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'ui-select-btn';
+  btn.setAttribute('aria-haspopup', 'listbox');
+  btn.setAttribute('aria-expanded', 'false');
+  const labelEl = document.createElement('span');
+  btn.append(labelEl, Object.assign(document.createElement('i'), { className: 'fas fa-chevron-down' }));
+
+  const menu = document.createElement('div');
+  menu.className = 'ui-select-menu'; menu.setAttribute('role', 'listbox'); menu.hidden = true;
+
+  function repaint() {
+    const opts = Array.from(selectEl.options);
+    const active = opts.find(o => o.value === selectEl.value) || opts[0];
+    labelEl.textContent = active ? active.textContent : '';
+    menu.innerHTML = '';
+    opts.forEach(o => {
+      const item = document.createElement('button');
+      item.type = 'button'; item.className = 'ui-select-option'; item.setAttribute('role', 'option');
+      const selected = o.value === selectEl.value;
+      item.setAttribute('aria-selected', String(selected));
+      if (selected) item.classList.add('active');
+      item.innerHTML = `<span>${o.textContent}</span>`;
+      if (selected) item.insertAdjacentHTML('beforeend', '<i class="fas fa-check"></i>');
+      item.addEventListener('click', () => {
+        if (selectEl.value !== o.value) { selectEl.value = o.value; repaint(); }
+        closeAllDropdowns();
+      });
+      menu.appendChild(item);
+    });
+  }
+  btn.addEventListener('click', event => {
+    event.stopPropagation();
+    const isOpen = wrap.classList.contains('open');
+    closeAllDropdowns(wrap);
+    if (!isOpen) { wrap.classList.add('open'); menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+    else { wrap.classList.remove('open'); menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+  });
+
+  wrap.append(btn, menu);
+  selectEl.after(wrap);
+  repaint();
+  return repaint;
+}
+
 function renderShareRow(list, { id, name, permission }, { onPermissionChange, onRemove }) {
   const row = document.createElement('div');
   row.className = 'share-row';
@@ -524,19 +659,12 @@ function renderShareRow(list, { id, name, permission }, { onPermissionChange, on
   const nameEl = document.createElement('span');
   nameEl.className = 'share-row-name';
   nameEl.textContent = name;
-  const select = document.createElement('select');
-  select.setAttribute('aria-label', `Permission for ${name}`);
-  [['viewer', 'Viewer'], ['editor', 'Editor']].forEach(([value, label]) => {
-    const option = document.createElement('option');
-    option.value = value; option.textContent = label; option.selected = value === permission;
-    select.appendChild(option);
-  });
-  select.addEventListener('change', () => onPermissionChange(select.value));
+  const permControl = createPermissionControl(name, permission, onPermissionChange);
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button'; removeBtn.className = 'share-row-remove'; removeBtn.setAttribute('aria-label', `Remove ${name}`);
   removeBtn.innerHTML = '<i class="fas fa-times"></i>';
   removeBtn.addEventListener('click', onRemove);
-  row.append(nameEl, select, removeBtn);
+  row.append(nameEl, permControl, removeBtn);
   list.appendChild(row);
 }
 
@@ -565,13 +693,13 @@ async function loadShareCurrentList() {
             toast('Permission updated.');
           } catch (error) { toast(error.message || 'Unable to update permission.', 'error'); }
         },
-        onRemove: async () => {
-          try {
+        onRemove: () => {
+          openRemoveAccessConfirm(share.full_name || share.username, async () => {
             await request(`${api}/${shareNotebookId}/shares/${share.user_id}`, { method: 'DELETE' });
             shareEls.currentList.querySelector(`.share-row[data-user-id="${share.user_id}"]`)?.remove();
             if (!shareEls.currentList.children.length) shareEls.currentSection.hidden = true;
             toast('Access removed.');
-          } catch (error) { toast(error.message || 'Unable to remove access.', 'error'); }
+          });
         },
       });
     });
@@ -649,5 +777,37 @@ shareEls.submitBtn?.addEventListener('click', async () => {
   } finally {
     shareSubmitSaving = false;
     shareEls.submitBtn.disabled = false; shareEls.submitBtn.innerHTML = original;
+  }
+});
+
+/* Confirm-before-revoke: removing someone from "Currently has access" is a
+   real DELETE against a live share, so it goes through the same
+   confirm-modal pattern as deleteNotebookModal above instead of firing
+   immediately from the row's X button. */
+let removeShareAccessSaving = false;
+let pendingShareRemoval = null; // async () => void, set by openRemoveAccessConfirm
+function setRemoveShareAccessSaving(isSaving) {
+  const button = document.getElementById('confirmRemoveShareAccess');
+  if (!button) return;
+  button.disabled = isSaving;
+  button.innerHTML = isSaving ? '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Removing...' : '<i class="fas fa-user-times"></i> Remove access';
+}
+function openRemoveAccessConfirm(name, run) {
+  pendingShareRemoval = run;
+  const nameEl = document.getElementById('removeShareAccessName');
+  if (nameEl) nameEl.textContent = name;
+  message('removeShareAccessMessage');
+  openModal('removeShareAccessModal');
+}
+document.getElementById('confirmRemoveShareAccess')?.addEventListener('click', async () => {
+  if (removeShareAccessSaving || !pendingShareRemoval) return;
+  message('removeShareAccessMessage'); removeShareAccessSaving = true; setRemoveShareAccessSaving(true);
+  try {
+    await pendingShareRemoval();
+    closeModal('removeShareAccessModal');
+  } catch (error) {
+    message('removeShareAccessMessage', error.message);
+  } finally {
+    removeShareAccessSaving = false; setRemoveShareAccessSaving(false); pendingShareRemoval = null;
   }
 });

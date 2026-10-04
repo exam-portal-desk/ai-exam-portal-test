@@ -3,6 +3,7 @@ app/db/misc.py
 PostgreSQL queries for subjects and requests_raised tables.
 """
 
+import re
 from typing import Optional, List, Dict
 from app.db import fetch_one, fetch_all, execute, set_clause, insert_returning
 from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
@@ -108,6 +109,42 @@ def delete_subject(subject_id: int) -> bool:
 # ─────────────────────────────────────────────
 # Access Requests
 # ─────────────────────────────────────────────
+
+def available_role_requests(current_access: str) -> List[str]:
+    """The role(s) a person may request FROM their current one — the one shared rule both
+    access_requests.py's logged-out form and profile.py's logged-in "Admin Access" card call,
+    instead of each keeping its own (previously divergent, and for the dual-role case simply
+    missing) inline version:
+      user            -> admin, or both user and admin
+      user and admin  -> user only (a downgrade: gives up admin, keeps taking exams)
+      admin only      -> nothing (that account never reaches the user portal to ask from here)
+    No DB access, no schema — current_access is the same comma-joined role string already read
+    off users.role everywhere else (e.g. "user,admin"); this only decides what's offerable."""
+    roles = set(str(current_access or "user").strip().lower().split(","))
+    if roles == {"user"}:
+        return ["admin", "user,admin"]
+    if roles == {"user", "admin"}:
+        return ["user"]
+    return []
+
+
+_REASON_SPLIT_RE = re.compile(r"^\[USER REQUEST\]\s?(.*?)(?:\n\[ADMIN (?:APPROVAL|DENIAL)\]\s?(.*))?$", re.S)
+
+
+def split_request_reason(raw: str) -> tuple[str, str]:
+    """(user_reason, admin_response) parsed from requests_raised.reason — no schema change: every
+    row already follows one fixed, machine-written convention (see create_request's callers for
+    the first line, and approve_request/deny_request in app/routes/api/v01/admin/requests.py for
+    the second), so this is exact string-splitting on a known shape, not a guess. A row that
+    doesn't match (e.g. one written before this convention existed) is shown as-is with no
+    separated response, never dropped."""
+    if not raw:
+        return "", ""
+    m = _REASON_SPLIT_RE.match(raw.strip())
+    if not m:
+        return raw.strip(), ""
+    return (m.group(1) or "").strip(), (m.group(2) or "").strip()
+
 
 def get_requests_status_counts() -> Dict[str, int]:
     """Access-request count per request_status — one aggregate query, for

@@ -8,7 +8,15 @@
 .page-rail.collapsed .page-rail-head span,
 .page-rail.collapsed #newPageBtn,
 .page-rail.collapsed .page-list{display:none}
-.page-rail.collapsed .page-rail-collapse-btn i{transform:rotate(180deg)}.page-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.4rem;padding:.5rem .55rem;border:0;border-radius:7px;background:transparent;color:var(--text-2);font:500 .76rem inherit;text-align:left;cursor:pointer}.page-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-item>span:last-of-type{flex:1;min-width:0}.page-item i{font-size:.6rem;opacity:0}
+.page-rail.collapsed .page-rail-collapse-btn i{transform:rotate(180deg)}
+/* .page-item shares its row with a sibling .page-dots-btn (see renderPages in editor.js) — it
+   used to be width:100% with the dots button positioned absolute on top, so a long page title's
+   ellipsis was computed against the FULL row width and ran straight under the dots icon instead
+   of stopping before it (the two visually overlapped). flex:1;min-width:0 here, plus the dots
+   button now being a normal flex-shrink:0 sibling instead of position:absolute (see editor.js),
+   makes the row's real flex layout reserve the dots button's space, so the title correctly
+   shrinks/ellipsizes to fit next to it instead of running underneath. */
+.page-item{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:.4rem;padding:.5rem .55rem;border:0;border-radius:7px;background:transparent;color:var(--text-2);font:500 .76rem inherit;text-align:left;cursor:pointer}.page-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-item>span:last-of-type{flex:1;min-width:0}.page-item i{font-size:.6rem;opacity:0}
 .page-item-num{flex-shrink:0;min-width:15px;text-align:center;font-size:.6rem;font-weight:700;color:var(--text-3);background:var(--surface-2);border-radius:4px;padding:1px 4px}
 .page-item.active .page-item-num{color:var(--accent)}
 /* Collapsed-rail compact controls: add / prev / current page (click = jump popover) / next / actions.

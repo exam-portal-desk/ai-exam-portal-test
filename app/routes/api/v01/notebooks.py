@@ -484,8 +484,11 @@ def import_notebook_status_api(job_id: str):
 @require_user_role
 def notebook_export_data_api(notebook_id: str):
     """Every page's objects for the client's PDF-export render loop, in ONE request instead of
-    one request per page — same owner-or-public rule as export-pdf below (and the same one route
-    for both; nothing here differs by visibility beyond which check let the caller in)."""
+    one request per page — one route serving either an owned or a currently-public notebook,
+    nothing here differs by visibility beyond which check let the caller in. The PDF itself is
+    then assembled entirely client-side (see static/notes/notebook-export.js) — this route only
+    ever hands back lightweight per-object JSON, never rendered images, so it isn't part of the
+    memory cost that used to come from the retired /export-pdf route building the PDF server-side."""
     try:
         pages = notes_service.get_pages_with_objects_for_export(session["user_id"], notebook_id)
         if pages is None:
@@ -497,40 +500,6 @@ def notebook_export_data_api(notebook_id: str):
         return _api_error(str(exc))
     except Exception:
         return _api_error("Unable to load this notebook. Please try again.", 500)
-
-
-@notes_api_bp.route("/notebooks/<notebook_id>/export-pdf", methods=["POST"])
-@require_user_role
-def export_notebook_pdf_api(notebook_id: str):
-    try:
-        # Owner export (private/unlisted) or a currently-public notebook viewed read-only —
-        # same one export flow/service for both, just two ways to be allowed to read it.
-        notebook = notes_service.get_editor_notebook(session["user_id"], notebook_id) or notes_service.public_notebook(notebook_id)
-        if not notebook:
-            return _api_error("Notebook not found.", 404)
-        if "pages" in request.form:
-            try:
-                pages = json.loads(request.form["pages"])
-            except ValueError:
-                return _api_error("Send a valid JSON object.", 400)
-        else:
-            pages = _payload().get("pages", [])
-        if not pages:
-            return _api_error("Nothing to export.", 400)
-        grid_theme = None
-        if "gridTheme" in request.form:
-            try:
-                grid_theme = json.loads(request.form["gridTheme"])
-            except ValueError:
-                grid_theme = None
-        from app.services.pdf_service import build_notebook_pdf
-        pdf = build_notebook_pdf(notebook.get("title") or "Notebook", pages, grid_theme)
-        safe_name = _safe_export_filename(notebook.get("title"))
-        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'})
-    except (NotesValidationError, ValueError) as exc:
-        return _api_error(str(exc))
-    except Exception:
-        return _api_error("Unable to export this notebook as PDF. Please try again.", 500)
 
 
 @notes_api_bp.route("/notebooks/<notebook_id>/permanent", methods=["DELETE"])

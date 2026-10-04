@@ -109,7 +109,7 @@ Both `app/routes/web/` and `app/routes/api/v01/` are split into a flat set of fe
 | **AI** | Config-driven model registry (`config/ai_models.json`); calls Groq and Google Gemini directly over HTTP — no vendor SDK |
 | **Object storage** | Local filesystem, or any S3-compatible provider via `boto3` |
 | **Email** | Generic HTTP email API — provider-independent, no vendor SDK |
-| **PDF** | ReportLab (generation), pypdf (parsing) |
+| **PDF** | ReportLab (exam-result PDFs, server-side), pypdf (parsing), jsPDF (Notes notebook export — assembled client-side so exporting a large notebook can't spike server memory) |
 | **Data processing** | pandas, numpy (CSV import/export) |
 | **Frontend** | Bootstrap 5.3, vanilla JavaScript (ES6+), Socket.IO client |
 | **Math rendering** | MathJax 3, KaTeX, latex2mathml |

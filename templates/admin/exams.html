@@ -463,6 +463,17 @@
 .exam-bulk-count { font-size: .85rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: .4rem; }
 .exam-bulk-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
+/* ── Export/Import job progress bar — same look as Notes' notebook-import progress
+   (static/notes/notes.css's .import-progress-*), same real-percent-only convention. ── */
+.exam-job-progress-row { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; margin-bottom: .5rem; }
+.exam-job-progress-track { height: 8px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.exam-job-progress-fill { height: 100%; border-radius: 4px; background: var(--accent); width: 0%; transition: width .25s ease; }
+.exam-job-progress-fill.done { background: #22c55e; }
+.exam-job-progress-fill.failed { background: #ef4444; }
+.exam-job-report-list { margin: 0; padding-left: 1.1rem; font-size: .8rem; line-height: 1.7; }
+.exam-job-report-list .fail { color: #ef4444; }
+.exam-job-report-list .ok { color: #22c55e; }
+
 /* ── Bulk Update modal: per-field "Change this field" toggle. The checkbox
    enables/disables (and visually dims) its own paired input(s) only —
    unchecked fields are simply never added to the request body, so an
@@ -486,9 +497,15 @@
     <h1><i class="fas fa-file-alt"></i> Manage Exams</h1>
     <p>Create, edit and manage all exams on the portal.</p>
   </div>
-  <button class="btn-flat primary" data-bs-toggle="modal" data-bs-target="#addExamModal">
-    <i class="fas fa-plus"></i> Add Exam
-  </button>
+  <div style="display:flex;gap:.5rem">
+    <button class="btn-flat secondary" onclick="document.getElementById('examImportFile').click()">
+      <i class="fas fa-file-import"></i> Import Exams
+    </button>
+    <input type="file" id="examImportFile" accept=".zip" style="display:none" onchange="startExamImport(this.files[0])">
+    <button class="btn-flat primary" data-bs-toggle="modal" data-bs-target="#addExamModal">
+      <i class="fas fa-plus"></i> Add Exam
+    </button>
+  </div>
 </div>
 
 <!-- ── Search / Filter / View toggle toolbar ── -->
@@ -521,6 +538,7 @@
   <div class="exam-bulk-actions">
     <button type="button" class="btn-flat secondary" onclick="selectAllOnPage()"><i class="fas fa-check-double"></i> Select all on page</button>
     <button type="button" class="btn-flat secondary" onclick="clearExamSelection()"><i class="fas fa-times"></i> Clear selection</button>
+    <button type="button" class="btn-flat secondary" onclick="startExamExport()"><i class="fas fa-file-export"></i> Export Selected</button>
     <button type="button" class="btn-flat primary" onclick="openBulkUpdateModal()"><i class="fas fa-layer-group"></i> Bulk Update</button>
   </div>
 </div>
@@ -949,6 +967,33 @@
         <button type="button" class="btn btn-primary btn-sm" id="confirmBulkUpdateBtn">
           <i class="fas fa-check me-1"></i>Confirm &amp; Update
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BULK EXPORT / IMPORT PROGRESS MODAL ════════════════════════════════
+     Shared by both directions (only the title/icon/percent text differ) — same real-progress-
+     bar pattern already used by Notes' notebook import (templates/notes/index.html's
+     importProgressView): the percent shown is always what the background job's own status
+     endpoint last reported, polled every ~800ms, never a timer standing in for real work. ── -->
+<div class="modal fade" id="examJobModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-spinner fa-spin me-2" id="examJobIcon"></i><span id="examJobTitle">Working...</span></h5>
+        <button type="button" class="btn-close" id="examJobCloseBtn" data-bs-dismiss="modal" hidden></button>
+      </div>
+      <div class="modal-body">
+        <div class="exam-job-progress-row">
+          <span id="examJobMessage" style="font-size:.82rem;color:var(--text-2)">Starting...</span>
+          <span id="examJobPercent" style="font-size:.82rem;font-weight:700;color:var(--accent)">0%</span>
+        </div>
+        <div class="exam-job-progress-track"><div class="exam-job-progress-fill" id="examJobFill" style="width:0%"></div></div>
+        <div id="examJobReport" style="margin-top:1rem;display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" id="examJobDismissBtn" data-bs-dismiss="modal" hidden>Close</button>
       </div>
     </div>
   </div>
@@ -1906,6 +1951,141 @@ function _syncExamSelectionUI() {
   const countEl = document.getElementById('examBulkCount');
   if (countEl) countEl.textContent = selectedExams.size;
   if (bar) bar.style.display = selectedExams.size > 0 ? 'flex' : 'none';
+}
+
+/* ── Bulk exam export/import — background job + polling, mirrors Notes' notebook import
+   (templates/notes/index.html) exactly: start the job, poll its status every ~800ms, and the
+   modal shows whatever percent/message the job's own status endpoint last reported — never a
+   timer standing in for real progress (see app/services/exam_export_service.py). ── */
+let _examJobNeedsReload = false;
+document.getElementById('examJobModal').addEventListener('hidden.bs.modal', function () {
+  if (_examJobNeedsReload) { _examJobNeedsReload = false; window.location.reload(); }
+});
+
+function _examJobReset(title, icon) {
+  document.getElementById('examJobTitle').textContent = title;
+  document.getElementById('examJobIcon').className = icon + ' me-2';
+  document.getElementById('examJobMessage').textContent = 'Starting...';
+  document.getElementById('examJobPercent').textContent = '0%';
+  const fill = document.getElementById('examJobFill');
+  fill.style.width = '0%'; fill.classList.remove('done', 'failed');
+  document.getElementById('examJobReport').style.display = 'none';
+  document.getElementById('examJobReport').innerHTML = '';
+  document.getElementById('examJobCloseBtn').hidden = true;
+  document.getElementById('examJobDismissBtn').hidden = true;
+  new bootstrap.Modal(document.getElementById('examJobModal'), { backdrop: 'static', keyboard: false }).show();
+}
+
+function _examJobUpdate(job) {
+  document.getElementById('examJobMessage').textContent = job.message || '';
+  const pct = job.percent || 0;
+  document.getElementById('examJobPercent').textContent = pct + '%';
+  document.getElementById('examJobFill').style.width = pct + '%';
+}
+
+function _examJobFinish(ok) {
+  document.getElementById('examJobFill').classList.add(ok ? 'done' : 'failed');
+  document.getElementById('examJobIcon').className = (ok ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle') + ' me-2';
+  document.getElementById('examJobCloseBtn').hidden = false;
+  document.getElementById('examJobDismissBtn').hidden = false;
+}
+
+function _escHtmlExam(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Polls until the job finishes, updating the modal on every response; returns the finished job
+// object on success, or null (having already shown the failure) otherwise.
+async function _pollExamJob(statusUrl) {
+  for (;;) {
+    let resp;
+    try { resp = await fetch(statusUrl); } catch (e) { await new Promise(r => setTimeout(r, 1500)); continue; }
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.success) {
+      _examJobUpdate({ message: (data && data.message) || 'Something went wrong.', percent: 0 });
+      _examJobFinish(false);
+      return null;
+    }
+    const job = data.job;
+    _examJobUpdate(job);
+    if (job.status === 'done') return job;
+    if (job.status === 'failed') {
+      _examJobUpdate({ message: job.error || 'Failed.', percent: job.percent || 0 });
+      _examJobFinish(false);
+      return null;
+    }
+    await new Promise(r => setTimeout(r, 800));
+  }
+}
+
+async function startExamExport() {
+  if (selectedExams.size === 0) return;
+  const examIds = Array.from(selectedExams.keys()).map(Number);
+  _examJobReset('Exporting exams...', 'fas fa-file-export');
+  try {
+    const startResp = await fetch('/api/v01/admin/exams/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exam_ids: examIds }),
+    });
+    const startData = await startResp.json();
+    if (!startResp.ok || !startData.success) {
+      _examJobUpdate({ message: startData.message || 'Could not start export.', percent: 0 });
+      _examJobFinish(false);
+      return;
+    }
+    const job = await _pollExamJob('/api/v01/admin/exams/export/status/' + startData.job_id);
+    if (!job) return;
+    _examJobUpdate({ message: `Export ready — ${job.summary.exam_count} exam(s), ${job.summary.question_count} question(s).`, percent: 100 });
+    _examJobFinish(true);
+    // A real request to a real URL, via a hidden iframe — the server's own
+    // Content-Disposition: attachment decides "download", never a client-synthesized blob:
+    // URL, which a browser's built-in file viewer can intercept and show inline instead.
+    const frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.src = job.download_url;
+    document.body.appendChild(frame);
+  } catch (e) {
+    _examJobUpdate({ message: 'Network error. Please try again.', percent: 0 });
+    _examJobFinish(false);
+  }
+}
+
+async function startExamImport(file) {
+  if (!file) return;
+  document.getElementById('examImportFile').value = '';
+  _examJobReset('Importing exams...', 'fas fa-file-import');
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const startResp = await fetch('/api/v01/admin/exams/import', { method: 'POST', body: form });
+    const startData = await startResp.json();
+    if (!startResp.ok || !startData.success) {
+      _examJobUpdate({ message: startData.message || 'Could not start import.', percent: 0 });
+      _examJobFinish(false);
+      return;
+    }
+    const job = await _pollExamJob('/api/v01/admin/exams/import/status/' + startData.job_id);
+    if (!job) return;
+    const report = job.report || { imported: [], failed: [] };
+    _examJobUpdate({
+      message: `Imported ${report.imported.length} exam(s)${report.failed.length ? ', ' + report.failed.length + ' failed' : ''}.`,
+      percent: 100,
+    });
+    _examJobFinish(report.failed.length === 0);
+    const reportEl = document.getElementById('examJobReport');
+    reportEl.style.display = 'block';
+    reportEl.innerHTML = '<ul class="exam-job-report-list">' +
+      report.imported.map(name => `<li class="ok"><i class="fas fa-check"></i> ${_escHtmlExam(name)}</li>`).join('') +
+      report.failed.map(f => `<li class="fail"><i class="fas fa-times"></i> ${_escHtmlExam(f.name)}: ${_escHtmlExam(f.error)}</li>`).join('') +
+      '</ul>';
+    // The page's own exam list only reloads once the admin has actually seen this report and
+    // dismissed the modal themselves (see the hidden.bs.modal listener above) — never yanked
+    // out from under them mid-read.
+    if (report.imported.length) _examJobNeedsReload = true;
+  } catch (e) {
+    _examJobUpdate({ message: 'Network error. Please try again.', percent: 0 });
+    _examJobFinish(false);
+  }
 }
 
 /* ── Bulk Update modal: "Change this field" checkbox enables/dims its own

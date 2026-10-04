@@ -19,6 +19,9 @@ from app import entitlements
 from app.middleware.session_guard import require_admin_permission
 from app.db.misc import update_request, soft_delete_request
 from app.db import fetch_one, fetch_all, execute
+from app.db.misc import split_request_reason
+from app.db.sessions import invalidate_session
+from app.services import image_storage_service
 from app.utils.pagination import paginate_params, pagination_meta, attach_row_numbers
 
 _VALID_ROLES  = ("user", "admin", "user,admin")
@@ -40,40 +43,53 @@ def api_requests_list():
     date_to        = request.args.get("date_to", "").strip()
     page, per_page, offset = paginate_params(request.args.get("page"), 25, max_per_page=100)
 
-    where, params = ["is_deleted = FALSE"], []
+    # "r." on every column below (including ones that don't strictly need it, like
+    # request_status) since the main query now LEFT JOINs users for avatar_url — that table
+    # has its own username/email/created_at/updated_at/deleted_at columns, which would otherwise
+    # collide and make Postgres refuse the query as ambiguous once joined.
+    where, params = ["r.is_deleted = FALSE"], []
 
     if status in _VALID_STATUS:
-        where.append("request_status = %s")
+        where.append("r.request_status = %s")
         params.append(status)
     elif status != "all":
         # Any other/unknown value (including the old implicit "history"
         # caller) falls back to the original pending-vs-processed split so
         # existing behaviour for anyone still passing status=history is
         # unchanged.
-        where.append("request_status = ANY(%s)")
+        where.append("r.request_status = ANY(%s)")
         params.append(["completed", "denied"])
 
     if q:
-        where.append("(username ILIKE %s OR email ILIKE %s)")
+        where.append("(r.username ILIKE %s OR r.email ILIKE %s)")
         params += [f"%{q}%", f"%{q}%"]
     if current_role in _VALID_ROLES:
-        where.append("current_access = %s")
+        where.append("r.current_access = %s")
         params.append(current_role)
     if requested_role in _VALID_ROLES:
-        where.append("requested_access = %s")
+        where.append("r.requested_access = %s")
         params.append(requested_role)
     if date_from:
-        where.append("request_date >= %s::date")
+        where.append("r.request_date >= %s::date")
         params.append(date_from)
     if date_to:
-        where.append("request_date < (%s::date + INTERVAL '1 day')")
+        where.append("r.request_date < (%s::date + INTERVAL '1 day')")
         params.append(date_to)
 
     where_sql = " AND ".join(where)
 
-    total = fetch_one(f"SELECT COUNT(*) AS count FROM requests_raised WHERE {where_sql}", params)["count"]
+    total = fetch_one(f"SELECT COUNT(*) AS count FROM requests_raised r WHERE {where_sql}", params)["count"]
+    # requests_raised has no user_id column (it stores username/email as its own denormalized
+    # snapshot at request time — see approve_request's own username+email lookup below), so the
+    # only way to find this request's CURRENT user row (for their avatar) is the same match
+    # approve_request already uses. LEFT JOIN, not JOIN: an unmatched historical row (e.g. the
+    # username was since renamed, or the account no longer exists) just shows no photo, exactly
+    # like _fmt() already tolerates a missing/blank field elsewhere.
     reqs = fetch_all(
-        f"SELECT * FROM requests_raised WHERE {where_sql} ORDER BY request_date DESC LIMIT %s OFFSET %s",
+        f"""SELECT r.*, u.id AS req_user_id, u.profile_photo_key AS req_profile_photo_key
+            FROM requests_raised r
+            LEFT JOIN users u ON u.username = r.username AND u.email = r.email
+            WHERE {where_sql} ORDER BY r.request_date DESC LIMIT %s OFFSET %s""",
         params + [per_page, offset],
     )
     attach_row_numbers(reqs, page, per_page)
@@ -98,6 +114,11 @@ def _fmt(r):
         "row_no":           r.get("row_no"),
         "username":         r.get("username", ""),
         "email":            r.get("email", ""),
+        # Same admin-only, content-addressed photo URL api/v01/admin/users.py's own user list
+        # uses — never the raw storage key, and never the app-wide /api/v01/images/asset/<key>
+        # route every authenticated session (any role) can reach (see that route's own comment
+        # for why this page specifically doesn't reuse it).
+        "avatar_url":       image_storage_service.admin_user_photo_url(r.get("req_user_id"), r.get("req_profile_photo_key")) if r.get("req_user_id") else None,
         "current_access":   r.get("current_access", ""),
         "requested_access": r.get("requested_access", ""),
         "request_date":     format_display(r.get("request_date")),
@@ -106,7 +127,12 @@ def _fmt(r):
         # "pending for Xh" age indicator needs this instead.
         "request_date_raw": _raw_iso_utc(r.get("request_date")),
         "status":           r.get("request_status", ""),
-        "reason":           r.get("reason", "") or "",
+        # Split from the one raw reason column — no schema change, just parsing the existing
+        # "[USER REQUEST] ...\n[ADMIN APPROVAL/DENIAL] ..." convention every row already follows
+        # (see split_request_reason in app/db/misc.py) — so the UI can show the user's
+        # justification and the admin's decision as two separate lines instead of one blob.
+        "user_reason":      split_request_reason(r.get("reason", ""))[0],
+        "admin_response":   split_request_reason(r.get("reason", ""))[1],
         "processed_by":     r.get("processed_by", "Admin"),
         "processed_date":   format_display(r.get("processed_date")),
     }
@@ -140,6 +166,14 @@ def approve_request(request_id):
         return jsonify({"success": False, "message": str(e)}), 403
 
     execute("UPDATE users SET role=%s, updated_at=%s WHERE id=%s", (approved, now_utc_naive().isoformat(), user_r["id"]))
+    # The role IS written correctly above — the real gap was here: an already-logged-in session
+    # caches its role/admin_session flag at LOGIN time (see _create_user_session in
+    # app/routes/web/auth.py) and nothing ever re-synced it against a later role change, so a
+    # user active at the moment of approval kept their OLD privileges (admin or not) until they
+    # happened to log out. Ending their session here forces a fresh login next time they act,
+    # which re-derives admin_session/session['role'] from the users row this UPDATE just wrote —
+    # so a downgrade actually revokes admin access, not just in the database but in practice.
+    invalidate_session(int(user_r["id"]))
 
     reason = (req.get("reason", "") or "") + f"\n[ADMIN APPROVAL] Approved: {approved}"
     update_request(request_id, {

@@ -12,4 +12,4 @@
 <div class="notes-toast-region" id="notesToastRegion" aria-live="polite"></div>
 </main>
 {% endblock %}
-{% block scripts %}<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script><script type="module" src="{{ url_for('static', filename='notes/editor.js') }}"></script><script type="module" src="{{ url_for('static', filename='notes/drawing-tools.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><script type="module" src="{{ url_for('static', filename='notes/editor.js') }}"></script><script type="module" src="{{ url_for('static', filename='notes/drawing-tools.js') }}"></script>{% endblock %}

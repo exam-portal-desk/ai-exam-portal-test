@@ -109,6 +109,7 @@
   background: var(--accent-subtle); border: 1px solid var(--border);
   color: var(--accent); font-size: .72rem;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  position: relative; overflow: hidden; /* anchors the fading-in <img> (see avatarChip()) to this circle */
 }
 
 /* ── Access Badges ── */
@@ -195,6 +196,10 @@ span.custom-chip, span.admin-chip { cursor:default; }
    letting them stretch the row; "Show more" reveals the rest. ── */
 .reason-cell { max-width: 220px; font-size: .79rem; color: var(--text-2); word-break: break-word; white-space: pre-wrap; }
 .reason-cell.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* User's justification (plain) vs admin's response (visually set apart, own line) — see
+   reasonCell() below; the two were previously one concatenated string with no visual split. */
+.reason-admin { display: flex; align-items: flex-start; gap: .3rem; margin-top: .4rem; padding: .35rem .5rem; background: var(--surface-2); border-radius: 6px; font-size: .74rem; color: var(--text-2); }
+.reason-admin i { flex-shrink: 0; margin-top: .15rem; color: var(--accent); font-size: .68rem; }
 .reason-toggle {
   display: inline-block; margin-top: .25rem;
   background: none; border: none; padding: 0; font-family: inherit;
@@ -832,12 +837,12 @@ function renderPendingRows(reqs) {
   tbody.innerHTML = reqs.map(r => `
     <tr>
       <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.row_no ?? r.request_id}</span></td>
-      <td>${userCell(r.username)}</td>
+      <td>${userCell(r.username, r.avatar_url)}</td>
       <td><span style="font-size:.8rem;color:var(--text-muted)">${escHtml(r.email)}</span></td>
       <td>${accessBadge(r.current_access)}</td>
       <td>${accessBadge(r.requested_access)}</td>
       <td>${_fmtTs(r.request_date)}</td>
-      <td>${reasonCell(r.reason)}</td>
+      <td>${reasonCell(r.user_reason, r.admin_response)}</td>
       <td>
         <span class="status-badge sb-pending">Pending</span>
         <div class="pending-age">${pendingAge(r.request_date_raw)}</div>
@@ -887,7 +892,7 @@ function renderHistoryRows(reqs) {
     return `
     <tr>
       <td><span style="font-size:.78rem;font-weight:700;color:var(--text-muted)">#${r.row_no ?? r.request_id}</span></td>
-      <td>${userCell(r.username)}</td>
+      <td>${userCell(r.username, r.avatar_url)}</td>
       <td><span style="font-size:.8rem;color:var(--text-muted)">${escHtml(r.email)}</span></td>
       <td>${accessBadge(r.current_access)}</td>
       <td>${accessBadge(r.requested_access)}</td>
@@ -897,21 +902,27 @@ function renderHistoryRows(reqs) {
         ${r.processed_by ? `<div style="font-size:.82rem;font-weight:600;color:var(--text-primary)">${escHtml(r.processed_by)}</div>` : '<span style="font-size:.78rem;color:var(--text-muted)">—</span>'}
         ${r.processed_date ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:.1rem">${r.processed_date}</div>` : ''}
       </td>
-      <td>${reasonCell(r.reason)}</td>
+      <td>${reasonCell(r.user_reason, r.admin_response)}</td>
       <td><button class="icon-btn delete" title="Delete" onclick="openDelete(${r.request_id},'${esc(r.username)}','history')"><i class="fas fa-trash"></i></button></td>
     </tr>`}).join('');
 }
 
-// Long/multi-line audit-trail reasons clamp to 3 lines with a toggle
-// instead of stretching the row; escHtml() guards against the reason text
-// being attacker-controlled free text (it originates from the public
-// access-request form and the admin's own denial-reason field).
-function reasonCell(reason) {
-  if (!reason) return '<em style="color:var(--text-muted)">—</em>';
-  const isLong = reason.length > 140 || reason.split('\n').length > 3;
+// User's justification and admin's response as two visually separate lines instead of one
+// machine-tagged blob — userReason/adminResponse are already split server-side (see
+// split_request_reason in app/db/misc.py; no schema change, it just parses the one existing
+// "[USER REQUEST] ...\n[ADMIN APPROVAL/DENIAL] ..." convention every reason column already
+// follows). Long/multi-line content still clamps to 3 lines with a toggle instead of stretching
+// the row; escHtml() guards against either being attacker-controlled free text (the user's own
+// justification, or the admin's own denial-reason field).
+function reasonCell(userReason, adminResponse) {
+  if (!userReason && !adminResponse) return '<em style="color:var(--text-muted)">—</em>';
   const id = 'rz' + Math.random().toString(36).slice(2, 9);
+  const combinedLength = (userReason || '').length + (adminResponse || '').length;
+  const isLong = combinedLength > 140 || (userReason || '').split('\n').length > 3;
   const toggle = isLong ? `<button type="button" class="reason-toggle" onclick="toggleReason('${id}', this)">Show more</button>` : '';
-  return `<div class="reason-cell${isLong ? ' clamped' : ''}" id="${id}">${escHtml(reason)}</div>${toggle}`;
+  const userPart = userReason ? `<div class="reason-user">${escHtml(userReason)}</div>` : '';
+  const adminPart = adminResponse ? `<div class="reason-admin"><i class="fas fa-user-shield"></i>${escHtml(adminResponse)}</div>` : '';
+  return `<div class="reason-cell${isLong ? ' clamped' : ''}" id="${id}">${userPart}${adminPart}</div>${toggle}`;
 }
 function toggleReason(id, btn) {
   const el = document.getElementById(id);
@@ -1155,7 +1166,7 @@ function renderUsers(users) {
       <td><input type="checkbox" class="e-checkbox user-chk" value="${u.id}" ${isSel?'checked':''} onchange="onChkChange(this)"></td>
       <td>
         <div style="display:flex;align-items:center;gap:.6rem">
-          <div class="avatar-chip"><i class="fas fa-user"></i></div>
+          ${avatarChip(u.avatar_url)}
           <div>
             <div style="font-size:.83rem;font-weight:600;color:var(--text-1)" class="uname">${u.username||''}</div>
             ${u.full_name && u.full_name!==u.username?`<div style="font-size:.75rem;color:var(--text-3)">${u.full_name}</div>`:''}
@@ -1637,8 +1648,26 @@ function errRow(cols, msg, retryCall) {
 function emptyState(icon, title, sub) {
   return `<div class="empty-state"><i class="fas ${icon}"></i><p><strong>${title}</strong><br><span style="font-size:.8rem">${sub}</span></p></div>`;
 }
-function userCell(uname) {
-  return `<div style="display:flex;align-items:center;gap:.6rem"><div class="avatar-chip"><i class="fas fa-user"></i></div><span style="font-size:.83rem;font-weight:600;color:var(--text-primary)">${uname||'—'}</span></div>`;
+// Real profile photo (avatar_url, from the admin-only /api/v01/admin/users/<id>/photo route —
+// see api_users_search/_fmt on the server) when the user has one, else the same generic-icon
+// chip as before. Shared by every row across all three tabs (New Requests, History, User
+// Management) so the fallback and sizing stay identical everywhere.
+//
+// The <i> icon is always rendered underneath as the instant placeholder (no separate skeleton
+// element needed) — the <img> sits on top of it via position:absolute, starts transparent, and
+// fades in once it actually loads; loading="lazy" defers a row that's scrolled off-screen (this
+// tab can page through many rows) until it's actually about to be visible, so those never fetch
+// at all until they need to. onerror removes the <img> entirely, permanently revealing the icon
+// underneath — a deleted/unreadable photo degrades to the same fallback as no photo at all,
+// never a broken-image icon.
+function avatarChip(url) {
+  if (!url) return `<div class="avatar-chip"><i class="fas fa-user"></i></div>`;
+  return `<div class="avatar-chip"><i class="fas fa-user"></i><img src="${url}" alt="" loading="lazy" decoding="async"
+    style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;opacity:0;transition:opacity .15s"
+    onload="this.style.opacity=1" onerror="this.remove()"></div>`;
+}
+function userCell(uname, avatarUrl) {
+  return `<div style="display:flex;align-items:center;gap:.6rem">${avatarChip(avatarUrl)}<span style="font-size:.83rem;font-weight:600;color:var(--text-primary)">${uname||'—'}</span></div>`;
 }
 function accessBadge(role) {
   const cls = role==='user'?'ab-user':role==='admin'?'ab-admin':'ab-both';

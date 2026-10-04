@@ -91,13 +91,28 @@
   .status-badge.status-pending { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
   .status-badge.status-completed { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
   .status-badge.status-denied { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+  .aar-current { font-size:.72rem; color:var(--text-3); margin:0 0 .7rem; text-transform:uppercase; letter-spacing:.04em; }
+  .aar-current strong { color:var(--text-1); text-transform:none; letter-spacing:normal; }
   .aar-status-row { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; }
   .aar-date { font-size:.72rem; color:var(--text-3); }
   .aar-note { font-size:.8rem; line-height:1.55; color:var(--text-2); margin:.6rem 0 0; }
+  /* User's justification vs admin's response — two visually distinct lines instead of one
+     machine-tagged blob (see split_request_reason in app/db/misc.py for where they're parsed
+     apart, with no change to how they're actually stored). */
+  .aar-quote { font-style:italic; color:var(--text-3); }
+  .aar-response { display:flex; align-items:flex-start; gap:.4rem; padding:.5rem .65rem; background:var(--surface-2); border-radius:var(--radius); font-style:normal; }
+  .aar-response i { flex-shrink:0; margin-top:.15rem; color:var(--accent); font-size:.72rem; }
   .aar-form { margin-top:.9rem; display:grid; gap:.6rem; }
   .aar-form[hidden] { display:none; }
   .aar-form label { display:grid; gap:.35rem; font-size:.75rem; font-weight:600; color:var(--text-2); }
   .aar-form-actions { display:flex; justify-content:flex-end; gap:.5rem; }
+  /* Segmented-control role picker — replaces a plain <select> for the (at most 2-option) choice
+     between the roles available_role_requests() actually offers; a downgrade-only account never
+     renders this at all (nothing to choose between), it just confirms the one action instead. */
+  .aar-role-picker { display:flex; background:var(--surface-2); border-radius:var(--radius); padding:3px; gap:3px; }
+  .aar-role-opt { flex:1; display:flex; align-items:center; justify-content:center; gap:.4rem; padding:.55rem .5rem; border:0; border-radius:6px; background:transparent; color:var(--text-2); font:inherit; font-size:.78rem; font-weight:600; cursor:pointer; transition:background .15s,color .15s; }
+  .aar-role-opt:hover { color:var(--text-1); }
+  .aar-role-opt.active { background:var(--accent); color:var(--accent-on); }
 
   /* Lightbox */
   .pf-lightbox { display:none; position:fixed; inset:0; z-index:900; background:rgba(0,0,0,.75); align-items:center; justify-content:center; padding:1.5rem; }
@@ -221,39 +236,68 @@
   <div class="pf-card">
     <div class="pf-sec-hdr"><i class="fas fa-user-shield" style="color:var(--accent)"></i><h6>Admin Access</h6></div>
     <div class="pf-body" style="padding-top:.3rem">
+      {# Always sourced fresh from the DB (current_access, above) — never from a request's
+         historical "Approved" status and never from the session, so this line can't ever say
+         something the account's real, current role doesn't back up. #}
+      <p class="aar-current">Current access:
+        <strong>{{ 'User and admin' if current_access == 'user,admin' else 'Admin only' if current_access == 'admin' else 'User' }}</strong>
+      </p>
       {% set req = latest_access_request %}
       {% set req_status = req.request_status if req else None %}
+
+      {# latest_request_reason = (user_reason, admin_response), split from the one raw reason
+         column server-side (app/db/misc.py split_request_reason) — no schema change, just
+         parsing the existing "[USER REQUEST] ...\n[ADMIN APPROVAL/DENIAL] ..." convention every
+         row already follows, so the two can render as separate lines instead of one blob. #}
+      {% set user_reason, admin_response = latest_request_reason %}
 
       {% if req_status == 'pending' %}
         <div class="aar-status-row">
           <span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending Review</span>
           <span class="aar-date">Submitted {{ req.request_date | display_dt if req.request_date else '' }}</span>
         </div>
-        <p class="aar-note">Your request for admin access is awaiting review by an administrator. You'll be able to submit a new request if this one isn't approved.</p>
+        {% if user_reason %}<p class="aar-note aar-quote">"{{ user_reason }}"</p>{% endif %}
+        <p class="aar-note">Awaiting review by an administrator. You'll be able to submit a new request if this one isn't approved.</p>
       {% elif req_status == 'completed' %}
         <div class="aar-status-row">
           <span class="status-badge status-completed"><i class="fas fa-check-circle"></i> Approved</span>
           <span class="aar-date">{{ req.processed_date | display_dt if req.processed_date else '' }}</span>
         </div>
-        <p class="aar-note">Your request for admin access was approved.</p>
+        {% if user_reason %}<p class="aar-note aar-quote">"{{ user_reason }}"</p>{% endif %}
       {% elif req_status == 'denied' %}
         <div class="aar-status-row">
           <span class="status-badge status-denied"><i class="fas fa-times-circle"></i> Not Approved</span>
           <span class="aar-date">{{ req.processed_date | display_dt if req.processed_date else '' }}</span>
         </div>
-        {% if req.reason %}<p class="aar-note">{{ req.reason }}</p>{% endif %}
+        {% if user_reason %}<p class="aar-note aar-quote">"{{ user_reason }}"</p>{% endif %}
+        {% if admin_response %}<p class="aar-note aar-response"><i class="fas fa-user-shield"></i> {{ admin_response }}</p>{% endif %}
       {% endif %}
 
       {% if can_request_access %}
         {% if not req_status %}
-        <p class="aar-note">Request elevated permissions to manage exams, questions, and student data.</p>
+        <p class="aar-note">{{ 'Request elevated permissions to manage exams, questions, and student data.' if available_requests != ['user'] else 'Give up your admin access and keep your student account.' }}</p>
         {% endif %}
         <button class="sbtn {{ 'sbtn-ghost' if req_status == 'denied' else 'sbtn-primary' }}" type="button" style="margin-top:.7rem" onclick="pfToggleAccessForm(true)">
-          <i class="fas {{ 'fa-redo' if req_status == 'denied' else 'fa-user-shield' }}"></i> {{ 'Request Again' if req_status == 'denied' else 'Request Admin Access' }}
+          <i class="fas {{ 'fa-redo' if req_status == 'denied' else 'fa-user-shield' }}"></i>
+          {%- if req_status == 'denied' %} Request Again
+          {%- elif available_requests == ['user'] %} Remove Admin Access
+          {%- else %} Request Access Change{% endif %}
         </button>
         <div class="aar-form" id="aarForm" hidden>
+          {% if available_requests|length > 1 %}
+          <div class="aar-role-picker" id="aarRolePicker" role="radiogroup" aria-label="Requested access">
+            {% for r in available_requests %}
+            <button type="button" class="aar-role-opt{{ ' active' if loop.first else '' }}" data-value="{{ r }}" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}">
+              <i class="fas {{ 'fa-user-shield' if r == 'admin' else 'fa-user-plus' }}"></i>
+              {{ 'Admin only' if r == 'admin' else 'User and admin' if r == 'user,admin' else 'User only' }}
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+          <input type="hidden" id="aarSingleRole" value="{{ available_requests[0] if available_requests else '' }}">
+          {% endif %}
           <label>Reason for request
-            <textarea class="auth-textarea" id="aarReason" maxlength="500" placeholder="Briefly explain why you need admin access"></textarea>
+            <textarea class="auth-textarea" id="aarReason" maxlength="500" placeholder="Briefly explain why you need this change"></textarea>
           </label>
           <div class="aar-form-actions">
             <button class="sbtn sbtn-ghost" type="button" onclick="pfToggleAccessForm(false)">Cancel</button>
@@ -261,7 +305,7 @@
           </div>
         </div>
       {% elif not req_status %}
-        <p class="aar-note">You already have admin access.</p>
+        <p class="aar-note">No further access changes are available for your account.</p>
       {% endif %}
     </div>
   </div>
@@ -479,12 +523,30 @@ function pfToggleAccessForm(show){
   if(show) document.getElementById('aarReason')?.focus();
 }
 
+// Segmented-control role picker (only rendered when there's an actual choice — see
+// available_requests|length > 1 in the template above): click selects one option, exactly one
+// is ever active, mirrored via aria-checked for a screen reader same as a real radio group would.
+document.getElementById('aarRolePicker')?.addEventListener('click', function(e){
+  var opt = e.target.closest('.aar-role-opt');
+  if(!opt) return;
+  this.querySelectorAll('.aar-role-opt').forEach(function(o){ o.classList.remove('active'); o.setAttribute('aria-checked','false'); });
+  opt.classList.add('active'); opt.setAttribute('aria-checked','true');
+});
+function pfSelectedRole(){
+  var active = document.querySelector('#aarRolePicker .aar-role-opt.active');
+  if(active) return active.dataset.value;
+  var single = document.getElementById('aarSingleRole');
+  return single ? single.value : '';
+}
+
 var aarSubmitting = false;
 function pfSubmitAccessRequest(){
   if(aarSubmitting) return;
   var textarea = document.getElementById('aarReason');
   var reason = (textarea.value || '').trim();
   if(!reason){ appToast('Please provide a reason', 'danger'); textarea.focus(); return; }
+  var requestedAccess = pfSelectedRole();
+  if(!requestedAccess){ appToast('Please choose an access level', 'danger'); return; }
 
   var btn = document.getElementById('aarSubmitBtn');
   aarSubmitting = true;
@@ -495,7 +557,7 @@ function pfSubmitAccessRequest(){
   fetch('{{ url_for("profile_api.submit_admin_access_request") }}', {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reason: reason }),
+    body: JSON.stringify({ reason: reason, requested_access: requestedAccess }),
   })
     .then(function(r){ return r.json(); })
     .then(function(d){

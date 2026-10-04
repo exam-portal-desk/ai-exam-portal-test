@@ -30,7 +30,7 @@ def api_validate_user_for_request():
     if not user or str(user.get("email","")).lower() != email:
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    from app.db.misc import get_requests_by_user
+    from app.db.misc import get_requests_by_user, available_role_requests, split_request_reason
     current_access = str(user.get("role","user")).strip().lower()
     reqs = get_requests_by_user(username, email)
 
@@ -39,21 +39,14 @@ def api_validate_user_for_request():
          "requested_access": r.get("requested_access",""),
          "request_date": format_display(r.get("request_date")),
          "status": r.get("request_status",""),
-         "reason": r.get("reason","") or ""}
+         "reason": split_request_reason(r.get("reason",""))[0]}
         for r in reqs
     ]
 
-    available = []
-    if current_access == "user":
-        available = ["admin","user,admin"]
-    elif current_access == "admin":
-        available = ["user","user,admin"]
-
-    # Same dual-role convention already used in login() — role is a comma-joined string
-    # (e.g. "user,admin") for accounts with both, so substring checks detect it regardless
-    # of ordering. Checked separately from has_pending so the template can tell "nothing left
-    # to request" apart from "already has both" instead of collapsing them into one message.
-    has_both_access = "user" in current_access and "admin" in current_access
+    # Same one rule profile.py's own request card uses (app/db/misc.py) — a "user" account may
+    # ask for admin-only or both; a dual-role account may only ask to drop back to user-only
+    # (admin-only never reaches this logged-out form at all, since it can't sign in to it).
+    available = available_role_requests(current_access)
 
     has_pending = any(r["status"] == "pending" for r in formatted)
 
@@ -64,8 +57,10 @@ def api_validate_user_for_request():
                  "full_name": user.get("full_name", username)},
         "requests": formatted,
         "available_requests": available,
-        "has_both_access": has_both_access,
         "has_pending_request": has_pending,
+        # False only for an admin-only account (never reaches the user portal to ask from there,
+        # but this logged-out form takes any username+email pair) — a dual-role account now
+        # always has at least the downgrade-to-user option, so it's never "nothing to do" for it.
         "can_request": bool(available) and not has_pending,
     })
 
