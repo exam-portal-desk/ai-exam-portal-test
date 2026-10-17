@@ -6,6 +6,7 @@
 
 An online examination platform built with Flask and PostgreSQL. Administrators organise exams and question banks and control when results are released. Students sit exams in a timed interface, review their responses, and use an AI study assistant. Every AI call, the plans students are on, and the storage backend are driven by configuration rather than hard-coded.
 
+<div align="center">
 ## Features
 
 **Students**
