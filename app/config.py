@@ -202,6 +202,13 @@ PUBLIC_SOCIAL_LINKEDIN = _public_env("PUBLIC_SOCIAL_LINKEDIN")
 PUBLIC_SOCIAL_GITHUB   = _public_env("PUBLIC_SOCIAL_GITHUB")
 PUBLIC_SOCIAL_INSTAGRAM = _public_env("PUBLIC_SOCIAL_INSTAGRAM")
 
+# Optional "back to the product hub" link in the landing page header. Blank hides it;
+# only https:// (or http://localhost) addresses are accepted.
+PUBLIC_HUB_URL = _public_env("HUB_URL")
+if not PUBLIC_HUB_URL.startswith(("https://", "http://localhost")):
+    PUBLIC_HUB_URL = ""
+PUBLIC_HUB_NAME = _public_env("HUB_NAME") or "Sarvadwar"
+
 # Per-policy "Last updated" dates — each policy can genuinely change on its
 # own schedule, so these are independent. Left blank until a real date is
 # known; the templates omit the line entirely rather than show a

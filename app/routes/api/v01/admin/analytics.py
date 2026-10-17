@@ -21,6 +21,33 @@ from app.middleware.session_guard import require_admin_permission
 from app.db import fetch_one, fetch_all
 
 DELETED_USER_LABEL = "Deleted User"
+PASS_MARK = 40                      # a result passes at this percentage or more (the one place the portal's pass mark is defined for analytics)
+_DAILY_SPAN_DAYS = 62               # up to this many days apart the timeline is per day, beyond it per month
+
+
+def _timeline(results):
+    """Attempts, distinct students and average percentage per day (per month for a long range), in APP_TIMEZONE, from the rows
+    already fetched: no extra query. Empty when no result has a completion time."""
+    from app.utils.datetime_service import to_app_tz
+    by_day = {}
+    for r in results:
+        when = to_app_tz(r.get("completed_at"))
+        if when:
+            by_day.setdefault(when.date(), []).append((float(r.get("percentage") or 0), str(r.get("student_id"))))
+    if not by_day:
+        return {"granularity": "day", "labels": [], "attempts": [], "users": [], "avgScore": []}
+    monthly = (max(by_day) - min(by_day)).days > _DAILY_SPAN_DAYS
+    buckets = {}
+    for day, rows in by_day.items():
+        buckets.setdefault(day.strftime("%Y-%m") if monthly else day.isoformat(), []).extend(rows)
+    labels = sorted(buckets)
+    return {
+        "granularity": "month" if monthly else "day",
+        "labels": labels,
+        "attempts": [len(buckets[k]) for k in labels],
+        "users": [len({sid for _, sid in buckets[k]}) for k in labels],
+        "avgScore": [round(sum(p for p, _ in buckets[k]) / len(buckets[k]), 2) for k in labels],
+    }
 
 
 def _display_username(user: dict) -> str:
@@ -119,7 +146,7 @@ def users_analytics_data_api():
 
         if not all_results:
             return jsonify({
-                "summary": {"avgScore":0,"totalAttempts":0,"passRate":0,"activeUsers":0,
+                "summary": {"avgScore":0,"totalAttempts":0,"passRate":0,"activeUsers":0,"passMark":PASS_MARK,
                             "scoreChange":0,"attemptsChange":0,"passRateChange":0,"usersChange":0},
                 "charts":  {"scoreDistribution":[0,0,0,0],
                             "examPerformance":{"labels":[],"data":[]},
@@ -146,10 +173,11 @@ def users_analytics_data_api():
         exam_map  = {str(e["id"]): e.get("name", f"Exam {e['id']}") for e in exams}
 
         # ── Step 6: Compute analytics ─────────────────────────────────
+        timeline = _timeline(all_results)
         total = len(all_results)
         pcts  = [float(r.get("percentage") or 0) for r in all_results]
         avg   = sum(pcts) / total if total else 0
-        passed = sum(1 for p in pcts if p >= 40)
+        passed = sum(1 for p in pcts if p >= PASS_MARK)
 
         dist = [
             sum(1 for p in pcts if p >= 90),
@@ -198,7 +226,7 @@ def users_analytics_data_api():
                 "name":     name,
                 "attempts": len(scores),
                 "avgScore": round(sum(scores)/len(scores), 2) if scores else 0,
-                "passRate": round(sum(1 for s in scores if s >= 40)/len(scores)*100, 2) if scores else 0,
+                "passRate": round(sum(1 for s in scores if s >= PASS_MARK)/len(scores)*100, 2) if scores else 0,
             }
             for name, scores in exam_perf.items()
         ]
@@ -209,6 +237,7 @@ def users_analytics_data_api():
                 "totalAttempts": total,
                 "passRate":      round(passed/total*100, 2) if total else 0,
                 "activeUsers":   len(sid_set),
+                "passMark":      PASS_MARK,
                 "scoreChange":0, "attemptsChange":0,
                 "passRateChange":0, "usersChange":0,
             },
@@ -218,8 +247,9 @@ def users_analytics_data_api():
                     "labels": list(exam_perf.keys()),
                     "data":   [round(sum(v)/len(v), 2) for v in exam_perf.values()],
                 },
-                "performanceTrends": {"labels":[],"data":[]},
-                "userActivity":      {"labels":[],"data":[]},
+                "performanceTrends": {"labels": timeline["labels"], "data": timeline["avgScore"], "granularity": timeline["granularity"]},
+                "userActivity":      {"labels": timeline["labels"], "data": timeline["attempts"], "users": timeline["users"],
+                                      "granularity": timeline["granularity"]},
             },
             "tables": {
                 "topPerformers":  top,

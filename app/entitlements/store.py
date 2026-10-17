@@ -116,6 +116,17 @@ def list_overrides(user_id: int) -> List[Override]:
     return [_override(r) for r in rows]
 
 
+def plan_assigned_at(user_id: int) -> Optional[datetime]:
+    """When an administrator last set this user's plan (the plan's start), from the audit trail; None if never."""
+    try:
+        from app.db import fetch_one
+        row = fetch_one("SELECT at FROM access_audit_log WHERE target_user_id=%s AND action='plan_set' ORDER BY at DESC LIMIT 1", (int(user_id),))
+        return _parse_ts(row.get("at")) if row else None
+    except Exception as e:
+        _warn(e)
+        return None
+
+
 def audit(actor_id: Optional[int], target_user_id: int, action: str, feature_key: Optional[str] = None, detail: Optional[dict] = None) -> None:
     from app.db import execute
     execute("INSERT INTO access_audit_log (actor_id, target_user_id, action, feature_key, detail) VALUES (%s, %s, %s, %s, %s)",

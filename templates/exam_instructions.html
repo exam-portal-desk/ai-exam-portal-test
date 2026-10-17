@@ -38,15 +38,21 @@
 .ei-muted { font-size:.85rem; color:var(--text-3); line-height:1.6; margin:0; font-style:italic; }
 
 /* ── Exam Overview — plain label/value grid, not oversized cards ── */
+/* 1px gaps over a border-coloured backdrop draw the dividers, so any number of items tiles cleanly; the last item widens
+   to take whatever is left of its row, so optional fields (Passing Score, Format) never leave an empty cell. */
 .ei-overview-grid {
-  display:grid; grid-template-columns:repeat(3, 1fr); gap:0;
+  display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:1px; background:var(--border);
   border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
 }
-.ei-ov-item {
-  padding:.75rem 1rem; border-right:1px solid var(--border); border-bottom:1px solid var(--border);
-  background:var(--surface-2);
+.ei-ov-item { padding:.75rem 1rem; background:var(--surface-2); min-width:0; }
+.ei-overview-grid[data-r3="1"] .ei-ov-item:last-child { grid-column:span 3; }
+.ei-overview-grid[data-r3="2"] .ei-ov-item:last-child { grid-column:span 2; }
+.ei-backlink {
+  display:inline-flex; align-items:center; gap:.45rem; min-height:36px; padding:.4rem .8rem; margin-bottom:.85rem;
+  border-radius:var(--radius); background:var(--surface-2); border:1px solid var(--border);
+  font-size:.8rem; font-weight:600; color:var(--text-2); text-decoration:none; transition:border-color .12s, color .12s;
 }
-.ei-overview-grid .ei-ov-item:nth-child(3n) { border-right:none; }
+.ei-backlink:hover, .ei-backlink:focus-visible { border-color:var(--accent); color:var(--accent); outline:none; }
 .ei-ov-label { display:block; font-size:.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:.25rem; }
 .ei-ov-value { display:block; font-size:.92rem; font-weight:700; color:var(--text-1); }
 
@@ -176,9 +182,10 @@
 
 @media(max-width:640px){
   .ei-card-body { padding:1.2rem 1rem 1.4rem; }
-  .ei-overview-grid { grid-template-columns:repeat(2, 1fr); }
-  .ei-overview-grid .ei-ov-item:nth-child(3n) { border-right:1px solid var(--border); }
-  .ei-overview-grid .ei-ov-item:nth-child(2n) { border-right:none; }
+  .ei-overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .ei-overview-grid .ei-ov-item:last-child { grid-column:auto; }
+  .ei-overview-grid[data-r2="1"] .ei-ov-item:last-child { grid-column:span 2; }
+  .ei-backlink { min-height:44px; margin-bottom:.7rem; }
   .ei-qtype-grid { grid-template-columns:1fr; }
   .ei-actions{ flex-direction:column; align-items:stretch; }
   .ei-btn{ justify-content:center; }
@@ -200,6 +207,7 @@
 <div class="ei-page"><div class="ei-wrap">
 
   <div class="ei-head">
+    <a href="{{ url_for('dashboard.dashboard') }}" class="ei-backlink"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
     <h2><i class="fas fa-info-circle"></i> Exam Instructions</h2>
     <p>Please read everything below carefully before you begin.</p>
   </div>
@@ -223,7 +231,8 @@
 
       <div class="ei-section">
         <div class="ei-section-title"><i class="fas fa-clipboard-list"></i>Exam Overview</div>
-        <div class="ei-overview-grid">
+        {% set ov_n = 6 + (1 if exam.passing_percentage is not none else 0) + (1 if is_scheduled else 0) %}
+        <div class="ei-overview-grid" data-r3="{{ ov_n % 3 }}" data-r2="{{ ov_n % 2 }}">
           <div class="ei-ov-item"><span class="ei-ov-label">Exam Date</span><span class="ei-ov-value">{{ exam.date | calendar_date }}</span></div>
           <div class="ei-ov-item"><span class="ei-ov-label">Start Time</span><span class="ei-ov-value">{{ exam.start_time | calendar_time }}</span></div>
           <div class="ei-ov-item"><span class="ei-ov-label">Duration</span><span class="ei-ov-value">{{ exam.duration }} minutes</span></div>

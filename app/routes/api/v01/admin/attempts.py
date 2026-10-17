@@ -1,245 +1,191 @@
 """
 app/routes/api/v01/admin/attempts.py
-Admin attempt-management JSON API (v01). Relocated from
-app/routes/admin/attempts.py.
+Admin attempt-management JSON API (v01).
 
-  GET  /admin/api/attempts/search  -> GET  /api/v01/admin/attempts/search
-  POST /admin/attempts/modify      -> POST /api/v01/admin/attempts/modify
-  POST /admin/attempts/bulk-modify -> POST /api/v01/admin/attempts/bulk-modify
+  GET  /api/v01/admin/attempts/search       one row per (student, exam): used / running / limit / status
+  POST /api/v01/admin/attempts/modify       reset, increase or decrease one student's attempts on one exam
+  POST /api/v01/admin/attempts/bulk-modify  the same for several (student, exam) pairs
 
-NOTE on scope: api_attempts_search's pagination (fetch every matching
-exam_attempts row, aggregate/sort/paginate in Python) is flagged in the
-architecture audit as a High-severity issue — a true fix means pushing
-the (student_id, exam_id) aggregation, the exam.max_attempts join, and
-the derived status filter into SQL, which changes this endpoint's query
-shape substantially. Given the risk of a live-data admin tool silently
-returning wrong rows with no test suite to catch a mistake, that rewrite
-is intentionally deferred rather than attempted here — relocated as-is.
-The two write endpoints below DID get their flagged fix applied (batched
-DELETE/INSERT instead of one statement per row), since that's a
-mechanical, low-risk change that can't alter which rows are affected.
+What "used" means: an attempt counts against the exam's limit once it has completed, or when an administrator added it by
+hand (status 'manual_add'). This is the same count the student-side start and resume checks use
+(app.db.attempts.get_used_attempts_count), so this page and the exam itself always agree. An attempt that is still
+running ('in_progress' / 'finalizing') is shown separately and is never deleted by these actions.
 """
 from flask import request, jsonify
 from app.routes.api.v01.admin import admin_api_bp
 from app.middleware.session_guard import require_admin_permission
 from app.db import fetch_all, execute, insert_many
+from app.db.attempts import ATTEMPT_STATUS_FILTERS, search_attempts
 from app.utils.datetime_service import now_utc_naive
+
+PER_PAGE = 50
+MAX_AMOUNT = 1000
+
+
+def _bad_request(message):
+    return jsonify({"success": False, "message": message}), 400
+
+
+def _row(r):
+    limit = r.get("max_attempts")
+    used = int(r["used"])
+    if not limit or int(limit) <= 0:
+        shown_max, remaining, status = "∞", "∞", "unlimited"
+    else:
+        limit = int(limit)
+        shown_max, remaining = str(limit), max(limit - used, 0)
+        status = "exhausted" if used >= limit else "available"
+    return {
+        "student_id":    r["student_id"],
+        "username":      r.get("username") or "Deleted User",
+        "exam_id":       r["exam_id"],
+        "exam_name":     r.get("exam_name") or f"Exam {r['exam_id']}",
+        "max_attempts":  shown_max,
+        "attempts_used": used,
+        "in_progress":   int(r.get("running") or 0),
+        "remaining":     remaining,
+        "status":        status,
+    }
 
 
 @admin_api_bp.route("/attempts/search")
 @require_admin_permission("attempt_management")
 def api_attempts_search():
     """
-    Query params:
-      q        – username ilike search
-      exam_id  – filter by exam ('' = all)
-      status   – '' | 'unlimited' | 'available' | 'exhausted'
-      page     – int (default 1)
-    Strategy:
-      1. Find matching user IDs via users table (ilike on username)
-      2. Fetch exam_attempts counts per (student_id, exam_id)
-      3. Join with exam max_attempts to compute remaining
-      4. Return paginated rows
+    Query params (all optional, combined with AND):
+      q        username or full name contains this text (case-insensitive)
+      exam_id  one exam
+      status   unlimited | available | exhausted | in_progress
+      page     1-based; a page past the end returns the last page that exists
+    The filters, the total and the page window are all computed in one SQL statement.
     """
-    q        = request.args.get("q", "").strip()
-    exam_id  = request.args.get("exam_id", "").strip()
-    status_f = request.args.get("status", "").strip()
+    q = request.args.get("q", "").strip()
+    exam_raw = request.args.get("exam_id", "").strip()
+    status = request.args.get("status", "").strip()
+    if status and status not in ATTEMPT_STATUS_FILTERS:
+        return _bad_request("Unknown status filter.")
+    exam_id = None
+    if exam_raw:
+        try:
+            exam_id = int(exam_raw)
+        except ValueError:
+            return _bad_request("exam_id must be a number.")
     try:
         page = max(1, int(request.args.get("page", 1)))
     except (ValueError, TypeError):
         page = 1
 
-    per_page = 50
-
     try:
-        # ── Step 1: resolve matching user IDs ─────────────────────────
-        if q:
-            users_data = fetch_all(
-                "SELECT id, username FROM users WHERE username ILIKE %s OR full_name ILIKE %s LIMIT 500",
-                (f"%{q}%", f"%{q}%"),
-            )
-        else:
-            # No text search — we'll just get users from attempt records
-            users_data = None   # signal: don't pre-filter
-
-        # ── Step 2: build attempt counts query ───────────────────────
-        att_query = "SELECT student_id, exam_id, status FROM exam_attempts WHERE 1=1"
-        att_params = []
-        if exam_id:
-            att_query += " AND exam_id=%s"
-            att_params.append(exam_id)
-        if users_data is not None:
-            uids = [u["id"] for u in users_data]
-            if not uids:
-                # No matching users → empty result
-                return jsonify({
-                    "rows": [], "total": 0,
-                    "page": page, "per_page": per_page, "total_pages": 1
-                })
-            att_query += " AND student_id = ANY(%s)"
-            att_params.append(uids)
-
-        atts = fetch_all(att_query, att_params)
-
-        # ── Step 3: aggregate attempt counts ─────────────────────────
-        from collections import defaultdict
-        count_map = defaultdict(int)       # (student_id, exam_id) → count
-        sid_set   = set()
-        eid_set   = set()
-        for a in atts:
-            sid = a["student_id"]
-            eid = a["exam_id"]
-            count_map[(sid, eid)] += 1
-            sid_set.add(sid)
-            eid_set.add(eid)
-
-        if not count_map:
-            return jsonify({
-                "rows": [], "total": 0,
-                "page": page, "per_page": per_page, "total_pages": 1
-            })
-
-        # ── Step 4: fetch user names (only for seen IDs) ──────────────
-        if users_data is not None:
-            user_map = {u["id"]: u["username"] for u in users_data}
-        else:
-            ur2 = fetch_all("SELECT id, username FROM users WHERE id = ANY(%s)", (list(sid_set),))
-            user_map = {u["id"]: u["username"] for u in ur2}
-
-        # ── Step 5: fetch exam details (only for seen IDs) ────────────
-        if exam_id:
-            exams_r = fetch_all("SELECT id, name, max_attempts FROM exams WHERE id=%s", (exam_id,))
-        else:
-            exams_r = fetch_all("SELECT id, name, max_attempts FROM exams WHERE id = ANY(%s)", (list(eid_set),))
-        exam_map = {e["id"]: e for e in exams_r}
-
-        # ── Step 6: build rows ────────────────────────────────────────
-        all_rows = []
-        for (sid, eid), used in count_map.items():
-            uname = user_map.get(sid, "Deleted User")
-            exam  = exam_map.get(eid, {})
-            ename = exam.get("name", f"Exam {eid}")
-            max_r = exam.get("max_attempts")
-
-            if not max_r:
-                display_max = "∞"
-                remaining   = "∞"
-                status_val  = "unlimited"
-            else:
-                try:
-                    m = int(float(max_r))
-                    remaining  = max(m - used, 0)
-                    display_max = str(m)
-                    status_val = "exhausted" if remaining == 0 else "available"
-                except (ValueError, TypeError):
-                    display_max = str(max_r)
-                    remaining   = "?"
-                    status_val  = "available"
-
-            if status_f and status_val != status_f:
-                continue
-
-            all_rows.append({
-                "student_id":    sid,
-                "username":      uname,
-                "exam_id":       eid,
-                "exam_name":     ename,
-                "max_attempts":  display_max,
-                "attempts_used": used,
-                "remaining":     remaining,
-                "status":        status_val,
-            })
-
-        # ── Step 7: sort + paginate ───────────────────────────────────
-        all_rows.sort(key=lambda r: (r["username"].lower(), r["exam_name"].lower()))
-        total     = len(all_rows)
-        start     = (page - 1) * per_page
-        page_rows = all_rows[start: start + per_page]
-
-        return jsonify({
-            "rows":        page_rows,
-            "total":       total,
-            "page":        page,
-            "per_page":    per_page,
-            "total_pages": max(1, -(-total // per_page)),
-        })
-
+        rows, total, page = search_attempts(q, exam_id, status, page, PER_PAGE)
     except Exception as e:
-        import traceback; traceback.print_exc()
-        return jsonify({"success": False, "message": str(e)}), 500
+        print(f"[admin.attempts] search error: {e}")
+        return jsonify({"success": False, "message": "Could not load attempts. Please try again."}), 500
+
+    return jsonify({
+        "rows":        [_row(r) for r in rows],
+        "total":       total,
+        "page":        page,
+        "per_page":    PER_PAGE,
+        "total_pages": max(1, -(-total // PER_PAGE)),
+    })
 
 
-def _apply_attempt_action(student_id: str, exam_id: str, action: str, amount: int):
-    """Shared by attempts_modify and attempts_bulk_modify. Batched
-    DELETE/INSERT instead of one statement per row (flagged in the
-    architecture audit)."""
-    current = fetch_all("SELECT id FROM exam_attempts WHERE student_id=%s AND exam_id=%s", (student_id, exam_id))
-    used = len(current)
-
-    if action == "reset":
-        if current:
-            execute("DELETE FROM exam_attempts WHERE id = ANY(%s)", ([a["id"] for a in current],))
-
-    elif action == "decrease":
-        if used < amount:
-            return False, "Not enough attempts to remove"
-        to_remove = sorted(current, key=lambda x: x["id"])[-amount:]
-        execute("DELETE FROM exam_attempts WHERE id = ANY(%s)", ([a["id"] for a in to_remove],))
-
-    elif action == "increase":
-        insert_many("exam_attempts", [
-            {
-                "student_id":     int(student_id),
-                "exam_id":        int(exam_id),
-                "attempt_number": used + i + 1,
-                "status":         "manual_add",
-                "start_time":     now_utc_naive().isoformat(),
-                "end_time":       None,
-            }
-            for i in range(amount)
-        ])
-    else:
+def _apply_attempt_action(student_id: int, exam_id: int, action: str, amount: int):
+    """Shared by modify and bulk-modify. Only counted attempts (completed / manual_add) are ever deleted; a running attempt is
+    never touched."""
+    if action not in ("reset", "increase", "decrease"):
         return False, "Invalid action"
 
+    rows = fetch_all(
+        "SELECT id, status, attempt_number FROM exam_attempts WHERE student_id=%s AND exam_id=%s",
+        (student_id, exam_id),
+    )
+    counted = [r for r in rows if r["status"] in ("completed", "manual_add")]
+
+    if action == "reset":
+        if counted:
+            execute("DELETE FROM exam_attempts WHERE id = ANY(%s)", ([r["id"] for r in counted],))
+
+    elif action == "decrease":
+        if len(counted) < amount:
+            return False, f"Only {len(counted)} used attempt(s) can be removed."
+        # hand-added attempts go first, then the most recent completed ones
+        order = sorted(counted, key=lambda r: (r["status"] != "manual_add", -int(r["id"])))
+        execute("DELETE FROM exam_attempts WHERE id = ANY(%s)", ([r["id"] for r in order[:amount]],))
+
+    else:
+        top = max((int(r.get("attempt_number") or 0) for r in rows), default=0)
+        now = now_utc_naive().isoformat()
+        insert_many("exam_attempts", [
+            {"student_id": student_id, "exam_id": exam_id, "attempt_number": top + i + 1,
+             "status": "manual_add", "start_time": now, "end_time": None}
+            for i in range(amount)
+        ])
     return True, None
 
 
-# ── Single modify ────────────────────────────────────────────────────────
+def _parse_amount(raw):
+    try:
+        amount = int(raw if raw not in (None, "") else 1)
+    except (TypeError, ValueError):
+        return None
+    return amount if 1 <= amount <= MAX_AMOUNT else None
+
+
+def _parse_pair(student_id, exam_id):
+    try:
+        return int(student_id), int(exam_id)
+    except (TypeError, ValueError):
+        return None
+
+
 @admin_api_bp.route("/attempts/modify", methods=["POST"])
 @require_admin_permission("attempt_management")
 def attempts_modify():
-    p          = request.get_json(force=True) or {}
-    student_id = str(p.get("student_id", ""))
-    exam_id    = str(p.get("exam_id", ""))
-    action     = p.get("action", "")
-    amount     = int(p.get("amount") or 1)
-
-    ok, err = _apply_attempt_action(student_id, exam_id, action, amount)
+    p = request.get_json(silent=True) or {}
+    pair = _parse_pair(p.get("student_id"), p.get("exam_id"))
+    amount = _parse_amount(p.get("amount"))
+    if pair is None:
+        return _bad_request("A student and an exam are required.")
+    if amount is None:
+        return _bad_request(f"Amount must be a whole number from 1 to {MAX_AMOUNT}.")
+    try:
+        ok, err = _apply_attempt_action(pair[0], pair[1], p.get("action", ""), amount)
+    except Exception as e:
+        print(f"[admin.attempts] modify error: {e}")
+        return jsonify({"success": False, "message": "Could not change the attempts. Nothing was saved."}), 500
     if not ok:
-        return jsonify({"success": False, "message": err}), 400
+        return _bad_request(err)
     return jsonify({"success": True})
 
 
-# ── Bulk modify ──────────────────────────────────────────────────────────
 @admin_api_bp.route("/attempts/bulk-modify", methods=["POST"])
 @require_admin_permission("attempt_management")
 def attempts_bulk_modify():
-    data   = request.get_json() or {}
-    items  = data.get("items", [])
-    action = data.get("action", "")
-    amount = int(data.get("amount") or 1)
-    ok = 0; errors = []
+    data = request.get_json(silent=True) or {}
+    items = data.get("items")
+    amount = _parse_amount(data.get("amount"))
+    if not isinstance(items, list) or not items:
+        return _bad_request("Select at least one student and exam.")
+    if amount is None:
+        return _bad_request(f"Amount must be a whole number from 1 to {MAX_AMOUNT}.")
 
+    done, errors = 0, []
     for item in items:
-        sid = str(item.get("student_id", ""))
-        eid = str(item.get("exam_id", ""))
+        pair = _parse_pair(item.get("student_id"), item.get("exam_id")) if isinstance(item, dict) else None
+        if pair is None:
+            errors.append("Skipped an entry without a valid student and exam.")
+            continue
         try:
-            success, err = _apply_attempt_action(sid, eid, action, amount)
-            if not success:
-                errors.append(f"uid={sid}/eid={eid}: {err}")
-                continue
-            ok += 1
+            ok, err = _apply_attempt_action(pair[0], pair[1], data.get("action", ""), amount)
         except Exception as e:
-            errors.append(f"uid={sid}/eid={eid}: {e}")
+            print(f"[admin.attempts] bulk item error: {e}")
+            errors.append(f"student {pair[0]} / exam {pair[1]}: could not be changed")
+            continue
+        if ok:
+            done += 1
+        else:
+            errors.append(f"student {pair[0]} / exam {pair[1]}: {err}")
 
-    return jsonify({"success": ok > 0, "processed": ok, "errors": errors or None})
+    return jsonify({"success": done > 0, "processed": done, "errors": errors or None,
+                    "message": None if done else (errors[0] if errors else "Nothing was changed.")})

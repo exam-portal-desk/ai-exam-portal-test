@@ -211,9 +211,9 @@
           <div class="plan-hero-name">{{ _plan.plan_label }}</div>
           {# the state and the formatted date come from the server (entitlements.user_plan -> expiry), in the configured date format #}
           {% set _ex = _plan.expiry %}
-          <div class="plan-hero-sub" id="planExpiry" data-state="{{ _ex.state }}">
+          <div class="plan-hero-sub" id="planExpiry" data-state="{{ _ex.state }}"{% if _ex.state in ('active', 'expiring_soon') %} data-plan-expires="{{ _ex.expires_at_utc }}"{% endif %}>
             {% if _ex.state == 'expired' %}Your {{ _ex.expired_plan_label }} plan expired on {{ _ex.expires_display }}
-            {% elif _ex.state == 'active' %}Expires: {{ _ex.expires_display }}
+            {% elif _ex.state in ('active', 'expiring_soon') %}Expires {{ _ex.expires_display }} &middot; <span data-plan-remaining>{{ _ex.remaining_text }}</span>
             {% else %}No expiry{% endif %}
             {% if _plan.custom %} &middot; plus {{ _plan.custom }} custom access{% endif %}
           </div>

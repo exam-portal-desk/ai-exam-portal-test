@@ -13,10 +13,40 @@ import app.config as config
 misc_bp = Blueprint("misc", __name__)
 
 
+def _public_plans():
+    """The plans exactly as config/entitlements.json defines them, for the public pages: student features only, with
+    each plan's limits. `adds` is what a plan includes beyond the plan it inherits from. No prices exist in the
+    configuration, so none are shown."""
+    from app.entitlements.catalog import get_catalog, STUDENT
+    cat = get_catalog()
+    features = [f for f in cat.features.values() if f.category == STUDENT and f.enforced]
+    plans = []
+    for p in cat.plans.values():
+        parent = cat.plans.get(p.inherits) if p.inherits else None
+
+        def row(f, limits):
+            return {"key": f.key, "label": f.label, "description": f.description,
+                    "limits": [{"label": f.limits[k].label if k in f.limits else k, "per": f.limits[k].per if k in f.limits else "", "value": v}
+                               for k, v in limits.items()]}
+
+        included = {f.key: row(f, p.effective[f.key]) for f in features if f.key in p.effective}
+        adds = [r for k, r in included.items() if not parent or k not in parent.effective]
+        plans.append({"key": p.key, "label": p.label, "tone": p.tone, "icon": p.icon,
+                      "inherits": parent.label if parent else None, "is_default": p.key == cat.default_plan,
+                      "adds": adds, "included": included})
+    return {"plans": plans, "features": [{"key": f.key, "label": f.label, "description": f.description} for f in features]}
+
+
+@misc_bp.route("/plans")
+def plans():
+    return render_template("plans.html", **_public_plans())
+
+
 @misc_bp.route("/")
 def home():
     return render_template(
         "index.html",
+        public_plans=_public_plans()["plans"],
         ceo_name=config.CEO_NAME,
         ceo_title=config.CEO_TITLE,
         ceo_image_url=url_for("misc.ceo_photo") if config.CEO_IMAGE_KEY else None,

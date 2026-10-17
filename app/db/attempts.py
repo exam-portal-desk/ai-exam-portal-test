@@ -79,6 +79,26 @@ def get_exam_attempts_count(exam_id: int) -> int:
         return 0
 
 
+# Attempts that count against an exam's attempt limit: submitted attempts, plus the ones an administrator added by hand
+# ('manual_add'). An in-progress or finalizing attempt is not counted until it completes.
+COUNTED_STATUSES = ("completed", "manual_add")
+IN_PROGRESS_STATUSES = ("in_progress", "finalizing")
+
+
+def get_used_attempts_count(user_id: int, exam_id: int) -> int:
+    """How many of the exam's allowed attempts this student has used. The one number the student-side limit checks and the
+    admin Attempts page both rely on."""
+    try:
+        row = fetch_one(
+            "SELECT COUNT(*) AS count FROM exam_attempts WHERE student_id=%s AND exam_id=%s AND status IN ('completed','manual_add')",
+            (user_id, exam_id),
+        )
+        return row["count"] if row else 0
+    except Exception as e:
+        print(f"[db.attempts] get_used_attempts_count error: {e}")
+        return 0
+
+
 def get_completed_attempts_count(user_id: int, exam_id: int) -> int:
     try:
         row = fetch_one(
@@ -119,6 +139,75 @@ def update_exam_attempt(attempt_id: int, updates: Dict) -> bool:
     except Exception as e:
         print(f"[db.attempts] update_exam_attempt error: {e}")
         return False
+
+
+ATTEMPT_STATUS_FILTERS = ("unlimited", "available", "exhausted", "in_progress")
+
+
+def like_contains(text: str) -> str:
+    """A contains-pattern for LIKE with the user's own backslash, % and _ taken literally (escape character: backslash)."""
+    return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def build_attempt_search(q: str = "", exam_id: Optional[int] = None, status: str = "", page: int = 1, per_page: int = 50):
+    """SQL and parameters for the admin Attempts page: one row per (student, exam) that has attempts, with how many are used,
+    how many are running now, the exam's limit and the derived status. Every filter, the status, the total and the page
+    window are decided here in one statement, so the count and the rows can never disagree. Plain SQL that PostgreSQL and
+    SQLite both run (the tests use SQLite)."""
+    where, params = [], []
+    if exam_id is not None:
+        where.append("a.exam_id = %s")
+        params.append(exam_id)
+    outer, outer_params = [], []
+    if q:
+        outer.append(r"(LOWER(u.username) LIKE LOWER(%s) ESCAPE '\' OR LOWER(COALESCE(u.full_name, '')) LIKE LOWER(%s) ESCAPE '\')")
+        outer_params += [like_contains(q)] * 2
+    limit_expr = "COALESCE(e.max_attempts, 0)"
+    if status == "unlimited":
+        outer.append(f"{limit_expr} <= 0")
+    elif status == "available":
+        outer.append(f"{limit_expr} > 0 AND g.used < {limit_expr}")
+    elif status == "exhausted":
+        outer.append(f"{limit_expr} > 0 AND g.used >= {limit_expr}")
+    elif status == "in_progress":
+        outer.append("g.running > 0")
+    sql = f"""
+        SELECT g.student_id, g.exam_id, g.used, g.running,
+               u.username, e.name AS exam_name, e.max_attempts,
+               COUNT(*) OVER () AS total
+        FROM (
+            SELECT a.student_id, a.exam_id,
+                   COUNT(*) FILTER (WHERE a.status IN ('completed','manual_add')) AS used,
+                   COUNT(*) FILTER (WHERE a.status IN ('in_progress','finalizing')) AS running
+            FROM exam_attempts a
+            {('WHERE ' + ' AND '.join(where)) if where else ''}
+            GROUP BY a.student_id, a.exam_id
+        ) g
+        LEFT JOIN users u ON u.id = g.student_id
+        LEFT JOIN exams e ON e.id = g.exam_id
+        {('WHERE ' + ' AND '.join(outer)) if outer else ''}
+        ORDER BY LOWER(COALESCE(u.username, '')), LOWER(COALESCE(e.name, '')), g.student_id, g.exam_id
+        LIMIT %s OFFSET %s
+    """
+    return sql, params + outer_params + [per_page, max(0, (page - 1) * per_page)]
+
+
+def search_attempts(q: str = "", exam_id: Optional[int] = None, status: str = "", page: int = 1, per_page: int = 50):
+    """(rows, total, page): the requested page, clamped to the last page that exists when the filters leave fewer rows
+    than the caller expected."""
+    sql, params = build_attempt_search(q, exam_id, status, page, per_page)
+    rows = fetch_all(sql, params)
+    if not rows and page > 1:
+        sql, params = build_attempt_search(q, exam_id, status, 1, per_page)
+        first = fetch_all(sql, params)
+        total = first[0]["total"] if first else 0
+        if not total:
+            return [], 0, 1
+        page = max(1, -(-total // per_page))
+        sql, params = build_attempt_search(q, exam_id, status, page, per_page)
+        rows = fetch_all(sql, params)
+    total = int(rows[0]["total"]) if rows else 0
+    return rows, total, page
 
 
 def get_attempts_summary() -> List[Dict]:

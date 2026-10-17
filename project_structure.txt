@@ -14,11 +14,22 @@
 |   |   |-- misc.py
 |   |   |-- notes.py
 |   |   |-- password_history.py
+|   |   |-- question_access.py
 |   |   |-- questions.py
 |   |   |-- results.py
 |   |   |-- sessions.py
 |   |   |-- subcategories.py
 |   |   |-- users.py
+|   |-- entitlements
+|   |   |-- __init__.py
+|   |   |-- authority.py
+|   |   |-- catalog.py
+|   |   |-- errors.py
+|   |   |-- guard.py
+|   |   |-- resolver.py
+|   |   |-- service.py
+|   |   |-- store.py
+|   |   |-- validity.py
 |   |-- middleware
 |   |   |-- jwt_middleware.py
 |   |   |-- session_guard.py
@@ -27,11 +38,14 @@
 |   |   |   |-- v01
 |   |   |   |   |-- admin
 |   |   |   |   |   |-- __init__.py
+|   |   |   |   |   |-- access.py
 |   |   |   |   |   |-- ai_centre.py
+|   |   |   |   |   |-- ai_config.py
 |   |   |   |   |   |-- analytics.py
 |   |   |   |   |   |-- attempts.py
 |   |   |   |   |   |-- categories.py
 |   |   |   |   |   |-- exams.py
+|   |   |   |   |   |-- image_mapping.py
 |   |   |   |   |   |-- images.py
 |   |   |   |   |   |-- preferences.py
 |   |   |   |   |   |-- questions.py
@@ -50,6 +64,7 @@
 |   |   |   |   |-- explanations.py
 |   |   |   |   |-- images.py
 |   |   |   |   |-- notebooks.py
+|   |   |   |   |-- plan.py
 |   |   |   |   |-- portal.py
 |   |   |   |   |-- profile.py
 |   |   |   |-- __init__.py
@@ -57,11 +72,13 @@
 |   |   |   |-- admin
 |   |   |   |   |-- __init__.py
 |   |   |   |   |-- ai_centre.py
+|   |   |   |   |-- ai_configuration.py
 |   |   |   |   |-- attempts.py
 |   |   |   |   |-- auth.py
 |   |   |   |   |-- categories.py
 |   |   |   |   |-- dashboard.py
 |   |   |   |   |-- exams.py
+|   |   |   |   |-- image_mapping.py
 |   |   |   |   |-- images.py
 |   |   |   |   |-- latex_editor.py
 |   |   |   |   |-- profile.py
@@ -70,6 +87,7 @@
 |   |   |   |   |-- results.py
 |   |   |   |   |-- storage.py
 |   |   |   |   |-- subjects.py
+|   |   |   |   |-- users.py
 |   |   |   |-- __init__.py
 |   |   |   |-- ai_assistant.py
 |   |   |   |-- auth.py
@@ -82,14 +100,28 @@
 |   |   |   |-- profile.py
 |   |   |   |-- results.py
 |   |-- services
+|   |   |-- ai
+|   |   |   |-- adapters
+|   |   |   |   |-- __init__.py
+|   |   |   |   |-- anthropic.py
+|   |   |   |   |-- base.py
+|   |   |   |   |-- gemini.py
+|   |   |   |   |-- openai_compatible.py
+|   |   |   |-- __init__.py
+|   |   |   |-- client.py
+|   |   |   |-- guide.py
+|   |   |   |-- registry.py
+|   |   |   |-- types.py
 |   |   |-- ai_provider.py
 |   |   |-- ai_question_generator.py
 |   |   |-- ai_service.py
 |   |   |-- auth_service.py
+|   |   |-- auto_submit_service.py
 |   |   |-- chat_service.py
 |   |   |-- dashboard_service.py
 |   |   |-- discussion_service.py
 |   |   |-- email_service.py
+|   |   |-- exam_export_service.py
 |   |   |-- exam_service.py
 |   |   |-- explanation_service.py
 |   |   |-- image_storage_service.py
@@ -97,6 +129,8 @@
 |   |   |-- notes_service.py
 |   |   |-- notes_storage_service.py
 |   |   |-- pdf_service.py
+|   |   |-- question_access.py
+|   |   |-- question_context.py
 |   |   |-- ranking_service.py
 |   |   |-- result_service.py
 |   |   |-- user_deletion_service.py
@@ -109,6 +143,7 @@
 |   |   |-- cache.py
 |   |   |-- datetime_service.py
 |   |   |-- helpers.py
+|   |   |-- instructions_formatter.py
 |   |   |-- latex.py
 |   |   |-- notes_validation.py
 |   |   |-- pagination.py
@@ -117,13 +152,61 @@
 |   |-- config.py
 |-- config
 |   |-- ai_models.json
+|   |-- AI_MODELS.md
+|   |-- entitlements.json
+|   |-- ENTITLEMENTS.md
+|-- database
+|   |-- db_pgAdmin4_command.txt
+|   |-- full_database_clone.sql
+|-- migrations
+|   |-- 20260820_add_profile_photo.sql
+|   |-- 20260821_discussion_thread_index.sql
+|   |-- 20260823_add_chat_background.sql
+|   |-- 20260823_add_password_history.sql
+|   |-- 20260824_add_exam_passing_percentage.sql
+|   |-- 20260824_chat_background_split.sql
+|   |-- 20260825_ai_assistant_conversations.sql
+|   |-- 20260825_chat_background_zoom_pan.sql
+|   |-- 20260825_notes_view_and_sections.sql
+|   |-- 20260826_category_subcategory_hierarchy.sql
+|   |-- 20260826_consolidate_notes_view_mode.sql
+|   |-- 20260826_notebook_sharing.sql
+|   |-- 20260826_student_dashboard.sql
+|   |-- 20260826_view_prefs.sql
+|   |-- 20260827_group_photo.sql
+|   |-- 20260828_otp_challenges.sql
+|   |-- 20260828_question_metadata.sql
+|   |-- 20260829_access_requests_soft_delete.sql
+|   |-- 20260829_scheduled_exam.sql
+|   |-- 20260830_normal_exam_available_after_datetime.sql
+|   |-- 20260830_scheduled_auto_submit.sql
+|   |-- 20260831_ai_generation_jobs.sql
+|   |-- 20260920_ai_feature_assignments.sql
+|   |-- 20260921_ai_conversation_focus.sql
+|   |-- 20260922_explanation_history_index.sql
+|   |-- 20260923_entitlements.sql
+|   |-- 20260924_admin_access.sql
+|-- scripts
+|   |-- grant_root.py
 |-- static
 |   |-- admin
+|   |   |-- ai-guide.css
+|   |   |-- ai-guide.js
 |   |   |-- list-controller.css
 |   |   |-- list-controller.js
+|   |   |-- select-enhance.css
+|   |   |-- select-enhance.js
+|   |-- ai
+|   |   |-- models
+|   |   |   |-- gemini.svg
+|   |   |   |-- gpt.svg
+|   |   |-- providers
+|   |   |   |-- gemini.svg
+|   |   |   |-- groq.svg
 |   |-- ai_assistant
 |   |   |-- chat.css
 |   |   |-- chat.js
+|   |   |-- stream-render.js
 |   |-- fonts
 |   |   |-- DejaVuSans-Bold.ttf
 |   |   |-- DejaVuSans.ttf
@@ -138,9 +221,17 @@
 |   |   |-- notes.css
 |   |   |-- trash.js
 |   |-- shared
+|   |   |-- ai-badge.css
+|   |   |-- ai-explain.css
+|   |   |-- ai-explain.js
+|   |   |-- chart-export.js
 |   |   |-- date-picker.css
 |   |   |-- date-picker.js
 |   |   |-- greeting.js
+|   |   |-- page-nav.css
+|   |   |-- page-nav.js
+|   |   |-- plan-badge.css
+|   |   |-- plan-validity.js
 |   |   |-- view-toggle.css
 |   |   |-- view-toggle.js
 |   |-- favicon.png
@@ -151,26 +242,37 @@
 |   |-- admin
 |   |   |-- _category_rows.html
 |   |   |-- _exam_rows.html
+|   |   |-- _question_rows.html
 |   |   |-- _subject_rows.html
 |   |   |-- admin_login.html
 |   |   |-- ai_command_centre.html
+|   |   |-- ai_configuration.html
 |   |   |-- attempts.html
+|   |   |-- backup-admin_base.html
 |   |   |-- categories.html
 |   |   |-- csv_upload.html
 |   |   |-- dashboard.html
+|   |   |-- exam_preview.html
 |   |   |-- exams.html
+|   |   |-- forbidden.html
 |   |   |-- guide.html
+|   |   |-- guide_scheduled_exams.html
+|   |   |-- image_mapping.html
 |   |   |-- latex_editor.html
+|   |   |-- new_requests.html
 |   |   |-- object_storage.html
 |   |   |-- profile.html
 |   |   |-- questions.html
 |   |   |-- requests.html
+|   |   |-- requests_history.html
 |   |   |-- subjects.html
 |   |   |-- upload_images.html
-|   |   |-- users_analytics_analytics.html
-|   |   |-- users_analytics_results_table.html
-|   |   |-- users_analytics_results.html
 |   |   |-- users_analytics.html
+|   |   |-- users_analytics_analytics.html
+|   |   |-- users_analytics_responses.html
+|   |   |-- users_analytics_results.html
+|   |   |-- users_analytics_results_table.html
+|   |   |-- users_manage.html
 |   |   |-- view_responses_popup.html
 |   |   |-- view_result_popup.html
 |   |-- emails
@@ -187,7 +289,10 @@
 |   |   |-- library.html
 |   |   |-- trash.html
 |   |-- partials
+|   |   |-- _ai_badge.html
+|   |   |-- _exam_meta.html
 |   |   |-- _leaderboard_row_macro.html
+|   |   |-- _plan_badge.html
 |   |   |-- leaderboard_rows.html
 |   |   |-- updates_panel.html
 |   |-- _dashboard_exam_cards.html
@@ -205,19 +310,23 @@
 |   |-- dashboard.html
 |   |-- error.html
 |   |-- exam_instructions.html
+|   |-- exam_kiosk.html
 |   |-- exam_page.html
+|   |-- feature_locked.html
 |   |-- index.html
 |   |-- login.html
 |   |-- logout_redirect.html
-|   |-- password_reset_form.html
 |   |-- password_reset.html
+|   |-- password_reset_form.html
 |   |-- password_setup_form.html
+|   |-- plans.html
 |   |-- privacy_policy.html
 |   |-- profile.html
 |   |-- registration_success.html
+|   |-- request_admin_access.html
 |   |-- response.html
-|   |-- result_pending.html
 |   |-- result.html
+|   |-- result_pending.html
 |   |-- results_history.html
 |   |-- select_portal.html
 |   |-- student_analytics.html
@@ -225,11 +334,34 @@
 |   |-- support.html
 |   |-- terms_of_service.html
 |   |-- verify_session.html
+|-- tests
+|   |-- fixtures
+|   |   |-- ai_models.baseline.json
+|   |   |-- cot_prompts_golden.json
+|   |-- js
+|   |   |-- ai_explain_render.mjs
+|   |   |-- stream_safe_boundary.mjs
+|   |-- entitled.py
+|   |-- test_admin_authority.py
+|   |-- test_ai_layer.py
+|   |-- test_assistant_pipeline.py
+|   |-- test_entitlements.py
+|   |-- test_explanation_reliability.py
+|   |-- test_explanation_storage.py
+|   |-- test_explanation_ui.py
+|   |-- test_notebook_export.py
+|   |-- test_notebook_limits.py
+|   |-- test_plan_expiry.py
+|   |-- test_profile_name.py
+|   |-- test_question_discussion.py
+|   |-- test_stream_render.py
 |-- uploads_tmp
 |-- .env
 |-- .gitignore
+|-- FullDBReplication.sql
 |-- LICENSE
 |-- main.py
+|-- project_structure.txt
 |-- README.md
 |-- requirements.txt
 |-- resuable_commands.txt

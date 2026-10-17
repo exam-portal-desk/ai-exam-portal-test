@@ -204,6 +204,33 @@
         if (menu._search && window.matchMedia('(hover: hover)').matches) menu._search.focus({ preventScroll: true });
       }
     });
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    // Arrow keys: from the button they open the list on the current option; inside it they move between options.
+    function visibleItems() { return Array.from(menu.querySelectorAll('.sel-enh-item')).filter(it => it.style.display !== 'none'); }
+    trigger.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      if (!wrap.classList.contains('open')) trigger.click();
+      const list = visibleItems();
+      const target = menu.querySelector('.sel-enh-item.active') || list[0];
+      if (target) target.focus({ preventScroll: false });
+    });
+    menu.addEventListener('keydown', e => {
+      const list = visibleItems();
+      const i = list.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (menu._search && document.activeElement === menu._search && e.key === 'ArrowUp') return;
+        e.preventDefault();
+        const next = e.key === 'ArrowDown' ? list[Math.min(list.length - 1, i + 1)] : list[Math.max(0, i - 1)];
+        if (next) next.focus();
+      } else if (e.key === 'Home' || e.key === 'End') {
+        if (i < 0) return;
+        e.preventDefault();
+        (e.key === 'Home' ? list[0] : list[list.length - 1]).focus();
+      } else if (e.key === 'Escape') {
+        closeOpen(); trigger.focus();
+      }
+    });
     wrap.addEventListener('click', e => e.stopPropagation()); // clicks inside the open menu must not bubble to the page-level closer
 
     // The underlying <select>'s own option list can be rebuilt elsewhere
@@ -231,84 +258,52 @@
   }
 
 
-  /* FloatingPanel — the same interaction rules as the dropdown menus above, for a larger popover (e.g. a user's plan card)
+  /* FloatingPanel — a modal dialog for larger content (e.g. a user's plan and access card)
    *
-   *   FloatingPanel.open(anchor, panel, { resolve, onClose })   panel is an element with class "floating-panel"
-   *   FloatingPanel.reposition() / FloatingPanel.close() / FloatingPanel.current()
+   *   FloatingPanel.open(anchor, panel, { onClose })   panel is an element; it gets the "floating-panel" class
+   *   FloatingPanel.close() / FloatingPanel.current()
    *
-   * One is open at a time, page-wide. It closes on Escape and on a press OUTSIDE it (pointerdown, so a drag on its own
-   * scrollbar or a touch inside it never counts as outside). Scrolling INSIDE it is never treated as the page moving, and
-   * select-enhance.css stops the scroll from chaining to the page (overscroll-behavior). When the PAGE scrolls or resizes
-   * the panel follows its anchor (fixed coordinates, so no parent container can clip it) and closes only if the anchor has
-   * left the screen. `resolve` returns the anchor again when the page re-rendered it; on a narrow screen it becomes a sheet.
+   * One is open at a time, page-wide. It is centred over a backdrop, never wider or taller than the viewport (it scrolls
+   * inside), locks the page behind it from scrolling, and closes on Escape, on a press on the backdrop, or through its own
+   * close button. Focus moves into it and returns to the trigger afterwards.
    */
   const FloatingPanel = (function () {
-    let cur = null;   // { anchor, panel, opts, frame }
-
-    function anchorEl() {
-      if (!cur) return null;
-      if (cur.anchor && cur.anchor.isConnected) return cur.anchor;
-      const found = cur.opts.resolve ? cur.opts.resolve() : null;
-      if (found) cur.anchor = found;
-      return found;
-    }
-
-    function place() {
-      if (!cur) return;
-      const anchor = anchorEl();
-      const panel = cur.panel;
-      if (!anchor) return;                                   // the page is re-rendering it right now: stay where the panel is
-      const r = anchor.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > window.innerHeight) { close(); return; }
-      const sheet = window.innerWidth <= 640;
-      panel.classList.toggle('is-sheet', sheet);
-      if (sheet) { panel.style.left = panel.style.top = ''; return; }
-      const w = panel.offsetWidth, h = panel.offsetHeight;
-      panel.style.left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8)) + 'px';
-      let top = r.bottom + 6;
-      if (top + h > window.innerHeight - 8) {
-        const above = r.top - h - 6;
-        top = above >= 8 ? above : Math.max(8, window.innerHeight - h - 8);
-      }
-      panel.style.top = top + 'px';
-    }
-
-    function schedule() {
-      if (!cur || cur.frame) return;
-      cur.frame = requestAnimationFrame(() => { if (cur) { cur.frame = 0; place(); } });
-    }
+    let cur = null;   // { anchor, panel, backdrop, opts, restore }
 
     function close() {
       if (!cur) return;
-      const { panel, opts, frame } = cur;
+      const { anchor, panel, backdrop, opts, restore } = cur;
       cur = null;
-      if (frame) cancelAnimationFrame(frame);
       panel.remove();
+      backdrop.remove();
+      document.body.style.overflow = restore.overflow;
+      document.body.style.paddingRight = restore.paddingRight;
+      if (anchor && anchor.isConnected && typeof anchor.focus === 'function') anchor.focus({ preventScroll: true });
       if (opts.onClose) opts.onClose();
     }
 
     function open(anchor, panel, opts) {
       close();
-      cur = { anchor, panel, opts: opts || {}, frame: 0 };
+      const backdrop = document.createElement('div');
+      backdrop.className = 'floating-backdrop';
+      backdrop.addEventListener('pointerdown', e => { if (e.target === backdrop) close(); });
       panel.classList.add('floating-panel');
-      document.body.appendChild(panel);
-      place();
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      panel.tabIndex = -1;
+      backdrop.appendChild(panel);
+      const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+      const restore = { overflow: document.body.style.overflow, paddingRight: document.body.style.paddingRight };
+      document.body.style.overflow = 'hidden';
+      if (scrollbar > 0) document.body.style.paddingRight = scrollbar + 'px';
+      document.body.appendChild(backdrop);
+      cur = { anchor, panel, backdrop, opts: opts || {}, restore };
+      panel.focus({ preventScroll: true });
     }
 
-    document.addEventListener('pointerdown', e => {
-      if (!cur || cur.panel.contains(e.target)) return;
-      const anchor = anchorEl();
-      if (anchor && anchor.contains(e.target)) return;      // the anchor's own click decides (open again / close)
-      close();
-    }, true);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-    window.addEventListener('scroll', e => {
-      if (!cur || (e.target && typeof e.target.contains === 'function' && cur.panel.contains(e.target))) return;
-      schedule();
-    }, true);
-    window.addEventListener('resize', schedule);
 
-    return { open, close, reposition: schedule, current: () => (cur ? cur.panel : null) };
+    return { open, close, current: () => (cur ? cur.panel : null) };
   })();
   global.FloatingPanel = FloatingPanel;
 

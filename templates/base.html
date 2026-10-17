@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}SmartAIExam{% endblock %}</title>
@@ -787,10 +787,12 @@
     {% set _ex = _plan.expiry %}
     <a class="sb-plan" href="{{ url_for('profile.my_profile') }}#plan" aria-label="Your plan: {{ _plan.plan_label }}"
        data-tip="{{ _plan.plan_label }} plan"
-       data-tip-sub="{% if _ex.state == 'expired' %}{{ _ex.expired_plan_label }} plan expired {{ _ex.expires_display }}{% elif _ex.state == 'active' %}Expires: {{ _ex.expires_display }}{% else %}No expiry{% endif %}"
+       data-tip-sub="{% if _ex.state == 'expired' %}{{ _ex.expired_plan_label }} plan expired {{ _ex.expires_display }}{% elif _ex.state in ('active', 'expiring_soon') %}Expires {{ _ex.expires_display }} &middot; {{ _ex.remaining_text }}{% else %}No expiry{% endif %}"
+       {% if _ex.state in ('active', 'expiring_soon') %}data-plan-expires="{{ _ex.expires_at_utc }}"{% endif %}
        data-tip-hint="View what your plan includes">
       {{ plan_badge(_plan.plan_label, _plan.tone, _plan.icon, 'md') }}
     </a>
+    <script src="{{ url_for('static', filename='shared/plan-validity.js') }}" defer></script>
     {% endif %}
     <a class="sb-item {{ 'active' if active_nav == 'profile' else '' }}" href="{{ url_for('profile.my_profile') }}" data-tip="Profile &amp; Account">
       <span class="sb-ic"><i class="fas fa-user-circle"></i></span>

@@ -10,11 +10,11 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Dict, Iterable, Optional
 
-from app.entitlements import authority, store
+from app.entitlements import authority, store, validity
 from app.entitlements.catalog import ADMIN, STUDENT, Catalog, get_catalog, parse_limits
 from app.entitlements.errors import AccessDenied, AccessError
 from app.entitlements.resolver import DENY, GRANT, Access, LimitStatus, Subject, check_limit as _check_limit, effective_plan, resolve
-from app.utils.datetime_service import format_display_date, now_utc_naive
+from app.utils.datetime_service import now_utc_naive
 
 
 def _access(user_id: int, feature: str, is_admin: Optional[bool] = None, need_limits: bool = False) -> Access:
@@ -92,7 +92,8 @@ def summaries_for(user_ids: Iterable[int]) -> Dict[int, dict]:
     for uid in ids:
         row = stored.get(uid) or {}
         out[uid] = {**_plan_view(catalog, row.get("plan"), row.get("plan_expires_at"), now), "custom": row.get("custom", 0),
-                    "admin_access": row.get("admin_access", 0)}
+                    "admin_access": row.get("admin_access", 0),
+                    "expiry": _expiry_view(catalog, Subject(uid, plan=row.get("plan"), plan_expires_at=row.get("plan_expires_at")), now)}
     return out
 
 
@@ -118,7 +119,7 @@ def describe_user(user_id: int, actor_id: Optional[int] = None) -> dict:
         limits = dict(o.limits)
         return {"feature": o.feature, "label": definition.label if definition else o.feature, "effect": o.effect, "limits": limits,
                 "limit_text": [f"{definition.limits[k].label}: {v}" for k, v in limits.items() if definition and k in definition.limits],
-                "expires_at": _iso(o.expires_at), "reason": o.reason, "active": o.active(now),
+                "expires_at": _iso(o.expires_at), "expiry": validity.describe(o.expires_at, now), "reason": o.reason, "active": o.active(now),
                 "privileged": bool(definition and definition.privileged)}
 
     def category(o):
@@ -128,6 +129,8 @@ def describe_user(user_id: int, actor_id: Optional[int] = None) -> dict:
     return {
         "user_id": int(user_id), "is_admin": subject.is_admin, **plan,
         "plan_key": subject.plan, "plan_expires_at": _iso(subject.plan_expires_at),
+        "plan_expiry": _expiry_view(catalog, subject, now),
+        "plan_assigned_display": validity.display(store.plan_assigned_at(user_id)),
         "special": [entry(o) for o in overrides if category(o) == STUDENT],
         "admin_access": [entry(o) for o in overrides if category(o) == ADMIN],
         "features": rows,
@@ -136,17 +139,14 @@ def describe_user(user_id: int, actor_id: Optional[int] = None) -> dict:
 
 
 def _expiry_view(catalog: Catalog, subject: Subject, now: datetime) -> dict:
-    """The plan expiry a person is shown, from the one stored value the resolver also uses (users.plan_expires_at), formatted
-    by the central date service (APP_TIMEZONE + DISPLAY_DATE_FORMAT). state: "none" (no expiry, which includes every account
-    that never had a plan set), "active" (expires on expires_display) or "expired" (that plan has lapsed and the account is
-    already on the default plan, expired_plan_label says which plan)."""
+    """The plan expiry a person is shown, from the one stored value the resolver also uses (users.plan_expires_at), computed
+    by app.entitlements.validity in APP_TIMEZONE. state: "none" (no expiry, which includes every account that never had a
+    plan set), "active", "expiring_soon", or "expired" (that plan has lapsed and the account is already on the default
+    plan; expired_plan_label says which plan). The exact expiry and a readable remaining time come with it."""
     if not subject.plan or subject.plan_expires_at is None or subject.plan not in catalog.plans:
-        return {"state": "none", "expires_at": None, "expires_display": None, "expired_plan_label": None}
-    lapsed = subject.plan_expires_at <= now
-    stored = catalog.plans.get(subject.plan)
-    return {"state": "expired" if lapsed else "active", "expires_at": _iso(subject.plan_expires_at),
-            "expires_display": format_display_date(subject.plan_expires_at),
-            "expired_plan_label": stored.label if lapsed else None}
+        return {**validity.describe(None, now), "expired_plan_label": None}
+    info = validity.describe(subject.plan_expires_at, now)
+    return {**info, "expired_plan_label": catalog.plans[subject.plan].label if info["state"] == "expired" else None}
 
 
 def user_plan(user_id: int) -> dict:

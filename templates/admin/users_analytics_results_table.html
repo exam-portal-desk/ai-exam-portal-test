@@ -1,4 +1,3 @@
-{% if results %}
 <style>
 .icon-btn { width:30px; height:30px; border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-2); display:inline-block; position:relative; cursor:pointer; transition:background .12s,color .12s,border-color .12s; font-size:.72rem; text-decoration:none; vertical-align:middle; }
 .icon-btn i { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); line-height:1; }
@@ -15,7 +14,11 @@
 .empty-state { text-align:center; padding:3rem 1rem; }
 .empty-state i { font-size:2rem; color:var(--text-3); opacity:.35; display:block; margin-bottom:.75rem; }
 .empty-state p { color:var(--text-3); margin:0; font-size:.88rem; }
+.empty-why { font-size:.8rem !important; margin-top:.4rem !important; max-width:46ch; margin-left:auto !important; margin-right:auto !important; line-height:1.5; }
+.empty-btn { margin-top:.9rem; display:inline-flex; align-items:center; gap:.4rem; padding:.45rem .95rem; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); font:inherit; font-size:.8rem; font-weight:600; cursor:pointer; }
+.empty-btn:hover { border-color:var(--accent); color:var(--accent); }
 </style>
+{% if results %}
 <div class="table-responsive">
   <table class="table mb-0">
     <thead>
@@ -86,9 +89,24 @@
 </div>
 {% endif %}
 
+{% elif error %}
+<div class="empty-state" role="alert">
+  <i class="fas fa-triangle-exclamation" style="color:var(--danger-text);opacity:.8"></i>
+  <p><strong>Could not load results</strong></p>
+  <p class="empty-why">{{ error }}</p>
+  <button type="button" class="empty-btn" onclick="_fetchResults()"><i class="fas fa-rotate"></i> Try again</button>
+</div>
+{% elif active_filters %}
+<div class="empty-state">
+  <i class="fas fa-filter-circle-xmark"></i>
+  <p><strong>No results match these filters</strong></p>
+  <p class="empty-why">Filtering by {{ active_filters | join(' and ') }}. Widen the dates, pick another exam, or clear the filters.</p>
+  <button type="button" class="empty-btn" onclick="clearResultsFilter()"><i class="fas fa-rotate-left"></i> Clear filters</button>
+</div>
 {% else %}
 <div class="empty-state">
   <i class="fas fa-inbox"></i>
-  <p><strong>No Results Found</strong><br><span style="font-size:.8rem">Try adjusting the filters.</span></p>
+  <p><strong>No results yet</strong></p>
+  <p class="empty-why">Results appear here once students submit an exam.</p>
 </div>
 {% endif %}

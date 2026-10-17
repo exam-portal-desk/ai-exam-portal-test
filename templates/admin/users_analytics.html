@@ -83,18 +83,42 @@
 .a-filter-bar label { font-size:.72rem; font-weight:600; color:var(--text-3); display:block; margin-bottom:.3rem; }
 #customRange { display:none; gap:.5rem; }
 
-/* ── Analytics Mini-Stats ── */
-.a-stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.75rem; padding:1rem 1.25rem; border-bottom:1px solid var(--border); }
-.a-stat-card  { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem 1rem; text-align:center; }
-.a-stat-val   { font-size:1.35rem; font-weight:800; color:var(--accent); line-height:1; }
-.a-stat-lbl   { font-size:.67rem; font-weight:600; color:var(--text-3); margin-top:.25rem; text-transform:uppercase; letter-spacing:.05em; }
-
-/* ── Charts Grid ── */
-.charts-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:1rem; padding:1rem 1.25rem; border-bottom:1px solid var(--border); }
-.chart-card  { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; }
-.chart-card h6 { font-size:.78rem; font-weight:700; color:var(--text-2); margin:0 0 .75rem; display:flex; align-items:center; gap:.35rem; }
-.chart-card h6 i { color:var(--accent); }
-.chart-wrap  { height:200px; position:relative; }
+/* ── Analytics sections ── */
+.a-section { padding:1.1rem 1.25rem; border-bottom:1px solid var(--border); }
+.a-section:last-child { border-bottom:none; }
+.a-sec-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin-bottom:.85rem; }
+.a-sec-head h5 { font-size:.95rem; font-weight:700; color:var(--text-1); margin:0 0 .15rem; }
+.a-sec-head p  { font-size:.76rem; color:var(--text-3); margin:0; }
+.a-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.75rem; }
+.a-kpi  { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.85rem 1rem; min-width:0; }
+.a-kpi-lbl { font-size:.68rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; }
+.a-kpi-val { font-size:1.55rem; font-weight:800; color:var(--text-1); line-height:1.15; margin:.2rem 0; }
+.a-kpi-note { font-size:.72rem; color:var(--text-3); line-height:1.35; }
+.a-scope { font-size:.74rem; color:var(--text-3); padding:.55rem 1.25rem; border-bottom:1px solid var(--border); background:var(--surface); }
+.chart-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; min-width:0; }
+.chart-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; margin-bottom:.15rem; }
+.chart-head h6 { font-size:.84rem; font-weight:700; color:var(--text-1); margin:0; }
+.chart-sub { font-size:.72rem; color:var(--text-3); margin:0 0 .75rem; line-height:1.35; }
+.chart-wrap { position:relative; height:260px; }
+.chart-empty { display:none; align-items:center; justify-content:center; text-align:center; min-height:140px; padding:1rem; font-size:.8rem; color:var(--text-3); border:1px dashed var(--border); border-radius:var(--radius); }
+.chart-card.is-empty .chart-wrap, .chart-card.is-empty .band-legend { display:none; }
+.chart-card.is-empty .chart-empty { display:flex; }
+.a-grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr)); gap:1rem; }
+.btn-png { padding:.25rem .6rem; font-size:.72rem; }
+.band-legend { list-style:none; margin:.75rem 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.4rem .9rem; }
+.band-legend li { display:flex; align-items:center; gap:.45rem; font-size:.76rem; color:var(--text-2); min-width:0; }
+.band-legend .sw { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.band-legend b { color:var(--text-1); margin-left:auto; white-space:nowrap; }
+.a-skel .a-kpi-val { color:var(--text-3); }
+@media (max-width:575.98px) {
+  .a-section { padding:.9rem .85rem; }
+  .a-scope { padding:.5rem .85rem; }
+  .chart-wrap { height:240px; }
+  .chart-head { flex-wrap:wrap; }
+  .a-sec-head .btn-flat { width:100%; justify-content:center; }
+  .a-filter-bar > div { flex:1 1 100%; }
+  .a-filter-bar .f-select, .a-filter-bar .f-date { width:100%; font-size:16px; }
+}
 
 /* ── Tables Grid ── */
 .tables-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem; padding:1rem 1.25rem; }
@@ -200,14 +224,14 @@
         <div class="user-search-wrap">
           <input type="text" class="user-search-input" id="rf-user-search"
                  placeholder="Search username…" autocomplete="off"
-                 oninput="userSearchDebounce()" onfocus="userSearchDebounce()">
+                 oninput="document.getElementById('rf-user-id').value='';userSearchDebounce()" onfocus="userSearchDebounce()">
           <input type="hidden" id="rf-user-id" value="">
           <div class="user-dropdown" id="userDropdown"></div>
         </div>
       </div>
       <div>
         <label>Exam</label>
-        <select class="f-select" id="rf-exam">
+        <select class="f-select" id="rf-exam" onchange="applyResultsFilter()">
           <option value="">All Exams</option>
           {% for e in exams %}
           <option value="{{ e.id }}">{{ e.name }}</option>
@@ -230,7 +254,7 @@
       </div>
       <div style="display:flex;gap:.5rem;align-items:flex-end">
         <button class="btn-flat primary" onclick="applyResultsFilter()"><i class="fas fa-search"></i>Filter</button>
-        <button class="btn-flat secondary" onclick="clearResultsFilter()"><i class="fas fa-times"></i></button>
+        <button class="btn-flat secondary" onclick="clearResultsFilter()" title="Clear all filters"><i class="fas fa-rotate-left"></i>Clear</button>
       </div>
     </div>
 
@@ -286,25 +310,61 @@
       </div>
     </div>
 
-    <div class="a-stats-grid">
-      <div class="a-stat-card"><div class="a-stat-val" id="as-avg">—</div><div class="a-stat-lbl">Avg Score</div></div>
-      <div class="a-stat-card"><div class="a-stat-val" id="as-att">—</div><div class="a-stat-lbl">Total Attempts</div></div>
-      <div class="a-stat-card"><div class="a-stat-val" id="as-pass">—</div><div class="a-stat-lbl">Pass Rate</div></div>
-      <div class="a-stat-card"><div class="a-stat-val" id="as-users">—</div><div class="a-stat-lbl">Active Users</div></div>
-    </div>
+    <div class="a-scope" id="aScope" aria-live="polite">Loading analytics…</div>
 
-    <div class="charts-grid">
-      <div class="chart-card">
-        <h6><i class="fas fa-chart-pie me-1"></i>Score Distribution</h6>
-        <div class="chart-wrap"><canvas id="chartDist"></canvas></div>
+    <section class="a-section" aria-labelledby="secOverview">
+      <div class="a-sec-head">
+        <div><h5 id="secOverview">Overview</h5><p>Headline numbers for the filters above. A result passes at <span data-pass-mark>40</span>% or more.</p></div>
+        <button class="btn-flat secondary" type="button" onclick="exportDashboardPng()" id="btnDashPng"><i class="fas fa-download"></i>Export dashboard (PNG)</button>
       </div>
-      <div class="chart-card">
-        <h6><i class="fas fa-chart-bar me-1"></i>Exam Performance</h6>
-        <div class="chart-wrap"><canvas id="chartExam"></canvas></div>
+      <div class="a-kpis">
+        <div class="a-kpi"><div class="a-kpi-lbl">Average score</div><div class="a-kpi-val" id="as-avg">—</div><div class="a-kpi-note">Mean percentage across all attempts in range.</div></div>
+        <div class="a-kpi"><div class="a-kpi-lbl">Total attempts</div><div class="a-kpi-val" id="as-att">—</div><div class="a-kpi-note">Exam results submitted in range.</div></div>
+        <div class="a-kpi"><div class="a-kpi-lbl">Pass rate</div><div class="a-kpi-val" id="as-pass">—</div><div class="a-kpi-note">Share of attempts scoring <span data-pass-mark>40</span>% or more.</div></div>
+        <div class="a-kpi"><div class="a-kpi-lbl">Active students</div><div class="a-kpi-val" id="as-users">—</div><div class="a-kpi-note">Distinct students with at least one attempt.</div></div>
       </div>
-    </div>
+    </section>
 
-    <div class="tables-grid">
+    <section class="a-section" aria-labelledby="secExam">
+      <div class="a-sec-head"><div><h5 id="secExam">Exam performance</h5><p>Average score per exam, highest first. Hover a bar for attempts and pass rate.</p></div></div>
+      <div class="chart-card" id="card-exam">
+        <div class="chart-head"><h6>Average score by exam</h6><button class="btn-flat secondary btn-png" type="button" onclick="exportChartPng('exam')"><i class="fas fa-image"></i>PNG</button></div>
+        <p class="chart-sub" id="sub-exam"></p>
+        <div class="chart-wrap"><canvas id="chartExam" role="img" aria-label="Average score by exam"></canvas></div>
+        <div class="chart-empty">No exam results in this range.</div>
+      </div>
+    </section>
+
+    <section class="a-section" aria-labelledby="secDist">
+      <div class="a-sec-head"><div><h5 id="secDist">Score distribution</h5><p>How many attempts fall in each score band.</p></div></div>
+      <div class="chart-card" id="card-dist">
+        <div class="chart-head"><h6>Attempts by score band</h6><button class="btn-flat secondary btn-png" type="button" onclick="exportChartPng('dist')"><i class="fas fa-image"></i>PNG</button></div>
+        <p class="chart-sub" id="sub-dist"></p>
+        <div class="chart-wrap" style="height:220px"><canvas id="chartDist" role="img" aria-label="Attempts by score band"></canvas></div>
+        <ul class="band-legend" id="bandLegend"></ul>
+        <div class="chart-empty">No attempts in this range.</div>
+      </div>
+    </section>
+
+    <section class="a-section" aria-labelledby="secAct">
+      <div class="a-sec-head"><div><h5 id="secAct">User activity</h5><p id="actDesc">Attempts and average score over time.</p></div></div>
+      <div class="a-grid-2">
+        <div class="chart-card" id="card-act">
+          <div class="chart-head"><h6>Attempts over time</h6><button class="btn-flat secondary btn-png" type="button" onclick="exportChartPng('act')"><i class="fas fa-image"></i>PNG</button></div>
+          <p class="chart-sub" id="sub-act"></p>
+          <div class="chart-wrap"><canvas id="chartAct" role="img" aria-label="Attempts over time"></canvas></div>
+          <div class="chart-empty">No dated attempts in this range.</div>
+        </div>
+        <div class="chart-card" id="card-trend">
+          <div class="chart-head"><h6>Average score over time</h6><button class="btn-flat secondary btn-png" type="button" onclick="exportChartPng('trend')"><i class="fas fa-image"></i>PNG</button></div>
+          <p class="chart-sub" id="sub-trend"></p>
+          <div class="chart-wrap"><canvas id="chartTrend" role="img" aria-label="Average score over time"></canvas></div>
+          <div class="chart-empty">No dated attempts in this range.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="tables-grid" id="detailTables">
       <div class="perf-card">
         <h6><i class="fas fa-medal me-1"></i>Top Performers</h6>
         <div class="table-responsive">
@@ -339,6 +399,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='shared/chart-export.js') }}"></script>
 <script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
 <script>
 /* ═══════════════════════════════════════════
@@ -449,6 +510,10 @@ document.addEventListener('click', e => {
 let _resultsCurPage = 1;
 let _resultsLoading = false;
 
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'rf-user-search') { e.preventDefault(); document.getElementById('userDropdown').classList.remove('open'); applyResultsFilter(); }
+});
+
 function applyResultsFilter() {
   const from = document.getElementById('rf-from').dataset.iso || '';
   const to   = document.getElementById('rf-to').dataset.iso || '';
@@ -474,29 +539,40 @@ function clearResultsFilter() {
 
 function resultsPage(p) { _resultsCurPage = p; _fetchResults(); }
 
+let _resultsInflight = null, _resultsSeq = 0;
+
 function _fetchResults() {
-  if (_resultsLoading) return;
-  _resultsLoading = true;
+  // Only the newest request may draw: a filter change while one is loading cancels it instead of being ignored.
+  if (_resultsInflight) _resultsInflight.abort();
+  const ctl = new AbortController();
+  _resultsInflight = ctl;
+  const seq = ++_resultsSeq;
   const wrap = document.getElementById('resultsTableWrap');
   wrap.innerHTML = _skeletonTable();
+  wrap.setAttribute('aria-busy', 'true');
 
   const from = document.getElementById('rf-from').dataset.iso || '';   // YYYY-MM-DD, kept in sync by date-picker.js
   const to   = document.getElementById('rf-to').dataset.iso || '';
+  const userId = document.getElementById('rf-user-id').value;
+  const typed  = document.getElementById('rf-user-search').value.trim();
 
-  const params = new URLSearchParams({
-    user:     document.getElementById('rf-user-id').value,
-    exam:     document.getElementById('rf-exam').value,
-    dateFrom: from,
-    dateTo:   to,
-    page:     _resultsCurPage,
-    partial:  '1'
-  });
+  const params = new URLSearchParams({ page: _resultsCurPage, partial: '1' });
+  if (userId) { params.set('user', userId); params.set('userLabel', typed); }
+  else if (typed) params.set('q', typed);
+  if (document.getElementById('rf-exam').value) params.set('exam', document.getElementById('rf-exam').value);
+  if (from) params.set('dateFrom', from);
+  if (to)   params.set('dateTo', to);
 
-  fetch('/admin/users-analytics/results?' + params)
-    .then(r => r.text())
-    .then(html => { wrap.innerHTML = html; })
-    .catch(() => { wrap.innerHTML = '<p style="padding:2rem;color:#ef4444">Error loading results.</p>'; })
-    .finally(() => _resultsLoading = false);
+  fetch('/admin/users-analytics/results?' + params, { signal: ctl.signal, credentials: 'same-origin' })
+    .then(r => r.text().then(html => ({ ok: r.ok, html })))
+    .then(({ html }) => { if (seq === _resultsSeq) wrap.innerHTML = html; })   // the server renders the right state: rows, empty, filtered-empty or error
+    .catch(err => {
+      if (err.name === 'AbortError' || seq !== _resultsSeq) return;
+      wrap.innerHTML = `<div class="empty-state" role="alert"><i class="fas fa-wifi" style="color:var(--danger-text);opacity:.8"></i>
+        <p><strong>Could not reach the server</strong></p><p style="font-size:.8rem;margin-top:.4rem">Check your connection and try again.</p>
+        <button type="button" class="btn-flat secondary" style="margin-top:.9rem" onclick="_fetchResults()"><i class="fas fa-rotate"></i>Try again</button></div>`;
+    })
+    .finally(() => { if (seq === _resultsSeq) { _resultsInflight = null; wrap.removeAttribute('aria-busy'); } });
 }
 
 function _skeletonTable() {
@@ -522,43 +598,155 @@ function popupOpen(url, w, h) {
 let _analyticsLoaded = false;
 let _charts = {};
 
-const CHART_COLORS = {
-  accent: '#2d5be3',
-  green:  '#10b981',
-  amber:  '#f59e0b',
-  red:    '#ef4444',
-};
+const BAND_COLORS = ['#10b981', '#2d5be3', '#f59e0b', '#ef4444'];
+const BAND_LABELS = ['Excellent (90%+)', 'Good (75–89%)', 'Average (60–74%)', 'Below 60%'];
+const CHART_TITLES = { exam: 'Average score by exam', dist: 'Attempts by score band', act: 'Attempts over time', trend: 'Average score over time' };
+const MAX_EXAM_BARS = 12;
+let _data = null;
 
 function toggleCustomRange(v) {
   const el = document.getElementById('customRange');
   el.style.display = (v === 'custom') ? 'grid' : 'none';
 }
 
-function _themeColors() {
-  const s = getComputedStyle(document.documentElement);
-  return {
-    tick:           s.getPropertyValue('--text-3').trim(),
-    grid:           s.getPropertyValue('--border').trim(),
-    doughnutBorder: s.getPropertyValue('--surface-2').trim(),
-    legendColor:    s.getPropertyValue('--text-2').trim(),
-  };
+function _cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function _livePalette() {
+  return { text: _cssVar('--text-1'), tick: _cssVar('--text-3'), grid: _cssVar('--border'), accent: _cssVar('--accent') || '#2d5be3', tipBg: _cssVar('--surface'), tipText: _cssVar('--text-1') };
+}
+const EXPORT_PALETTE = { text: '#1c1b18', tick: '#4b4a45', grid: '#e4e2da', accent: '#2d5be3', tipBg: '#ffffff', tipText: '#1c1b18' };
+
+function _trunc(label, n) { label = String(label); return label.length > n ? label.slice(0, n - 1) + '…' : label; }
+function _niceDay(key, gran) {
+  const p = String(key).split('-');
+  const d = new Date(Date.UTC(+p[0], +p[1] - 1, +(p[2] || 1)));
+  return d.toLocaleDateString('en-GB', gran === 'month' ? { month: 'short', year: 'numeric', timeZone: 'UTC' } : { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+function _scopeText() {
+  const period = document.getElementById('af-period');
+  const exam = document.getElementById('af-exam');
+  const p = period.options[period.selectedIndex].text;
+  const e = exam.value ? exam.options[exam.selectedIndex].text : 'All exams';
+  let range = p;
+  if (period.value === 'custom') {
+    const f = document.getElementById('af-from').value, t = document.getElementById('af-to').value;
+    range = (f || t) ? `${f || 'start'} to ${t || 'today'}` : 'Custom range';
+  }
+  return `${range} · ${e}`;
 }
 
-function _chartDefaults() {
-  const tc = _themeColors();
-  return {
-    plugins: {
-      legend: { labels: { color: tc.legendColor, font:{ size:11 } } }
-    },
-    scales: {
-      x: { ticks:{ color:tc.tick, font:{size:10} }, grid:{ color:tc.grid } },
-      y: { ticks:{ color:tc.tick, font:{size:10} }, grid:{ color:tc.grid }, beginAtZero:true }
-    }
-  };
+/* One config builder serves the live chart and the PNG export, so the file is exactly what is on screen. */
+function chartConfig(key, pal, exporting) {
+  const d = _data;
+  const base = { responsive: !exporting, maintainAspectRatio: false, animation: exporting ? false : { duration: 350 }, devicePixelRatio: exporting ? 2 : undefined };
+  const tip = { backgroundColor: pal.tipBg, titleColor: pal.tipText, bodyColor: pal.tipText, borderColor: pal.grid, borderWidth: 1, padding: 10, displayColors: false };
+  const axis = (extra) => Object.assign({ ticks: { color: pal.tick, font: { size: exporting ? 13 : 11 } }, grid: { color: pal.grid } }, extra || {});
+
+  if (key === 'exam') {
+    const rows = d.examRows;
+    return { type: 'bar', data: { labels: rows.map(r => _trunc(r.name, 30)), datasets: [{ data: rows.map(r => r.avg), backgroundColor: pal.accent + 'cc', borderColor: pal.accent, borderWidth: 1, borderRadius: 4, barThickness: 'flex', maxBarThickness: 26 }] },
+      options: Object.assign({}, base, { indexAxis: 'y', plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: {
+        title: (it) => rows[it[0].dataIndex].name,
+        label: (it) => { const r = rows[it.dataIndex]; return [`Average: ${r.avg.toFixed(1)}%`, `Attempts: ${r.attempts}`, `Pass rate: ${r.passRate.toFixed(1)}%`]; } } }) },
+        scales: { x: axis({ min: 0, max: 100, ticks: { color: pal.tick, callback: v => v + '%', font: { size: exporting ? 13 : 11 } } }), y: axis({ grid: { display: false } }) } }) };
+  }
+  if (key === 'dist') {
+    const total = d.dist.reduce((a, b) => a + b, 0);
+    return { type: 'bar', data: { labels: BAND_LABELS, datasets: [{ data: d.dist, backgroundColor: BAND_COLORS, borderRadius: 4, maxBarThickness: 30 }] },
+      options: Object.assign({}, base, { indexAxis: 'y', plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: {
+        label: (it) => `${it.raw} attempt${it.raw === 1 ? '' : 's'} (${total ? (it.raw / total * 100).toFixed(1) : 0}%)` } }) },
+        scales: { x: axis({ beginAtZero: true, ticks: { color: pal.tick, precision: 0, font: { size: exporting ? 13 : 11 } } }), y: axis({ grid: { display: false } }) } }) };
+  }
+  const gran = d.timeline.granularity;
+  const labels = d.timeline.labels.map(k => _niceDay(k, gran));
+  if (key === 'act') {
+    return { type: 'bar', data: { labels, datasets: [{ data: d.timeline.attempts, backgroundColor: pal.accent + 'cc', borderRadius: 3, maxBarThickness: 28 }] },
+      options: Object.assign({}, base, { plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: {
+        label: (it) => [`Attempts: ${it.raw}`, `Students: ${d.timeline.users[it.dataIndex]}`] } }) },
+        scales: { x: axis({ grid: { display: false }, ticks: { color: pal.tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, font: { size: exporting ? 13 : 11 } } }), y: axis({ beginAtZero: true, ticks: { color: pal.tick, precision: 0, font: { size: exporting ? 13 : 11 } } }) } }) };
+  }
+  return { type: 'line', data: { labels, datasets: [{ data: d.timeline.avgScore, borderColor: pal.accent, backgroundColor: pal.accent + '22', fill: true, tension: .25, pointRadius: labels.length > 31 ? 0 : 3, borderWidth: 2 }] },
+    options: Object.assign({}, base, { plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: (it) => `Average: ${Number(it.raw).toFixed(1)}%` } }) },
+      scales: { x: axis({ grid: { display: false }, ticks: { color: pal.tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, font: { size: exporting ? 13 : 11 } } }), y: axis({ min: 0, max: 100, ticks: { color: pal.tick, callback: v => v + '%', font: { size: exporting ? 13 : 11 } } }) } }) };
 }
 
-function _destroyChart(k) {
-  if (_charts[k]) { try { _charts[k].destroy(); } catch(e){} _charts[k] = null; }
+const CANVAS_IDS = { exam: 'chartExam', dist: 'chartDist', act: 'chartAct', trend: 'chartTrend' };
+function _destroyChart(k) { if (_charts[k]) { try { _charts[k].destroy(); } catch (e) {} _charts[k] = null; } }
+function _setEmpty(key, empty) { const c = document.getElementById('card-' + key); if (c) c.classList.toggle('is-empty', !!empty); }
+
+function drawCharts() {
+  if (!_data) return;
+  const pal = _livePalette();
+  const has = { exam: _data.examRows.length > 0, dist: _data.dist.some(n => n > 0), act: _data.timeline.labels.length > 0, trend: _data.timeline.labels.length > 0 };
+  Object.keys(CANVAS_IDS).forEach(k => {
+    _destroyChart(k);
+    _setEmpty(k, !has[k]);
+    if (has[k]) _charts[k] = new Chart(document.getElementById(CANVAS_IDS[k]), chartConfig(k, pal, false));
+  });
+  const shown = _data.examRows.length, all = _data.examTotal;
+  document.getElementById('sub-exam').textContent = all > shown ? `Showing the top ${shown} of ${all} exams by average score.` : `${all} exam${all === 1 ? '' : 's'}, sorted by average score.`;
+  const total = _data.dist.reduce((a, b) => a + b, 0);
+  document.getElementById('sub-dist').textContent = total ? `${total} attempt${total === 1 ? '' : 's'} grouped by percentage scored.` : '';
+  document.getElementById('bandLegend').innerHTML = BAND_LABELS.map((l, i) => `<li><span class="sw" style="background:${BAND_COLORS[i]}"></span>${l}<b>${_data.dist[i]} · ${total ? (_data.dist[i] / total * 100).toFixed(1) : 0}%</b></li>`).join('');
+  const per = _data.timeline.granularity === 'month' ? 'month' : 'day';
+  ['act', 'trend'].forEach(k => { document.getElementById('sub-' + k).textContent = has[k] ? `Grouped per ${per}.` : ''; });
+  document.getElementById('actDesc').textContent = `Attempts and average score per ${per}.`;
+}
+
+const _download = ChartExport.download, _slug = ChartExport.slug, _stamp = ChartExport.stamp;
+
+/* Renders one chart on a fresh offscreen canvas with the light export palette, wrapped in a title/subtitle/footer. */
+function renderExportCanvas(key, width) {
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-10000px;top:0;pointer-events:none';
+  const cv = document.createElement('canvas');
+  const h = key === 'exam' ? Math.max(260, 60 + _data.examRows.length * 34) : key === 'dist' ? 260 : 320;
+  cv.width = width * 2; cv.height = h * 2; cv.style.width = width + 'px'; cv.style.height = h + 'px';
+  holder.appendChild(cv); document.body.appendChild(holder);
+  const cfg = chartConfig(key, EXPORT_PALETTE, true);
+  cfg.options.responsive = false;
+  const chart = new Chart(cv, cfg);
+  chart.resize(width, h);
+  const img = chart.canvas;
+  const out = { chart, holder, canvas: img, w: width, h };
+  return out;
+}
+
+const composeCanvas = ChartExport.compose;
+
+async function exportChartPng(key) {
+  if (!_data || document.getElementById('card-' + key).classList.contains('is-empty')) { adminToast('There is no data to export for this chart.', 'warning'); return; }
+  let exp = null;
+  try {
+    exp = renderExportCanvas(key, 900);
+    const sub = _scopeText() + ' · Pass mark ' + _data.passMark + '%';
+    const out = composeCanvas([{ canvas: exp.canvas, w: exp.w, h: exp.h }], CHART_TITLES[key], sub, 960);
+    await _download(out, `${_slug(CHART_TITLES[key])}-${_stamp()}.png`);
+    adminToast('Chart exported as PNG.', 'success');
+  } catch (e) {
+    console.error(e); adminToast('Could not export this chart.', 'error', e.message);
+  } finally {
+    if (exp) { try { exp.chart.destroy(); } catch (e) {} exp.holder.remove(); }
+  }
+}
+
+async function exportDashboardPng() {
+  if (!_data) { adminToast('Analytics have not loaded yet.', 'warning'); return; }
+  const keys = ['exam', 'dist', 'act', 'trend'].filter(k => !document.getElementById('card-' + k).classList.contains('is-empty'));
+  if (!keys.length) { adminToast('There is no data to export for this range.', 'warning'); return; }
+  const made = [];
+  try {
+    const parts = keys.map(k => { const e = renderExportCanvas(k, 900); made.push(e); return { canvas: e.canvas, w: e.w, h: e.h, caption: CHART_TITLES[k] }; });
+    const sum = _data.summary;
+    const sub = `${_scopeText()} · ${sum.totalAttempts} attempts · avg ${Number(sum.avgScore).toFixed(1)}% · pass rate ${Number(sum.passRate).toFixed(1)}% (pass mark ${_data.passMark}%) · ${sum.activeUsers} students`;
+    const out = composeCanvas(parts, 'User analytics dashboard', sub, 960);
+    await _download(out, `user-analytics-dashboard-${_stamp()}.png`);
+    adminToast('Dashboard exported as PNG.', 'success');
+  } catch (e) {
+    console.error(e); adminToast('Could not export the dashboard.', 'error', e.message);
+  } finally {
+    made.forEach(e => { try { e.chart.destroy(); } catch (x) {} e.holder.remove(); });
+  }
 }
 
 function loadAnalytics() {
@@ -578,86 +766,49 @@ function loadAnalytics() {
     startDate:  document.getElementById('af-from')?.dataset.iso || '',
     endDate:    document.getElementById('af-to')?.dataset.iso   || '',
   });
-  ['as-avg','as-att','as-pass','as-users'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:.9rem"></i>';
-  });
+  document.querySelector('#pane-analytics .a-kpis').classList.add('a-skel');
+  document.getElementById('aScope').textContent = 'Loading analytics…';
   fetch('/api/v01/admin/analytics/data?' + params)
-    .then(r => r.json())
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(d => {
-      _renderSummary(d.summary || {});
-      _renderCharts(d.charts   || {});
-      _renderTables(d.tables   || {});
+      const ch = d.charts || {}, sm = d.summary || {}, tb = d.tables || {};
+      const ep = ch.examPerformance || { labels: [], data: [] };
+      const stats = {};
+      (tb.examStats || []).forEach(x => { stats[x.name] = x; });
+      const all = ep.labels.map((name, i) => ({ name, avg: Number(ep.data[i]) || 0, attempts: (stats[name] || {}).attempts || 0, passRate: Number((stats[name] || {}).passRate) || 0 }))
+        .sort((a, b) => b.avg - a.avg);
+      const tl = ch.userActivity || { labels: [], data: [], users: [], granularity: 'day' };
+      const tr = ch.performanceTrends || { data: [] };
+      _data = {
+        summary: sm, passMark: sm.passMark || 40,
+        examRows: all.slice(0, MAX_EXAM_BARS), examTotal: all.length,
+        dist: (ch.scoreDistribution || [0, 0, 0, 0]).map(Number),
+        timeline: { labels: tl.labels || [], attempts: tl.data || [], users: tl.users || [], avgScore: tr.data || [], granularity: tl.granularity || 'day' },
+      };
+      document.querySelector('#pane-analytics .a-kpis').classList.remove('a-skel');
+      document.querySelectorAll('[data-pass-mark]').forEach(el => { el.textContent = _data.passMark; });
+      _renderSummary(sm);
+      document.getElementById('aScope').textContent = _scopeText();
+      drawCharts();
+      _renderTables(tb);
     })
-    .catch(e => console.error('Analytics fetch error', e));
+    .catch(e => {
+      console.error('Analytics fetch error', e);
+      document.querySelector('#pane-analytics .a-kpis').classList.remove('a-skel');
+      document.getElementById('aScope').textContent = 'Could not load analytics. Try Update again.';
+      adminToast('Could not load analytics.', 'error');
+    });
 }
 
 function _renderSummary(s) {
-  _set('as-avg',   s.avgScore  !== undefined ? Number(s.avgScore).toFixed(1) + '%' : '—');
-  _set('as-att',   s.totalAttempts ?? 0);
-  _set('as-pass',  s.passRate  !== undefined ? Number(s.passRate).toFixed(1) + '%' : '—');
-  _set('as-users', s.activeUsers ?? 0);
+  const n = Number(s.totalAttempts) || 0;
+  _set('as-avg',   n ? Number(s.avgScore).toFixed(1) + '%' : '—');
+  _set('as-att',   n.toLocaleString('en-IN'));
+  _set('as-pass',  n ? Number(s.passRate).toFixed(1) + '%' : '—');
+  _set('as-users', (Number(s.activeUsers) || 0).toLocaleString('en-IN'));
 }
 
 function _set(id, val) { const el=document.getElementById(id); if(el) el.textContent=val; }
-
-function _renderCharts(c) {
-  const tc = _themeColors();
-
-  _destroyChart('dist');
-  const dc = document.getElementById('chartDist');
-  if (dc) {
-    _charts.dist = new Chart(dc, {
-      type: 'doughnut',
-      data: {
-        labels: ['Excellent ≥90%','Good ≥75%','Average ≥60%','Poor <60%'],
-        datasets: [{
-          data: c.scoreDistribution || [0,0,0,0],
-          backgroundColor: [CHART_COLORS.green, CHART_COLORS.accent, CHART_COLORS.amber, CHART_COLORS.red],
-          borderColor:  tc.doughnutBorder,
-          borderWidth:  2,
-          hoverOffset:  6,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: tc.legendColor, font:{size:11}, padding:14, usePointStyle:true }
-          }
-        }
-      }
-    });
-  }
-
-  _destroyChart('exam');
-  const ec = document.getElementById('chartExam');
-  const ep = c.examPerformance || { labels:[], data:[] };
-  if (ec) {
-    const def = _chartDefaults();
-    _charts.exam = new Chart(ec, {
-      type: 'bar',
-      data: {
-        labels: ep.labels,
-        datasets: [{
-          label:           'Avg %',
-          data:            ep.data,
-          backgroundColor: CHART_COLORS.accent + 'cc',
-          borderColor:     CHART_COLORS.accent,
-          borderWidth:     1,
-          borderRadius:    5,
-          borderSkipped:   false,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: def.plugins,
-        scales: { x:{...def.scales.x}, y:{...def.scales.y, max:100} }
-      }
-    });
-  }
-}
 
 function _renderTables(t) {
   const tp = t.topPerformers || [];
@@ -724,10 +875,7 @@ function _renderTables(t) {
    THEME SYNC — redraw charts on theme change
 ═══════════════════════════════════════════ */
 function _redrawChartsForTheme() {
-  if (_analyticsLoaded && (_charts.dist || _charts.exam)) {
-    // Reload analytics data to redraw with new theme colors
-    loadAnalytics();
-  }
+  if (_data) drawCharts();
 }
 
 // Watch for theme attribute changes on <html>

@@ -213,6 +213,8 @@ def create_app() -> Flask:
                 "PUBLIC_ADDRESS": config.PUBLIC_ADDRESS,
                 "PUBLIC_SOCIAL_TWITTER": config.PUBLIC_SOCIAL_TWITTER,
                 "PUBLIC_SOCIAL_LINKEDIN": config.PUBLIC_SOCIAL_LINKEDIN,
+                "PUBLIC_HUB_URL": config.PUBLIC_HUB_URL,
+                "PUBLIC_HUB_NAME": config.PUBLIC_HUB_NAME,
                 "PUBLIC_SOCIAL_GITHUB": config.PUBLIC_SOCIAL_GITHUB,
                 "PUBLIC_SOCIAL_INSTAGRAM": config.PUBLIC_SOCIAL_INSTAGRAM,
                 "LEGAL_PRIVACY_LAST_UPDATED": config.LEGAL_PRIVACY_LAST_UPDATED,

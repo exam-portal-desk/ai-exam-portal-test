@@ -87,7 +87,7 @@ def api_users_search():
             summary = access.get(u["id"])
             if summary and not _is_ghost(user_id=u["id"], username=u.get("username"), role=u.get("role")):
                 u.update(plan=summary["plan"], plan_label=summary["plan_label"], plan_tone=summary["tone"], plan_icon=summary["icon"],
-                         custom_access=summary["custom"], admin_access=summary["admin_access"])
+                         custom_access=summary["custom"], admin_access=summary["admin_access"], plan_expiry=summary.get("expiry"))
             # avatar_url only — the raw storage key never leaves the server. Points at the
             # admin-only photo route below (require_admin_permission("user_management")), not the
             # app-wide /api/v01/images/asset/<key> route every other authenticated user can reach:

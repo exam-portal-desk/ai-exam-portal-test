@@ -73,16 +73,21 @@
 }
 .sel-enh.sel-enh-block .sel-enh-menu { width: 100%; }
 
-/* FloatingPanel (select-enhance.js): a popover that follows its anchor with fixed coordinates, so no parent container can clip
-   it. It scrolls on its own and never hands the scroll on to the page; on a narrow screen it becomes a bottom sheet. */
-.floating-panel {
-  position: fixed; left: 0; top: 0; z-index: 10050;
-  max-width: calc(100vw - 16px); max-height: min(560px, calc(100vh - 16px));
-  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-  background: var(--surface); color: var(--text-1);
-  border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); box-shadow: var(--shadow-lg);
+/* FloatingPanel (select-enhance.js): a modal dialog over a backdrop. It is centred, never wider or taller than the
+   viewport, scrolls inside, and the page behind it is locked. No transform is used on it, so the position:fixed dropdown
+   menus opened inside it keep measuring against the viewport. */
+.floating-backdrop {
+  position: fixed; inset: 0; z-index: 10050;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; background: rgba(0,0,0,.55); overscroll-behavior: contain;
+  animation: floating-fade .15s ease-out;
 }
-.floating-panel::-webkit-scrollbar { width: 6px; }
-.floating-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
-.floating-panel.is-sheet { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto !important; max-width: none; max-height: 82vh; }
+.floating-panel {
+  display: flex; flex-direction: column;
+  width: min(560px, 100%); max-height: 100%; overflow: hidden;
+  background: var(--surface); color: var(--text-1);
+  border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); box-shadow: var(--shadow-lg);
+  outline: none;
+}
+@keyframes floating-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 640px) { .floating-backdrop { padding: 8px; } }

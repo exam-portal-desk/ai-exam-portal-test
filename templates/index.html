@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="SmartAIExam — an ecosystem for secure examinations, AI-assisted question generation and explanations, a collaborative digital notebook, and performance analytics.">
@@ -185,6 +185,86 @@ img{max-width:100%;display:block}
 .mockup-q-opt .opt-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0}
 .mockup-q-opt.correct .opt-dot{background:var(--chat-accent);border-color:var(--chat-accent);position:relative}
 
+
+/* ══ DISCUSS WITH AI DEMO ══ */
+.dwa{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1rem;backdrop-filter:blur(8px);box-shadow:0 20px 50px rgba(0,0,0,.12);min-width:0}
+.dwa-steps{list-style:none;margin:0 0 .85rem;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem;counter-reset:dw}
+.dwa-st{counter-increment:dw;display:flex;align-items:center;justify-content:center;gap:.35rem;padding:.35rem .25rem;border-radius:999px;border:1px solid var(--border);font-size:.66rem;font-weight:700;color:var(--ink3);text-align:center;white-space:nowrap;animation:dwaChip 20s infinite both}
+.dwa-st::before{content:counter(dw);width:15px;height:15px;border-radius:50%;background:color-mix(in srgb,var(--ink3) 18%,transparent);font-size:.58rem;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.dwa-st1{animation-name:dwaC1}.dwa-st2{animation-name:dwaC2}.dwa-st3{animation-name:dwaC3}.dwa-st4{animation-name:dwaC4}
+.dwa-stage{position:relative;height:330px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dwa-screen{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0}
+.dwa-s1{animation:dwaS1 20s infinite both}
+.dwa-s2{animation:dwaS2 20s infinite both}
+.dwa-bar{display:flex;align-items:center;gap:.5rem;padding:.55rem .8rem;border-bottom:1px solid var(--border);background:var(--surface-2,var(--bg2));font-size:.72rem;font-weight:700;color:var(--ink)}
+.dwa-bar i{color:var(--ai-accent)}
+.dwa-online{margin-left:auto;font-size:.62rem;font-weight:600;color:var(--chat-accent)}
+.dwa-qcard{margin:.8rem;padding:.9rem;border:1px solid var(--border);border-radius:12px;background:var(--card-bg)}
+.dwa-qmeta{font-size:.68rem;color:var(--ink3);display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
+.dwa-qmeta b{color:var(--ink)}
+.dwa-tag{margin-left:auto;padding:.1rem .5rem;border-radius:999px;background:color-mix(in srgb,var(--ink3) 16%,transparent);font-weight:700}
+.dwa-qtext{font-size:.8rem;line-height:1.5;color:var(--ink);margin:.55rem 0 .7rem;font-weight:600}
+.dwa-optrow{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.9rem}
+.dwa-optrow span{border:1px solid var(--border);border-radius:8px;padding:.3rem 0;text-align:center;font-size:.7rem;font-weight:700;color:var(--ink2)}
+.dwa-discuss-row{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:.35rem .7rem}
+.dwa-discuss{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .85rem;border-radius:10px;background:color-mix(in srgb,var(--ai-accent) 14%,transparent);color:var(--ai-accent);border:1px solid var(--border);font-size:.74rem;font-weight:700;animation:dwaBtn 20s infinite both}
+.dwa-hint{font-size:.66rem;color:var(--ink3)}
+.dwa-cursor{position:absolute;left:8%;top:150%;font-size:1rem;color:var(--ink);filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));opacity:0;animation:dwaCur 20s infinite both}
+.dwa-ctx{display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--ai-accent) 9%,var(--bg));animation:dwaCtx 20s infinite both}
+.dwa-ctx-icon{color:var(--ai-accent);font-size:1rem}
+.dwa-ctx-main{display:flex;flex-direction:column;min-width:0;flex:1}
+.dwa-ctx-main b{font-size:.74rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dwa-ctx-main span{font-size:.64rem;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dwa-ctx-view{flex-shrink:0;font-size:.64rem;font-weight:700;color:var(--ink2);border:1px solid var(--border);border-radius:8px;padding:.25rem .5rem;background:var(--card-bg)}
+.dwa-chat{flex:1;padding:.7rem .8rem;display:flex;flex-direction:column;gap:.5rem;min-height:0}
+.dwa-msg{max-width:88%;padding:.5rem .75rem;border-radius:12px;font-size:.72rem;line-height:1.5;opacity:0}
+.dwa-user{align-self:flex-end;background:var(--ai-accent);color:#fff;border-bottom-right-radius:4px;animation:dwaUser 20s infinite both}
+.dwa-typing{align-self:flex-start;display:flex;gap:4px;padding:.65rem .8rem;background:var(--surface-2,var(--bg2));border:1px solid var(--border);border-bottom-left-radius:4px;position:absolute;left:.8rem;bottom:2.8rem;animation:dwaTyp 20s infinite both}
+.dwa-typing i{width:5px;height:5px;border-radius:50%;background:var(--ink3);animation:dwaDot 1s infinite}
+.dwa-typing i:nth-child(2){animation-delay:.15s}.dwa-typing i:nth-child(3){animation-delay:.3s}
+.dwa-ai{align-self:flex-start;background:var(--surface-2,var(--bg2));color:var(--ink);border:1px solid var(--border);border-bottom-left-radius:4px;animation:dwaAi 20s infinite both}
+.dwa-chips{display:flex;gap:.35rem;padding:.5rem .8rem .65rem;overflow:hidden;border-top:1px solid var(--border)}
+.dwa-chips span{flex-shrink:0;font-size:.62rem;font-weight:700;color:var(--ink2);border:1px solid var(--border);border-radius:999px;padding:.22rem .6rem;background:var(--card-bg)}
+.dwa-foot{margin:.7rem 0 0;font-size:.66rem;color:var(--ink3);line-height:1.45}
+@keyframes dwaS1{0%{opacity:0}3%,24%{opacity:1}28%,96%{opacity:0}100%{opacity:0}}
+@keyframes dwaS2{0%,24%{opacity:0}28%,93%{opacity:1}97%,100%{opacity:0}}
+@keyframes dwaBtn{0%,8%{box-shadow:0 0 0 0 transparent}12%{box-shadow:0 0 0 4px color-mix(in srgb,var(--ai-accent) 35%,transparent)}20%{box-shadow:0 0 0 4px color-mix(in srgb,var(--ai-accent) 35%,transparent);transform:scale(.96)}24%,100%{box-shadow:0 0 0 0 transparent;transform:none}}
+@keyframes dwaCur{0%,4%{opacity:0;transform:translate(0,12px)}8%{opacity:1;transform:translate(0,12px)}18%{opacity:1;transform:translate(60px,-8px)}22%{opacity:1;transform:translate(60px,-8px) scale(.9)}25%,100%{opacity:0;transform:translate(60px,-8px)}}
+@keyframes dwaCtx{0%,28%{transform:translateY(-8px);opacity:0}34%{transform:none;opacity:1;box-shadow:0 0 0 2px color-mix(in srgb,var(--ai-accent) 45%,transparent) inset}46%{box-shadow:0 0 0 0 transparent inset}93%{opacity:1}97%,100%{opacity:0}}
+@keyframes dwaUser{0%,50%{opacity:0;transform:translateY(8px)}55%,93%{opacity:1;transform:none}97%,100%{opacity:0}}
+@keyframes dwaTyp{0%,57%{opacity:0}59%,66%{opacity:1}68%,100%{opacity:0}}
+@keyframes dwaAi{0%,67%{opacity:0;transform:translateY(8px)}73%,93%{opacity:1;transform:none}97%,100%{opacity:0}}
+@keyframes dwaDot{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes dwaC1{0%,24%{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}28%,100%{background:transparent;border-color:var(--border);color:var(--ink3)}}
+@keyframes dwaC2{0%,10%{background:transparent;border-color:var(--border);color:var(--ink3)}14%,27%{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}31%,100%{background:transparent;border-color:var(--border);color:var(--ink3)}}
+@keyframes dwaC3{0%,28%{background:transparent;border-color:var(--border);color:var(--ink3)}32%,48%{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}52%,100%{background:transparent;border-color:var(--border);color:var(--ink3)}}
+@keyframes dwaC4{0%,50%{background:transparent;border-color:var(--border);color:var(--ink3)}54%,94%{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}98%,100%{background:transparent;border-color:var(--border);color:var(--ink3)}}
+@media(max-width:575px){.dwa{padding:.8rem}.dwa-stage{height:350px}.dwa-st{font-size:.6rem;padding:.3rem .15rem}.dwa-st::before{display:none}.dwa-msg{max-width:94%}}
+@media(prefers-reduced-motion:reduce){
+  .dwa *{animation:none!important}
+  .dwa-s1,.dwa-cursor,.dwa-typing{display:none}
+  .dwa-s2,.dwa-msg,.dwa-ctx{opacity:1;transform:none}
+  .dwa-st{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}
+}
+
+
+/* ══ PLANS PREVIEW ══ */
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:1rem;margin-top:2rem}
+.plan-card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.3rem 1.2rem;display:flex;flex-direction:column;gap:.8rem;backdrop-filter:blur(8px);transition:transform .15s,border-color .15s,box-shadow .15s}
+.plan-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 28px rgba(0,0,0,.1)}
+.plan-name{display:flex;align-items:center;gap:.55rem;font-size:1.05rem;font-weight:800;color:var(--ink)}
+.plan-name i{width:30px;height:30px;border-radius:9px;background:var(--accent-subtle,color-mix(in srgb,var(--accent) 14%,transparent));color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.8rem}
+.plan-from{font-size:.74rem;color:var(--ink3);margin:0}
+.plan-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.plan-list li{display:flex;gap:.5rem;font-size:.8rem;color:var(--ink2);line-height:1.4}
+.plan-list li>i{color:var(--chat-accent);font-size:.7rem;margin-top:.2rem}
+.plan-list small{display:block;font-size:.7rem;color:var(--ink3)}
+.plan-note{margin:1.25rem auto 0;max-width:640px;text-align:center;font-size:.78rem;color:var(--ink3);line-height:1.6}
+.plan-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:1.1rem}
+.plan-actions a{display:inline-flex;align-items:center;gap:.45rem;min-height:42px;padding:.55rem 1.2rem;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;border:1px solid var(--border);color:var(--ink2);background:var(--card-bg)}
+.plan-actions a.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-on,#fff)}
+@media(max-width:575px){.plan-actions a{flex:1 1 100%;justify-content:center}}
+
 /* ══ NORMAL VS SCHEDULED COMPARE ══ */
 .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;position:relative;margin-top:3rem}
 .compare-vs{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:var(--ink3);z-index:2;box-shadow:0 4px 16px rgba(0,0,0,.15)}
@@ -337,10 +417,10 @@ img{max-width:100%;display:block}
    (see this session's Notebook/AI/PDF-generation/Results/Chat research) — not
    invented. #}
 {% set ai_assistant_steps = [
-  ('fa-circle-question','Ask a Question','Type any academic question — physics, chemistry, math, engineering, exam prep and more.'),
-  ('fa-robot','AI Assistant','A dedicated study assistant, not tied to any single exam — always focused on the subject at hand.'),
-  ('fa-comment-dots','Contextual Response','A clear, subject-focused answer, kept inside a named, searchable conversation.'),
-  ('fa-lightbulb','Better Understanding','Ask a follow-up, save the thread, and come back to it whenever you need to.'),
+  ('fa-file-circle-check','Review a question','Open any question from a result you can review after the exam.'),
+  ('fa-comments','Discuss with AI','One click opens the AI Assistant on that exact question.'),
+  ('fa-paperclip','Question attached','The question, its options, your answer and any saved explanation go with the chat, shown in a context bar.'),
+  ('fa-lightbulb','Ask follow-ups','Ask why, request a hint or try another method. Remove the context any time to return to general study.'),
 ] %}
 {% set notebook_steps = [
   ('fa-plus','Create','Start a new notebook — a hybrid canvas and rich-text workspace, not just a document.'),
@@ -384,8 +464,10 @@ img{max-width:100%;display:block}
         <a href="#ai-assistant" class="nav-link">AI</a>
         <a href="#notebook" class="nav-link">Notebook</a>
         <a href="#exams" class="nav-link">Exams</a>
+        <a href="#plans" class="nav-link">Plans</a>
         <a href="{{ url_for('misc.api_docs') }}" class="nav-link">API Docs</a>
         <a href="{{ url_for('misc.support') }}" class="nav-link">Support</a>
+        {% if PUBLIC_HUB_URL %}<a href="{{ PUBLIC_HUB_URL }}" class="nav-link">{{ PUBLIC_HUB_NAME }}</a>{% endif %}
         <a href="{{ url_for('auth.login') }}" class="nav-link">Sign in</a>
         <a href="{{ url_for('auth.create_account') }}" class="nav-cta">Get started</a>
         <div class="landing-theme-selector" id="landingThemeSelector">
@@ -409,8 +491,10 @@ img{max-width:100%;display:block}
         <a href="#ai-assistant">AI</a>
         <a href="#notebook">Notebook</a>
         <a href="#exams">Exams</a>
+        <a href="#plans">Plans</a>
         <a href="{{ url_for('misc.api_docs') }}" class="nav-link">API Docs</a>
         <a href="{{ url_for('misc.support') }}">Support</a>
+        {% if PUBLIC_HUB_URL %}<a href="{{ PUBLIC_HUB_URL }}">{{ PUBLIC_HUB_NAME }}</a>{% endif %}
         <a href="{{ url_for('auth.login') }}">Sign in</a>
         <a href="{{ url_for('auth.create_account') }}">Get started →</a>
         <div class="mobile-theme-row">
@@ -515,8 +599,8 @@ img{max-width:100%;display:block}
         <div>
             <div class="fade-up">
                 <div class="section-eyebrow eb-ai">Intelligence · AI Study Assistant</div>
-                <h2 class="section-title">An AI that actually<br>helps you study</h2>
-                <p class="section-sub">A dedicated academic assistant, always available — not locked to a single exam, and focused on the subject you actually need help with.</p>
+                <h2 class="section-title">Discuss any question<br>with AI, in context</h2>
+                <p class="section-sub">Pick a question you are reviewing and talk it through. The Assistant sees that question, so you can ask about the concept, the method or where your working went off. It is also a general study helper whenever you open it on its own.</p>
             </div>
             <div class="flow-track stagger-group" style="--fc:var(--ai-accent)" aria-label="AI Assistant flow">
                 {% for icon, title, desc in ai_assistant_steps %}
@@ -532,17 +616,49 @@ img{max-width:100%;display:block}
                 {% endfor %}
             </div>
             <div class="pill-cloud" style="--fc:var(--ai-accent)">
-                <span class="pill"><i class="fas fa-check"></i> Multiple named conversations</span>
-                <span class="pill"><i class="fas fa-check"></i> Conversation history kept</span>
-                <span class="pill"><i class="fas fa-check"></i> Physics, chemistry, math, engineering &amp; more</span>
+                <span class="pill"><i class="fas fa-check"></i> Opens from results you can review</span>
+                <span class="pill"><i class="fas fa-check"></i> Question context attached to the chat</span>
+                <span class="pill"><i class="fas fa-check"></i> Named conversations, history kept</span>
                 <span class="pill"><i class="fas fa-check"></i> Focused strictly on academics</span>
             </div>
         </div>
-        <div class="mockup-card mockup-chat fade-up">
-            <div class="bubble-label">You</div>
-            <div class="chat-bubble bubble-user">Why is my numerical answer marked wrong if it's close to correct?</div>
-            <div class="bubble-label" style="margin-top:.9rem">AI Assistant</div>
-            <div class="chat-bubble bubble-ai">Numerical questions use a small tolerance range set by your instructor — your answer likely fell just outside it. Want me to walk through how tolerance works?</div>
+        <div class="dwa fade-up" role="img" aria-label="Animated example: a student reviews a question, selects Discuss with AI, the question is attached to the Assistant conversation, and the student asks a follow-up about it.">
+            <ol class="dwa-steps" aria-hidden="true">
+                <li class="dwa-st dwa-st1">Review</li>
+                <li class="dwa-st dwa-st2">Discuss</li>
+                <li class="dwa-st dwa-st3">Attached</li>
+                <li class="dwa-st dwa-st4">Follow up</li>
+            </ol>
+            <div class="dwa-stage" aria-hidden="true">
+                <div class="dwa-screen dwa-s1">
+                    <div class="dwa-bar"><i class="fas fa-file-circle-check"></i> Review · Sample exam</div>
+                    <div class="dwa-qcard">
+                        <div class="dwa-qmeta"><b>Q29</b> · Single choice <span class="dwa-tag">Skipped</span></div>
+                        <p class="dwa-qtext">A composite rod of two different materials is joined end to end and pulled by an axial load of 20&nbsp;kN. Find the total elongation of the rod.</p>
+                        <div class="dwa-optrow"><span>A</span><span>B</span><span>C</span><span>D</span></div>
+                        <div class="dwa-discuss-row">
+                            <span class="dwa-discuss"><i class="fas fa-comments"></i> Discuss with AI</span>
+                            <span class="dwa-hint">Ask follow-up questions about this question</span>
+                            <i class="fas fa-arrow-pointer dwa-cursor"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="dwa-screen dwa-s2">
+                    <div class="dwa-bar"><i class="fas fa-robot"></i> AI Assistant <span class="dwa-online">Online</span></div>
+                    <div class="dwa-ctx">
+                        <i class="fas fa-circle-question dwa-ctx-icon"></i>
+                        <div class="dwa-ctx-main"><b>Q29 · Sample exam</b><span>Mechanics › Axial loading · Single choice · Skipped</span></div>
+                        <span class="dwa-ctx-view"><i class="fas fa-up-right-from-square"></i> View Question</span>
+                    </div>
+                    <div class="dwa-chat">
+                        <div class="dwa-msg dwa-user">Give me a hint, without the full solution.</div>
+                        <div class="dwa-msg dwa-typing"><i></i><i></i><i></i></div>
+                        <div class="dwa-msg dwa-ai">Start from the data in your question: each part stretches by ΔL = PL / AE. Convert units first (m → mm, GPa → N/mm²), then add the two elongations. Try Part A and send me your working?</div>
+                    </div>
+                    <div class="dwa-chips"><span>Give me a hint</span><span>Another method</span><span>Explain the concept</span></div>
+                </div>
+            </div>
+            <p class="dwa-foot">Sample conversation for illustration. AI responses can be inaccurate, so verify important details.</p>
         </div>
     </div>
 </section>
@@ -927,6 +1043,34 @@ img{max-width:100%;display:block}
 </section>
 
 <!-- CTA -->
+<!-- PLANS -->
+<section class="section-block narrow" id="plans">
+    <div class="fade-up" style="text-align:center;max-width:640px;margin:0 auto">
+        <div class="section-eyebrow">Plans</div>
+        <h2 class="section-title">Start free, add more as you need it</h2>
+        <p class="section-sub centered">Each plan includes everything in the one before it. Here is what each one adds.</p>
+    </div>
+    <div class="plan-grid stagger-group">
+        {% for p in public_plans %}
+        <div class="plan-card reveal-item">
+            <div class="plan-name"><i class="fas {{ p.icon }}"></i>{{ p.label }}</div>
+            <p class="plan-from">{% if p.inherits %}Everything in {{ p.inherits }}, plus:{% else %}Included from the start:{% endif %}</p>
+            <ul class="plan-list">
+                {% for f in p.adds %}
+                <li><i class="fas fa-check"></i><span>{{ f.label }}{% for l in f.limits %}<small>{{ l.label }}: {{ l.value }}</small>{% endfor %}</span></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="plan-note">New accounts start on the {% for p in public_plans %}{% if p.is_default %}{{ p.label }}{% endif %}{% endfor %} plan. Plans are assigned by an administrator; there is no online checkout.</p>
+    <div class="plan-actions">
+        <a href="{{ url_for('auth.create_account') }}" class="primary"><i class="fas fa-user-plus"></i> Create account</a>
+        <a href="{{ url_for('misc.plans') }}"><i class="fas fa-table-columns"></i> Compare all plans</a>
+        <a href="{{ url_for('auth.login') }}"><i class="fas fa-right-to-bracket"></i> Sign in</a>
+    </div>
+</section>
+
 <section class="cta-section">
     <div class="cta-bg"></div>
     <div class="cta-glow"></div>

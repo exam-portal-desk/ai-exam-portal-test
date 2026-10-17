@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - {% block title %}{% endblock %}</title>
@@ -458,7 +458,8 @@
   /* ══ GLOBAL ADMIN TOAST ══════════════════════════════════ */
   #adminToastContainer {
     position: fixed; bottom: 1.5rem; right: 1.5rem;
-    z-index: 9999;
+    z-index: 10100;                                  /* above the Access card's backdrop (select-enhance.css, 10050) */
+    max-width: calc(100vw - 2rem);
     display: flex; flex-direction: column; gap: .4rem;
     pointer-events: none;
   }

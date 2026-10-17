@@ -41,6 +41,16 @@
 .filter-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .filter-badge { display:none; align-items:center; gap:.3rem; padding:.25rem .65rem; border-radius:999px; background:var(--accent-subtle); border:1px solid var(--border); color:var(--accent); font-size:.72rem; font-weight:700; }
 .filter-badge i { font-size:.65rem; }
+.filter-help { font-size:.76rem; color:var(--text-3); margin-left:auto; max-width:60ch; }
+.running-badge { display:inline-flex; align-items:center; gap:.25rem; margin-left:.4rem; padding:.12rem .5rem; border-radius:999px; font-size:.68rem; font-weight:700; background:var(--info-bg, var(--accent-subtle)); color:var(--info-text, var(--accent)); border:1px solid var(--info-border, var(--border)); white-space:nowrap; }
+.empty-state .btn-flat { margin-top:.9rem; }
+.empty-state .why { font-size:.78rem; color:var(--text-3); margin-top:.5rem; }
+@media (max-width:575.98px) {
+  .filter-card { padding:.9rem; }
+  .filter-help { margin-left:0; flex-basis:100%; }
+  .filter-actions .btn-flat { flex:1 1 auto; justify-content:center; }
+  .filter-input { font-size:16px; }
+}
 
 /* ── Bulk Bar ── */
 .bulk-bar { display:none; align-items:center; gap:.5rem; flex-wrap:wrap; padding:.65rem 1rem; background:var(--accent-subtle); border:1px solid var(--border); border-radius:calc(var(--radius)+4px); margin-bottom:1rem; }
@@ -125,41 +135,40 @@
 <div class="page-top">
   <div>
     <h1><i class="fas fa-users-cog me-2" style="color:var(--accent)"></i>Attempts Management</h1>
-    <p>Reset, increase, or decrease user exam attempts. Type username to search.</p>
+    <p>See how many attempts each student has used on each exam, and reset, add or remove them.</p>
   </div>
 </div>
 
 <div class="filter-card">
   <div class="filter-grid">
     <div class="filter-group">
-      <label><i class="fas fa-user me-1"></i>Username</label>
-      <input type="text" id="userFilter" class="filter-input" placeholder="Search username…" oninput="debounceSearch()">
+      <label for="userFilter"><i class="fas fa-user me-1"></i>Student</label>
+      <input type="search" id="userFilter" class="filter-input" placeholder="Username or full name" autocomplete="off" oninput="debounceSearch()">
     </div>
     <div class="filter-group">
-      <label><i class="fas fa-file-alt me-1"></i>Exam</label>
-      <select id="examFilter" class="filter-input" onchange="fetchAttempts(1)">
-        <option value="">All Exams</option>
+      <label for="examFilter"><i class="fas fa-file-alt me-1"></i>Exam</label>
+      <select id="examFilter" class="filter-input" onchange="onFilterChange()">
+        <option value="">All exams</option>
         {% for exam in exams %}
         <option value="{{ exam.id }}">{{ exam.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="filter-group">
-      <label><i class="fas fa-chart-bar me-1"></i>Status</label>
-      <select id="statusFilter" class="filter-input" onchange="fetchAttempts(1)">
-        <option value="">All Status</option>
-        <option value="unlimited">Unlimited</option>
-        <option value="available">Has Remaining</option>
-        <option value="exhausted">Exhausted</option>
+      <label for="statusFilter"><i class="fas fa-chart-bar me-1"></i>Attempt status</label>
+      <select id="statusFilter" class="filter-input" onchange="onFilterChange()">
+        <option value="">Any status</option>
+        <option value="available">Attempts remaining</option>
+        <option value="exhausted">Limit reached</option>
+        <option value="unlimited">Unlimited exam</option>
+        <option value="in_progress">Attempt in progress</option>
       </select>
     </div>
   </div>
   <div class="filter-actions">
-    <button class="btn-flat secondary" onclick="clearFilters()"><i class="fas fa-times"></i>Clear</button>
-    <span class="filter-badge" id="filterBadge"><i class="fas fa-check-circle"></i>Filters Active</span>
-    <span style="font-size:0.78rem;color:var(--text-3);margin-left:auto">
-      <i class="fas fa-info-circle me-1"></i>Type a username to load results
-    </span>
+    <button type="button" class="btn-flat secondary" id="clearFiltersBtn" onclick="clearFilters()" disabled><i class="fas fa-rotate-left"></i>Reset filters</button>
+    <span class="filter-badge" id="filterBadge"><i class="fas fa-filter"></i><span id="filterBadgeText"></span></span>
+    <span class="filter-help"><i class="fas fa-info-circle me-1"></i>An attempt counts once it is submitted or added here. Attempts still running are shown separately.</span>
   </div>
 </div>
 
@@ -181,17 +190,11 @@
       <thead>
         <tr>
           <th style="width:40px"><input type="checkbox" id="selectAll" class="enhanced-checkbox" onchange="toggleSelectAll()"></th>
-          <th>User</th><th>Exam</th><th>Max</th><th>Used</th><th>Remaining</th><th>Actions</th>
+          <th>Student</th><th>Exam</th><th>Limit</th><th>Used</th><th>Remaining</th><th>Actions</th>
         </tr>
       </thead>
       <tbody id="attemptsBody">
-        <tr><td colspan="7">
-          <div class="empty-state">
-            <i class="fas fa-search"></i>
-            <p><strong>Enter a username above to search</strong><br>
-            <span style="font-size:0.8rem">Or select an exam filter to browse all attempts</span></p>
-          </div>
-        </td></tr>
+        <tr><td colspan="7"><div class="skeleton" style="width:60%"></div></td></tr>
       </tbody>
     </table>
   </div>
@@ -251,100 +254,148 @@
 let _page         = 1;
 let _searchTimer  = null;
 let _isProcessing = false;
-let _selectedItems = new Set();   // "sid-eid" keys, persists across pages
+let _selectedItems = new Set();   // "sid-eid" keys, persists across pages and filters
 let _currentAction = null, _currentSid = null, _currentEid = null;
 let _currentBulkAction = null;
-// Store current page row data for bulk modal labels
 let _currentRows = [];
+let _reqSeq = 0, _inflight = null;   // only the newest request may draw
+const STATUS_TEXT = { available: 'Attempts remaining', exhausted: 'Limit reached', unlimited: 'Unlimited exam', in_progress: 'Attempt in progress' };
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function currentFilters() {
+  const examSel = document.getElementById('examFilter');
+  return {
+    q:      document.getElementById('userFilter').value.trim(),
+    examId: examSel.value,
+    examName: examSel.value ? examSel.options[examSel.selectedIndex].text : '',
+    status: document.getElementById('statusFilter').value,
+  };
+}
+
+function filterSummary(f) {
+  const parts = [];
+  if (f.q) parts.push(`student “${f.q}”`);
+  if (f.examId) parts.push(`exam “${f.examName}”`);
+  if (f.status) parts.push(`status “${STATUS_TEXT[f.status]}”`);
+  return parts;
+}
+
+function updateFilterUi(f) {
+  const n = filterSummary(f).length;
+  document.getElementById('clearFiltersBtn').disabled = n === 0;
+  const badge = document.getElementById('filterBadge');
+  badge.style.display = n ? 'inline-flex' : 'none';
+  document.getElementById('filterBadgeText').textContent = `${n} filter${n === 1 ? '' : 's'} active`;
+}
 
 /* ═══════════════════════════════════════════════
    SEARCH / FETCH
 ═══════════════════════════════════════════════ */
 function debounceSearch() {
   clearTimeout(_searchTimer);
-  _searchTimer = setTimeout(() => fetchAttempts(1), 400);
+  _searchTimer = setTimeout(() => fetchAttempts(1), 350);
+}
+function onFilterChange() { clearTimeout(_searchTimer); fetchAttempts(1); }
+
+function showLoading() {
+  document.getElementById('attemptsBody').innerHTML = Array(5).fill(0).map(() =>
+    `<tr><td colspan="7"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
+  ).join('');
+  document.getElementById('resultsCounter').textContent = 'Loading…';
 }
 
 function fetchAttempts(page) {
-  _page = page;
-  const q      = document.getElementById('userFilter').value.trim();
-  const examId = document.getElementById('examFilter').value;
-  const status = document.getElementById('statusFilter').value;
+  clearTimeout(_searchTimer);
+  _page = Math.max(1, parseInt(page, 10) || 1);
+  const f = currentFilters();
+  updateFilterUi(f);
 
-  // Show hint if no filters at all
-  if (!q && !examId && !status) {
-    document.getElementById('attemptsBody').innerHTML = `
-      <tr><td colspan="7"><div class="empty-state">
-        <i class="fas fa-search"></i>
-        <p><strong>Enter a username or select an exam</strong><br>
-        <span style="font-size:0.8rem">Results will load here</span></p>
-      </div></td></tr>`;
-    document.getElementById('resultsCounter').textContent = '—';
-    document.getElementById('paginationInfo').textContent = '';
-    document.getElementById('paginatorBtns').innerHTML   = '';
-    return;
-  }
+  if (_inflight) _inflight.abort();
+  const ctl = new AbortController();
+  _inflight = ctl;
+  const seq = ++_reqSeq;
+  showLoading();
 
-  // Show skeleton
-  const tbody = document.getElementById('attemptsBody');
-  tbody.innerHTML = Array(5).fill(0).map(() =>
-    `<tr><td colspan="7"><div class="skeleton" style="width:${55+Math.random()*35|0}%"></div></td></tr>`
-  ).join('');
+  const params = new URLSearchParams({ page: _page });
+  if (f.q) params.set('q', f.q);
+  if (f.examId) params.set('exam_id', f.examId);
+  if (f.status) params.set('status', f.status);
 
-  const badge = document.getElementById('filterBadge');
-  badge.style.display = (q || examId || status) ? 'inline-flex' : 'none';
-
-  const params = new URLSearchParams({ page, q, exam_id: examId, status });
-  fetch(`/api/v01/admin/attempts/search?${params}`)
-    .then(r => r.json())
-    .then(d => {
-      if (d.success === false) { renderError(d.message); return; }
-      _currentRows = d.rows || [];
-      renderRows(_currentRows);
-      renderPaginator(d.page, d.total_pages, d.total);
-      document.getElementById('resultsCounter').textContent =
-        `${d.total} result${d.total!==1?'s':''}`;
+  fetch(`/api/v01/admin/attempts/search?${params}`, { signal: ctl.signal, credentials: 'same-origin' })
+    .then(async r => {
+      let d = null;
+      try { d = await r.json(); } catch (e) {}
+      if (!r.ok || !d || d.success === false) throw new Error((d && d.message) || 'Could not load attempts.');
+      return d;
     })
-    .catch(err => renderError('Network error: ' + err));
+    .then(d => {
+      if (seq !== _reqSeq) return;
+      _page = d.page;
+      _currentRows = d.rows || [];
+      renderRows(_currentRows, f);
+      renderPaginator(d.page, d.total_pages, d.total, d.per_page);
+      document.getElementById('resultsCounter').textContent =
+        `${d.total.toLocaleString()} ${d.total === 1 ? 'row' : 'rows'}${filterSummary(f).length ? ' (filtered)' : ''}`;
+    })
+    .catch(err => {
+      if (err.name === 'AbortError' || seq !== _reqSeq) return;
+      _currentRows = [];
+      renderError(err.message || 'Could not load attempts.');
+      document.getElementById('resultsCounter').textContent = '—';
+      document.getElementById('paginationInfo').textContent = '';
+      document.getElementById('paginatorBtns').innerHTML = '';
+    })
+    .finally(() => { if (seq === _reqSeq) _inflight = null; });
 }
 
 /* ═══════════════════════════════════════════════
    RENDER ROWS
 ═══════════════════════════════════════════════ */
-function renderRows(rows) {
+function renderRows(rows, f) {
   const tbody = document.getElementById('attemptsBody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
-      <i class="fas fa-search"></i>
-      <p><strong>No Results</strong><br><span style="font-size:0.8rem">Adjust filters to see entries.</span></p>
-    </div></td></tr>`;
+    const why = filterSummary(f);
+    tbody.innerHTML = why.length
+      ? `<tr><td colspan="7"><div class="empty-state">
+           <i class="fas fa-filter-circle-xmark"></i>
+           <p><strong>No attempts match these filters</strong></p>
+           <p class="why">Currently filtering by ${why.map(esc).join(' and ')}.</p>
+           <button type="button" class="btn-flat secondary" onclick="clearFilters()"><i class="fas fa-rotate-left"></i>Reset filters</button>
+         </div></td></tr>`
+      : `<tr><td colspan="7"><div class="empty-state">
+           <i class="fas fa-inbox"></i>
+           <p><strong>No attempts recorded yet</strong></p>
+           <p class="why">Rows appear here once a student starts an exam.</p>
+         </div></td></tr>`;
     syncSelectAll(); return;
   }
 
-  tbody.innerHTML = rows.map(r => {
+  tbody.innerHTML = rows.map((r, i) => {
     const remCls = r.remaining === '∞' ? 'unlimited' : r.remaining === 0 ? 'exhausted' : '';
     const isSel  = _selectedItems.has(`${r.student_id}-${r.exam_id}`);
-    const esc    = s => String(s).replace(/'/g, "\\'");
     return `
-    <tr data-student-id="${r.student_id}" data-exam-id="${r.exam_id}">
-      <td><input type="checkbox" class="enhanced-checkbox row-select" ${isSel?'checked':''}
+    <tr data-student-id="${r.student_id}" data-exam-id="${r.exam_id}" data-i="${i}">
+      <td><input type="checkbox" class="enhanced-checkbox row-select" aria-label="Select ${esc(r.username)}" ${isSel?'checked':''}
           onchange="onRowCheck(this,'${r.student_id}','${r.exam_id}')"></td>
       <td>
-        <span class="user-chip"><i class="fas fa-user"></i>${r.username}</span>
+        <span class="user-chip"><i class="fas fa-user"></i>${esc(r.username)}</span>
         <div class="id-text">ID: ${r.student_id}</div>
       </td>
       <td>
-        <span class="exam-chip"><i class="fas fa-file-alt"></i>${r.exam_name}</span>
+        <span class="exam-chip"><i class="fas fa-file-alt"></i>${esc(r.exam_name)}</span>
         <div class="id-text">EID: ${r.exam_id}</div>
       </td>
-      <td><strong style="color:var(--text-1)">${r.max_attempts}</strong></td>
-      <td><span class="used-badge">${r.attempts_used}</span></td>
-      <td><span class="remaining-val ${remCls}">${r.remaining}</span></td>
+      <td><strong style="color:var(--text-1)">${esc(r.max_attempts)}</strong></td>
+      <td><span class="used-badge">${r.attempts_used}</span>${r.in_progress ? `<span class="running-badge" title="An attempt is running now. It counts once submitted."><i class="fas fa-play"></i>${r.in_progress} running</span>` : ''}</td>
+      <td><span class="remaining-val ${remCls}">${esc(r.remaining)}</span></td>
       <td>
         <div class="action-cell">
-          <button class="icon-btn reset" title="Reset"  onclick="openModal('reset',   '${r.student_id}','${r.exam_id}','${esc(r.username)}','${esc(r.exam_name)}')"><i class="fas fa-redo"></i></button>
-          <button class="icon-btn inc"   title="Add"    onclick="openModal('increase','${r.student_id}','${r.exam_id}','${esc(r.username)}','${esc(r.exam_name)}')"><i class="fas fa-plus"></i></button>
-          <button class="icon-btn dec"   title="Remove" onclick="openModal('decrease','${r.student_id}','${r.exam_id}','${esc(r.username)}','${esc(r.exam_name)}')"><i class="fas fa-minus"></i></button>
+          <button class="icon-btn reset" data-act="reset"    title="Reset: remove all used attempts" aria-label="Reset attempts"><i class="fas fa-redo"></i></button>
+          <button class="icon-btn inc"   data-act="increase" title="Add used attempts"               aria-label="Add attempts"><i class="fas fa-plus"></i></button>
+          <button class="icon-btn dec"   data-act="decrease" title="Remove used attempts"            aria-label="Remove attempts"><i class="fas fa-minus"></i></button>
         </div>
       </td>
     </tr>`;
@@ -353,19 +404,28 @@ function renderRows(rows) {
   syncSelectAll();
 }
 
+document.getElementById('attemptsBody').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const r = _currentRows[+btn.closest('tr').dataset.i];
+  if (r) openModal(btn.dataset.act, String(r.student_id), String(r.exam_id), r.username, r.exam_name);
+});
+
 function renderError(msg) {
   document.getElementById('attemptsBody').innerHTML =
-    `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--danger-text)">
-      <i class="fas fa-exclamation-circle me-2"></i>${msg}
-    </td></tr>`;
+    `<tr><td colspan="7"><div class="empty-state">
+       <i class="fas fa-triangle-exclamation" style="color:var(--danger-text);opacity:.8"></i>
+       <p><strong>Could not load attempts</strong></p>
+       <p class="why">${esc(msg)}</p>
+       <button type="button" class="btn-flat secondary" onclick="fetchAttempts(_page)"><i class="fas fa-rotate"></i>Try again</button>
+     </div></td></tr>`;
 }
 
 /* ═══════════════════════════════════════════════
    PAGINATOR
 ═══════════════════════════════════════════════ */
-function renderPaginator(page, totalPages, total) {
-  const perPage = 50;
-  const start   = (page-1)*perPage+1, end = Math.min(page*perPage, total);
+function renderPaginator(page, totalPages, total, perPage) {
+  const start = (page-1)*perPage+1, end = Math.min(page*perPage, total);
   document.getElementById('paginationInfo').textContent =
     total ? `Showing ${start}–${end} of ${total}` : 'No entries';
 
@@ -384,12 +444,12 @@ function renderPaginator(page, totalPages, total) {
   }
 
   wrap.innerHTML = `
-    <button class="pg-btn" ${page===1?'disabled':''} onclick="fetchAttempts(${page-1})">‹</button>
+    <button class="pg-btn" ${page===1?'disabled':''} onclick="fetchAttempts(${page-1})" aria-label="Previous page">‹</button>
     ${pages.map(p => p==='…'
       ? `<span style="color:var(--text-3);padding:0 4px">…</span>`
       : `<button class="pg-btn${p===page?' active':''}" onclick="fetchAttempts(${p})">${p}</button>`
     ).join('')}
-    <button class="pg-btn" ${page===totalPages?'disabled':''} onclick="fetchAttempts(${page+1})">›</button>`;
+    <button class="pg-btn" ${page===totalPages?'disabled':''} onclick="fetchAttempts(${page+1})" aria-label="Next page">›</button>`;
 }
 
 /* ═══════════════════════════════════════════════
@@ -399,8 +459,6 @@ function clearFilters() {
   document.getElementById('userFilter').value = '';
   document.getElementById('examFilter').value = '';
   document.getElementById('statusFilter').value = '';
-  document.getElementById('filterBadge').style.display = 'none';
-  // Reset to empty hint state
   fetchAttempts(1);
 }
 
@@ -457,11 +515,11 @@ function clearAllSelections() {
 ═══════════════════════════════════════════════ */
 function openModal(action, sid, eid, uname, ename) {
   _currentAction = action; _currentSid = sid; _currentEid = eid;
-  const titles = {reset:'Reset Attempts', increase:'Add Attempts', decrease:'Remove Attempts'};
-  const msgs   = {reset:'This will reset ALL attempts. Cannot be undone.', increase:'Add extra attempts for this user.', decrease:'Remove attempts from this user.'};
+  const titles = {reset:'Reset attempts', increase:'Add used attempts', decrease:'Remove used attempts'};
+  const msgs   = {reset:'This removes every used attempt, so the student starts again with the full limit. An attempt in progress is not affected. It cannot be undone.', increase:'This adds used attempts, which reduces how many the student has left.', decrease:'This removes used attempts (hand-added ones first, then the most recent submitted ones), which gives the student attempts back.'};
   document.getElementById('modalTitle').textContent   = titles[action];
   document.getElementById('modalMessage').textContent = msgs[action];
-  document.getElementById('modalInfoBox').innerHTML   = `<strong>User:</strong> ${uname}<br><strong>Exam:</strong> ${ename}`;
+  document.getElementById('modalInfoBox').innerHTML   = `<strong>Student:</strong> ${esc(uname)}<br><strong>Exam:</strong> ${esc(ename)}`;
   document.getElementById('amountWrap').style.display = action==='reset'?'none':'block';
   if (action !== 'reset') document.getElementById('amount').value = 1;
   document.getElementById('actionModal').classList.add('show');
@@ -517,7 +575,7 @@ function openBulkModal(action) {
   let html = '';
   _selectedItems.forEach(key => {
     const r = rowMap[key];
-    if (r) html += `<div class="selected-item"><span><strong>${r.username}</strong> — ${r.exam_name}</span><small>#${r.student_id}</small></div>`;
+    if (r) html += `<div class="selected-item"><span><strong>${esc(r.username)}</strong> — ${esc(r.exam_name)}</span><small>#${r.student_id}</small></div>`;
     else {
       const [s,e] = key.split('-');
       html += `<div class="selected-item"><span>User ${s} — Exam ${e}</span></div>`;
@@ -585,5 +643,6 @@ document.getElementById('bulkModal').addEventListener('click', e => {
 // above (which read/set .value and rely on the "change" event) need no changes.
 enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-alt' });
 enhanceSelect(document.getElementById('statusFilter'), { icon: 'fas fa-chart-bar' });
+fetchAttempts(1);
 </script>
 {% endblock %}

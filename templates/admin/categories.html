@@ -177,6 +177,39 @@
 }
 .m-input::placeholder { color: var(--text-3); }
 .m-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-subtle); }
+
+/* Subcategories modal. Bootstrap's modal-dialog-scrollable caps the dialog at the viewport; the body is a column whose
+   list is the only part that scrolls (min-height:0 lets a flex child shrink below its content), so the header, the Add
+   row and the footer stay put and the page behind never moves. Scoped to this modal; other modals are unchanged. */
+#subcatModal .modal-dialog { max-width: 480px; height: auto; }
+#subcatModal .modal-content { max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); }
+#subcatModal .modal-header { padding: .75rem 1rem; }
+#subcatModal .modal-footer { padding: .6rem 1rem; }
+#subcatModal .modal-body { display: flex; flex-direction: column; gap: .75rem; min-height: 0; overflow: hidden; padding: .85rem 1rem; }
+.subcat-title { display: flex; align-items: center; gap: .6rem; min-width: 0; font-size: .92rem; font-weight: 700; }
+.subcat-title-icon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--accent-subtle); color: var(--accent); font-size: .72rem; }
+.subcat-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subcat-add { display: flex; gap: .5rem; flex-shrink: 0; }
+.subcat-add .m-input { flex: 1; min-width: 0; }
+.subcat-add .btn-flat { flex-shrink: 0; min-height: 2.4rem; }
+.subcat-count { flex-shrink: 0; margin: 0; color: var(--text-3); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.subcat-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: .35rem; padding-right: .15rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.subcat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .35rem; padding: .35rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); transition: border-color .15s, background-color .15s; }
+.subcat-row:focus-within { border-color: var(--accent); }
+.subcat-row.is-new { animation: subcat-flash 1.4s ease-out; }
+@keyframes subcat-flash { from { background: var(--accent-subtle); border-color: var(--accent); } }
+.subcat-row .m-input { padding: .4rem .6rem; font-size: .82rem; text-overflow: ellipsis; }
+.subcat-row .icon-btn { width: 2.2rem; height: 2.2rem; flex-shrink: 0; }
+.subcat-empty { padding: 1.25rem .5rem; text-align: center; color: var(--text-3); font-size: .82rem; }
+.subcat-empty i { display: block; margin-bottom: .4rem; font-size: 1.1rem; opacity: .6; }
+.subcat-empty.error { color: var(--danger-text); }
+@media (max-width: 575.98px) {
+  #subcatModal .modal-dialog { margin: .5rem; max-width: none; }
+  #subcatModal .modal-content { max-height: calc(100vh - 1rem); max-height: calc(100dvh - 1rem - env(safe-area-inset-bottom)); }
+  .subcat-row .icon-btn { width: 2.6rem; height: 2.6rem; }
+  .subcat-add .btn-flat { min-height: 2.6rem; }
+  .subcat-add .m-input, .subcat-row .m-input { font-size: 16px; }              /* below 16px iOS zooms the page when a field is focused */
+}
 .m-file {
   width: 100%;
   padding: .42rem .75rem;
@@ -427,28 +460,27 @@
 </div>
 
 <!-- ══ SUBCATEGORIES MODAL ════════════════════════════════════════ -->
-<div class="modal fade" id="subcatModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+<div class="modal fade" id="subcatModal" tabindex="-1" aria-labelledby="subcatTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" style="font-size:.92rem;font-weight:700;display:flex;align-items:center;gap:.5rem">
-          <span style="width:28px;height:28px;border-radius:8px;background:var(--accent-subtle);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">
-            <i class="fas fa-sitemap"></i>
-          </span>
-          Subcategories — <span id="subcatCatName"></span>
+        <h5 class="modal-title subcat-title" id="subcatTitle">
+          <span class="subcat-title-icon"><i class="fas fa-sitemap"></i></span>
+          <span class="subcat-title-text">Subcategories — <span id="subcatCatName"></span></span>
         </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="subcatCatId">
-        <div style="display:flex;gap:.5rem;margin-bottom:1rem">
-          <input type="text" id="subcatNewName" class="m-input" placeholder="New subcategory name (e.g. Civil, SOM)">
-          <button class="btn-flat primary" id="subcatAddBtn" onclick="submitAddSubcat()" style="flex-shrink:0">
+        <div class="subcat-add">
+          <input type="text" id="subcatNewName" class="m-input" placeholder="New subcategory name" maxlength="100" autocomplete="off" aria-label="New subcategory name">
+          <button class="btn-flat primary" id="subcatAddBtn" onclick="submitAddSubcat()">
             <i class="fas fa-plus"></i> Add
           </button>
         </div>
-        <div id="subcatList" style="display:flex;flex-direction:column;gap:.4rem">
-          <div style="text-align:center;color:var(--text-3);font-size:.82rem;padding:1rem">Loading…</div>
+        <p class="subcat-count" id="subcatCount" aria-live="polite"></p>
+        <div id="subcatList" class="subcat-list">
+          <div class="subcat-empty">Loading…</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -638,10 +670,10 @@
   }
 
   function renderSubcatRow(s) {
-    return '<div class="subcat-row" style="display:flex;align-items:center;gap:.4rem;padding:.5rem .65rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius)" data-subcat-id="' + s.id + '">' +
-      '<input type="text" class="m-input subcat-name-input" value="' + escHtml(s.name) + '" style="padding:.4rem .6rem;font-size:.82rem">' +
-      '<button class="icon-btn" title="Save" onclick="submitRenameSubcat(' + s.id + ', this)"><i class="fas fa-save"></i></button>' +
-      '<button class="icon-btn danger" title="Delete" onclick="submitDeleteSubcat(' + s.id + ', this)"><i class="fas fa-trash"></i></button>' +
+    return '<div class="subcat-row" data-subcat-id="' + s.id + '">' +
+      '<input type="text" class="m-input subcat-name-input" value="' + escHtml(s.name) + '" title="' + escHtml(s.name) + '" maxlength="100" aria-label="Subcategory name">' +
+      '<button class="icon-btn" title="Save" aria-label="Save name" onclick="submitRenameSubcat(' + s.id + ', this)"><i class="fas fa-save"></i></button>' +
+      '<button class="icon-btn danger" title="Delete" aria-label="Delete subcategory" onclick="submitDeleteSubcat(' + s.id + ', this)"><i class="fas fa-trash"></i></button>' +
       '</div>';
   }
 
@@ -650,26 +682,45 @@
     document.getElementById('subcatCatName').textContent = catName;
     document.getElementById('subcatNewName').value = '';
     var list = document.getElementById('subcatList');
-    list.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:.82rem;padding:1rem">Loading…</div>';
+    list.innerHTML = '<div class="subcat-empty">Loading…</div>';
+    document.getElementById('subcatCount').textContent = '';
     (_subcatM || new bootstrap.Modal(document.getElementById('subcatModal'))).show();
     reloadSubcats();
   };
 
-  function reloadSubcats() {
+  function reloadSubcats(revealName) {
     var catId = document.getElementById('subcatCatId').value;
     var list = document.getElementById('subcatList');
+    var count = document.getElementById('subcatCount');
     fetch('/api/v01/admin/categories/' + catId + '/subcategories')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var subs = d.subcategories || [];
+        count.textContent = subs.length ? subs.length + (subs.length === 1 ? ' subcategory' : ' subcategories') : '';
         list.innerHTML = subs.length
           ? subs.map(renderSubcatRow).join('')
-          : '<div style="text-align:center;color:var(--text-3);font-size:.82rem;padding:1rem">No subcategories yet — add one above.</div>';
+          : '<div class="subcat-empty"><i class="fas fa-sitemap"></i>No subcategories yet. Add one above.</div>';
+        if (!revealName) return;
+        var wanted = revealName.toLowerCase();
+        var row = Array.prototype.find.call(list.querySelectorAll('.subcat-row'), function (r) {
+          return r.querySelector('.subcat-name-input').value.trim().toLowerCase() === wanted;
+        });
+        if (row) { row.classList.add('is-new'); row.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
       })
       .catch(function () {
-        list.innerHTML = '<div style="text-align:center;color:var(--danger-text);font-size:.82rem;padding:1rem">Failed to load subcategories.</div>';
+        count.textContent = '';
+        list.innerHTML = '<div class="subcat-empty error">Failed to load subcategories.</div>';
       });
   }
+
+  document.getElementById('subcatNewName').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submitAddSubcat(); }
+  });
+  document.getElementById('subcatList').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !e.target.classList.contains('subcat-name-input')) return;
+    e.preventDefault();
+    e.target.closest('.subcat-row').querySelector('.icon-btn').click();
+  });
 
   window.submitAddSubcat = function () {
     var catId = document.getElementById('subcatCatId').value;
@@ -686,7 +737,7 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         btn.disabled = false;
-        if (d.success) { input.value = ''; reloadSubcats(); adminToast('Subcategory added.', 'success'); }
+        if (d.success) { input.value = ''; reloadSubcats(name); adminToast('Subcategory added.', 'success'); input.focus(); }
         else { adminToast(d.message || 'Failed to add subcategory.', 'danger'); }
       })
       .catch(function () { btn.disabled = false; adminToast('Network error. Please try again.', 'danger'); });

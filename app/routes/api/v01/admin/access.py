@@ -13,13 +13,13 @@ app/entitlements/authority.py): nobody edits their own record, and only a root a
   DELETE /api/v01/admin/access/users/<id>/overrides/<feature>
 """
 
-from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import jsonify, request, session
 
 from app import entitlements
 from app.db import fetch_one
+from app.entitlements import validity
 from app.middleware.session_guard import require_admin_permission
 from app.routes.api.v01.admin import admin_api_bp
 from app.routes.api.v01.admin.users import _is_ghost
@@ -46,17 +46,20 @@ def _needs_tables(f):
     return wrapped
 
 
+def _days(raw) -> int:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("days must be a whole number.")
+
+
 def _expiry(data: dict):
-    """`days` (from now) or an ISO `expires_at` (UTC); neither means no expiry."""
+    """`days` (calendar days from today, through 23:59:59 of that day in APP_TIMEZONE) or an ISO `expires_at`; neither means
+    no expiry. The policy lives in app/entitlements/validity.py."""
     if data.get("days") not in (None, ""):
-        days = int(data["days"])
-        if days < 1:
-            raise ValueError("days must be at least 1.")
-        return now_utc_naive() + timedelta(days=days)
+        return validity.expiry_from_days(_days(data["days"]), now_utc_naive())
     raw = data.get("expires_at")
-    if not raw:
-        return None
-    return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).replace(tzinfo=None)
+    return validity.parse_expires_at(raw) if raw else None
 
 
 def _target(user_id: int):
@@ -78,6 +81,17 @@ def api_access_plans():
     return jsonify({"success": True, **entitlements.overview()})
 
 
+@admin_api_bp.route("/access/expiry-preview")
+@require_admin_permission(ACCESS_PERMISSION)
+def api_access_expiry_preview():
+    """What `days` would mean right now, so the admin sees the exact expiry before saving."""
+    try:
+        expires_at = validity.expiry_from_days(_days(request.args.get("days")), now_utc_naive())
+    except ValueError as e:
+        return _fail(str(e))
+    return jsonify({"success": True, **validity.describe(expires_at, now_utc_naive())})
+
+
 @admin_api_bp.route("/access/users/<int:user_id>")
 @require_admin_permission(ACCESS_PERMISSION)
 @_needs_tables
@@ -96,11 +110,17 @@ def api_access_set_plan(user_id):
     if error:
         return error
     data = request.get_json() or {}
+    plan = data.get("plan") or None
     try:
         expires_at = _expiry(data)
         if expires_at and expires_at <= now_utc_naive():
             raise ValueError("The expiry must be in the future.")
-        entitlements.set_user_plan(user_id, data.get("plan") or None, expires_at, session.get("user_id"))
+        current = fetch_one("SELECT plan, plan_expires_at FROM users WHERE id=%s", (user_id,)) or {}
+        running = current.get("plan_expires_at")
+        expires_at = validity.plan_expiry_to_store(plan, expires_at, current.get("plan"), running, now_utc_naive())
+        if current.get("plan") == plan and running == expires_at:
+            return jsonify({"success": True, "message": "Plan unchanged.", "username": user["username"], **_described(user_id)})
+        entitlements.set_user_plan(user_id, plan, expires_at, session.get("user_id"))
     except entitlements.AccessDenied as e:
         return _fail(str(e), 403)
     except (ValueError, entitlements.AccessError) as e:

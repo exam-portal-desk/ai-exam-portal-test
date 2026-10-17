@@ -436,11 +436,11 @@ def compute_exam_action_state(user_id: int, exam: Dict) -> Dict:
     official window has already closed, never offers a Start button. This
     mirrors the backend gate in the /start API so the UI and the
     enforcement it depends on can never disagree."""
-    from app.db.attempts import get_active_attempt, get_completed_attempts_count
+    from app.db.attempts import get_active_attempt, get_used_attempts_count
 
     exam_id = int(exam["id"])
     active_attempt = get_active_attempt(user_id, exam_id)
-    completed_count = get_completed_attempts_count(user_id, exam_id)
+    completed_count = get_used_attempts_count(user_id, exam_id)
     max_attempts = safe_int(exam.get("max_attempts"), 0)
 
     if max_attempts > 0:

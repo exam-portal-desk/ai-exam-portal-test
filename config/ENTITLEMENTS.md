@@ -25,6 +25,19 @@ Pro and Elite inherit from the plan above them (`"inherits"`). A plan does not h
 - **Where it is shown:** the user portal sidebar and the profile page ("Your Plan": the plan and exactly what it includes), the locked page, `GET /api/v01/me/plan`, and the Users tab. All of them read `entitlements.user_plan()`, the same function the server checks use, so what is shown is what is enforced.
 - **To give everyone more for a while:** change `default_plan` (for example to `"elite"`); no user data changes.
 
+### How expiry works
+
+One policy, in `app/entitlements/validity.py`, for plans and for special access alike.
+
+- **Stored once, as one instant:** `users.plan_expires_at` and `user_feature_overrides.expires_at` hold naive UTC, like every timestamp in this schema. They are shown in `APP_TIMEZONE`, in `DISPLAY_DATETIME_FORMAT`, with the timezone name (for example `02 November 2026 11:59 PM IST`).
+- **"N days" means N calendar days from today in `APP_TIMEZONE`, through 23:59:59 of that day.** Given on 18 Oct, 15 days ends on 02 Nov at 11:59 PM. The rest of today is a bonus, so the user always gets at least the days given, and saving the same number of days again on the same day gives the same expiry. Daylight-saving changes cannot move the end of the day.
+- **Blank means no expiry**, never zero days. `0` or a negative number is refused.
+- **Same plan, no days:** saving a plan that is already running without a duration keeps its running expiry. A different plan with no days has no expiry. A lapsed plan saved again with no days is renewed without an expiry.
+- **A plan or grant is active while its expiry is later than the current instant;** at the expiry instant itself it has lapsed. Every authorization decision compares against the current time (`resolver.py`), so a cached user record, an open session or a cleanup job that has not run can never keep access alive. Nothing needs to run for an expiry to take effect, and no timer setting can extend one. The 60-second user cache only delays how soon a *change by another process* is seen, never an expiry.
+- **Plan expiry and special-access expiry are independent.** A plan that lapses falls back to the default plan; grants and denies keep their own expiry dates on top of whichever plan applies. The admin role gives no plan and no student feature.
+- **What people see:** the Users tab card and the user portal (sidebar chip, profile, `GET /api/v01/me/plan`) read the same stored value through `validity.describe()`: a state (`none`, `active`, `expiring_soon` within 3 days, `expired`), the exact expiry, and a readable remaining time. The portal refreshes the chip and the remaining time every minute and at the expiry instant (`static/shared/plan-validity.js`). The card previews the exact expiry while an admin types the days (`GET /api/v01/admin/access/expiry-preview?days=`). "Assigned" is the time of the last `plan_set` entry in the audit trail.
+- **Configuration:** no new environment variable. The timezone and display formats are the existing `APP_TIMEZONE`, `DISPLAY_DATETIME_FORMAT`; nothing about subscriptions is timed by a scheduler.
+
 ### What is enforced
 
 Every student feature is `"enforced": true`, and the **server** checks the plan on every request; hiding a link is only a courtesy on top. A student whose plan does not include a feature gets a 403: the locked page in a browser, JSON (`feature_locked`, `plan_label`, `required_plan`, ...) from an API. Where:

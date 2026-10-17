@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Plans - SmartAIExam{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/plan-badge.css') }}">
+<style>
+.pl-wrap { max-width:1100px; width:100%; min-width:0; box-sizing:border-box; margin:0 auto; padding:2.25rem 1.5rem 4rem; }   /* min-width:0: the page is a flex row, so without it the wide table would stretch this past the screen */
+.pl-head h1 { font-size:1.55rem; font-weight:800; color:var(--text-1); margin:0 0 .35rem; letter-spacing:-.02em; display:flex; align-items:center; gap:.55rem; }
+.pl-head h1 i { color:var(--accent); font-size:1.2rem; }
+.pl-head p { font-size:.88rem; color:var(--text-3); margin:0 0 1.5rem; max-width:62ch; line-height:1.55; }
+.pl-back { display:inline-flex; align-items:center; gap:.45rem; min-height:36px; padding:.4rem .8rem; margin-bottom:1rem; border-radius:var(--radius); background:var(--surface-2); border:1px solid var(--border); font-size:.8rem; font-weight:600; color:var(--text-2); text-decoration:none; }
+.pl-back:hover { border-color:var(--accent); color:var(--accent); }
+.pl-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap:1rem; margin-bottom:2rem; }
+.pl-card, .pl-card * { min-width:0; overflow-wrap:anywhere; }
+.pl-card { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 4px); padding:1.25rem; display:flex; flex-direction:column; gap:.75rem; box-shadow:var(--shadow-sm); }
+.pl-card .plan-badge { align-self:flex-start; }
+.pl-card h2 { font-size:1.15rem; font-weight:800; color:var(--text-1); margin:0; }
+.pl-card .pl-sub { font-size:.78rem; color:var(--text-3); margin:0; }
+.pl-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.55rem; }
+.pl-list li { display:flex; gap:.55rem; font-size:.82rem; color:var(--text-2); line-height:1.4; }
+.pl-list li > i { color:var(--success-text); margin-top:.15rem; font-size:.75rem; }
+.pl-list small { display:block; color:var(--text-3); font-size:.72rem; margin-top:.1rem; }
+.pl-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 4px); overflow-x:auto; }
+.pl-table { width:100%; border-collapse:collapse; font-size:.82rem; min-width:520px; }
+.pl-table th { background:var(--surface-2); padding:.7rem .9rem; text-align:left; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); border-bottom:1px solid var(--border); }
+.pl-table th:not(:first-child), .pl-table td:not(:first-child) { text-align:center; }
+.pl-table td { padding:.7rem .9rem; border-bottom:1px solid var(--border); color:var(--text-2); vertical-align:middle; }
+.pl-table tbody tr:last-child td { border-bottom:none; }
+.pl-table td:first-child { font-weight:600; color:var(--text-1); }
+.pl-table td:first-child small { display:block; font-weight:400; color:var(--text-3); font-size:.72rem; }
+.pl-yes { color:var(--success-text); }
+.pl-no { color:var(--text-3); }
+.pl-cell { display:inline-flex; flex-direction:column; align-items:center; gap:.15rem; }
+.pl-lim { display:block; font-size:.7rem; color:var(--text-3); }
+.pl-note { margin-top:1.5rem; padding:1rem 1.15rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); font-size:.82rem; color:var(--text-2); line-height:1.6; }
+.pl-cta { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1.25rem; }
+.pl-btn { display:inline-flex; align-items:center; gap:.45rem; min-height:40px; padding:.5rem 1.1rem; border-radius:var(--radius); font-size:.84rem; font-weight:700; text-decoration:none; border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); }
+.pl-btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-on); }
+.pl-btn.primary:hover { background:var(--accent-hover); }
+.pl-btn:not(.primary):hover { border-color:var(--accent); color:var(--accent); }
+@media (max-width:640px) {
+  .pl-wrap { padding:1.5rem 1rem 3rem; }
+  .pl-btn { flex:1 1 100%; justify-content:center; }
+  /* the comparison becomes one card per feature, with each plan on its own line */
+  .pl-table-wrap { border:none; background:none; overflow:visible; }
+  .pl-table { min-width:0; }
+  .pl-table, .pl-table tbody, .pl-table tr, .pl-table td { display:block; width:100%; }
+  .pl-table thead { display:none; }
+  .pl-table tr { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:.7rem; overflow:hidden; }
+  .pl-table td { display:flex; align-items:center; justify-content:space-between; gap:.75rem; text-align:right !important; padding:.6rem .85rem; }
+  .pl-table td:first-child { display:block; text-align:left !important; background:var(--surface-2); }
+  .pl-table td[data-label]::before { content:attr(data-label); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); flex-shrink:0; }
+  .pl-cell { align-items:flex-end; }
+  .pl-note { font-size:.8rem; }
+}
+</style>
+
+<div class="pl-wrap">
+  <a class="pl-back" href="{{ url_for('misc.home') }}"><i class="fas fa-arrow-left"></i> Back to home</a>
+  <div class="pl-head">
+    <h1><i class="fas fa-layer-group"></i>Plans</h1>
+    <p>What each plan includes. Every plan builds on the one before it, and the limits below are the ones the portal enforces.</p>
+  </div>
+
+  <div class="pl-cards">
+    {% for p in plans %}
+    <section class="pl-card" aria-labelledby="plan-{{ p.key }}">
+      <span class="plan-badge pb-lg" data-tone="{{ p.tone }}"><i class="fas {{ p.icon }}"></i><span class="pb-text">{{ p.label }}</span></span>
+      <h2 id="plan-{{ p.key }}">{{ p.label }}{% if p.is_default %} <small style="font-size:.7rem;font-weight:600;color:var(--text-3)">· starting plan</small>{% endif %}</h2>
+      <p class="pl-sub">{% if p.inherits %}Everything in {{ p.inherits }}, plus:{% else %}Included:{% endif %}</p>
+      <ul class="pl-list">
+        {% for f in p.adds %}
+        <li><i class="fas fa-check"></i><span>{{ f.label }}
+          {% for l in f.limits %}<small>{{ l.label }}: {{ l.value }}</small>{% endfor %}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  </div>
+
+  <div class="pl-table-wrap">
+    <table class="pl-table">
+      <thead><tr><th scope="col">Feature</th>{% for p in plans %}<th scope="col">{{ p.label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for f in features %}
+        <tr>
+          <td>{{ f.label }}<small>{{ f.description }}</small></td>
+          {% for p in plans %}
+          {% set inc = p.included.get(f.key) %}
+          <td data-label="{{ p.label }}"><span class="pl-cell">
+            {% if inc %}<i class="fas fa-check pl-yes" aria-label="Included"></i>
+              {% for l in inc.limits %}<span class="pl-lim">{{ l.label }}: {{ l.value }}</span>{% endfor %}
+            {% else %}<i class="fas fa-minus pl-no" aria-label="Not included"></i>{% endif %}
+          </span></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pl-note">
+    New accounts start on the {% for p in plans %}{% if p.is_default %}{{ p.label }}{% endif %}{% endfor %} plan. There is no online checkout: plans are assigned by an administrator, and the plan you are on is always shown on your profile.
+  </div>
+
+  <div class="pl-cta">
+    <a class="pl-btn primary" href="{{ url_for('auth.create_account') }}"><i class="fas fa-user-plus"></i> Create account</a>
+    <a class="pl-btn" href="{{ url_for('auth.login') }}"><i class="fas fa-right-to-bracket"></i> Sign in</a>
+  </div>
+</div>
+{% endblock %}

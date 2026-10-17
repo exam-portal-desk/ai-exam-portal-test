@@ -15,6 +15,7 @@ from app.db.users import get_user_by_id, get_users_by_ids, get_all_users
 from app.db.results import get_result_by_id, get_responses_by_result
 from app.db.questions import get_questions_by_exam
 from app.db import fetch_one, fetch_all
+from app.db.attempts import like_contains
 
 DELETED_USER_LABEL = "Deleted User"
 
@@ -30,6 +31,88 @@ def _display_username(user: dict) -> str:
 
 def _display_full_name(user: dict) -> str:
     return user.get("full_name") or user.get("username") or DELETED_USER_LABEL
+
+
+RESULTS_PER_PAGE = 20
+
+
+def _local_day_bounds(day_iso: str):
+    """[start, next start) of a calendar day in the application timezone, as naive UTC, which is how completed_at is stored.
+    The date pickers speak local days; comparing them with UTC timestamps directly shifts every boundary by the offset."""
+    from datetime import datetime, timedelta, timezone, time
+    from app.utils.datetime_service import app_timezone
+    day = datetime.strptime(day_iso, "%Y-%m-%d").date()
+    tz = app_timezone()
+
+    def utc(d):
+        return datetime.combine(d, time.min, tzinfo=tz).astimezone(timezone.utc).replace(tzinfo=None)
+
+    return utc(day), utc(day + timedelta(days=1))
+
+
+def parse_result_filters(args):
+    """(filters, error message). Every value is validated here, so a bad request is a clear 400 and never a query error."""
+    f = {"student_id": None, "q": "", "exam_id": None, "date_from": "", "date_to": "", "start": None, "end": None}
+    user, q = args.get("user", "").strip(), args.get("q", "").strip()
+    try:
+        if user:
+            f["student_id"] = int(user)
+        elif q:
+            f["q"] = q
+        if args.get("exam", "").strip():
+            f["exam_id"] = int(args.get("exam").strip())
+    except ValueError:
+        return f, "The user or exam filter is not valid."
+    for key, field in (("dateFrom", "date_from"), ("dateTo", "date_to")):
+        value = args.get(key, "").strip()
+        if value:
+            try:
+                bounds = _local_day_bounds(value)
+            except ValueError:
+                return f, "Dates must look like YYYY-MM-DD."
+            f[field] = value
+            f["start" if field == "date_from" else "end"] = bounds[0] if field == "date_from" else bounds[1]
+    if f["date_from"] and f["date_to"] and f["date_from"] > f["date_to"]:
+        return f, "\"From\" date must be on or before the \"To\" date."
+    return f, None
+
+
+def result_where(f):
+    where, params = [], []
+    if f["student_id"] is not None:
+        where.append("student_id=%s"); params.append(f["student_id"])
+    elif f["q"]:
+        where.append(r"student_id IN (SELECT id FROM users WHERE username ILIKE %s ESCAPE '\' OR full_name ILIKE %s ESCAPE '\')")
+        params += [like_contains(f["q"])] * 2
+    if f["exam_id"] is not None:
+        where.append("exam_id=%s"); params.append(f["exam_id"])
+    if f["start"]:
+        where.append("completed_at >= %s"); params.append(f["start"])
+    if f["end"]:
+        where.append("completed_at < %s"); params.append(f["end"])
+    return (f"WHERE {' AND '.join(where)}" if where else ""), params
+
+
+def _filter_labels(f, args):
+    labels = []
+    if f["student_id"] is not None:
+        labels.append(f"user {args.get('userLabel') or '#' + str(f['student_id'])}")
+    elif f["q"]:
+        labels.append(f"user matching \u201c{f['q']}\u201d")
+    if f["exam_id"] is not None:
+        row = fetch_one("SELECT name FROM exams WHERE id=%s", (f["exam_id"],))
+        labels.append(f"exam \u201c{row['name']}\u201d" if row else f"exam #{f['exam_id']}")
+    if f["date_from"] and f["date_to"]:
+        labels.append(f"dates {f['date_from']} to {f['date_to']}")
+    elif f["date_from"]:
+        labels.append(f"from {f['date_from']}")
+    elif f["date_to"]:
+        labels.append(f"up to {f['date_to']}")
+    return labels
+
+
+def _results_error(message, status):
+    return render_template("admin/users_analytics_results_table.html", results=[], pagination=None, error=message), status
 
 
 # ── Analytics dashboard ───────────────────────────────────────────────────
@@ -99,33 +182,27 @@ def users_analytics_results():
     Param: partial=1 returns only the table fragment (no full page).
     Date params: dateFrom / dateTo in YYYY-MM-DD (native <input type=date> format).
     """
-    user_filter = request.args.get("user",     "").strip()
-    exam_filter = request.args.get("exam",     "").strip()
-    date_from   = request.args.get("dateFrom", "").strip()
-    date_to     = request.args.get("dateTo",   "").strip()
+    filters, bad = parse_result_filters(request.args)
+    if bad:
+        return _results_error(bad, 400)
     try:
         page = max(1, int(request.args.get("page", 1)))
     except (ValueError, TypeError):
         page = 1
 
-    per_page  = 20
-    start_idx = (page - 1) * per_page
+    per_page = RESULTS_PER_PAGE
 
     try:
-        # ── Shared WHERE clause ──────────────────────────────────────
-        where, params = [], []
-        if user_filter: where.append("student_id=%s"); params.append(user_filter)
-        if exam_filter: where.append("exam_id=%s");     params.append(exam_filter)
-        if date_from:   where.append("completed_at >= %s"); params.append(date_from)
-        if date_to:     where.append("completed_at <= %s"); params.append(date_to + "T23:59:59")
-        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        where_sql, params = result_where(filters)
 
-        # ── Count query ───────────────────────────────────────────────
         total_results = fetch_one(f"SELECT COUNT(*) AS count FROM results {where_sql}", params)["count"]
 
-        # ── Data query ────────────────────────────────────────────────
+        # a page past the end (the filters narrowed the set since the last click) shows the last page that exists
+        page = min(page, max(1, -(-total_results // per_page)))
+        start_idx = (page - 1) * per_page
+
         page_results = fetch_all(
-            f"SELECT * FROM results {where_sql} ORDER BY completed_at DESC LIMIT %s OFFSET %s",
+            f"SELECT * FROM results {where_sql} ORDER BY completed_at DESC, id DESC LIMIT %s OFFSET %s",
             params + [per_page, start_idx],
         )
 
@@ -200,7 +277,8 @@ def users_analytics_results():
         if partial:
             return render_template(
                 "admin/users_analytics_results_table.html",
-                results=results_list, pagination=pagination
+                results=results_list, pagination=pagination,
+                active_filters=_filter_labels(filters, request.args) if not results_list else [],
             )
 
         # Full page (direct navigation) — also load exams for filter dropdown
@@ -216,12 +294,9 @@ def users_analytics_results():
             pagination=pagination
         )
 
-    except Exception as e:
+    except Exception:
         import traceback; traceback.print_exc()
-        return render_template(
-            "admin/users_analytics_results_table.html",
-            results=[], pagination=None
-        )
+        return _results_error("The results could not be loaded. Please try again.", 500)
 
 
 @admin_bp.route("/users-analytics/analytics")

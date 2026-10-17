@@ -139,28 +139,58 @@ span.custom-chip, span.admin-chip { cursor:default; }
 .no-manage #usersTbody .sel-enh, .no-manage #usersTbody .update-btn, .no-manage #bulkRoleSelect + .sel-enh, .no-manage #applyBulkBtn { opacity:.45; pointer-events:none; }
 .custom-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.16rem .55rem; border-radius:999px; border:1px dashed var(--accent); background:var(--accent-subtle); color:var(--accent); font:inherit; font-size:.68rem; font-weight:700; cursor:pointer; white-space:nowrap; }
 .custom-chip:hover { filter:brightness(.97); border-style:solid; }
-.access-pop { width:min(390px, calc(100vw - 16px)); padding:.85rem .95rem; font-size:.78rem; }
-.ap-title { font-size:.88rem; font-weight:800; }
-.ap-sub { color:var(--text-3); font-size:.7rem; margin-bottom:.55rem; }
-.ap-row { display:flex; align-items:flex-start; gap:.6rem; padding:.55rem 0; border-top:1px solid var(--border); }
-.ap-key { width:84px; flex-shrink:0; padding-top:.15rem; color:var(--text-3); font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-.ap-val { flex:1; min-width:0; display:flex; flex-direction:column; gap:.35rem; }
-.ap-val > .plan-badge { align-self:flex-start; }
+.access-pop { font-size:.78rem; }
+.am-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; padding:.9rem 1rem .75rem; border-bottom:1px solid var(--border); }
+.am-head-text { min-width:0; }
+.ap-title { font-size:.95rem; font-weight:800; overflow-wrap:anywhere; }
+.ap-sub { margin-top:.1rem; color:var(--text-3); font-size:.7rem; line-height:1.4; }
+.am-close { flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; width:2rem; height:2rem; border:1px solid var(--border); border-radius:9px; background:var(--surface-2); color:var(--text-2); font-size:1.1rem; line-height:1; cursor:pointer; }
+.am-close:hover { border-color:var(--accent); color:var(--accent); }
+.am-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:.7rem; padding:.85rem 1rem 1rem; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.am-summary { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:.7rem; }
+.am-sec { min-width:0; padding:.7rem .8rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); }
+.am-sec-title { margin-bottom:.45rem; color:var(--text-3); font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.am-sec-body { display:flex; flex-direction:column; gap:.5rem; min-width:0; }
+.am-sec-body > .plan-badge, .am-sec-body > .ap-tag { align-self:flex-start; }
 .ap-note { color:var(--text-3); font-size:.7rem; line-height:1.4; }
 .ap-ov { display:flex; align-items:center; flex-wrap:wrap; gap:.2rem .45rem; }
 .ap-ov.expired { opacity:.55; }
 .ap-tag { padding:.08rem .45rem; border-radius:6px; border:1px solid var(--border); font-size:.66rem; font-weight:700; }
 .ap-tag.grant { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
 .ap-tag.deny  { background:var(--danger-bg);  color:var(--danger-text);  border-color:var(--danger-border); }
+.ap-tag.st-active { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.ap-tag.st-expiring_soon { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.ap-tag.st-expired { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+.ap-tag.st-none { background:var(--surface); color:var(--text-2); }
+.am-meta { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.2rem .7rem; margin:0; font-size:.74rem; }
+.am-meta dt { color:var(--text-3); font-weight:600; }
+.am-meta dd { margin:0; color:var(--text-1); overflow-wrap:anywhere; }
+.plan-stack { display:inline-flex; flex-direction:column; align-items:flex-start; gap:.3rem; }
+.plan-exp { display:inline-flex; align-items:center; gap:.3rem; padding:.1rem .5rem; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); font-size:.66rem; font-weight:700; line-height:1.4; white-space:nowrap; }
+.plan-exp i { font-size:.62rem; }
+.plan-exp[data-state="expiring_soon"] { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.plan-exp[data-state="expired"] { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+.ap-lim { padding:.06rem .4rem; border-radius:6px; background:var(--surface); border:1px solid var(--border); font-size:.66rem; color:var(--text-2); }
 .ap-x { margin-left:auto; padding:0 .25rem; border:none; background:none; color:var(--text-3); font-size:1rem; line-height:1; cursor:pointer; }
 .ap-x:hover { color:var(--danger-text); }
-.ap-form { display:flex; flex-direction:column; gap:.4rem; }
-.ap-form input { flex:1; min-width:0; padding:.35rem .55rem; border:1px solid var(--border); border-radius:9px; background:var(--bg); color:var(--text-1); font:inherit; font-size:.76rem; }
-.ap-form input:focus { outline:none; border-color:var(--border-focus, var(--accent)); }
-.ap-edit { display:flex; gap:.4rem; align-items:center; }
-.ap-edit .sel-enh.sel-enh-block { flex:1 1 0; width:auto; min-width:0; }
-.ap-edit.ap-pick { flex-direction:column; align-items:stretch; }
-.access-pop .sel-enh-trigger { padding:.35rem .55rem; font-size:.76rem; }
+.ap-form { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:.5rem; margin-top:.15rem; }
+.ap-form > .ap-span, .ap-form > .ap-limits, .ap-form > .ap-actions { grid-column:1 / -1; }
+.ap-form input { width:100%; min-width:0; padding:.4rem .6rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text-1); font:inherit; font-size:.8rem; }
+.ap-form input:focus { outline:none; border-color:var(--border-focus, var(--accent)); box-shadow:0 0 0 3px var(--accent-subtle); }
+.ap-form .sel-enh.sel-enh-block { min-width:0; }
+.ap-limits { display:flex; flex-direction:column; gap:.4rem; }
+.ap-limits:empty { display:none; }
+.ap-actions { display:flex; justify-content:flex-end; }
+.ap-actions .btn-flat { min-width:5.5rem; justify-content:center; }
+.ap-lock { padding:.5rem .65rem; border-radius:var(--radius); background:var(--warning-bg); color:var(--warning-text); font-size:.72rem; line-height:1.45; }
+.access-pop .sel-enh-trigger { padding:.4rem .6rem; font-size:.8rem; }
+@media (max-width: 640px) {
+  .am-head { padding:.8rem .85rem .65rem; }
+  .am-head .ap-sub { display:none; }
+  .am-body { padding:.75rem .85rem .9rem; gap:.6rem; }
+  .am-summary, .ap-form { grid-template-columns:minmax(0,1fr); }
+  .ap-actions .btn-flat { width:100%; min-height:2.5rem; }
+}
 .plans-note { margin-top:1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
 .plans-note > summary { display:flex; align-items:center; gap:.5rem; padding:.65rem .9rem; cursor:pointer; font-size:.8rem; font-weight:700; color:var(--text-1); list-style:none; }
 .plans-note > summary::-webkit-details-marker { display:none; }
@@ -436,19 +466,8 @@ span.custom-chip, span.admin-chip { cursor:default; }
   .col-updated .ts-time { font-size: .62rem; }
 }
 
-#toastContainer { position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none; }
-.toast-item { display:flex;align-items:center;gap:0.65rem;padding:0.75rem 1.1rem;border-radius:12px;font-size:0.83rem;font-weight:600;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.35);min-width:240px;max-width:340px;pointer-events:all;animation:toastIn 0.25s cubic-bezier(.34,1.56,.64,1); }
-@keyframes toastIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
-.toast-item.removing { animation:toastOut 0.22s ease forwards; }
-@keyframes toastOut { to{opacity:0;transform:translateX(40px)} }
-.toast-success { background:linear-gradient(135deg,#059669,#10b981); }
-.toast-danger  { background:linear-gradient(135deg,#dc2626,#ef4444); }
-.toast-warning { background:linear-gradient(135deg,#d97706,#f59e0b); }
-.toast-close { margin-left:auto;background:none;border:none;color:#fff;opacity:0.7;cursor:pointer;font-size:0.85rem;padding:0;flex-shrink:0; }
-.toast-close:hover { opacity:1; }
 </style>
 
-<div id="toastContainer"></div>
 
 <!-- Bulk Confirm Modal -->
 <div id="bulkModal" class="bulk-modal-overlay" onclick="if(event.target===this)this.style.display='none'">
@@ -1216,9 +1235,16 @@ function planCell(u) {
   if (!u.plan) return '<span class="cell-none">-</span>';
   const attrs = `class="plan-badge pb-md" data-tone="${escHtml(u.plan_tone || 'neutral')}" data-uid="${u.id}"`;
   const inner = `<i class="fas ${escHtml(u.plan_icon || 'fa-star')}" aria-hidden="true"></i><span class="pb-text">${escHtml(u.plan_label || u.plan)}</span>`;
-  return CAN_MANAGE_ACCESS
-    ? `<button type="button" ${attrs} onclick="openAccess(this)" title="Plan and access details">${inner}</button>`
-    : `<span ${attrs}>${inner}</span>`;
+  const px = u.plan_expiry || {};
+  const tip = px.expires_display ? (px.state === 'expired' ? 'Expired ' : 'Expires ') + px.expires_display : 'Plan and access details';
+  const badge = CAN_MANAGE_ACCESS
+    ? `<button type="button" ${attrs} onclick="openAccess(this)" title="${escHtml(tip)}">${inner}</button>`
+    : `<span ${attrs} title="${escHtml(tip)}">${inner}</span>`;
+  if (!px.state || px.state === 'none') return badge;
+  const expired = px.state === 'expired';
+  const text = expired ? `${px.expired_plan_label || 'Plan'} expired` : `${px.remaining_short} left`;
+  const flag = `<span class="plan-exp" data-state="${px.state}" title="${escHtml(tip)}"><i class="far ${expired ? 'fa-calendar-times' : 'fa-clock'}" aria-hidden="true"></i>${escHtml(text)}</span>`;
+  return `<span class="plan-stack">${badge}${flag}</span>`;
 }
 
 function adminAccessCell(u) {
@@ -1266,17 +1292,55 @@ function _planBadge(label, tone, icon, size) {
 }
 
 function _accessRow(key, ...children) {
-  const val = _mk('div', 'ap-val');
-  children.forEach(c => c && val.appendChild(c));
-  const row = _mk('div', 'ap-row');
-  row.appendChild(_mk('div', 'ap-key', key));
-  row.appendChild(val);
-  return row;
+  const body = _mk('div', 'am-sec-body');
+  children.forEach(c => c && body.appendChild(c));
+  const sec = _mk('section', 'am-sec');
+  sec.appendChild(_mk('div', 'am-sec-title', key));
+  sec.appendChild(body);
+  return sec;
 }
 
-function _fmtDay(iso) {
-  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+function _field(node, cls) {
+  const wrap = _mk('div', cls || null);
+  wrap.appendChild(node);
+  return wrap;
+}
+
+function _accessHead(title, subtitle) {
+  const head = _mk('div', 'am-head');
+  const text = _mk('div', 'am-head-text');
+  text.appendChild(_mk('div', 'ap-title', title));
+  if (subtitle) text.appendChild(_mk('div', 'ap-sub', subtitle));
+  const close = _mk('button', 'am-close', '×');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close');
+  close.onclick = () => FloatingPanel.close();
+  head.appendChild(text);
+  head.appendChild(close);
+  return head;
+}
+
+const _STATE_LABELS = { active: 'Active', expiring_soon: 'Expiring soon', expired: 'Expired', none: 'No expiry' };
+
+function _durationControls(blankText) {
+  const input = _mk('input');
+  input.type = 'number'; input.min = '1'; input.placeholder = 'Days (blank = no expiry)';
+  const note = _mk('div', 'ap-note ap-span');
+  let timer = 0, seq = 0;
+  const show = () => {
+    const value = input.value.trim();
+    clearTimeout(timer);
+    const mine = ++seq;
+    if (value === '') { note.textContent = blankText(); return; }
+    timer = setTimeout(() => {
+      fetch('/api/v01/admin/access/expiry-preview?days=' + encodeURIComponent(value)).then(r => r.json()).then(p => {
+        if (mine === seq) note.textContent = p.success ? 'Expires ' + p.expires_display + ' (' + p.remaining_text + ')' : p.message;
+      }).catch(() => {});
+    }, 250);
+  };
+  input.addEventListener('input', show);
+  show();
+  return { input, note, refresh: show };
 }
 
 function _themedSelect(options, selected) {
@@ -1295,7 +1359,8 @@ function _entryLine(o, d, pop, removable) {
   line.appendChild(_mk('span', 'ap-tag ' + o.effect, o.effect === 'grant' ? 'Granted' : 'Denied'));
   line.appendChild(_mk('span', null, o.label));
   (o.limit_text || []).forEach(t => line.appendChild(_mk('span', 'ap-lim', t)));
-  line.appendChild(_mk('span', 'ap-note', !o.active ? 'expired' : (o.expires_at ? 'until ' + _fmtDay(o.expires_at) : 'no expiry')));
+  const ex = o.expiry || {};
+  line.appendChild(_mk('span', 'ap-note', !o.active ? 'expired ' + (ex.expires_display || '') : (ex.expires_display ? 'until ' + ex.expires_display + ' (' + ex.remaining_text + ')' : 'no expiry')));
   if (o.reason) line.appendChild(_mk('span', 'ap-note', '- ' + o.reason));
   if (removable) {
     const rm = _mk('button', 'ap-x', '×');
@@ -1323,8 +1388,8 @@ function _grantForm(d, pop, features, withEffect, toEnhance) {
   };
   featureSel.addEventListener('change', syncLimits);
   syncLimits();
-  const days = _mk('input');
-  days.type = 'number'; days.min = '1'; days.placeholder = 'Days (blank = no expiry)';
+  const duration = _durationControls(() => 'No expiry');
+  const days = duration.input;
   const why = _mk('input');
   why.type = 'text'; why.maxLength = 200; why.placeholder = 'Reason (optional)';
   const add = _mk('button', 'btn-flat primary sm', 'Add');
@@ -1338,34 +1403,45 @@ function _grantForm(d, pop, features, withEffect, toEnhance) {
     }, pop);
   };
   const form = _mk('div', 'ap-form');
-  if (effectSel) form.appendChild(effectSel);
-  form.appendChild(featureSel);
+  if (effectSel) form.appendChild(_field(effectSel));
+  form.appendChild(_field(featureSel, effectSel ? null : 'ap-span'));
   form.appendChild(limitBox);
-  form.appendChild(why);
-  const when = _mk('div', 'ap-edit');
-  when.appendChild(days);
-  when.appendChild(add);
-  form.appendChild(when);
+  form.appendChild(_field(why));
+  form.appendChild(_field(days));
+  form.appendChild(duration.note);
+  form.appendChild(_field(add, 'ap-actions'));
   if (effectSel) toEnhance.push([effectSel, 'fas fa-toggle-on']);
   toEnhance.push([featureSel, 'fas fa-puzzle-piece']);
   return form;
 }
 
 function renderAccess(pop, d) {
-  const keep = pop.scrollTop;                                   // a change must not throw the reader back to the top
+  const oldBody = pop.querySelector('.am-body');
+  const keep = oldBody ? oldBody.scrollTop : 0;                 // a change must not throw the reader back to the top
   const caps = d.capabilities || {};
   const toEnhance = [];
   pop.replaceChildren();
-  pop.appendChild(_mk('div', 'ap-title', d.username));
-  pop.appendChild(_mk('div', 'ap-sub', 'Plan, role, admin access and special access are four separate things'));
+  pop.appendChild(_accessHead(d.username, 'Plan, role, admin access and special access are four separate things'));
+  const body = _mk('div', 'am-body');
+  pop.appendChild(body);
+  const summary = _mk('div', 'am-summary');
+  body.appendChild(summary);
 
   // PLAN: what the user gets in the student portal
-  const planVal = [_planBadge(d.plan_label, d.tone, d.icon, 'md')];
-  if (d.plan_expires_at) planVal.push(_mk('div', 'ap-note', 'Until ' + _fmtDay(d.plan_expires_at) + ', then the default plan.'));
-  pop.appendChild(_accessRow('Plan', ...planVal));
+  const px = d.plan_expiry || { state: 'none' };
+  const stateText = px.state === 'expired' ? (px.expired_plan_label || 'Plan') + ' expired' : (_STATE_LABELS[px.state] || '');
+  const planVal = [_planBadge(d.plan_label, d.tone, d.icon, 'md'), _mk('span', 'ap-tag st-' + px.state, stateText)];
+  const meta = _mk('dl', 'am-meta');
+  const addMeta = (key, value) => { if (value) { meta.appendChild(_mk('dt', null, key)); meta.appendChild(_mk('dd', null, value.replace(/ (\w+)$/, ' $1'))); } };
+  addMeta('Assigned', d.plan_assigned_display);
+  addMeta(px.state === 'expired' ? 'Expired' : 'Expires', px.state === 'none' ? 'Never' : px.expires_display);
+  if (px.state === 'active' || px.state === 'expiring_soon') addMeta('Remaining', px.remaining_text);
+  planVal.push(meta);
+  if (px.state === 'expired') planVal.push(_mk('div', 'ap-note', (px.expired_plan_label || 'The plan') + ' expired, so the user is now on the default ' + d.plan_label + ' plan.'));
+  summary.appendChild(_accessRow('Plan', ...planVal));
 
   // ROLE: only eligibility for the Admin Portal
-  pop.appendChild(_accessRow('Role', _mk('div', null, d.is_admin ? 'Admin' : 'User (not an admin)'),
+  summary.appendChild(_accessRow('Role', _mk('div', null, d.is_admin ? 'Admin' : 'User (not an admin)'),
     _mk('div', 'ap-note', 'The Admin role only lets a person into the Admin Portal. It grants no admin feature and no plan.')));
 
   // ADMIN ACCESS: which admin features this administrator has been granted (and any limits on them)
@@ -1376,39 +1452,40 @@ function renderAccess(pop, d) {
       : [_mk('div', 'ap-note', 'None. This administrator can open the portal but no admin feature.')];
     if (!d.is_admin) items.push(_mk('div', 'ap-note', 'Not an admin yet: these take effect once the Admin role is set.'));
     if (grantable.length) items.push(_grantForm(d, pop, grantable, false, toEnhance));
-    pop.appendChild(_accessRow('Admin access', ...items));
+    body.appendChild(_accessRow('Admin access', ...items));
   }
 
   // SPECIAL ACCESS: grants or denials of user features on top of the plan
   const special = d.special.length ? d.special.map(o => _entryLine(o, d, pop, caps.special_access))
                                    : [_mk('div', 'ap-note', 'None. This user has exactly what their plan gives.')];
   if (caps.special_access && STUDENT_FEATURES.length) special.push(_grantForm(d, pop, STUDENT_FEATURES, true, toEnhance));
-  pop.appendChild(_accessRow('Special access', ...special));
+  body.appendChild(_accessRow('Special access', ...special));
 
   // CHANGE PLAN
   if (caps.plan) {
     const planSel = _themedSelect(PLAN_OPTIONS.map((key, i) => [key, PLAN_LABELS[i]]), d.plan);
     const save = _mk('button', 'btn-flat primary sm', 'Save');
     save.type = 'button';
-    // The plan can be given for a number of days; blank = it does not expire. When it lapses the user is back on the default plan.
-    const days = _mk('input');
-    days.type = 'number'; days.min = '1'; days.placeholder = 'Days (blank = no expiry)';
+    // The plan can be given for a number of days; blank = it does not expire, except that saving the same plan again keeps its
+    // running expiry. When it lapses the user is back on the default plan.
+    const keeps = () => planSel.value === d.plan_key && (px.state === 'active' || px.state === 'expiring_soon');
+    const duration = _durationControls(() => (keeps() ? 'Keeps the current expiry' : 'No expiry'));
+    const days = duration.input;
+    planSel.addEventListener('change', duration.refresh);
     save.onclick = () => saveUserPlan(d.user_id, planSel.value, days.value, save, pop);
-    const when = _mk('div', 'ap-edit');
-    when.appendChild(days);
-    when.appendChild(save);
     const edit = _mk('div', 'ap-form');
-    edit.appendChild(planSel);
-    edit.appendChild(when);
-    pop.appendChild(_accessRow('Change plan', edit));
+    edit.appendChild(_field(planSel));
+    edit.appendChild(_field(days));
+    edit.appendChild(duration.note);
+    edit.appendChild(_field(save, 'ap-actions'));
+    body.appendChild(_accessRow('Change plan', edit));
     toEnhance.push([planSel, 'fas fa-layer-group']);
   }
-  if (caps.reason) pop.appendChild(_mk('div', 'ap-lock', caps.reason));
+  if (caps.reason) body.appendChild(_mk('div', 'ap-lock', caps.reason));
 
   // the project's themed dropdown, not the browser's native list (they must be in the page before they are enhanced)
   toEnhance.forEach(([sel, icon]) => enhanceSelect(sel, { icon, block: true }));
-  pop.scrollTop = keep;
-  FloatingPanel.reposition();
+  body.scrollTop = keep;
 }
 
 function changeAccess(uid, method, feature, body, pop) {
@@ -1434,24 +1511,28 @@ function saveUserPlan(uid, plan, days, btn, pop) {
   }).catch(() => { toast('Could not change the plan.', 'error'); btn.disabled = false; });
 }
 
+function _loadNote(text) {
+  const frag = document.createDocumentFragment();
+  const box = _mk('div', 'am-body');
+  box.appendChild(_mk('div', 'ap-note', text));
+  frag.appendChild(_accessHead('Access details'));
+  frag.appendChild(box);
+  return frag;
+}
+
 function openAccess(anchor) {
   if (!CAN_MANAGE_ACCESS) return;
   const uid = anchor.dataset.uid;
-  const shown = FloatingPanel.current();
-  if (shown && shown.dataset.uid === uid) { FloatingPanel.close(); return; }        // the same badge again closes it
   const pop = _mk('div', 'access-pop');
   pop.dataset.uid = uid;
-  pop.appendChild(_mk('div', 'ap-note', 'Loading...'));
+  pop.appendChild(_loadNote('Loading...'));
   _accessPop = pop;
-  FloatingPanel.open(anchor, pop, {
-    resolve: () => document.querySelector(`td.plan-cell .plan-badge[data-uid="${uid}"]`),      // the table re-renders after every change
-    onClose: () => { if (_accessPop === pop) _accessPop = null; }
-  });
+  FloatingPanel.open(anchor, pop, { onClose: () => { if (_accessPop === pop) _accessPop = null; } });
   fetch(`/api/v01/admin/access/users/${uid}`).then(r => r.json()).then(d => {
     if (_accessPop !== pop) return;
-    if (!d.success) { pop.replaceChildren(_mk('div', 'ap-note', d.message || "Couldn't load access details.")); FloatingPanel.reposition(); return; }
+    if (!d.success) { pop.replaceChildren(_loadNote(d.message || "Couldn't load access details.")); return; }
     renderAccess(pop, d);
-  }).catch(() => { if (_accessPop === pop) { pop.replaceChildren(_mk('div', 'ap-note', "Couldn't load access details.")); FloatingPanel.reposition(); } });
+  }).catch(() => { if (_accessPop === pop) pop.replaceChildren(_loadNote("Couldn't load access details.")); });
 }
 
 function umLoadStats() {
@@ -1683,23 +1764,9 @@ function setLoading(btn, on) {
   else if (btn._orig) btn.innerHTML = btn._orig;
 }
 
-/* Same implementation as templates/admin/users_manage.html's toast() — kept
-   local to each page rather than factored into admin_base.html since that's
-   the existing convention here, but this page previously had none at all
-   (see the #toastContainer comment above). */
+/* The one themed toast of the Admin Portal (adminToast, templates/admin_base.html): theme tokens, above the Access card. */
 function toast(msg, type='success') {
-  const icons={success:'fa-check-circle',danger:'fa-times-circle',warning:'fa-exclamation-triangle'};
-  const el=document.createElement('div');
-  el.className=`toast-item toast-${type}`;
-  el.innerHTML=`<i class="fas ${icons[type]||'fa-info-circle'}" style="flex-shrink:0"></i>
-    <span style="flex:1;line-height:1.4">${msg}</span>
-    <button class="toast-close" onclick="removeToast(this.parentElement)"><i class="fas fa-times"></i></button>`;
-  document.getElementById('toastContainer').appendChild(el);
-  setTimeout(()=>removeToast(el),4000);
-}
-function removeToast(el){
-  if(!el||el._removing)return;el._removing=true;
-  el.classList.add('removing');setTimeout(()=>el.remove(),220);
+  adminToast(msg, type === 'error' ? 'danger' : type, null, 4000);
 }
 
 /* ═══════════════════════════════════════════════

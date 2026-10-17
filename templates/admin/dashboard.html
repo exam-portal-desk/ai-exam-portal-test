@@ -138,8 +138,21 @@
   background: var(--chart-c, var(--accent));
 }
 .dash-chart-sub { font-size: .7rem; color: var(--text-3); margin-bottom: .75rem; margin-left: 1.15rem; }
+.dash-chart-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.dash-chart-top .dash-chart-hdr { min-width: 0; }
+.dash-png {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: .3rem; padding: .22rem .55rem; border-radius: var(--radius);
+  font: inherit; font-size: .68rem; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.dash-png:hover, .dash-png:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.dash-png:disabled { opacity: .5; cursor: progress; }
+.dash-chart-note { font-size: .68rem; color: var(--text-3); margin: .5rem 0 0; }
 .dash-chart-body { position: relative; height: 210px; }
 .dash-chart-body.tall { height: 240px; }
+.dash-section-row .dash-section-title { flex: 1; min-width: 0; }
+.dash-section-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+@media (max-width: 700px) { .dash-section-row .dash-png { width: 100%; justify-content: center; padding: .45rem .7rem; font-size: .76rem; } }
 .dash-chart-empty {
   display: flex; align-items: center; justify-content: center; height: 210px;
   font-size: .78rem; color: var(--text-3); text-align: center; padding: 0 1rem;
@@ -262,13 +275,13 @@
 
 <!-- ── Analytics ── -->
 {% if show.library or show.users or show.question_types or show.attempts or show.requests or show.exams %}
-<div class="dash-section-title">Analytics</div>
+<div class="dash-section-row"><div class="dash-section-title">Analytics</div></div>
 <div class="dash-charts">
 
   {% if show.library %}
   <div class="dash-chart-card span2" style="--chart-c:var(--info-text)">
     <div class="dash-chart-hdr">Content Library</div>
-    <div class="dash-chart-sub">Categories, subjects, exams and questions on the portal</div>
+    <div class="dash-chart-sub">Total categories, subjects, exams and questions on the portal.</div>
     <div class="dash-chart-body"><canvas id="chartContentLibrary"></canvas></div>
   </div>
   {% endif %}
@@ -276,7 +289,7 @@
   {% if show.users %}
   <div class="dash-chart-card" style="--chart-c:var(--accent)">
     <div class="dash-chart-hdr">Users</div>
-    <div class="dash-chart-sub">Admins vs. students</div>
+    <div class="dash-chart-sub">Number of accounts by role: admins and students.</div>
     <div class="dash-chart-body"><canvas id="chartUserRoles"></canvas></div>
   </div>
   {% endif %}
@@ -284,7 +297,7 @@
   {% if show.question_types %}
   <div class="dash-chart-card" style="--chart-c:#7c3aed">
     <div class="dash-chart-hdr">Questions by Type</div>
-    <div class="dash-chart-sub">Across all exams</div>
+    <div class="dash-chart-sub">Number of questions of each type, across all exams.</div>
     <div class="dash-chart-body"><canvas id="chartQuestionTypes"></canvas></div>
   </div>
   {% endif %}
@@ -292,7 +305,7 @@
   {% if show.attempts %}
   <div class="dash-chart-card" style="--chart-c:var(--success-text)">
     <div class="dash-chart-hdr">Exam Attempts</div>
-    <div class="dash-chart-sub">By status</div>
+    <div class="dash-chart-sub">Number of attempts in each status.</div>
     <div class="dash-chart-body"><canvas id="chartAttempts"></canvas></div>
   </div>
   {% endif %}
@@ -300,7 +313,7 @@
   {% if show.requests %}
   <div class="dash-chart-card" style="--chart-c:var(--warning-text)">
     <div class="dash-chart-hdr">Access Requests</div>
-    <div class="dash-chart-sub">By status</div>
+    <div class="dash-chart-sub">Number of access requests in each status.</div>
     <div class="dash-chart-body"><canvas id="chartRequests"></canvas></div>
   </div>
   {% endif %}
@@ -308,7 +321,7 @@
   {% if show.exams %}
   <div class="dash-chart-card" style="--chart-c:#0891b2">
     <div class="dash-chart-hdr">Exams per Category</div>
-    <div class="dash-chart-sub">Where exams are concentrated</div>
+    <div class="dash-chart-sub">Number of exams in each category.</div>
     <div class="dash-chart-body tall"><canvas id="chartExamsPerCategory"></canvas></div>
   </div>
   {% endif %}
@@ -316,7 +329,7 @@
   {% if show.attempts %}
   <div class="dash-chart-card" style="--chart-c:var(--info-text)">
     <div class="dash-chart-hdr">Most Attempted Exams</div>
-    <div class="dash-chart-sub">Top 5 by attempt count</div>
+    <div class="dash-chart-sub">The 5 exams with the most attempts.</div>
     <div class="dash-chart-body tall"><canvas id="chartTopAttempted"></canvas></div>
   </div>
   {% endif %}
@@ -324,7 +337,7 @@
   {% if show.exams %}
   <div class="dash-chart-card" style="--chart-c:var(--danger-text)">
     <div class="dash-chart-hdr">Largest Exams</div>
-    <div class="dash-chart-sub">Top 5 by question count</div>
+    <div class="dash-chart-sub">The 5 exams with the most questions.</div>
     <div class="dash-chart-body tall"><canvas id="chartTopQuestions"></canvas></div>
   </div>
   {% endif %}
@@ -406,100 +419,201 @@ document.addEventListener('DOMContentLoaded', function () {
   var COLORS = { blue: '#2d5be3', green: '#16a34a', amber: '#f59e0b', red: '#dc2626', purple: '#7c3aed', teal: '#0891b2' };
   var PALETTE = [COLORS.blue, COLORS.green, COLORS.amber, COLORS.red, COLORS.purple, COLORS.teal];
 
-  function styles() {
-    var cs = getComputedStyle(document.documentElement);
-    return { text: cs.getPropertyValue('--text-2').trim() || '#666', grid: cs.getPropertyValue('--border').trim() || '#ddd' };
+  var SPECS = [
+    { id: 'chartContentLibrary',   data: 'content_library',     title: 'Content Library',      kind: 'bar',   color: COLORS.blue,   log: true,  empty: 'No content yet.' },
+    { id: 'chartUserRoles',        data: 'user_roles',          title: 'Users',                kind: 'donut',                         empty: 'No users yet.' },
+    { id: 'chartQuestionTypes',    data: 'question_types',      title: 'Questions by Type',    kind: 'bar',   color: COLORS.purple, log: true,  empty: 'No questions yet.' },
+    { id: 'chartAttempts',         data: 'attempt_status',      title: 'Exam Attempts',        kind: 'bar',   color: COLORS.green,  empty: 'No exam attempts yet.' },
+    { id: 'chartRequests',         data: 'request_status',      title: 'Access Requests',      kind: 'bar',   color: COLORS.amber,  empty: 'No access requests yet.' },
+    { id: 'chartExamsPerCategory', data: 'exams_per_category',  title: 'Exams per Category',   kind: 'bar',   color: COLORS.teal,   empty: 'No categories yet.' },
+    { id: 'chartTopAttempted',     data: 'top_attempted_exams', title: 'Most Attempted Exams', kind: 'bar',   color: COLORS.blue,   empty: 'No exam attempts yet.' },
+    { id: 'chartTopQuestions',     data: 'top_question_exams',  title: 'Largest Exams',        kind: 'bar',   color: COLORS.red,    empty: 'No questions yet.' }
+  ];
+  var live = {};      // id -> Chart
+  var active = [];    // specs that have data
+
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function livePalette() {
+    return { text: cssVar('--text-2') || '#666', tick: cssVar('--text-3') || '#777', grid: cssVar('--border') || '#ddd',
+             tipBg: cssVar('--surface') || '#fff', tipText: cssVar('--text-1') || '#111' };
   }
 
-  function renderEmpty(canvasId, message) {
-    var canvas = document.getElementById(canvasId);
+  function entries(spec) {
+    var obj = CHART_DATA[spec.data] || {};
+    return Object.keys(obj).map(function (k) { return { label: k, value: Number(obj[k]) || 0 }; });
+  }
+  function hasData(spec) { return entries(spec).some(function (e) { return e.value > 0; }); }
+  function useLog(spec) {
+    var v = entries(spec).map(function (e) { return e.value; });
+    return !!spec.log && v.length > 1 && v.every(function (x) { return x > 0; }) && Math.max.apply(null, v) / Math.min.apply(null, v) >= 10;
+  }
+
+  /* Long names wrap onto up to three lines at word boundaries (the tooltip always carries the full name). */
+  function wrap(label, max) {
+    var words = String(label).split(/\s+/), lines = [], cur = '';
+    words.forEach(function (w) {
+      if (w.length > max) w = w.slice(0, max - 1) + '…';
+      if (cur && (cur + ' ' + w).length > max) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+    });
+    if (cur) lines.push(cur);
+    if (lines.length > 3) { lines = lines.slice(0, 3); lines[2] = lines[2].replace(/…?$/, '…'); }
+    return lines.length > 1 ? lines : (lines[0] || '');
+  }
+  function lineCount(l) { return Array.isArray(l) ? l.length : 1; }
+
+  function barHeight(rows, maxChars, fontPx) {
+    var h = 36;
+    rows.forEach(function (r) { h += Math.max(30, lineCount(wrap(r.label, maxChars)) * (fontPx + 3) + 14); });
+    return Math.max(150, h);
+  }
+
+  function config(spec, pal, exporting, maxChars) {
+    var rows = entries(spec), fs = exporting ? 13 : 11, log = useLog(spec);
+    var tip = { backgroundColor: pal.tipBg, titleColor: pal.tipText, bodyColor: pal.tipText, borderColor: pal.grid, borderWidth: 1, padding: 10, displayColors: false };
+    if (spec.kind === 'donut') {
+      var total = rows.reduce(function (a, r) { return a + r.value; }, 0);
+      return { type: 'doughnut',
+        data: { labels: rows.map(function (r) { return r.label + ' — ' + r.value.toLocaleString('en-IN'); }), datasets: [{ data: rows.map(function (r) { return r.value; }), backgroundColor: PALETTE, borderColor: exporting ? '#ffffff' : pal.tipBg, borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: {
+          legend: { position: 'bottom', labels: { color: pal.text, boxWidth: 10, usePointStyle: true, font: { size: fs } } },
+          tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return c.raw.toLocaleString('en-IN') + ' (' + (total ? (c.raw / total * 100).toFixed(1) : 0) + '%)'; } } }) } } };
+    }
+    return { type: 'bar',
+      data: { labels: rows.map(function (r) { return wrap(r.label, maxChars); }), datasets: [{ data: rows.map(function (r) { return r.value; }), backgroundColor: spec.color, borderRadius: 5, maxBarThickness: 24 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 12 } },
+        plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: {
+          title: function (it) { return rows[it[0].dataIndex].label; },
+          label: function (c) { return c.raw.toLocaleString('en-IN'); } } }) },
+        scales: {
+          x: { type: log ? 'logarithmic' : 'linear', beginAtZero: !log, ticks: { color: pal.tick, precision: 0, font: { size: fs - 1 } }, grid: { color: pal.grid } },
+          y: { ticks: { color: pal.text, font: { size: fs }, autoSkip: false }, grid: { display: false } } } } };
+  }
+
+  function charsFor(canvas) {
+    var w = canvas.closest('.dash-chart-card').clientWidth;
+    return w < 340 ? 18 : w < 460 ? 22 : 28;
+  }
+
+  function draw(spec) {
+    var canvas = document.getElementById(spec.id);
     if (!canvas) return;
-    var wrap = canvas.closest('.dash-chart-body');
-    if (wrap) wrap.outerHTML = '<div class="dash-chart-empty">' + message + '</div>';
+    var body = canvas.closest('.dash-chart-body');
+    if (live[spec.id]) { live[spec.id].destroy(); live[spec.id] = null; }
+    var max = charsFor(canvas);
+    if (spec.kind === 'bar') body.style.height = barHeight(entries(spec), max, 11) + 'px';
+    live[spec.id] = new Chart(canvas.getContext('2d'), config(spec, livePalette(), false, max));
   }
 
-  function hasData(values) {
-    return values.length && values.some(function (v) { return v > 0; });
+  function renderEmpty(spec) {
+    var canvas = document.getElementById(spec.id);
+    if (!canvas) return;
+    var wrapEl = canvas.closest('.dash-chart-body');
+    if (wrapEl) wrapEl.outerHTML = '<div class="dash-chart-empty">' + spec.empty + '</div>';
   }
 
-  function renderDonut(canvasId, dataObj, emptyMsg) {
-    var labels = Object.keys(dataObj || {});
-    var values = labels.map(function (k) { return dataObj[k]; });
-    if (!hasData(values)) { renderEmpty(canvasId, emptyMsg); return; }
-    var s = styles();
-    new Chart(document.getElementById(canvasId).getContext('2d'), {
-      type: 'doughnut',
-      data: { labels: labels, datasets: [{ data: values, backgroundColor: PALETTE, borderWidth: 0 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '62%',
-        plugins: { legend: { position: 'bottom', labels: { color: s.text, boxWidth: 10, font: { size: 11 } } } }
-      }
-    });
+  function toast(msg, type, sub) { if (window.adminToast) window.adminToast(msg, type, sub); }
+
+  function exportOne(spec) {
+    var made = null;
+    try {
+      var rows = entries(spec), W = 900, max = 34;
+      var H = spec.kind === 'donut' ? 420 : barHeight(rows, max, 13) + 30;
+      made = ChartExport.offscreen(Chart, config(spec, ChartExport.palette, true, max), W, H);
+      var out = ChartExport.compose([{ canvas: made.canvas, w: W, h: H }], spec.title, subtitle(spec), 960);
+      return ChartExport.download(out, ChartExport.slug(spec.title) + '-' + ChartExport.stamp() + '.png')
+        .then(function () { toast('Chart exported as PNG.', 'success'); })
+        .catch(function (e) { toast('Could not export this chart.', 'error', e.message); })
+        .then(function () { made.dispose(); });
+    } catch (e) {
+      if (made) made.dispose();
+      toast('Could not export this chart.', 'error', e.message);
+      return Promise.resolve();
+    }
   }
 
-  // Vertical bar — small category counts (2-4 categories), linear scale.
-  function renderVBar(canvasId, dataObj, emptyMsg, color) {
-    var labels = Object.keys(dataObj || {});
-    var values = labels.map(function (k) { return dataObj[k]; });
-    if (!hasData(values)) { renderEmpty(canvasId, emptyMsg); return; }
-    var s = styles();
-    new Chart(document.getElementById(canvasId).getContext('2d'), {
-      type: 'bar',
-      data: { labels: labels, datasets: [{ data: values, backgroundColor: color, borderRadius: 5, maxBarThickness: 46 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (ctx) { return ctx.formattedValue; } } } },
-        scales: {
-          x: { ticks: { color: s.text, font: { size: 11 } }, grid: { display: false } },
-          y: { beginAtZero: true, ticks: { color: s.text, precision: 0 }, grid: { color: s.grid } }
-        }
-      }
-    });
+  function exportAll() {
+    var made = [];
+    try {
+      var W = 900, max = 34;
+      var parts = active.map(function (spec) {
+        var rows = entries(spec);
+        var H = spec.kind === 'donut' ? 380 : barHeight(rows, max, 13) + 30;
+        var m = ChartExport.offscreen(Chart, config(spec, ChartExport.palette, true, max), W, H);
+        made.push(m);
+        return { canvas: m.canvas, w: W, h: H, caption: spec.title + ' — ' + subtitle(spec) };
+      });
+      var out = ChartExport.compose(parts, 'Admin dashboard analytics', 'Live portal totals · ' + new Date().toLocaleDateString(), 960);
+      return ChartExport.download(out, 'admin-dashboard-analytics-' + ChartExport.stamp() + '.png')
+        .then(function () { toast('Dashboard exported as PNG.', 'success'); })
+        .catch(function (e) { toast('Could not export the dashboard.', 'error', e.message); })
+        .then(function () { made.forEach(function (m) { m.dispose(); }); });
+    } catch (e) {
+      made.forEach(function (m) { m.dispose(); });
+      toast('Could not export the dashboard.', 'error', e.message);
+      return Promise.resolve();
+    }
   }
 
-  // Horizontal bar — ranked/named categories, optionally log-scaled when
-  // values span very different orders of magnitude (e.g. 381 questions
-  // next to 5 categories) so small bars stay visible without distorting
-  // the real numbers.
-  function renderHBar(canvasId, dataObj, emptyMsg, color, opts) {
-    opts = opts || {};
-    var labels = Object.keys(dataObj || {});
-    var values = labels.map(function (k) { return dataObj[k]; });
-    if (!hasData(values)) { renderEmpty(canvasId, emptyMsg); return; }
-    var s = styles();
-    var useLog = !!opts.log && values.every(function (v) { return v > 0; }) && Math.max.apply(null, values) / Math.min.apply(null, values) >= 10;
-    new Chart(document.getElementById(canvasId).getContext('2d'), {
-      type: 'bar',
-      data: { labels: labels, datasets: [{ data: values, backgroundColor: color, borderRadius: 5, maxBarThickness: 22 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { type: useLog ? 'logarithmic' : 'linear', beginAtZero: !useLog, ticks: { color: s.text, font: { size: 10 } }, grid: { color: s.grid } },
-          y: { ticks: { color: s.text, font: { size: 11 } }, grid: { display: false } }
-        }
-      }
-    });
+  function subtitle(spec) {
+    var card = document.getElementById(spec.id) && document.getElementById(spec.id).closest('.dash-chart-card');
+    var sub = card && card.querySelector('.dash-chart-sub');
+    return sub ? sub.textContent : '';
+  }
+
+  function button(label, title, fn) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'dash-png'; b.title = title;
+    b.innerHTML = '<i class="fas fa-download"></i>' + label;
+    b.addEventListener('click', function () { b.disabled = true; Promise.resolve(fn()).then(function () { b.disabled = false; }); });
+    return b;
+  }
+
+  function decorate(spec) {
+    var card = document.getElementById(spec.id).closest('.dash-chart-card');
+    var hdr = card.querySelector('.dash-chart-hdr');
+    var top = document.createElement('div');
+    top.className = 'dash-chart-top';
+    hdr.parentNode.insertBefore(top, hdr);
+    top.appendChild(hdr);
+    top.appendChild(button('PNG', 'Download “' + spec.title + '” as a PNG image', function () { return exportOne(spec); }));
+    if (useLog(spec)) {
+      var note = document.createElement('p');
+      note.className = 'dash-chart-note';
+      note.textContent = 'Log scale: counts differ widely, so bar length shows order of magnitude. Hover for exact values.';
+      card.appendChild(note);
+    }
   }
 
   function initCharts() {
-    renderHBar('chartContentLibrary', CHART_DATA.content_library, 'No content yet.', COLORS.blue, { log: true });
-    renderDonut('chartUserRoles', CHART_DATA.user_roles, 'No users yet.');
-    renderHBar('chartQuestionTypes', CHART_DATA.question_types, 'No questions yet.', COLORS.purple, { log: true });
-    renderVBar('chartAttempts', CHART_DATA.attempt_status, 'No exam attempts yet.', COLORS.green);
-    renderVBar('chartRequests', CHART_DATA.request_status, 'No access requests yet.', COLORS.amber);
-    renderHBar('chartExamsPerCategory', CHART_DATA.exams_per_category, 'No categories yet.', COLORS.teal);
-    renderHBar('chartTopAttempted', CHART_DATA.top_attempted_exams, 'No exam attempts yet.', COLORS.blue);
-    renderHBar('chartTopQuestions', CHART_DATA.top_question_exams, 'No questions yet.', COLORS.red);
+    SPECS.forEach(function (spec) {
+      if (!document.getElementById(spec.id)) return;
+      if (!hasData(spec)) { renderEmpty(spec); return; }
+      active.push(spec);
+      decorate(spec);
+      draw(spec);
+    });
+    var title = document.querySelector('.dash-section-row');
+    if (title && active.length) title.appendChild(button('Export all charts (PNG)', 'Download every chart below as one PNG image', exportAll));
+
+    var timer = 0;
+    window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(function () { active.forEach(draw); }, 200); });
+    new MutationObserver(function () { active.forEach(draw); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  function boot() {
+    var s = document.createElement('script');
+    s.src = '{{ url_for("static", filename="shared/chart-export.js") }}';
+    s.onload = initCharts;
+    document.head.appendChild(s);
   }
 
   if (!window.Chart) {
     var script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js';
-    script.onload = initCharts;
+    script.onload = boot;
     document.head.appendChild(script);
   } else {
-    document.addEventListener('DOMContentLoaded', initCharts);
+    document.addEventListener('DOMContentLoaded', boot);
   }
 })();
 </script>

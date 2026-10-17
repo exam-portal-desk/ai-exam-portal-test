@@ -18,7 +18,7 @@ from app.middleware.session_guard import require_user_role
 from app.entitlements.guard import require_feature
 from app.db.exams import get_exam_by_id
 from app.db.attempts import (
-    get_active_attempt, get_completed_attempts_count,
+    get_active_attempt, get_used_attempts_count,
     get_all_attempts_for_exam, create_exam_attempt,
 )
 from app.db.sessions import set_exam_active
@@ -153,7 +153,7 @@ def start_exam(exam_id):
     _purge_exam_session(exam_id)
 
     # Check attempt limit against the DB (completed count is already authoritative)
-    completed = get_completed_attempts_count(user_id, exam_id)
+    completed = get_used_attempts_count(user_id, exam_id)
     max_att   = safe_int(exam.get("max_attempts"), 0)
     if max_att > 0 and completed >= max_att:
         return jsonify({"success": False, "message": f"Maximum attempts ({max_att}) reached."})
@@ -338,7 +338,7 @@ def api_exam_attempts_status(exam_id):
         return jsonify({"error": "exam_not_found"}), 404
 
     max_att   = safe_int(exam.get("max_attempts"), 0)
-    completed = get_completed_attempts_count(user_id, exam_id)
+    completed = get_used_attempts_count(user_id, exam_id)
     latest    = get_active_attempt(user_id, exam_id)
 
     from app.services.exam_service import (
