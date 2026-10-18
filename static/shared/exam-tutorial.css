@@ -1,0 +1,120 @@
+/* "How to Navigate Your Exam" — animated walkthrough on the Exam Instructions page (static/shared/exam-tutorial.js).
+   Everything is scoped under .xt and mirrors the real exam window (templates/exam_page.html): same labels, same palette colours
+   and status names, same button roles. Colours that are fixed in the exam window (palette gradients) are repeated here
+   verbatim — tests/test_exam_tutorial.py fails if the two ever drift apart. All other colours are theme tokens, so the demo
+   follows light/dark/every theme automatically. */
+.xt {
+  --xt-ease: cubic-bezier(.4, 0, .2, 1); min-width: 0; position: relative;
+  /* ONE dedicated demo area: a tinted, dashed-outline zone with a label on its top edge and an "end" tag on its bottom edge, so it
+     is obvious where the demonstration starts and stops. Not another card: no shadow, and the border follows the theme. */
+  --xt-edge: color-mix(in srgb, var(--accent) 45%, var(--border));
+  margin-top: 1.15rem; padding: 1.4rem .9rem 1.25rem;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface-2));
+  border: 1.5px dashed var(--xt-edge); border-radius: calc(var(--radius) + 8px);
+}
+.xt-label, .xt-endtag {
+  position: absolute; z-index: 6; display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--surface); border: 1px solid var(--xt-edge); border-radius: 20px;
+  padding: .16rem .7rem; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
+}
+.xt-label { top: -.72rem; left: 1rem; color: var(--accent); }
+.xt-endtag { bottom: -.72rem; right: 1rem; color: var(--text-3); }
+.xt-stage {
+  position: relative; overflow: hidden; pointer-events: none; user-select: none;
+  background: var(--bg); border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px);
+  }
+.xt-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .8rem; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.xt-name { display: flex; align-items: center; gap: .4rem; font-size: .8rem; font-weight: 700; color: var(--text-1); min-width: 0; }
+.xt-name i { color: var(--accent); }
+.xt-name span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xt-qc { display: inline-flex; background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--border); border-radius: 20px; padding: .12rem .55rem; font-size: .68rem; font-weight: 700; flex-shrink: 0; }
+.xt-timer { display: inline-flex; align-items: center; gap: .35rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: .25rem .6rem; font-size: .78rem; font-weight: 700; color: var(--text-1); white-space: nowrap; }
+.xt-timer i { color: var(--accent); }
+.xt-body { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: .75rem; padding: .75rem; align-items: start; }
+.xt-card { background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); padding: 1rem; min-width: 0; transition: opacity .2s var(--xt-ease), transform .2s var(--xt-ease); }
+.xt-card.swap { opacity: 0; transform: translateY(4px); }
+.xt-qtext { font-size: .86rem; font-weight: 600; color: var(--text-1); margin-bottom: .7rem; line-height: 1.5; }
+.xt-opt { display: flex; align-items: center; gap: .5rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem .75rem; margin-bottom: .4rem; font-size: .82rem; color: var(--text-1); transition: border-color .15s, background .15s; }
+.xt-opt .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; transition: border-color .15s, background .15s, box-shadow .15s; }
+.xt-opt.selected { border-color: var(--accent); background: var(--accent-subtle); }
+.xt-opt.selected .dot { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 2px var(--surface); }
+.xt-side { display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
+.xt-side .xt-card { padding: 0; overflow: hidden; }
+.xt-side-hd { display: flex; align-items: center; gap: .35rem; padding: .45rem .7rem; background: var(--accent); color: var(--accent-on); font-size: .72rem; font-weight: 700; }
+.xt-side-bd { padding: .65rem; }
+.xt .question-palette { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: center; }
+.xt .palette-link {
+  width: 32px; height: 32px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: .72rem; font-weight: 700; position: relative; background: linear-gradient(135deg, #6c757d, #495057); color: #fff;
+  border: 2px solid transparent; transition: transform .15s, box-shadow .2s, background .25s;
+}
+.xt .palette-link.current { border-color: var(--text-1) !important; box-shadow: 0 0 0 2px var(--accent); }
+.xt .palette-link.answered { background: linear-gradient(135deg, #16a34a, #059669); }
+.xt .palette-link.review { background: linear-gradient(135deg, #f59e0b, #f97316); }
+.xt .palette-link.visited { background: linear-gradient(135deg, #0ea5e9, #0369a1); }
+.xt .palette-link.not-visited { background: linear-gradient(135deg, #6c757d, #495057); }
+.xt .palette-link.xt-press { transform: scale(1.14); }
+.xt-legend { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; margin-top: .6rem; }
+.xt .legend-box { display: flex; align-items: center; gap: .3rem; font-size: .66rem; color: var(--text-2); }
+.xt .swatch { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; display: inline-block; }
+.xt-nav { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem .75rem; background: var(--surface-2); border-top: 1px solid var(--border); }
+.xt-nav-mid { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: center; align-items: center; }
+.xt-btn { padding: .4rem .8rem; min-height: 36px; border-radius: var(--radius); font-size: .76rem; font-weight: 700; font-family: inherit; display: inline-flex; align-items: center; gap: .35rem; border: 1.5px solid var(--border); transition: transform .15s, box-shadow .2s, background .2s, color .2s; }
+.xt-btn.prev { background: var(--info-bg); color: var(--info-text); border-color: var(--info-border); }
+.xt-btn.prev[disabled] { opacity: .4; background: var(--surface-2); color: var(--text-3); border-color: var(--border); }
+.xt-btn.mark { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+.xt-btn.mark.marked { background: var(--success); color: #fff; border-color: var(--success); }
+.xt-btn.next { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+.xt-btn.submit { background: var(--success); color: #fff; border-color: var(--success); }
+.xt-nosubmit { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 600; color: var(--text-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .4rem .7rem; }
+.xt-press { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent) !important; transform: scale(.96); }
+.xt-hl { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+.xt-cursor { position: absolute; left: 0; top: 0; z-index: 5; font-size: 1.15rem; color: var(--text-1); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35)); opacity: 0; transition: transform .9s var(--xt-ease), opacity .25s; will-change: transform; }
+.xt-cursor.on { opacity: 1; }
+.xt-cursor.click { animation: xtClick .35s ease; }
+@keyframes xtClick { 40% { margin: 2px 0 0 2px; font-size: 1.02rem; } }
+/* submit confirmation — dark in the real exam window too, for focus */
+.xt-sco { position: absolute; inset: 0; z-index: 4; background: rgba(0, 0, 0, .78); display: flex; align-items: center; justify-content: center; padding: .6rem; opacity: 0; visibility: hidden; transition: opacity .25s; }
+.xt-sco.show { opacity: 1; visibility: visible; }
+.xt-sco-card { width: min(340px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: .9rem; text-align: center; color: var(--text-1); transform: translateY(8px) scale(.98); transition: transform .25s var(--xt-ease); }
+.xt-sco.show .xt-sco-card { transform: none; }
+.xt-sco-ic { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--accent); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; margin-bottom: .35rem; font-size: .8rem; }
+.xt-sco-title { font-size: .92rem; font-weight: 700; }
+.xt-sco-desc { font-size: .72rem; color: var(--text-2); margin-bottom: .55rem; }
+.xt-sco-steps { display: flex; justify-content: center; gap: .25rem; margin-bottom: .55rem; flex-wrap: wrap; }
+.xt-sco-steps span { font-size: .6rem; font-weight: 700; color: var(--text-3); border: 1px solid var(--border); border-radius: 20px; padding: .1rem .45rem; }
+.xt-sco-steps span.on { color: var(--accent); border-color: var(--accent); background: var(--accent-subtle); }
+.xt-sco-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: .3rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: .45rem; margin-bottom: .6rem; }
+.xt-sco-stat b { display: block; font-size: 1rem; line-height: 1.1; }
+.xt-sco-stat small { font-size: .56rem; color: var(--text-3); }
+.xt-sco-acts { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; }
+.xt-sco-btn { padding: .38rem .7rem; border-radius: 9px; font-size: .72rem; font-weight: 700; font-family: inherit; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-1); display: inline-flex; align-items: center; gap: .3rem; transition: box-shadow .2s, transform .15s; }
+.xt-sco-btn.primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+
+.xt-caption { display: flex; align-items: flex-start; gap: .7rem; margin-top: .8rem; padding: .7rem .85rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-height: 4.2rem; }
+.xt-step-no { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--accent-on); display: inline-flex; align-items: center; justify-content: center; font-size: .78rem; font-weight: 800; }
+.xt-cap-title { display: block; font-size: .88rem; color: var(--text-1); margin-bottom: .1rem; }
+.xt-cap-text { font-size: .8rem; color: var(--text-2); line-height: 1.55; }
+.xt-controls { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .65rem; flex-wrap: wrap; }
+.xt-ctl-group { display: inline-flex; gap: .35rem; }
+.xt-ctl { min-width: 38px; min-height: 38px; padding: 0 .7rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-family: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; transition: border-color .12s, color .12s, background .12s; }
+.xt-ctl:hover:not(:disabled), .xt-ctl:focus-visible { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); outline: none; }
+.xt-ctl:disabled { opacity: .4; cursor: not-allowed; }
+.xt-dots { display: inline-flex; gap: .35rem; align-items: center; }
+.xt-dot { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-3); font-size: .62rem; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; transition: all .15s; }
+.xt-dot.on { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.xt-dot.done { border-color: var(--accent); color: var(--accent); }
+.xt-note { margin: .6rem 0 0; font-size: .72rem; color: var(--text-3); display: flex; gap: .4rem; align-items: flex-start; line-height: 1.5; }
+@media (max-width: 640px) {
+  .xt-body { grid-template-columns: minmax(0, 1fr); padding: .55rem; }
+  .xt-card { padding: .8rem; }
+  .xt-nav { padding: .5rem; }
+  .xt-btn { padding: .4rem .6rem; font-size: .72rem; }
+  .xt-btn.prev span, .xt-btn.next .lbl-s { }
+  .xt-controls { justify-content: center; }
+  .xt-dot { width: 26px; height: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xt-cursor, .xt-card, .xt-sco, .xt-sco-card, .xt .palette-link, .xt-btn, .xt-opt { transition: none; }
+  .xt-cursor.click { animation: none; }
+}

@@ -97,7 +97,7 @@
                   data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">{{ e.name }}</option>
                     {% endfor %}
                 </select>
-                <script>window.enhanceSelect && enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-alt', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });</script>
+                <script>window.enhanceSelect && enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-lines', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });</script>
             </div>
             <div class="res-filter-group">
                 <label>Date From</label>
@@ -133,7 +133,7 @@
             <thead>
                 <tr>
                     <th><i class="fas fa-user me-1"></i>User</th>
-                    <th><i class="fas fa-file-alt me-1"></i>Exam</th>
+                    <th><i class="fas fa-file-lines me-1"></i>Exam</th>
                     <th><i class="fas fa-calendar me-1"></i>Date</th>
                     <th><i class="fas fa-trophy me-1"></i>Score</th>
                     <th><i class="fas fa-percentage me-1"></i>%</th>

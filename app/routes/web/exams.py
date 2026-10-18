@@ -187,6 +187,28 @@ def _build_general_instructions(exam: dict, is_scheduled: bool) -> list:
     return items
 
 
+# How the General Instructions items are grouped on the Instructions page. Only the grouping lives here - every item's
+# title and text still comes from _build_general_instructions() unchanged.
+_GENERAL_GROUPS = (
+    ("Exam Window", "fa-window-maximize", ("Secure Exam Window", "No Refresh or Close")),
+    ("Moving Through Questions", "fa-route", ("Navigation", "Mark for Review")),
+    ("Time & Submission", "fa-hourglass-half", ("Timer", "Submission", "Scheduled Exam")),
+)
+
+
+def _group_general_instructions(items: list) -> list:
+    groups, used = [], set()
+    for title, icon, names in _GENERAL_GROUPS:
+        members = [i for i in items if i["title"] in names]
+        used.update(i["title"] for i in members)
+        if members:
+            groups.append({"title": title, "icon": icon, "items": members})
+    rest = [i for i in items if i["title"] not in used]
+    if rest:                                                    # an item added later is never silently dropped
+        groups.append({"title": "More", "icon": "fa-ellipsis", "items": rest})
+    return groups
+
+
 def _exam_action_context(exam_id):
     """Shared context-building for exam_instructions() and exam_kiosk() —
     both pages show the same Start/Resume/Prepare decision for the same
@@ -265,6 +287,9 @@ def _exam_action_context(exam_id):
         "result_mode_display": result_mode_display,
         "max_attempts_display": max_attempts_display,
         "general_instructions": _build_general_instructions(exam, state["is_scheduled"]),
+        "general_groups": _group_general_instructions(_build_general_instructions(exam, state["is_scheduled"])),
+        # the navigation tutorial shows a Submit Exam button only when the real exam window would
+        "manual_submission_allowed": bool(is_manual_submission_allowed(exam)),
     }
 
 

@@ -229,6 +229,8 @@
         {% endfor %}
       </ul>
       <p class="plan-note">Your plan is set by an administrator. Features marked with a lock are included in the plan shown next to them.</p>
+      {# the existing public plan-comparison page (misc.plans) — the same page the landing page links as "Compare all plans" #}
+      <a class="sbtn sbtn-ghost pf-plan-link" id="viewPlanDetails" href="{{ url_for('misc.plans') }}" target="_blank" rel="noopener noreferrer" style="margin-top:.8rem;min-height:36px;text-decoration:none"><i class="fas fa-table-columns"></i> View detailed plans <i class="fas fa-arrow-up-right-from-square" style="font-size:.65rem;opacity:.7" aria-hidden="true"></i></a>
     </div>
   </div>
   {% endif %}

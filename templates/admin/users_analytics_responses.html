@@ -123,7 +123,7 @@
                 <i class="fas fa-check-circle"></i>Correct
             </button>
             <button class="rsp-quick-btn" onclick="filterByStatus('incorrect')">
-                <i class="fas fa-times-circle"></i>Incorrect
+                <i class="fas fa-circle-xmark"></i>Incorrect
             </button>
             <button class="rsp-quick-btn" onclick="filterByStatus('unanswered')">
                 <i class="fas fa-question-circle"></i>Unanswered
@@ -165,7 +165,7 @@
                                 {% if response.status == 'correct' %}
                                     <i class="fas fa-check-circle"></i>Correct
                                 {% elif response.status == 'incorrect' %}
-                                    <i class="fas fa-times-circle"></i>Incorrect
+                                    <i class="fas fa-circle-xmark"></i>Incorrect
                                 {% else %}
                                     <i class="fas fa-question-circle"></i>Unanswered
                                 {% endif %}

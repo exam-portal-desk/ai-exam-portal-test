@@ -100,7 +100,13 @@
     let bold = false, italic = false, under = false;
     if (sym) { bold = stars >= 2; italic = stars % 2 === 1; under = unders >= 2; }
     const keepL = sym ? '' : L, keepR = sym ? '' : Rr;                   // an unbalanced run is left alone and we simply nest inside it
-    if (marker === '**') bold = !bold; else if (marker === '*') italic = !italic; else under = !under;
+    let turnedOn;
+    if (marker === '**') { bold = !bold; turnedOn = bold; } else if (marker === '*') { italic = !italic; turnedOn = italic; } else { under = !under; turnedOn = under; }
+    if (turnedOn) {                       // the selection may already hold some of this format inside it: merge it into the one new span
+      if (marker === '**') seg = seg.replace(/\*\*/g, '');
+      else if (marker === '__') seg = seg.replace(/__/g, '');
+      else seg = seg.replace(/(^|[^*])\*(?!\*)/g, '$1');
+    }
     const open = '*'.repeat((bold ? 2 : 0) + (italic ? 1 : 0)) + (under ? '__' : '');
     const close = (under ? '__' : '') + '*'.repeat((bold ? 2 : 0) + (italic ? 1 : 0));
     const outL = keepL + open, outR = close + keepR;
@@ -341,6 +347,104 @@
       ]);
   }
 
+  /* ── Auto-Fill Exam Details ──
+     Fills the template's "[Edit: …]" placeholders from the exam form that is already on screen (Add Exam, or the Edit Exam
+     modal): nothing is fetched or saved, and a placeholder is only replaced when its value is actually known. Matching is by the
+     bold label in front of the placeholder ("- **Total duration:** [Edit: …]"), so only those lines are ever touched. Once a
+     line is filled it no longer has a placeholder, which is what makes a second click harmless. */
+  const FILL_LINE = /^(\s*(?:[-*]|\d+[.)])\s+\*\*([^*]+?):\*\*\s*)\[Edit:[^\]]*\]\s*$/;
+  const PLACEHOLDER = /\[Edit:[^\]]*\]/;
+  const plural = (n, w) => n + ' ' + w + (Number(n) === 1 ? '' : 's');
+
+  // raw: the form's own values (strings). attempts: null when the form does not carry that value.
+  function formatValues(raw) {
+    const pos = v => { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : null; };
+    const nonneg = v => { if (v === '' || v == null) return null; const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : null; };
+    const out = {};
+    const name = (raw.name || '').trim();
+    if (name) out['Examination name'] = name;
+    const d = (raw.date || '').trim(), t = (raw.start_time || '').trim();
+    if (d && t) out['Date and start time'] = d + ' at ' + t;
+    const dur = pos(raw.duration);
+    if (dur) out['Total duration'] = plural(Math.round(dur), 'minute');
+    const q = pos(raw.total_questions);
+    if (q) out['Number of questions'] = String(Math.round(q));
+    if (raw.attempts != null) {
+      const a = String(raw.attempts).trim();
+      out['Attempts allowed'] = (a === '' || a === '0') ? 'Unlimited' : (isFinite(parseInt(a, 10)) ? String(parseInt(a, 10)) : undefined);
+      if (out['Attempts allowed'] === undefined) delete out['Attempts allowed'];
+    }
+    const p = nonneg(raw.positive_marks);
+    if (p !== null && p > 0) out['Marks for a correct answer'] = plural(p, 'mark');
+    const n = nonneg(raw.negative_marks);
+    if (n !== null) out['Negative marking'] = n === 0 ? 'None' : plural(n, 'mark') + ' deducted for each wrong answer';
+    const pc = pos(raw.passing_percentage);
+    if (pc) out['Passing criteria'] = pc + '%';
+    const mode = (raw.result_mode || '').trim();
+    if (mode === 'instant') out['Results'] = 'Instant — visible immediately after submission';
+    else if (mode === 'manual') out['Results'] = 'Released by the admin after review';
+    else if (mode === 'delayed') { const dl = pos(raw.result_delay); if (dl) out['Results'] = 'Delayed — visible ' + Math.round(dl) + ' min after submission'; }
+    return out;
+  }
+
+  // -> { text, filled: [labels], left: [labels still showing a placeholder] }
+  function fillPlaceholders(text, values) {
+    const filled = [], left = [];
+    const lines = text.split('\n').map(ln => {
+      const m = ln.match(FILL_LINE);
+      if (!m) return ln;
+      if (Object.prototype.hasOwnProperty.call(values, m[2])) { filled.push(m[2]); return m[1] + values[m[2]]; }
+      left.push(m[2]);
+      return ln;
+    });
+    return { text: lines.join('\n'), filled, left };
+  }
+
+  function gatherRaw(form) {
+    const val = n => { const el = form && form.querySelector('[name="' + n + '"]'); return el ? String(el.value) : ''; };
+    const raw = {};
+    ['name', 'date', 'start_time', 'duration', 'total_questions', 'positive_marks', 'negative_marks', 'passing_percentage', 'result_mode', 'result_delay']
+      .forEach(n => { raw[n] = val(n); });
+    // The attempt limit is not a field of the Add/Edit form; the Edit modal carries the exam's saved value (already on the page).
+    raw.attempts = form && form.hasAttribute('data-instr-attempts') ? form.getAttribute('data-instr-attempts') : null;
+    return raw;
+  }
+
+  const TEMPLATE_MARK = /^#\s+General Examination Instructions|\*\*Total duration:\*\*/m;
+
+  function autofillCmd(ta, anchor) {
+    const tpl = (global.INSTR_GENERAL_TEMPLATE || '').trim();
+    const values = formatValues(gatherRaw(ta.closest('form')));
+    const pending = list => list.length ? 'Still to complete: ' + list.map(esc).join(', ') : undefined;
+    if (!Object.keys(values).length) { toast('No exam details to fill in yet.', 'warning', 'Enter the exam name, date, duration and marks first.'); return; }
+    const current = ta.value;
+    if (!current.trim()) {                                                   // empty editor: the template, already filled
+      if (!tpl) { toast('The template is not available.', 'danger'); return; }
+      const r = fillPlaceholders(tpl, values);
+      replace(ta, 0, current.length, r.text, 0, 0); ta.scrollTop = 0;
+      toast('Template inserted with ' + plural(r.filled.length, 'exam detail') + ' filled in.', 'success', pending(otherPlaceholders(r.text)));
+      return;
+    }
+    if (PLACEHOLDER.test(current)) {                                         // only the placeholders change; every other character stays
+      const r = fillPlaceholders(current, values);
+      if (!r.filled.length) { toast('Nothing more to fill in.', 'warning', 'The remaining placeholders need details this form does not have.'); return; }
+      const top = ta.scrollTop;
+      replace(ta, 0, current.length, r.text, 0, 0); ta.scrollTop = top;
+      toast('Filled in ' + plural(r.filled.length, 'exam detail') + '.', 'success', pending(r.left));
+      return;
+    }
+    if (TEMPLATE_MARK.test(current)) { toast('Exam details are already filled in.', 'success', 'Edit the text directly to change them.'); return; }
+    if (!tpl) { toast('The template is not available.', 'danger'); return; }
+    confirmOverwrite(ta, anchor, fillPlaceholders(tpl, values).text);        // custom text without the template: ask first
+  }
+
+  // labels of placeholders that no mapping can fill (shown to the admin as things left to complete)
+  function otherPlaceholders(text) {
+    const out = [];
+    text.split('\n').forEach(ln => { const m = ln.match(FILL_LINE); if (m && out.indexOf(m[2]) < 0) out.push(m[2]); });
+    return out;
+  }
+
   /* ── preview (rendered by the same server code students see) ── */
   const timers = new WeakMap();
   function renderPreview(ta, el) {
@@ -377,6 +481,7 @@
       case 'rule': return insertBlock(ta, '---');
       case 'warning': return insertBlock(ta, 'IMPORTANT: Your message here', 'Your message here');
       case 'template': return templateCmd(ta, anchor);
+      case 'autofill': return autofillCmd(ta, anchor);
     }
   }
 
@@ -425,5 +530,5 @@
     }
   }
 
-  global.InstructionsEditor = { wire, render: renderPreview, run };
+  global.InstructionsEditor = { wire, render: renderPreview, run, formatValues, fillPlaceholders };
 })(window);

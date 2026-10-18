@@ -1,5 +1,5 @@
 {# Instructions editor toolbar — one definition shared by Add Exam, Edit Exam and Bulk Update. Behaviour: static/admin/instructions-editor.js #}
-{% macro instr_toolbar() %}
+{% macro instr_toolbar(autofill=true) %}
 <div class="instr-toolbar" role="toolbar" aria-label="Instructions formatting">
   <div class="instr-tb-group">
     <button type="button" class="instr-tb-btn instr-tb-txt" data-instr-cmd="h1" title="Title" aria-label="Title">H1</button>
@@ -28,6 +28,7 @@
     <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Important note" aria-label="Important note"><i class="fas fa-triangle-exclamation"></i></button>
   </div>
   <div class="instr-tb-group instr-tb-end">
+    {% if autofill %}<button type="button" class="instr-tb-btn instr-tb-wide" data-instr-cmd="autofill" title="Fill the template's placeholders from this exam's details" aria-label="Auto-Fill Exam Details"><i class="fas fa-wand-magic-sparkles"></i><span>Auto-Fill Exam Details</span></button>{% endif %}
     <button type="button" class="instr-tb-btn instr-tb-wide" data-instr-cmd="template" title="General exam instructions template" aria-label="General exam instructions template"><i class="fas fa-file-lines"></i><span>Template</span></button>
   </div>
 </div>

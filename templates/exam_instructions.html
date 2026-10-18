@@ -4,6 +4,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/instructions.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/exam-tutorial.css') }}">
 <style>
 .ei-page { background:var(--bg); padding:1.75rem 1rem 3rem; min-height:100%; }
 .ei-wrap { max-width:820px; margin:0 auto; }
@@ -92,7 +93,13 @@
   display:flex; align-items:center; justify-content:center; font-size:.78rem; margin-top:.05rem;
 }
 .ei-general-item-title { font-size:.85rem; font-weight:700; color:var(--text-1); margin-bottom:.15rem; }
-.ei-general-item-text { font-size:.82rem; color:var(--text-3); line-height:1.6; }
+.ei-general-item-text { font-size:.82rem; color:var(--text-2); line-height:1.6; }
+.ei-section-lead { font-size:.82rem; color:var(--text-3); margin:-.35rem 0 .9rem; }
+.ei-rule-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:.85rem; }
+.ei-rule-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.9rem 1rem 1rem; min-width:0; }
+.ei-rule-head { display:flex; align-items:center; gap:.5rem; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-1); padding-bottom:.65rem; margin-bottom:.8rem; border-bottom:1px solid var(--border); }
+.ei-rule-ic { width:24px; height:24px; border-radius:7px; background:var(--accent); color:var(--accent-on); display:inline-flex; align-items:center; justify-content:center; font-size:.68rem; }
+.ei-rule-card .ei-general-icon { background:var(--surface); border:1px solid var(--border); }
 
 /* ── Question status legend ── */
 .color-indicators { display:flex; flex-wrap:wrap; gap:.6rem .9rem; }
@@ -285,14 +292,22 @@
       {% endif %}
 
       <div class="ei-section">
-        <div class="ei-section-title"><i class="fas fa-circle-info"></i>General Instructions</div>
-        <div class="ei-general-list">
-          {% for item in general_instructions %}
-          <div class="ei-general-item">
-            <div class="ei-general-icon"><i class="fas {{ item.icon }}"></i></div>
-            <div>
-              <div class="ei-general-item-title">{{ item.title }}</div>
-              <div class="ei-general-item-text">{{ item.text }}</div>
+        <div class="ei-section-title"><i class="fas fa-shield-halved"></i>Exam Rules at a Glance</div>
+        <p class="ei-section-lead">Short rules that apply to every exam on this portal.</p>
+        <div class="ei-rule-grid">
+          {% for group in general_groups %}
+          <div class="ei-rule-card">
+            <div class="ei-rule-head"><span class="ei-rule-ic"><i class="fas {{ group.icon }}"></i></span>{{ group.title }}</div>
+            <div class="ei-general-list">
+              {% for item in group['items'] %}
+              <div class="ei-general-item">
+                <div class="ei-general-icon"><i class="fas {{ item.icon }}"></i></div>
+                <div>
+                  <div class="ei-general-item-title">{{ item.title }}</div>
+                  <div class="ei-general-item-text">{{ item.text }}</div>
+                </div>
+              </div>
+              {% endfor %}
             </div>
           </div>
           {% endfor %}
@@ -306,6 +321,34 @@
           <div class="color-indicator"><span class="color-box" style="background:#17a2b8"></span>Visited</div>
           <div class="color-indicator"><span class="color-box" style="background:#10b981"></span>Answered</div>
           <div class="color-indicator"><span class="color-box" style="background:#f59e0b"></span>Marked for Review</div>
+        </div>
+      </div>
+
+      {# Animated, demonstration-only walkthrough of the exam window (static/shared/exam-tutorial.js). Placed below the
+         instructions; it changes nothing above it and makes no requests. #}
+      <div class="ei-section" id="examTutorialSection">
+        <div class="ei-section-title"><i class="fas fa-circle-play"></i>How to Navigate Your Exam</div>
+        <p class="ei-section-lead">Watch a short preview of the exam window before you start. It is a sample, not your real exam.</p>
+        <div class="xt" id="xt" data-manual-submit="{{ '1' if manual_submission_allowed else '0' }}">
+          <span class="xt-label"><i class="fas fa-circle-play" aria-hidden="true"></i> Interactive Exam Demo</span>
+          <div class="xt-stage" aria-hidden="true"></div>
+          <div class="xt-caption" aria-live="polite">
+            <span class="xt-step-no">1</span>
+            <div><strong class="xt-cap-title">Choose your answer</strong><span class="xt-cap-text">A short animated preview of the exam window. You do not need to start the exam to watch it.</span></div>
+          </div>
+          <div class="xt-controls">
+            <div class="xt-ctl-group">
+              <button type="button" class="xt-ctl" data-ctl="prev" aria-label="Previous step"><i class="fas fa-chevron-left"></i></button>
+              <button type="button" class="xt-ctl" data-ctl="play" aria-label="Pause tutorial"><i class="fas fa-pause"></i><span> Pause</span></button>
+              <button type="button" class="xt-ctl" data-ctl="next" aria-label="Next step"><i class="fas fa-chevron-right"></i></button>
+              <button type="button" class="xt-ctl" data-ctl="replay" aria-label="Replay tutorial"><i class="fas fa-rotate-right"></i><span> Replay</span></button>
+            </div>
+            <div class="xt-dots" role="group" aria-label="Tutorial steps">
+              <button type="button" class="xt-dot on" aria-label="Step 1">1</button><button type="button" class="xt-dot" aria-label="Step 2">2</button><button type="button" class="xt-dot" aria-label="Step 3">3</button><button type="button" class="xt-dot" aria-label="Step 4">4</button><button type="button" class="xt-dot" aria-label="Step 5">5</button><button type="button" class="xt-dot" aria-label="Step 6">6</button>
+            </div>
+          </div>
+          <p class="xt-note"><i class="fas fa-circle-info" aria-hidden="true"></i><span>This is only a demonstration. Nothing you see here saves an answer, marks a question or submits an exam.</span></p>
+          <span class="xt-endtag">End of demo</span>
         </div>
       </div>
 
@@ -961,4 +1004,5 @@ document.addEventListener('DOMContentLoaded', function () {
     startPolling();
 });
 </script>
+<script src="{{ url_for('static', filename='shared/exam-tutorial.js') }}" defer></script>
 {% endblock %}

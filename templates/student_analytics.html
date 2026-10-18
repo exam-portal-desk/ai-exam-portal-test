@@ -210,7 +210,7 @@
     </div>
 
     <div class="an-card" id="card-recent">
-      <div class="an-card-title"><i class="fas fa-history ic"></i> Recent attempts</div>
+      <div class="an-card-title"><i class="fas fa-clock-rotate-left ic"></i> Recent attempts</div>
       <div class="an-table-wrap"><table class="an-table" id="recentTable"><thead><tr><th>Exam</th><th>Score</th><th>Percentage</th><th>Grade</th><th>Date</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
@@ -232,7 +232,7 @@ var charts = {};
 var dateFmt = {{ DISPLAY_DATE_FORMAT | default('%d-%m-%Y') | tojson }};
 var pFrom = createDatePicker($('anFrom'), { displayFormat: dateFmt, onChange: function () { setPreset('custom'); load(); } });
 var pTo = createDatePicker($('anTo'), { displayFormat: dateFmt, onChange: function () { setPreset('custom'); load(); } });
-[['anCategory', 'fas fa-layer-group'], ['anSubcategory', 'fas fa-sitemap'], ['anExam', 'fas fa-file-alt'], ['anKind', 'fas fa-calendar-check']].forEach(function (x) { enhanceSelect($(x[0]), { icon: x[1] }); });
+[['anCategory', 'fas {{ nav_icon("categories") }}'], ['anSubcategory', 'fas fa-diagram-project'], ['anExam', 'fas fa-file-lines'], ['anKind', 'fas fa-clipboard-list']].forEach(function (x) { enhanceSelect($(x[0]), { icon: x[1] }); });
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }

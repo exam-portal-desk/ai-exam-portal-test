@@ -63,7 +63,7 @@
     <!-- Filters -->
     <div class="anl-filter-box">
         <div class="anl-filter-header">
-            <h5><i class="fas fa-sliders-h"></i>Analytics Filters</h5>
+            <h5><i class="fas fa-sliders"></i>Analytics Filters</h5>
             <small>Use filters to focus the analytics</small>
         </div>
 
@@ -99,12 +99,12 @@
                   data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">{{ e.name }}</option>
                     {% endfor %}
                 </select>
-                <script>window.enhanceSelect && enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-alt', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });</script>
+                <script>window.enhanceSelect && enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-lines', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });</script>
             </div>
 
             <div style="align-self:flex-end;">
                 <button class="btn-flat-anl" onclick="updateAnalytics()">
-                    <i class="fas fa-sync-alt"></i>Update
+                    <i class="fas fa-arrows-rotate"></i>Update
                 </button>
             </div>
         </div>
@@ -186,7 +186,7 @@
         </div>
 
         <div class="anl-perf-card">
-            <div class="anl-perf-hdr"><i class="fas fa-file-alt me-1" style="color:var(--accent)"></i>Exam Statistics</div>
+            <div class="anl-perf-hdr"><i class="fas fa-file-lines me-1" style="color:var(--accent)"></i>Exam Statistics</div>
             <div class="table-responsive">
                 <table class="anl-table">
                     <thead>
@@ -201,7 +201,7 @@
     </div>
 
     <div class="anl-perf-card" style="margin:0 0 1rem">
-        <div class="anl-perf-hdr"><i class="fas fa-history me-1" style="color:var(--accent)"></i>Recent Activity</div>
+        <div class="anl-perf-hdr"><i class="fas fa-clock-rotate-left me-1" style="color:var(--accent)"></i>Recent Activity</div>
         <div class="table-responsive">
             <table class="anl-table">
                 <thead>
