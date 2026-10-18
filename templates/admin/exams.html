@@ -1124,44 +1124,42 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function (
   });
 });
 
-/* ── Form submit spinner + max_attempts validation ── */
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('form').forEach(form => {
-    form.addEventListener('submit', function (e) {
-      // The date field displays a human-readable string (DISPLAY_DATE_FORMAT)
-      // but must submit the plain ISO "YYYY-MM-DD" the backend expects —
-      // swap back to the real value (kept in data-iso) right before the
-      // browser serializes the form.
-      this.querySelectorAll('.dt-date-input[data-iso]').forEach(function (inp) {
-        if (inp.dataset.iso) inp.value = inp.dataset.iso;
-      });
-      // Same swap for time: the field displays "h:MM AM/PM" but must submit
-      // the plain 24-hour "HH:MM" the backend expects (kept in data-value).
-      this.querySelectorAll('.dt-time-input[data-value]').forEach(function (inp) {
-        if (inp.dataset.value) inp.value = inp.dataset.value;
-      });
-      const ma = this.querySelector('input[name="max_attempts"]');
-      if (ma && ma.value.trim() !== '' && !/^\d+$/.test(ma.value.trim())) {
-        e.preventDefault();
-        alert('Max Attempts must be a whole non-negative number');
-        ma.focus();
-        return;
-      }
-      const btn = this.querySelector('button[type="submit"]');
-      if (btn && !btn.disabled) {
-        btn.dataset.orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-        btn.disabled = true;
-      }
-    });
+/* ── Form submit spinner + max_attempts validation ──
+   Delegated on the document: the edit modals are inserted by the list controller after the page has loaded (on every
+   refresh, filter and page change), so a listener bound to each form at load time never reaches them. */
+document.addEventListener('submit', function (e) {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  // The date field displays a human-readable string (DISPLAY_DATE_FORMAT)
+  // but must submit the plain ISO "YYYY-MM-DD" the backend expects —
+  // swap back to the real value (kept in data-iso) right before the
+  // browser serializes the form.
+  form.querySelectorAll('.dt-date-input[data-iso]').forEach(function (inp) {
+    if (inp.dataset.iso) inp.value = inp.dataset.iso;
   });
-  document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('hidden.bs.modal', function () {
-      this.querySelectorAll('button[type="submit"]').forEach(btn => {
-        btn.disabled = false;
-        if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig;
-      });
-    });
+  // Same swap for time: the field displays "h:MM AM/PM" but must submit
+  // the plain 24-hour "HH:MM" the backend expects (kept in data-value).
+  form.querySelectorAll('.dt-time-input[data-value]').forEach(function (inp) {
+    if (inp.dataset.value) inp.value = inp.dataset.value;
+  });
+  const ma = form.querySelector('input[name="max_attempts"]');
+  if (ma && ma.value.trim() !== '' && !/^\d+$/.test(ma.value.trim())) {
+    e.preventDefault();
+    alert('Max Attempts must be a whole non-negative number');
+    ma.focus();
+    return;
+  }
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn && !btn.disabled) {
+    btn.dataset.orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+    btn.disabled = true;
+  }
+});
+document.addEventListener('hidden.bs.modal', function (e) {
+  e.target.querySelectorAll('button[type="submit"]').forEach(btn => {
+    btn.disabled = false;
+    if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig;
   });
 });
 

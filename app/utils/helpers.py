@@ -193,14 +193,35 @@ def parse_start_time(raw) -> str:
     return s
 
 
+_ISO_DAY_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$")
+_DAY_FIRST_RE = re.compile(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$")
+
+
 def parse_exam_date(raw) -> str:
     """
-    Validate an exam date string ("YYYY-MM-DD"). Raises ValueError on invalid input.
+    Normalise an exam date to the plain calendar day "YYYY-MM-DD" the exams.date column holds. Raises ValueError (message
+    unchanged) when it is not a real date.
+
+    Accepted: "YYYY-MM-DD"; an ISO date-time, whose own calendar day is kept (never converted between timezones, because
+    this is a date, not an instant); the text the date picker displays (DISPLAY_DATE_FORMAT), which is what reaches the
+    server if the browser did not swap in the ISO value kept beside it; and day-first DD-MM-YYYY / DD/MM/YYYY.
     """
-    s = str(raw or "").strip()
-    if not _EXAM_DATE_RE.match(s):
-        raise ValueError("Date must be a valid YYYY-MM-DD value")
-    return s
+    import app.config as config
+    from datetime import date, datetime
+
+    s = str(raw if raw is not None else "").strip()
+    try:
+        m = _ISO_DAY_RE.match(s)
+        if m:
+            return date(int(m[1]), int(m[2]), int(m[3])).isoformat()
+        m = _DAY_FIRST_RE.match(s)
+        if m:
+            return date(int(m[3]), int(m[2]), int(m[1])).isoformat()
+        if s:
+            return datetime.strptime(s, config.DISPLAY_DATE_FORMAT).date().isoformat()
+    except ValueError:
+        pass
+    raise ValueError("Date must be a valid YYYY-MM-DD value")
 
 
 def parse_scheduled_minutes_field(raw, field_label: str) -> int:
