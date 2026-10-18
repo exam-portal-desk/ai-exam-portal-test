@@ -327,6 +327,20 @@ def count_generation_jobs_since(admin_id: int, since) -> int:
     return int(row["n"]) if row else 0
 
 
+def get_active_generation_job(admin_id: int, within_minutes: int = 15) -> Optional[Dict]:
+    """This admin's newest generation job that is still queued/processing and has been updated recently (every batch
+    checkpoint touches updated_at, so a job abandoned by a crash stops counting as active after `within_minutes`)."""
+    try:
+        return fetch_one(
+            "SELECT id, status FROM ai_generation_jobs WHERE admin_id=%s AND status IN ('queued','processing') "
+            "AND updated_at > (now() AT TIME ZONE 'utc') - (%s || ' minutes')::interval ORDER BY created_at DESC LIMIT 1",
+            (admin_id, within_minutes),
+        )
+    except Exception as e:
+        print(f"[db.ai] get_active_generation_job error: {e}")
+        return None
+
+
 def update_generation_job(job_id: str, **fields) -> bool:
     """Partial update of a job row — pass any subset of its columns as kwargs."""
     if not fields:

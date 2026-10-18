@@ -6,11 +6,11 @@ app/routes/admin/results.py now live in
 app/routes/api/v01/admin/analytics.py.
 """
 
-from flask import render_template, request, abort, send_file
+from flask import render_template, request, abort, send_file, url_for
 
 from app.routes.web.admin import admin_bp
 from app.middleware.session_guard import require_admin_permission
-from app.db.exams import get_all_exams, get_exam_by_id
+from app.db.exams import get_all_exams, get_exam_by_id, get_exams_for_selector
 from app.db.users import get_user_by_id, get_users_by_ids, get_all_users
 from app.db.results import get_result_by_id, get_responses_by_result
 from app.db.questions import get_questions_by_exam
@@ -31,6 +31,12 @@ def _display_username(user: dict) -> str:
 
 def _display_full_name(user: dict) -> str:
     return user.get("full_name") or user.get("username") or DELETED_USER_LABEL
+
+
+def _exam_options():
+    """Exams for the User Analytics exam dropdowns: id (what the filters submit), name, category, subcategory and the
+    number of questions (app.db.exams.get_exams_for_selector — the same list the other admin exam pickers use)."""
+    return [{**e, "id": int(e["id"]), "name": e.get("name", "")} for e in get_exams_for_selector()]
 
 
 RESULTS_PER_PAGE = 20
@@ -120,8 +126,7 @@ def _results_error(message, status):
 @admin_bp.route("/users-analytics")
 @require_admin_permission("user_analytics")
 def users_analytics():
-    exams = get_all_exams()
-    exams_list = [{"id": int(e["id"]), "name": e.get("name","")} for e in exams]
+    exams_list = _exam_options()
 
     # One round trip (scalar subqueries) instead of 4 sequential COUNT
     # queries (flagged in the architecture audit).
@@ -282,8 +287,7 @@ def users_analytics_results():
             )
 
         # Full page (direct navigation) — also load exams for filter dropdown
-        exams_all  = get_all_exams()
-        exams_list = [{"id": int(e["id"]), "name": e.get("name", "")} for e in exams_all]
+        exams_list = _exam_options()
 
         # filter_users is now empty — user search is done via AJAX autocomplete
         return render_template(
@@ -302,8 +306,7 @@ def users_analytics_results():
 @admin_bp.route("/users-analytics/analytics")
 @require_admin_permission("user_analytics")
 def users_analytics_analytics():
-    exams = [{"id": int(e["id"]), "name": e.get("name","")} for e in get_all_exams()]
-    return render_template("admin/users_analytics_analytics.html", exams=exams)
+    return render_template("admin/users_analytics_analytics.html", exams=_exam_options())
 
 
 @admin_bp.route("/users-analytics/view-result/<int:result_id>/<int:exam_id>")
@@ -325,85 +328,25 @@ def users_analytics_view_result(result_id, exam_id):
 @admin_bp.route("/users-analytics/view-responses/<int:result_id>/<int:exam_id>")
 @require_admin_permission("user_analytics")
 def users_analytics_view_responses(result_id, exam_id):
-    import json as _json
-    from app.services.image_storage_service import resolve_question_image_urls_bulk
+    """The student's own Response Analysis page (templates/response.html, rows from the same
+    app.services.response_view_service the student route uses) for the attempt an admin picked in User Analytics.
+    The result must belong to the exam in the URL; AI Explanation, Discuss with AI and the discussion thread are
+    switched off here (admin_view)."""
+    from app.services.response_view_service import build_response_rows
 
     result = get_result_by_id(result_id)
-    if not result: abort(404)
-    user  = get_user_by_id(result.get("student_id")) or {"id": result.get("student_id"), "username": DELETED_USER_LABEL, "full_name": DELETED_USER_LABEL}
-    exam  = get_exam_by_id(exam_id) or {"id": exam_id, "name": "Unknown Exam"}
-    resps = get_responses_by_result(result_id)
-    qs    = get_questions_by_exam(exam_id)
-    qmap  = {str(q["id"]): q for q in qs}
-
-    def _parse_ans(raw, qtype):
-        if not raw or raw in ("None", "nan", ""):
-            return None
-        try:
-            if qtype == "MSQ":
-                return _json.loads(raw) if raw.startswith("[") else [x.strip() for x in raw.split(",")]
-        except Exception:
-            pass
-        return raw
-
-    # ── Bulk-resolve image URLs (one API call per unique image path) ──
-    unique_paths = set()
-    for r in resps:
-        qid = str(r.get("question_id", ""))
-        q   = qmap.get(qid, {})
-        ip  = q.get("image_path", "")
-        if ip and str(ip).strip() not in ("", "nan", "None"):
-            unique_paths.add(str(ip).strip())
-
-    # image_path -> (has_img, img_url) — resolved concurrently, not one at a
-    # time, since this is N storage existence checks (network round trips).
-    image_url_map = resolve_question_image_urls_bulk(unique_paths)
-
-    norm = []
-    for r in resps:
-        qid   = str(r.get("question_id", ""))
-        q     = qmap.get(qid, {})
-        qtype = str(r.get("question_type", q.get("question_type", "MCQ")))
-        ga    = str(r.get("given_answer", "") or "")
-        ca    = str(r.get("correct_answer", "") or "")
-
-        ia = r.get("is_attempted", False)
-        if isinstance(ia, str): ia = ia.lower() in ("true", "1", "yes")
-        ic = r.get("is_correct", False)
-        if isinstance(ic, str): ic = ic.lower() in ("true", "1", "yes")
-
-        given_parsed   = _parse_ans(ga, qtype) or "Not Answered"
-        correct_parsed = _parse_ans(ca, qtype) or "N/A"
-
-        if not ia or ga in ("", "None", "nan"):
-            given_parsed = "Not Answered"
-
-        status = "unanswered" if (not ia or given_parsed == "Not Answered") else "correct" if ic else "incorrect"
-
-        # Resolve image URL (from pre-built bulk map)
-        image_path = q.get("image_path", "")
-        if image_path and str(image_path).strip() not in ("", "nan", "None"):
-            has_img, img_url = image_url_map.get(str(image_path).strip(), (False, None))
-        else:
-            has_img, img_url = False, None
-
-        q["has_image"] = has_img
-        q["image_url"] = img_url
-
-        norm.append({
-            "question_id":    qid,
-            "question":       q,           # full question object (options, image, explanation etc.)
-            "question_type":  qtype,
-            "given_answer":   given_parsed,
-            "correct_answer": correct_parsed,
-            "is_attempted":   ia,
-            "is_correct":     ic,
-            "status":         status,
-            "marks_obtained": float(r.get("marks_obtained", 0) or 0),
-        })
-
-    return render_template("admin/view_responses_popup.html", result=result, user=user, exam=exam, responses=norm,
-                           standalone=True)
+    if not result or int(result.get("exam_id") or 0) != exam_id:
+        abort(404)
+    user = get_user_by_id(result.get("student_id")) or {"id": result.get("student_id"), "username": DELETED_USER_LABEL, "full_name": DELETED_USER_LABEL}
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        abort(404)
+    return render_template(
+        "response.html", exam=exam, result=result, responses=build_response_rows(result_id, exam_id),
+        from_history=False, standalone=True, from_assistant=False,
+        admin_view=True, student_name=_display_full_name(user),
+        text_download_url=url_for("admin.users_analytics_download_result", result_id=result_id),
+    )
 
 
 @admin_bp.route("/users-analytics/download-result/<int:result_id>")

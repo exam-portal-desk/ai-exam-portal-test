@@ -14,11 +14,12 @@ import zipfile
 from datetime import date
 from urllib.parse import quote
 
-from flask import jsonify, request, Response
+from flask import jsonify, request, Response, session
 
 from app.routes.api.v01.admin import admin_api_bp
 from app.middleware.session_guard import require_admin_permission
 from app.storage import get_storage
+from app.storage.service import StorageError
 from app.services.image_storage_service import resolve_object_url
 from app.utils.datetime_service import format_display
 import app.config as config
@@ -208,6 +209,46 @@ def delete_storage_objects():
         return jsonify({"success": False, "message": str(e)}), 500
 
     return jsonify({"success": True, "deleted": len(keys)})
+
+
+@admin_api_bp.route("/storage/folders/preview", methods=["POST"])
+@require_admin_permission("storage_management")
+def preview_storage_folder_delete():
+    """Step 1 of bulk folder deletion: validates every requested folder, measures it, applies the dependency rules and
+    returns the confirmation token + the exact phrase the admin must type. Deletes nothing."""
+    from app.services import storage_folder_service as folders
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify({"success": True, **folders.preview_folders(data.get("folders"), session.get("user_id"))})
+    except folders.FolderRequestError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except StorageError as e:
+        return jsonify({"success": False, "message": "Storage is not reachable right now. Try again shortly."}), 502
+    except Exception:
+        return jsonify({"success": False, "message": "Could not inspect the selected folders."}), 500
+
+
+@admin_api_bp.route("/storage/folders", methods=["DELETE"])
+@require_admin_permission("storage_management")
+def delete_storage_folders():
+    """Step 2: permanently deletes the previewed folders. Needs the preview's token and the typed phrase; every folder is
+    re-validated here. Never reports success unless every folder was fully deleted."""
+    from app.services import storage_folder_service as folders
+    data = request.get_json(silent=True) or {}
+    try:
+        out = folders.delete_folders(data.get("folders"), session.get("user_id"), data.get("token"),
+                                     data.get("confirm"), data.get("acknowledge"))
+    except folders.FolderRequestError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception:
+        return jsonify({"success": False, "message": "Folder deletion failed unexpectedly. Refresh and check what remains."}), 500
+    if out["all_deleted"]:
+        status = 200
+    elif out["any_deleted"]:
+        status = 207
+    else:
+        status = 409
+    return jsonify({"success": out["all_deleted"], "partial": out["any_deleted"] and not out["all_deleted"], **out}), status
 
 
 @admin_api_bp.route("/storage/download", methods=["GET"])

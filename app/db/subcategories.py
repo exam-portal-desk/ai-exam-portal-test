@@ -115,3 +115,12 @@ def subcategory_has_exams(subcat_id: int) -> bool:
     except Exception as e:
         print(f"[db.subcategories] subcategory_has_exams: {e}")
         return True
+
+
+def get_all_subcategories() -> List[Dict]:
+    """id, name, category_id for every subcategory — feeds the Manage Exams advanced filter's subcategory picker."""
+    try:
+        return fetch_all("SELECT id, name, category_id FROM subcategories ORDER BY name")
+    except Exception as e:
+        print(f"[db.subcategories] get_all_subcategories: {e}")
+        return []

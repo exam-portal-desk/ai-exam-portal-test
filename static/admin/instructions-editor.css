@@ -1,0 +1,48 @@
+/* Exam Instructions editor — toolbar, preview box and its popups (static/admin/instructions-editor.js).
+   The rendered preview content itself is styled by shared/instructions.css (.instr-rich). */
+.instr-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .55rem; margin-bottom: .45rem;
+  padding: .35rem .45rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.instr-tb-group { display: inline-flex; gap: .2rem; padding-right: .55rem; border-right: 1px solid var(--border); }
+.instr-tb-group:last-child, .instr-tb-end { border-right: 0; padding-right: 0; }
+.instr-tb-end { margin-left: auto; }
+.instr-tb-btn {
+  min-width: 32px; height: 32px; padding: 0 .4rem; border-radius: 7px; border: 1px solid transparent;
+  background: transparent; color: var(--text-2); cursor: pointer; font-size: .8rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem; touch-action: manipulation;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.instr-tb-txt { font-weight: 800; font-size: .72rem; letter-spacing: .02em; }
+.instr-tb-wide { padding: 0 .7rem; font-weight: 600; border-color: var(--border); background: var(--surface); }
+.instr-tb-wide span { font-size: .78rem; }
+.instr-tb-btn:hover, .instr-tb-btn:focus-visible { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); outline: none; }
+.instr-tb-btn:active { transform: scale(.96); }
+@media (max-width: 576px) {
+  .instr-toolbar { gap: .25rem .4rem; padding: .3rem; }
+  .instr-tb-group { padding-right: .4rem; }
+  .instr-tb-btn { min-width: 38px; height: 38px; }              /* touch-sized */
+  .instr-tb-end { margin-left: 0; flex: 1 0 100%; border-top: 1px solid var(--border); padding-top: .3rem; }
+  .instr-tb-wide { flex: 1; }
+}
+.instr-preview-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); margin: .6rem 0 .3rem; }
+.instr-preview {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .75rem .9rem; max-height: 260px; overflow-y: auto; overflow-x: hidden;
+}
+.instr-preview-empty { color: var(--text-3); font-style: italic; font-size: .82rem; }
+
+/* popups (FloatingPanel) */
+.instr-dialog { width: min(440px, 100%); }
+.instr-dlg-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .85rem 1rem; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text-1); }
+.instr-dlg-x { width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--text-3); cursor: pointer; }
+.instr-dlg-x:hover { background: var(--surface-2); color: var(--text-1); }
+.instr-dlg-body { padding: 1rem; overflow-y: auto; }
+.instr-dlg-label { display: block; font-size: .78rem; font-weight: 600; color: var(--text-2); margin: .6rem 0 .25rem; }
+.instr-dlg-label:first-child { margin-top: 0; }
+.instr-dlg-text { margin: 0 0 .6rem; font-size: .88rem; color: var(--text-2); line-height: 1.55; }
+.instr-dlg-text:last-child { margin-bottom: 0; }
+.instr-dlg-hint { font-size: .8rem; color: var(--text-3); }
+.instr-dlg-err { margin-top: .6rem; font-size: .8rem; color: var(--danger-text); }
+.instr-dlg-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; padding: .75rem 1rem; border-top: 1px solid var(--border); }
+@media (max-width: 480px) { .instr-dlg-foot .btn { flex: 1 1 auto; min-height: 40px; } }

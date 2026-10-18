@@ -25,27 +25,29 @@ from app.services.dashboard_service import get_greeting
 # templates/admin_base.html, are the ONLY two places Admin modules are
 # listed. This one drives the Dashboard's "Apps" grid; when a module is
 # added to the sidebar, add it here too so the two never drift apart.
+from app.utils.nav_icons import ICONS
+
 ADMIN_MODULE_GROUPS = [
     {"name": "Content", "modules": [
-        {"icon": "fa-layer-group",     "label": "Manage Categories", "desc": "Organize categories & subcategories", "endpoint": "admin.categories", "feature": "category_management"},
-        {"icon": "fa-file-alt",        "label": "Manage Exams",      "desc": "Create, edit and publish exams",       "endpoint": "admin.exams", "feature": "exam_management"},
-        {"icon": "fa-book",            "label": "Manage Subjects",   "desc": "Add or remove image subjects",         "endpoint": "admin.subjects", "feature": "subject_management"},
-        {"icon": "fa-question-circle", "label": "Manage Questions",  "desc": "Add, edit and import questions",       "endpoint": "admin.questions_index", "feature": "question_management"},
-        {"icon": "fa-images",          "label": "Upload Images",     "desc": "Manage question image files",          "endpoint": "admin.upload_images_page", "feature": "question_management"},
-        {"icon": "fa-square-root-alt", "label": "LaTeX Editor",      "desc": "Compose questions with LaTeX",         "endpoint": "admin.latex_editor", "feature": "question_management", "popup": True},
-        {"icon": "fa-hdd",             "label": "Object Storage",    "desc": "Browse stored files & images",         "endpoint": "admin.object_storage", "feature": "storage_management"},
-        {"icon": "fa-robot",           "label": "AI Command Centre", "desc": "Generate questions with AI",           "endpoint": "admin.ai_command_centre", "feature": "question_generation"},
+        {"icon": ICONS["categories"],     "label": "Manage Categories", "desc": "Organize categories & subcategories", "endpoint": "admin.categories", "feature": "category_management"},
+        {"icon": ICONS["exams"],        "label": "Manage Exams",      "desc": "Create, edit and publish exams",       "endpoint": "admin.exams", "feature": "exam_management"},
+        {"icon": ICONS["subjects"],            "label": "Manage Subjects",   "desc": "Add or remove image subjects",         "endpoint": "admin.subjects", "feature": "subject_management"},
+        {"icon": ICONS["questions"], "label": "Manage Questions",  "desc": "Add, edit and import questions",       "endpoint": "admin.questions_index", "feature": "question_management"},
+        {"icon": ICONS["upload_images"],          "label": "Upload Images",     "desc": "Manage question image files",          "endpoint": "admin.upload_images_page", "feature": "question_management"},
+        {"icon": ICONS["latex_editor"], "label": "LaTeX Editor",      "desc": "Compose questions with LaTeX",         "endpoint": "admin.latex_editor", "feature": "question_management", "popup": True},
+        {"icon": ICONS["object_storage"],             "label": "Object Storage",    "desc": "Browse stored files & images",         "endpoint": "admin.object_storage", "feature": "storage_management"},
+        {"icon": ICONS["ai"],           "label": "AI Command Centre", "desc": "Generate questions with AI",           "endpoint": "admin.ai_command_centre", "feature": "question_generation"},
     ]},
     {"name": "Management", "modules": [
-        {"icon": "fa-user-plus", "label": "Users & Requests", "desc": "Approve or deny access requests", "endpoint": "admin.requests_dashboard", "feature": "user_management"},
-        {"icon": "fa-list-ol",   "label": "Manage Attempts",  "desc": "View every exam attempt",         "endpoint": "admin.attempts", "feature": "attempt_management"},
+        {"icon": ICONS["users"], "label": "Users & Requests", "desc": "Approve or deny access requests", "endpoint": "admin.requests_dashboard", "feature": "user_management"},
+        {"icon": ICONS["attempts"],   "label": "Manage Attempts",  "desc": "View every exam attempt",         "endpoint": "admin.attempts", "feature": "attempt_management"},
     ]},
     {"name": "Analytics", "modules": [
-        {"icon": "fa-chart-line", "label": "Users Analytics", "desc": "Performance insights per student", "endpoint": "admin.users_analytics", "feature": "user_analytics"},
+        {"icon": ICONS["analytics"], "label": "Users Analytics", "desc": "Performance insights per student", "endpoint": "admin.users_analytics", "feature": "user_analytics"},
     ]},
     {"name": "Account", "modules": [
-        {"icon": "fa-book-open",   "label": "Admin Guide",       "desc": "Learn how to run the portal",  "endpoint": "admin.guide"},
-        {"icon": "fa-user-circle", "label": "Profile & Account", "desc": "Manage your admin account",    "endpoint": "admin.profile"},
+        {"icon": ICONS["guide"],   "label": "Admin Guide",       "desc": "Learn how to run the portal",  "endpoint": "admin.guide"},
+        {"icon": ICONS["profile"], "label": "Profile & Account", "desc": "Manage your admin account",    "endpoint": "admin.profile"},
     ]},
 ]
 

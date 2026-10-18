@@ -52,24 +52,6 @@
 .form-select option { background:var(--surface); color:var(--text-1); }
 textarea.form-control { resize:vertical; }
 
-/* ── Loading Overlay ── */
-#loadingOverlay { display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,.75); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center; overflow-y:auto; padding:1.5rem 0; }
-.loading-card { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+8px); padding:2.5rem 2rem; text-align:center; max-width:420px; width:90%; box-shadow:var(--shadow-lg); }
-
-/* ── Per-batch progress list ── */
-.batch-list { text-align:left; max-height:220px; overflow-y:auto; margin:1rem 0 0; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); display:none; }
-.batch-list.show { display:block; }
-.batch-row { display:flex; align-items:center; gap:.55rem; padding:.5rem .75rem; font-size:.75rem; border-bottom:1px solid var(--border); }
-.batch-row:last-child { border-bottom:none; }
-.batch-row-icon { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.6rem; flex-shrink:0; }
-.batch-row-icon.pending { background:var(--surface); border:1px solid var(--border); color:var(--text-3); }
-.batch-row-icon.running { background:var(--accent-subtle); color:var(--accent); border:1px solid var(--border); animation:core-pulse 1s ease-in-out infinite; }
-.batch-row-icon.done    { background:var(--success-bg); color:var(--success-text); border:1px solid var(--success-border); }
-.batch-row-icon.failed  { background:var(--danger-bg); color:var(--danger-text); border:1px solid var(--danger-border); }
-.batch-row-icon.retried { background:var(--warning-bg); color:var(--warning-text); border:1px solid var(--warning-border); }
-.batch-row-label { color:var(--text-2); flex:1; text-align:left; }
-.batch-row-detail { color:var(--text-3); font-size:.68rem; max-width:55%; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:default; }
-
 /* ── Terminal result panel (partial/failed) ── */
 #genResultPanel { display:none; }
 #genResultPanel.show { display:block; }
@@ -88,23 +70,93 @@ textarea.form-control { resize:vertical; }
 .result-reason-box i { margin-top:.15rem; flex-shrink:0; }
 .result-reason-label { display:block; text-transform:uppercase; font-size:.64rem; font-weight:700; letter-spacing:.05em; opacity:.8; margin-bottom:.15rem; }
 .result-actions { display:flex; gap:.55rem; flex-wrap:wrap; justify-content:center; margin-top:1rem; }
-.orbital-ring { position:relative; width:72px; height:72px; margin:0 auto 1.5rem; }
-.orbit { position:absolute; inset:0; border-radius:50%; border:2px solid transparent; }
-.orbit-1 { border-top-color:var(--accent); animation:orb 1.2s linear infinite; }
-.orbit-2 { inset:10px; border-right-color:var(--accent); opacity:.6; animation:orb 1.8s linear infinite reverse; }
-.orbit-3 { inset:20px; border-bottom-color:var(--accent); opacity:.3; animation:orb 2.4s linear infinite; }
-.orbit-core { position:absolute; inset:28px; border-radius:50%; background:var(--accent); opacity:.8; animation:core-pulse 1.2s ease-in-out infinite; }
-@keyframes orb { to { transform:rotate(360deg); } }
-@keyframes core-pulse { 0%,100%{transform:scale(1);opacity:.8;} 50%{transform:scale(.6);opacity:.4;} }
-.loading-title { font-size:1rem; font-weight:700; color:var(--text-1); margin-bottom:.35rem; }
-.loading-sub   { font-size:.78rem; color:var(--text-3); margin-bottom:1.1rem; min-height:1.2em; }
-.ai-progress-wrap { background:var(--surface-2); border-radius:999px; height:4px; overflow:hidden; margin-bottom:1.25rem; }
-.ai-progress-bar  { height:100%; background:var(--accent); border-radius:999px; width:0%; transition:width .5s ease; }
-.loading-steps { display:flex; justify-content:center; gap:1rem; flex-wrap:wrap; }
+/* Exclude-CSV upload: a long file name or status line must wrap inside the form, never widen it */
+#excludeSection, #excludeSection .form-control { min-width:0; max-width:100%; }
+#excludeStatus { overflow-wrap:anywhere; }
+#excludeStatus span { overflow-wrap:anywhere; }
+/* ── Generation progress window ── */
+#loadingOverlay { display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,.72); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:flex-start; overflow-y:auto; padding:1.25rem .75rem; }
+.gp-card { --gp-c: var(--accent); background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+8px); padding:1.4rem 1.4rem 1.2rem; width:100%; max-width:560px; margin:auto; box-shadow:var(--shadow-lg); }
+.gp-card[data-state="completed"] { --gp-c: var(--success-text); }
+.gp-card[data-state="partially_completed"] { --gp-c: var(--warning-text); }
+.gp-card[data-state="failed"] { --gp-c: var(--danger-text); }
+.gp-head { display:flex; align-items:center; gap:1rem; margin-bottom:.9rem; }
+.gp-ring { position:relative; width:88px; height:88px; flex-shrink:0; }
+.gp-ring svg { width:100%; height:100%; transform:rotate(-90deg); display:block; }
+.gp-ring-track { fill:none; stroke:var(--surface-2); stroke-width:8; }
+.gp-ring-fill { fill:none; stroke:var(--gp-c); stroke-width:8; stroke-linecap:round; stroke-dasharray:276.46; stroke-dashoffset:276.46; transition:stroke-dashoffset .6s ease, stroke .3s; }
+.gp-ring-spin { position:absolute; inset:-5px; border-radius:50%; border:2px solid transparent; border-top-color:var(--gp-c); opacity:.55; animation:orb 1.6s linear infinite; display:none; }
+.gp-card[data-state="processing"] .gp-ring-spin { display:block; }
+.gp-card[data-state="queued"] .gp-ring-spin { display:block; animation-duration:3s; opacity:.3; }
+.gp-ring-pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.15rem; font-weight:800; color:var(--text-1); font-variant-numeric:tabular-nums; }
+.gp-head-text { min-width:0; flex:1; }
+.gp-chip { display:inline-flex; align-items:center; gap:.4rem; padding:.18rem .65rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); margin-bottom:.35rem; }
+.gp-chip i { font-size:.62rem; }
+.gp-card[data-state="queued"] .gp-chip { background:var(--info-bg); color:var(--info-text); border-color:var(--info-border); }
+.gp-card[data-state="processing"] .gp-chip { background:var(--accent-subtle); color:var(--accent); }
+.gp-card[data-state="completed"] .gp-chip { background:var(--success-bg); color:var(--success-text); border-color:var(--success-border); }
+.gp-card[data-state="partially_completed"] .gp-chip { background:var(--warning-bg); color:var(--warning-text); border-color:var(--warning-border); }
+.gp-card[data-state="failed"] .gp-chip { background:var(--danger-bg); color:var(--danger-text); border-color:var(--danger-border); }
+.loading-title { font-size:1.02rem; font-weight:700; color:var(--text-1); overflow-wrap:anywhere; }
+.gp-exam { font-size:.76rem; color:var(--text-3); margin-top:.15rem; overflow-wrap:anywhere; }
+.gp-msg { font-size:.82rem; color:var(--text-2); background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.55rem .75rem; margin-bottom:.8rem; min-height:2.3em; overflow-wrap:anywhere; }
+.gp-bar { position:relative; height:10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); overflow:hidden; }
+.ai-progress-bar { height:100%; width:0%; background:var(--gp-c); border-radius:999px; transition:width .6s ease, background .3s; position:relative; overflow:hidden; }
+.gp-card[data-state="processing"] .ai-progress-bar::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); transform:translateX(-100%); animation:gp-sheen 1.6s ease-in-out infinite; }
+@keyframes gp-sheen { to { transform:translateX(100%); } }
+.gp-barmeta { display:flex; justify-content:space-between; gap:.5rem; font-size:.7rem; color:var(--text-3); margin:.3rem 0 .8rem; font-variant-numeric:tabular-nums; }
+.gp-stats { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:.4rem; margin-bottom:.8rem; }
+.gp-stat { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.45rem .3rem; text-align:center; min-width:0; }
+.gp-stat b { display:block; font-size:1.05rem; color:var(--text-1); font-variant-numeric:tabular-nums; line-height:1.2; }
+.gp-stat span { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); }
+.gp-stat.s-done b { color:var(--success-text); } .gp-stat.s-run b { color:var(--accent); } .gp-stat.s-fail b { color:var(--danger-text); }
+.gp-stat.bump { animation:gp-pop .35s ease; }
+@keyframes gp-pop { 0% { transform:scale(1); } 45% { transform:scale(1.12); } 100% { transform:scale(1); } }
+@keyframes gp-shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-3px); } 75% { transform:translateX(3px); } }
+.gp-qline { font-size:.75rem; color:var(--accent); font-weight:700; min-height:1.1em; margin-bottom:.6rem; text-align:center; }
+.gp-netwarn { display:flex; align-items:flex-start; gap:.5rem; background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text); border-radius:var(--radius); padding:.5rem .7rem; font-size:.76rem; margin-bottom:.7rem; }
+.gp-netwarn[hidden] { display:none; }
+.gp-note { font-size:.7rem; color:var(--text-3); text-align:center; margin:.6rem 0 0; line-height:1.5; }
+.loading-steps { display:flex; justify-content:center; gap:1rem; flex-wrap:wrap; margin-bottom:.8rem; }
 .loading-step  { display:flex; flex-direction:column; align-items:center; gap:.3rem; font-size:.6rem; font-weight:700; letter-spacing:.08em; color:var(--text-3); opacity:.4; transition:opacity .3s; }
 .loading-step.active { opacity:1; color:var(--accent); }
 .step-dot { width:8px; height:8px; border-radius:50%; background:var(--text-3); transition:background .3s; }
 .loading-step.active .step-dot { background:var(--accent); box-shadow:0 0 6px var(--accent); }
+@keyframes orb { to { transform:rotate(360deg); } }
+@keyframes core-pulse { 0%,100%{transform:scale(1);opacity:.8;} 50%{transform:scale(.6);opacity:.4;} }
+
+/* ── Per-batch progress list ── */
+.batch-list { text-align:left; max-height:210px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); display:none; }
+.batch-list.show { display:block; }
+.batch-row { display:flex; align-items:center; gap:.55rem; padding:.5rem .75rem; font-size:.75rem; border-bottom:1px solid var(--border); transition:opacity .25s; }
+.batch-row:last-child { border-bottom:none; }
+.batch-row.pending { opacity:.6; }
+.batch-row-icon { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.62rem; flex-shrink:0; }
+.batch-row-icon.pending { background:var(--surface); border:1px solid var(--border); color:var(--text-3); }
+.batch-row-icon.running { background:var(--accent-subtle); color:var(--accent); border:1px solid var(--border); animation:core-pulse 1.2s ease-in-out infinite; }
+.batch-row-icon.done    { background:var(--success-bg); color:var(--success-text); border:1px solid var(--success-border); }
+.batch-row-icon.failed  { background:var(--danger-bg); color:var(--danger-text); border:1px solid var(--danger-border); }
+.batch-row-icon.retried { background:var(--warning-bg); color:var(--warning-text); border:1px solid var(--warning-border); }
+.batch-row.changed .batch-row-icon.done { animation:gp-pop .4s ease; }
+.batch-row.changed .batch-row-icon.failed { animation:gp-shake .4s ease; }
+.batch-row-label { color:var(--text-2); flex:1; text-align:left; white-space:nowrap; }
+.batch-row-detail { color:var(--text-3); font-size:.68rem; max-width:62%; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:default; }
+.batch-row-detail.is-failed { color:var(--danger-text); }
+
+@media (max-width:480px) {
+  .gp-card { padding:1rem .9rem; }
+  .gp-ring { width:72px; height:72px; }
+  .gp-ring-pct { font-size:.98rem; }
+  .gp-stats { grid-template-columns:repeat(6, minmax(0,1fr)); }
+  .gp-stat:nth-child(-n+3) { grid-column:span 2; }
+  .gp-stat:nth-child(n+4) { grid-column:span 3; }
+  .batch-row-detail { max-width:50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-ring-spin, .gp-card .ai-progress-bar::after, .batch-row-icon.running { animation:none !important; }
+  .gp-ring-fill, .ai-progress-bar { transition:none; }
+  .gp-stat.bump, .batch-row.changed .batch-row-icon { animation:none !important; }
+}
 
 /* ── ACC Modals ── */
 .acc-modal-backdrop { display:none; position:fixed; inset:0; z-index:1070; background:rgba(0,0,0,.6); backdrop-filter:blur(5px); align-items:center; justify-content:center; }
@@ -293,7 +345,7 @@ window.MathJax = {
 <!-- Page Header -->
 <div class="page-top">
   <div>
-    <h1><i class="fas fa-robot me-2" style="color:var(--accent)"></i>AI Command Centre</h1>
+    <h1><i class="fas {{ nav_icon('ai') }} me-2" style="color:var(--accent)"></i>AI Command Centre</h1>
     <p>Generate high-quality exam questions using AI</p>
     {# The models that will do the work, from the central AI registry (change them in AI Configuration). #}
     {% from 'partials/_ai_badge.html' import ai_model_badge %}
@@ -658,27 +710,47 @@ window.MathJax = {
   </div>
 </div>
 
-<!-- Loading Overlay -->
-<div id="loadingOverlay">
-  <div class="loading-card">
-    <div class="orbital-ring">
-      <div class="orbit orbit-1"></div>
-      <div class="orbit orbit-2"></div>
-      <div class="orbit orbit-3"></div>
-      <div class="orbit-core"></div>
+<!-- Generation progress window: every number on it comes from GET /api/v01/admin/ai/status/<id> (the job's real batches);
+     nothing here is simulated. There is no cancel: the server has no way to stop a running generation. -->
+<div id="loadingOverlay" role="dialog" aria-modal="true" aria-labelledby="loadingTitle">
+  <div class="gp-card" id="gpCard" data-state="queued">
+    <div class="gp-head">
+      <div class="gp-ring" aria-hidden="true">
+        <div class="gp-ring-spin"></div>
+        <svg viewBox="0 0 100 100"><circle class="gp-ring-track" cx="50" cy="50" r="44"></circle><circle class="gp-ring-fill" id="gpRingFill" cx="50" cy="50" r="44"></circle></svg>
+        <div class="gp-ring-pct" id="gpRingPct">0%</div>
+      </div>
+      <div class="gp-head-text">
+        <span class="gp-chip" id="gpChip"><i class="fas fa-hourglass-start"></i><span id="gpChipText">Queued</span></span>
+        <div class="loading-title" id="loadingTitle">AI Engine Active</div>
+        <div class="gp-exam" id="gpExam"></div>
+      </div>
     </div>
-    <div class="loading-title" id="loadingTitle">AI Engine Active</div>
-    <div class="loading-sub" id="loadingSubText">Initialising question generation...</div>
-    <div style="font-size:.72rem;color:var(--accent);font-weight:700;margin-bottom:.5rem;min-height:1.1em;transition:opacity .3s;" id="loadingBatchText"></div>
-    <div class="ai-progress-wrap"><div class="ai-progress-bar" id="aiProgressBar"></div></div>
-    <div style="font-size:.65rem;color:var(--text-3);margin-top:.4rem;margin-bottom:.6rem;min-height:1em;" id="loadingPctText"></div>
+
+    <div class="gp-msg" id="loadingSubText" role="status" aria-live="polite">Initialising question generation...</div>
+
+    <div class="gp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="gpBar"><div class="ai-progress-bar" id="aiProgressBar"></div></div>
+    <div class="gp-barmeta"><span id="loadingPctText">0%</span><span id="gpElapsed"></span></div>
+
+    <div class="gp-stats" id="gpStats">
+      <div class="gp-stat"><b id="gpTotal">0</b><span>Total</span></div>
+      <div class="gp-stat s-done"><b id="gpDone">0</b><span>Completed</span></div>
+      <div class="gp-stat s-run"><b id="gpRun">0</b><span>Processing</span></div>
+      <div class="gp-stat"><b id="gpQueued">0</b><span>Queued</span></div>
+      <div class="gp-stat s-fail"><b id="gpFail">0</b><span>Failed</span></div>
+    </div>
+    <div class="gp-qline" id="loadingBatchText"></div>
+
     <div class="loading-steps" id="loadingStepsRow">
       <div class="loading-step active" id="lstep-1"><div class="step-dot"></div><span>READING</span></div>
       <div class="loading-step" id="lstep-2"><div class="step-dot"></div><span>ANALYSING</span></div>
       <div class="loading-step" id="lstep-3"><div class="step-dot"></div><span>CRAFTING</span></div>
       <div class="loading-step" id="lstep-4"><div class="step-dot"></div><span>VALIDATING</span></div>
     </div>
+
+    <div class="gp-netwarn" id="gpNetWarn" hidden><i class="fas fa-plug-circle-exclamation" style="margin-top:.15rem"></i><span id="gpNetWarnText"></span></div>
     <div class="batch-list" id="batchList"></div>
+    <div class="gp-note" id="gpNote">The generation runs on the server. You can refresh this page and the progress comes back.</div>
 
     <!-- Terminal state: shown instead of auto-redirect when the job didn't
          fully succeed — a plain "done" (all batches ok) still auto-redirects
@@ -829,6 +901,7 @@ function _resetChecklist() {
 }
 
 function openModeModal(mode) {
+  if (_jobActive) { showToast('A generation is already running — wait for it to finish.', 'warning'); return; }
   _pendingMode = mode;
   _resetChecklist();
   document.getElementById('preGenChecklistModal').classList.add('show');
@@ -851,11 +924,20 @@ function _openModeModalDirect(mode) {
 }
 
 let _pollTimer   = null;
-let _smoothTimer = null;
-let _displayPct  = 0;   // what bar actually shows right now
-let _targetPct   = 0;   // what backend last told us
+let _pollSeq     = 0;       // bumped whenever polling restarts/stops, so a late response from an old loop is ignored
+let _elapsedTimer = null;
+let _startedAt   = 0;
+let _jobActive   = false;   // a generation is running (or being resumed): no second one may be started from this page
+let _netFails    = 0;
+let _targetPct   = 0;       // the real percent the server last reported (never decreases)
 
 const _ACTIVE_JOB_KEY = 'acc_active_job_id';
+const _STATE_LABEL = {
+  queued: ['Queued', 'fa-hourglass-start'], processing: ['Processing', 'fa-gear fa-spin'],
+  completed: ['Completed', 'fa-circle-check'], partially_completed: ['Partially completed', 'fa-triangle-exclamation'],
+  failed: ['Failed', 'fa-circle-xmark'],
+};
+const _RING_C = 276.46;
 
 // ── Active-job persistence — survives a refresh ────────────────────────────
 // A generation job runs in a server-side background thread that keeps going
@@ -883,15 +965,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const job = await res.json();
     if (job.status === 'queued' || job.status === 'processing') {
       _showLoading('Resuming previous generation…');
+      _updateLoadingUI(job);
       _pollJob(jobId);
     } else if (job.status === 'partially_completed' || job.status === 'failed') {
       // Terminal but the admin never saw the outcome (closed/refreshed
       // before acting on it) — show the same result panel they'd have
       // gotten live, instead of silently dropping it.
       _showLoading('');
-      _renderBatchList(job.batches || []);
-      _targetPct = 100; _displayPct = 100;
-      document.getElementById('aiProgressBar').style.width = '100%';
+      _updateLoadingUI(job);
       _showTerminalPanel(job, jobId);
     } else {
       _clearActiveJob();
@@ -899,48 +980,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) { /* server unreachable — leave the stored id, try again next load */ }
 });
 
-// ── Smooth ticker: runs at 80ms, always moving toward target ──────────────
-function _startSmoothTicker() {
-  if (_smoothTimer) return;
-  _smoothTimer = setInterval(() => {
-    const bar   = document.getElementById('aiProgressBar');
-    const pctEl = document.getElementById('loadingPctText');
-    if (!bar) return;
-
-    if (_displayPct < _targetPct) {
-      // Ease-in: fast when gap is big, slow when close
-      const gap = _targetPct - _displayPct;
-      _displayPct += Math.max(0.3, gap * 0.06);
-      if (_displayPct > _targetPct) _displayPct = _targetPct;
-    } else if (_targetPct < 99 && _displayPct < 94) {
-      // Creep slowly while waiting for next server poll (never goes past 94 on its own)
-      _displayPct += 0.03;
-    }
-
-    const shown = Math.min(_displayPct, 99.5);
-    bar.style.width        = shown.toFixed(1) + '%';
-    if (pctEl) pctEl.textContent = Math.round(shown) + '%';
-  }, 80);
-}
-
-function _stopSmoothTicker() {
-  if (_smoothTimer) { clearInterval(_smoothTimer); _smoothTimer = null; }
-}
-
 // ── Form submit ───────────────────────────────────────────────────────────
 document.getElementById('aiGenForm').onsubmit = async (e) => {
   e.preventDefault();
+  if (_jobActive) { showToast('A generation is already running — wait for it to finish.', 'warning'); return; }
   const mode = document.getElementById('modalMode').value;
   const formData = new FormData(e.target);
   if (mode === 'pure' && !formData.get('topic')?.trim()) {
     showToast('Topic Required — please enter a topic for Pure Generation.', 'error'); return;
   }
+  const submitBtn = e.target.querySelector('button[type=submit]');
+  if (submitBtn) submitBtn.disabled = true;
+  _jobActive = true;
   genModal.hide();
   _showLoading('Submitting to AI Engine...');
   try {
     const res  = await fetch('/api/v01/admin/ai/generate', { method: 'POST', body: formData });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!data.success) {
+      if (data.already_running && data.job_id) {          // the server already has one for this admin: attach to it
+        showToast(data.message, 'warning');
+        _saveActiveJob(data.job_id);
+        _pollJob(data.job_id);
+        return;
+      }
       _hideLoading();
       showToast('Launch failed: ' + (data.message || 'Unknown error'), 'error');
       return;
@@ -950,44 +1013,103 @@ document.getElementById('aiGenForm').onsubmit = async (e) => {
   } catch {
     _hideLoading();
     showToast('Could not connect to server.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 };
 
+function _fmtElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000)), m = Math.floor(s / 60);
+  return m ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
+}
+
+function _gpSetState(state) {
+  const card = document.getElementById('gpCard');
+  if (!card || card.dataset.state === state) return;
+  card.dataset.state = state;
+  const [label, icon] = _STATE_LABEL[state] || _STATE_LABEL.processing;
+  document.getElementById('gpChipText').textContent = label;
+  document.querySelector('#gpChip i').className = 'fas ' + icon;
+  if (state === 'completed' || state === 'partially_completed' || state === 'failed') {
+    card.querySelector('.gp-ring').style.animation = 'gp-pop .5s ease';
+    if (state === 'failed') card.querySelector('.gp-head').style.animation = 'gp-shake .4s ease';
+  }
+}
+
+function _gpSetPct(pct) {
+  const p = Math.max(0, Math.min(100, pct));
+  document.getElementById('aiProgressBar').style.width = p + '%';
+  document.getElementById('gpRingFill').style.strokeDashoffset = (_RING_C * (1 - p / 100)).toFixed(2);
+  const t = Math.round(p) + '%';
+  document.getElementById('gpRingPct').textContent = t;
+  document.getElementById('loadingPctText').textContent = t;
+  document.getElementById('gpBar').setAttribute('aria-valuenow', String(Math.round(p)));
+}
+
 function _showLoading(msg) {
-  _displayPct = 0;
-  _targetPct  = 4;  // immediate tiny nudge so bar isn't dead at 0
+  _jobActive = true;
+  _targetPct = 0;
+  _netFails = 0;
+  _startedAt = Date.now();
+  const card = document.getElementById('gpCard');
+  card.dataset.state = '';                       // force _gpSetState to apply
+  card.querySelector('.gp-ring').style.animation = '';
+  card.querySelector('.gp-head').style.animation = '';
+  _gpSetState('queued');
   document.getElementById('loadingTitle').textContent = 'AI Engine Active';
-  document.getElementById('loadingSubText').textContent  = msg || '';
+  document.getElementById('gpExam').textContent = '';
+  document.getElementById('loadingSubText').textContent = msg || '';
   document.getElementById('loadingBatchText').textContent = '';
-  document.getElementById('loadingPctText').textContent   = '0%';
-  document.getElementById('aiProgressBar').style.width    = '0%';
+  ['gpTotal', 'gpDone', 'gpRun', 'gpQueued', 'gpFail'].forEach(id => { document.getElementById(id).textContent = '0'; });
+  _gpSetPct(0);
+  document.getElementById('gpNetWarn').hidden = true;
+  document.getElementById('gpNote').style.display = '';
+  document.getElementById('gpElapsed').textContent = 'Elapsed 0s';
   document.getElementById('loadingStepsRow').style.display = '';
   document.getElementById('genResultPanel').classList.remove('show');
+  _renderBatchList([]);
   for (let i = 1; i <= 4; i++) document.getElementById(`lstep-${i}`)?.classList.remove('active');
   document.getElementById('lstep-1')?.classList.add('active');
   document.getElementById('loadingOverlay').style.display = 'flex';
-  _startSmoothTicker();
+  if (_elapsedTimer) clearInterval(_elapsedTimer);
+  _elapsedTimer = setInterval(() => {
+    document.getElementById('gpElapsed').textContent = 'Elapsed ' + _fmtElapsed(Date.now() - _startedAt);
+  }, 1000);
 }
 
 function _hideLoading() {
-  _stopSmoothTicker();
+  _jobActive = false;
+  _pollSeq++;
+  if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
   document.getElementById('loadingOverlay').style.display = 'none';
-  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
 }
 
+// One request at a time (a slow response can never pile up behind the next poll), backing off while the connection is
+// failing; a failed poll never stops the job — it only changes how often this page asks.
 function _pollJob(jobId) {
-  if (_pollTimer) clearInterval(_pollTimer);
-  _pollTimer = setInterval(async () => {
+  if (_pollTimer) clearTimeout(_pollTimer);
+  const mySeq = ++_pollSeq;
+  _jobActive = true;
+  const tick = async () => {
+    if (mySeq !== _pollSeq) return;
+    let delay = 1500;
     try {
       const res = await fetch(`/api/v01/admin/ai/status/${jobId}`);
+      if (mySeq !== _pollSeq) return;
+      if (res.status === 404) { _clearActiveJob(); _hideLoading(); showToast('This generation job no longer exists on the server.', 'error'); return; }
+      if (res.status === 401 || res.status === 403) { _netProblem('Your session has expired or you no longer have access. Sign in again — the job keeps running on the server.', true); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const job = await res.json();
+      if (mySeq !== _pollSeq) return;
+      _netFails = 0;
+      document.getElementById('gpNetWarn').hidden = true;
       _updateLoadingUI(job);
 
       if (job.status === 'completed' || job.status === 'partially_completed' || job.status === 'failed') {
-        clearInterval(_pollTimer);
         _pollTimer = null;
-        _targetPct = 100;
-
+        _jobActive = false;
+        if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
         setTimeout(() => {
           if (job.status === 'completed') {
             // Clean full success — hand off straight to the CSV Editor, same
@@ -996,7 +1118,7 @@ function _pollJob(jobId) {
             // the generated questions never need to travel through the URL.
             _clearActiveJob();
             document.getElementById('loadingBatchText').textContent = '';
-            document.getElementById('loadingSubText').textContent = 'Opening CSV Editor…';
+            document.getElementById('loadingSubText').textContent = 'Complete — opening the CSV Editor…';
             window.location.href = '/admin/ai-command-centre/csv-upload?source=ai&job_id=' + encodeURIComponent(jobId);
             return;
           }
@@ -1004,37 +1126,59 @@ function _pollJob(jobId) {
           // silently drop successful questions); show exactly what
           // happened and let the admin choose what to do next.
           _showTerminalPanel(job, jobId);
-        }, 700);
+        }, 900);
+        return;
       }
     } catch (err) {
-      console.warn('Poll error (will retry):', err);
+      if (mySeq !== _pollSeq) return;
+      _netFails++;
+      _netProblem(_netFails < 4
+        ? `Connection problem — retrying… (attempt ${_netFails})`
+        : 'Still cannot reach the server. The generation keeps running there; this page will keep trying.');
+      delay = Math.min(1500 * Math.pow(2, _netFails), 12000);
     }
-  }, 1500);
+    _pollTimer = setTimeout(tick, delay);
+  };
+  _pollTimer = setTimeout(tick, 600);
+}
+
+function _netProblem(text, stop) {
+  document.getElementById('gpNetWarnText').textContent = text;
+  document.getElementById('gpNetWarn').hidden = false;
+  if (stop) { _pollSeq++; _pollTimer = null; _jobActive = false; }
+}
+
+function _setStat(id, value) {
+  const el = document.getElementById(id);
+  if (!el || el.textContent === String(value)) return;
+  el.textContent = value;
+  const box = el.parentElement;
+  box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump');       // restart the one-shot pop only on a real change
 }
 
 function _updateLoadingUI(job) {
+  const state = ['queued', 'processing', 'completed', 'partially_completed', 'failed'].includes(job.status) ? job.status : 'processing';
+  _gpSetState(state);
+  if (job.exam_name) document.getElementById('gpExam').textContent = job.exam_name + (job.mode ? ' · ' + ({extract: 'Direct Extraction', mine: 'Concept Mining', pure: 'Pure Generation'}[job.mode] || job.mode) : '');
+
   const sub = document.getElementById('loadingSubText');
-  if (sub) sub.textContent = job.message || 'Processing...';
+  if (sub && job.message) sub.textContent = job.message;
 
-  const total = job.total_batches || 1;
-  const done  = job.completed_batches || 0;
+  // Counts come from the real per-batch states; batches the server has not listed yet are still queued.
+  const batches = job.batches || [];
+  const count = s => batches.filter(b => b.status === s).length;
+  const retried = count('retried');
+  const total = Math.max((job.total_batches || batches.length || 0) - retried, 0);
+  const done = count('done'), failed = count('failed'), running = count('running');
+  const queued = Math.max(total - done - failed - running, 0);
+  _setStat('gpTotal', total); _setStat('gpDone', done); _setStat('gpRun', running); _setStat('gpQueued', queued); _setStat('gpFail', failed);
 
-  // Only update targetPct — smooth ticker handles actual bar movement
-  const serverPct = job.percent != null ? job.percent : Math.round((done / total) * 90);
+  const serverPct = job.percent != null ? job.percent : (total ? Math.round(((done + failed) / total) * 100) : 0);
   if (serverPct > _targetPct) _targetPct = serverPct;
+  _gpSetPct(state === 'completed' || state === 'partially_completed' || state === 'failed' ? 100 : Math.min(_targetPct, 99));
 
-  const batchText = document.getElementById('loadingBatchText');
-  if (batchText) {
-    if (total > 1 && done > 0) {
-      batchText.textContent = `Batch ${done} of ${total} complete - ${job.questions_so_far || 0} questions collected`;
-    } else if (total > 1) {
-      batchText.textContent = `${total} batches queued, starting...`;
-    } else if (job.questions_so_far) {
-      batchText.textContent = `${job.questions_so_far} questions generated`;
-    } else {
-      batchText.textContent = '';
-    }
-  }
+  const q = job.questions_so_far != null ? job.questions_so_far : (job.questions || []).length;
+  document.getElementById('loadingBatchText').textContent = q ? `${q} question${q === 1 ? '' : 's'} collected so far` : '';
 
   const stepMap = {
     start: 1, vision_detected: 1, uploading: 1, uploaded: 1,
@@ -1047,37 +1191,57 @@ function _updateLoadingUI(job) {
     document.getElementById(`lstep-${i}`)?.classList.toggle('active', i <= activeStep);
   }
 
-  _renderBatchList(job.batches || []);
+  const noteEl = document.getElementById('gpNote');
+  if (state === 'processing' || state === 'queued') {
+    const mins = (Date.now() - _startedAt) / 60000;
+    noteEl.textContent = mins > 3
+      ? 'Large PDFs can take several minutes. It is safe to keep this open or refresh — the job continues on the server.'
+      : 'The generation runs on the server. You can refresh this page and the progress comes back.';
+  } else {
+    noteEl.style.display = 'none';
+  }
+
+  _renderBatchList(batches);
 }
 
 // ── Per-batch progress list — real state per batch, not a single rolling
 //    line: pending/running/done/failed/retried, with question counts and
-//    (for failures) the classified reason. ────────────────────────────────
+//    (for failures) the classified reason. Rows are patched in place (never
+//    rebuilt) so a poll can't flicker or restart an animation; a one-shot
+//    animation plays only on the poll where a row's state actually changed. ──
 const _BATCH_ICONS = { pending: 'fa-circle', running: 'fa-spinner fa-spin', done: 'fa-check', failed: 'fa-times', retried: 'fa-rotate-right' };
 function _renderBatchList(batches) {
   const el = document.getElementById('batchList');
   if (!el) return;
-  if (!batches.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
+  if (!batches.length) { el.classList.remove('show'); el.replaceChildren(); return; }
   el.classList.add('show');
-  el.innerHTML = batches.map(b => {
-    const icon = _BATCH_ICONS[b.status] || 'fa-circle';
+  batches.forEach(b => {
+    let row = el.querySelector(`[data-n="${b.n}"]`);
+    if (!row) {
+      row = document.createElement('div');
+      row.dataset.n = b.n;
+      row.innerHTML = '<div class="batch-row-icon"><i class="fas"></i></div><div class="batch-row-label"></div><div class="batch-row-detail"></div>';
+      row.querySelector('.batch-row-label').textContent = `Batch ${b.n}`;
+      el.appendChild(row);
+    }
     let detail = '', fullDetail = '';
     if (b.status === 'done') detail = `${b.count || 0} question${b.count === 1 ? '' : 's'}`;
-    else if (b.status === 'failed') {
-      fullDetail = b.error_friendly || b.error || 'failed';
-      detail = fullDetail;
-    }
-    else if (b.status === 'retried') detail = 'retrying…';
+    else if (b.status === 'failed') { fullDetail = b.error_friendly || b.error || 'failed'; detail = fullDetail; }
+    else if (b.status === 'retried') detail = 'replaced by a retry';
     else if (b.status === 'running') detail = 'in progress…';
-    // title= gives the full, untruncated reason on hover — the row itself
-    // stays single-line/compact (CSS ellipsis) since a batch list can have
-    // many rows, but nothing is lost, just not all shown inline.
-    return `<div class="batch-row">
-      <div class="batch-row-icon ${b.status}"><i class="fas ${icon}"></i></div>
-      <div class="batch-row-label">Batch ${b.n}</div>
-      <div class="batch-row-detail"${fullDetail ? ` title="${_escHtml(fullDetail)}"` : ''}>${_escHtml(detail)}</div>
-    </div>`;
-  }).join('');
+    else detail = 'waiting';
+    const changed = row.dataset.status && row.dataset.status !== b.status;
+    if (row.dataset.status !== b.status) {
+      row.dataset.status = b.status;
+      row.className = 'batch-row ' + b.status + (changed ? ' changed' : '');
+      row.querySelector('.batch-row-icon').className = 'batch-row-icon ' + b.status;
+      row.querySelector('.batch-row-icon i').className = 'fas ' + (_BATCH_ICONS[b.status] || 'fa-circle');
+    }
+    const d = row.querySelector('.batch-row-detail');
+    if (d.textContent !== detail) d.textContent = detail;
+    d.classList.toggle('is-failed', b.status === 'failed');
+    if (fullDetail) d.title = fullDetail; else d.removeAttribute('title');
+  });
 }
 function _escHtml(s) {
   const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
@@ -1090,9 +1254,9 @@ function _escHtml(s) {
 // were generated" dead end with real per-batch state + real next actions.
 function _showTerminalPanel(job, jobId) {
   document.getElementById('loadingStepsRow').style.display = 'none';
-  document.getElementById('loadingBatchText').textContent = '';
-  document.getElementById('loadingPctText').textContent = '';
-  document.getElementById('aiProgressBar').style.width = '100%';
+  document.getElementById('gpNetWarn').hidden = true;
+  _gpSetState(job.status);
+  _gpSetPct(100);
 
   const nQ = (job.questions || []).length;
   const failedBatches = (job.batches || []).filter(b => b.status === 'failed');
@@ -1103,12 +1267,12 @@ function _showTerminalPanel(job, jobId) {
 
   if (job.status === 'partially_completed') {
     title.textContent = 'Generation Partially Completed';
-    sub.textContent = '';
+    sub.textContent = job.message || '';
     summary.innerHTML = `<strong>${nQ} question${nQ === 1 ? '' : 's'}</strong> generated successfully and ${failedBatches.length ? 'preserved below.' : 'preserved.'} `
       + `<strong>${failedBatches.length}</strong> of ${(job.batches || []).length} batch(es) failed — see reasons above.`;
   } else {
     title.textContent = 'Generation Failed';
-    sub.textContent = '';
+    sub.textContent = job.message || '';
     const friendly = job.error_friendly || _friendlyForType(job.error_type) || job.error || 'No questions could be generated.';
     // job.error is the specific, unclassified root cause (e.g. "First
     // rejection reason: AI returned an empty result") — shown as its own
@@ -1164,7 +1328,15 @@ async function _retryFailedBatches(jobId) {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Retrying…'; }
   try {
     const res = await fetch(`/api/v01/admin/ai/retry/${jobId}`, { method: 'POST' });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!data.success && data.already_running && data.job_id) {
+      showToast(data.message, 'warning');
+      document.getElementById('genResultPanel').classList.remove('show');
+      _showLoading('Reattaching to the running generation…');
+      _saveActiveJob(data.job_id);
+      _pollJob(data.job_id);
+      return;
+    }
     if (!data.success) {
       showToast('Retry failed: ' + (data.message || 'Unknown error'), 'error');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-rotate-right me-1"></i>Retry Failed Batches'; }

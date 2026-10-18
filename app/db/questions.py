@@ -96,6 +96,12 @@ def get_question_by_id(question_id: int) -> Optional[Dict]:
         return None
 
 
+def get_questions_by_exam_strict(exam_id: int) -> List[Dict]:
+    """get_questions_by_exam(), but a database error propagates instead of looking like "this exam has no questions".
+    Export needs the difference: an empty list from a failed query would produce a package that silently lacks questions."""
+    return fetch_all(f"SELECT {_ALL_COLS} FROM questions WHERE exam_id=%s ORDER BY id", (exam_id,))
+
+
 def get_questions_by_exam(exam_id: int) -> List[Dict]:
     """Every question for one exam, unpaginated — used by Import/Export
     (a CSV export means "every question", not "the currently visible

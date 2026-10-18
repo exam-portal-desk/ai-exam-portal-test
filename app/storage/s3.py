@@ -11,7 +11,7 @@ from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
 
 import app.config as config
-from app.storage.service import StorageProvider
+from app.storage.service import StorageProvider, classify_storage_error, is_not_found_error
 
 
 class S3StorageProvider(StorageProvider):
@@ -46,6 +46,16 @@ class S3StorageProvider(StorageProvider):
             return True
         except ClientError:
             return False
+
+    def exists_strict(self, key: str) -> bool:
+        # exists() answers False for EVERY ClientError (403, throttling, 5xx ...); here only a real 404 is "missing"
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+            return True
+        except Exception as e:
+            if is_not_found_error(e):
+                return False
+            raise classify_storage_error(e, key) from e
 
     def signed_url(self, key: str, expires_in: int = 3600) -> str:
         return self.client.generate_presigned_url(

@@ -35,17 +35,28 @@ def get_all_subjects() -> List[Dict]:
         return []
 
 
-def get_subjects_page(search: str = "", page=1, per_page=20) -> Dict:
+def get_subjects_page(search: str = "", page=1, per_page=20, advanced=None, sort: str = "name") -> Dict:
+    """Admin subject list. With no Advanced Filter and the default sort this is the plain SQL page. With an Advanced Filter or
+    another sort, the search-matching subjects (a small table) are filtered/sorted in Python by app.services.subject_filters
+    and then paged, so totals and page counts always describe the filtered set."""
     page, per_page, offset = paginate_params(page, per_page)
     try:
         where_sql, params = "", []
         if search:
             where_sql = "WHERE subject_name ILIKE %s"
             params.append(f"%{search}%")
+        cols = "id,subject_name,subject_folder_id,subject_folder_created_at"
+        if advanced or sort != "name":
+            from app.services import subject_filters
+            rows = fetch_all(f"SELECT {cols} FROM subjects {where_sql}", params)
+            rows = subject_filters.sort_rows(subject_filters.apply_advanced_filter(rows, advanced), sort)
+            total = len(rows)
+            page_rows = rows[offset:offset + per_page]
+            attach_row_numbers(page_rows, page, per_page)
+            return {"subjects": page_rows, **pagination_meta(total, page, per_page)}
         total = fetch_one(f"SELECT COUNT(*) AS count FROM subjects {where_sql}", params)["count"]
         rows = fetch_all(
-            f"SELECT id,subject_name,subject_folder_id,subject_folder_created_at FROM subjects "
-            f"{where_sql} ORDER BY subject_name LIMIT %s OFFSET %s",
+            f"SELECT {cols} FROM subjects {where_sql} ORDER BY subject_name LIMIT %s OFFSET %s",
             params + [per_page, offset],
         )
         attach_row_numbers(rows, page, per_page)

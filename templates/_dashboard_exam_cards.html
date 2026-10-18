@@ -8,7 +8,7 @@
 <div class="ec live" data-n="{{ e.name|lower }}"{% if e.next_transition_iso %} data-exam-id="{{ e.id }}" data-transition-target="{{ e.next_transition_iso }}"{% endif %}>
   <div class="ec-head"><div class="ec-title">{{ e.name }}</div><span class="ebadge eb-live"><i class="fas fa-circle" style="font-size:.4rem"></i>Live</span></div>
   <div class="ec-body">
-    <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
+    <p class="ec-desc">{{ e.instructions | plain_instructions(90) }}</p>
     <div class="ec-meta">
       <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date | calendar_date }}</span>
       <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>
@@ -25,7 +25,7 @@
 <div class="ec" data-n="{{ e.name|lower }}"{% if e.next_transition_iso %} data-exam-id="{{ e.id }}" data-transition-target="{{ e.next_transition_iso }}"{% endif %}>
   <div class="ec-head"><div class="ec-title">{{ e.name }}</div>{% if e.prep_open %}<span class="ebadge eb-prep"><i class="fas fa-clipboard-check" style="font-size:.6rem"></i>Preparation Available</span>{% else %}<span class="ebadge eb-upcoming">Upcoming</span>{% endif %}</div>
   <div class="ec-body">
-    <p class="ec-desc">{{ (e.instructions or '')[:90] }}{% if (e.instructions or '')|length > 90 %}…{% endif %}</p>
+    <p class="ec-desc">{{ e.instructions | plain_instructions(90) }}</p>
     <div class="ec-meta">
       <span class="ec-tag"><i class="fas fa-calendar"></i>{{ e.date | calendar_date }}</span>
       <span class="ec-tag"><i class="fas fa-clock"></i>{{ e.start_time }}</span>

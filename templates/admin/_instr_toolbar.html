@@ -1,0 +1,34 @@
+{# Instructions editor toolbar — one definition shared by Add Exam, Edit Exam and Bulk Update. Behaviour: static/admin/instructions-editor.js #}
+{% macro instr_toolbar() %}
+<div class="instr-toolbar" role="toolbar" aria-label="Instructions formatting">
+  <div class="instr-tb-group">
+    <button type="button" class="instr-tb-btn instr-tb-txt" data-instr-cmd="h1" title="Title" aria-label="Title">H1</button>
+    <button type="button" class="instr-tb-btn instr-tb-txt" data-instr-cmd="h2" title="Heading" aria-label="Heading">H2</button>
+    <button type="button" class="instr-tb-btn instr-tb-txt" data-instr-cmd="h3" title="Sub-heading" aria-label="Sub-heading">H3</button>
+  </div>
+  <div class="instr-tb-group">
+    <button type="button" class="instr-tb-btn" data-instr-cmd="bold" title="Bold (Ctrl+B)" aria-label="Bold"><i class="fas fa-bold"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i class="fas fa-italic"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="underline" title="Underline (Ctrl+U)" aria-label="Underline"><i class="fas fa-underline"></i></button>
+  </div>
+  <div class="instr-tb-group">
+    <button type="button" class="instr-tb-btn" data-instr-cmd="bullet" title="Bullet list" aria-label="Bullet list"><i class="fas fa-list-ul"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="number" title="Numbered list" aria-label="Numbered list"><i class="fas fa-list-ol"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="outdent" title="Decrease indent (Shift+Tab)" aria-label="Decrease indent"><i class="fas fa-outdent"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="indent" title="Increase indent (Tab)" aria-label="Increase indent"><i class="fas fa-indent"></i></button>
+  </div>
+  <div class="instr-tb-group">
+    <button type="button" class="instr-tb-btn" data-instr-cmd="left" title="Align left" aria-label="Align left"><i class="fas fa-align-left"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="center" title="Align centre" aria-label="Align centre"><i class="fas fa-align-center"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="right" title="Align right" aria-label="Align right"><i class="fas fa-align-right"></i></button>
+  </div>
+  <div class="instr-tb-group">
+    <button type="button" class="instr-tb-btn" data-instr-cmd="link" title="Insert link" aria-label="Insert link"><i class="fas fa-link"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="rule" title="Divider line" aria-label="Divider line"><i class="fas fa-minus"></i></button>
+    <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Important note" aria-label="Important note"><i class="fas fa-triangle-exclamation"></i></button>
+  </div>
+  <div class="instr-tb-group instr-tb-end">
+    <button type="button" class="instr-tb-btn instr-tb-wide" data-instr-cmd="template" title="General exam instructions template" aria-label="General exam instructions template"><i class="fas fa-file-lines"></i><span>Template</span></button>
+  </div>
+</div>
+{% endmacro %}

@@ -16,6 +16,61 @@ class ObjectInfo(TypedDict):
     last_modified: Optional[str]  # ISO 8601, when the backend provides it
 
 
+class StorageError(Exception):
+    """A storage operation failed for a reason other than "the object does not exist". `kind` says why, so a caller can
+    treat a genuinely missing object differently from a permission, network or throttling problem:
+    permission | throttled | network | unavailable | invalid_key | unknown."""
+
+    def __init__(self, kind: str, key: str = "", detail: str = ""):
+        super().__init__(f"{kind}: {key}" + (f" ({detail})" if detail else ""))
+        self.kind = kind
+        self.key = key
+        self.detail = detail
+
+
+_NOT_FOUND_CODES = {"404", "NoSuchKey", "NotFound"}
+_PERMISSION_CODES = {"403", "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AllAccessDisabled"}
+_THROTTLE_CODES = {"429", "503", "SlowDown", "Throttling", "ThrottlingException", "RequestLimitExceeded", "ServiceUnavailable"}
+
+
+def is_not_found_error(exc: BaseException) -> bool:
+    """True only for "the object is not there" (a missing file, or an S3 404/NoSuchKey), never for any other failure."""
+    if isinstance(exc, FileNotFoundError):
+        return True
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        code = str(response.get("Error", {}).get("Code", ""))
+        status = str(response.get("ResponseMetadata", {}).get("HTTPStatusCode", ""))
+        return code in _NOT_FOUND_CODES or status == "404"
+    return False
+
+
+def classify_storage_error(exc: BaseException, key: str = "") -> StorageError:
+    """Wrap any backend exception in a StorageError with a meaningful `kind`."""
+    if isinstance(exc, StorageError):
+        return exc
+    if isinstance(exc, ValueError):
+        return StorageError("invalid_key", key, str(exc))
+    if isinstance(exc, PermissionError):
+        return StorageError("permission", key, str(exc))
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        code = str(response.get("Error", {}).get("Code", ""))
+        status = str(response.get("ResponseMetadata", {}).get("HTTPStatusCode", ""))
+        if code in _PERMISSION_CODES or status == "403":
+            return StorageError("permission", key, code or status)
+        if code in _THROTTLE_CODES or status in ("429", "503"):
+            return StorageError("throttled", key, code or status)
+        if code == "NoSuchBucket" or status.startswith("5"):
+            return StorageError("unavailable", key, code or status)
+        return StorageError("unknown", key, code or status)
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return StorageError("network", key, f"{type(exc).__name__}: {exc}")
+    if type(exc).__name__ in ("EndpointConnectionError", "ConnectTimeoutError", "ReadTimeoutError", "ConnectionClosedError"):
+        return StorageError("network", key, type(exc).__name__)
+    return StorageError("unknown", key, f"{type(exc).__name__}: {exc}")
+
+
 class StorageProvider(ABC):
     @abstractmethod
     def upload(self, key: str, content: bytes, content_type: str) -> None:
@@ -36,6 +91,14 @@ class StorageProvider(ABC):
     @abstractmethod
     def exists(self, key: str) -> bool:
         ...
+
+    def exists_strict(self, key: str) -> bool:
+        """exists(), except that a failure to find out raises StorageError instead of answering False. Used where "missing"
+        and "could not check" must not be confused (export / import). Backends override this; the default trusts exists()."""
+        try:
+            return self.exists(key)
+        except Exception as e:
+            raise classify_storage_error(e, key) from e
 
     @abstractmethod
     def signed_url(self, key: str, expires_in: int = 3600) -> str:

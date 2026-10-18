@@ -164,7 +164,7 @@
 
 <div class="page-top">
   <div>
-    <h1><i class="fas fa-chart-line me-2" style="color:var(--accent)"></i>Users Analytics</h1>
+    <h1><i class="fas {{ nav_icon('analytics') }} me-2" style="color:var(--accent)"></i>Users Analytics</h1>
     <p>Performance insights, results, and exam statistics.</p>
   </div>
 </div>
@@ -231,10 +231,12 @@
       </div>
       <div>
         <label>Exam</label>
+        {% from 'partials/_exam_meta.html' import exam_meta %}
         <select class="f-select" id="rf-exam" onchange="applyResultsFilter()">
           <option value="">All Exams</option>
           {% for e in exams %}
-          <option value="{{ e.id }}">{{ e.name }}</option>
+          <option value="{{ e.id }}" data-meta="{{ exam_meta(e) }}"
+                  data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">{{ e.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -301,7 +303,8 @@
         <select class="f-select" id="af-exam">
           <option value="">All Exams</option>
           {% for e in exams %}
-          <option value="{{ e.id }}">{{ e.name }}</option>
+          <option value="{{ e.id }}" data-meta="{{ exam_meta(e) }}"
+                  data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">{{ e.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -739,7 +742,16 @@ async function exportDashboardPng() {
     const parts = keys.map(k => { const e = renderExportCanvas(k, 900); made.push(e); return { canvas: e.canvas, w: e.w, h: e.h, caption: CHART_TITLES[k] }; });
     const sum = _data.summary;
     const sub = `${_scopeText()} · ${sum.totalAttempts} attempts · avg ${Number(sum.avgScore).toFixed(1)}% · pass rate ${Number(sum.passRate).toFixed(1)}% (pass mark ${_data.passMark}%) · ${sum.activeUsers} students`;
-    const out = composeCanvas(parts, 'User analytics dashboard', sub, 960);
+    await ChartExport.ready();
+    const out = composeCanvas(parts, 'User analytics dashboard', sub, 960, {
+      filters: [{ label: 'Scope', value: _scopeText() }, { label: 'Pass mark', value: _data.passMark + '%' }],
+      cards: [
+        { label: 'Attempts', value: sum.totalAttempts, sub: 'In this scope' },
+        { label: 'Average score', value: Number(sum.avgScore).toFixed(1) + '%', sub: 'Mean percentage' },
+        { label: 'Pass rate', value: Number(sum.passRate).toFixed(1) + '%', sub: 'Pass mark ' + _data.passMark + '%' },
+        { label: 'Active students', value: sum.activeUsers, sub: 'With an attempt' },
+      ],
+    });
     await _download(out, `user-analytics-dashboard-${_stamp()}.png`);
     adminToast('Dashboard exported as PNG.', 'success');
   } catch (e) {
@@ -913,9 +925,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Themed dropdown-button in place of these native <select>s — same
   // component used elsewhere in the admin UI (static/admin/select-enhance.js).
-  enhanceSelect(document.getElementById('rf-exam'), { icon: 'fas fa-file-alt' });
+  enhanceSelect(document.getElementById('rf-exam'), { icon: 'fas fa-file-alt', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });
   enhanceSelect(document.getElementById('af-period'), { icon: 'fas fa-clock' });
-  enhanceSelect(document.getElementById('af-exam'), { icon: 'fas fa-file-alt' });
+  enhanceSelect(document.getElementById('af-exam'), { icon: 'fas fa-file-alt', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });
 });
 </script>
 {% endblock %}

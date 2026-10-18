@@ -1,0 +1,38 @@
+/* Rendered exam instructions (app/utils/instructions_formatter.py output). One stylesheet for every place they are shown:
+   the student Exam Instructions page, the scheduled-exam kiosk and the admin editor preview. Wrap the rendered HTML in
+   `.instr-rich`. Colours come from the page's theme tokens, so light and dark both work. */
+.instr-rich { color: var(--text-2); font-size: .92rem; line-height: 1.7; overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
+.instr-rich > :last-child { margin-bottom: 0; }
+.instr-rich p { margin: 0 0 .75rem; }
+.instr-rich strong { color: var(--text); font-weight: 700; }
+.instr-rich u { text-underline-offset: 2px; }
+.instr-rich a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; word-break: break-all; }
+.instr-rich a:hover { filter: brightness(1.15); }
+.instr-rich .instr-h { color: var(--text); font-weight: 700; line-height: 1.3; margin: 1.1rem 0 .5rem; letter-spacing: -.01em; }
+.instr-rich .instr-h:first-child { margin-top: 0; }
+.instr-rich .instr-h1 { font-size: 1.2rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border); }
+.instr-rich .instr-h2 { font-size: 1.02rem; }
+.instr-rich .instr-h3 { font-size: .92rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.instr-rich .instr-rule { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; opacity: 1; }
+.instr-rich .instr-list { margin: 0 0 .75rem; padding-left: 1.35rem; }
+.instr-rich .instr-list .instr-list { margin: .3rem 0 .2rem; }
+.instr-rich .instr-list li { margin-bottom: .3rem; padding-left: .15rem; }
+.instr-rich ul.instr-list { list-style: disc; }
+.instr-rich ul.instr-list ul.instr-list { list-style: circle; }
+.instr-rich ol.instr-list { list-style: decimal; }
+.instr-rich ol.instr-list ol.instr-list { list-style: lower-alpha; }
+.instr-rich .instr-align-left { text-align: left; }
+.instr-rich .instr-align-center { text-align: center; }
+.instr-rich .instr-align-right { text-align: right; }
+.instr-rich .instr-warning {
+  display: flex; align-items: flex-start; gap: .55rem; margin: 0 0 .85rem;
+  background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning-text);
+  border-radius: var(--radius); padding: .65rem .8rem; font-size: .88rem; font-weight: 600; line-height: 1.55;
+}
+.instr-rich .instr-warning i { margin-top: .2rem; flex-shrink: 0; }
+.instr-rich .instr-warning span { min-width: 0; }
+@media (max-width: 576px) {
+  .instr-rich { font-size: .9rem; }
+  .instr-rich .instr-h1 { font-size: 1.1rem; }
+  .instr-rich .instr-list { padding-left: 1.15rem; }
+}

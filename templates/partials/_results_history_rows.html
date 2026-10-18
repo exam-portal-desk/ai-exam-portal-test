@@ -1,0 +1,56 @@
+{# Results History rows and mobile cards. One markup for the first server render (results_history.html) and for every
+   filtered / sorted / paged reload (GET /api/v01/student/results-history), so they cannot drift apart. #}
+{% macro table_rows(results) %}
+{% for r in results %}
+{% set pct = (r.percentage or 0)|float %}
+{% set vis = r.result_visible if r.result_visible is defined else true %}
+<tr>
+  <td style="color:var(--text-3);font-size:.73rem">{{ r.completed_at | display_dt }}</td>
+  <td class="exam-col">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check sched-ico" title="Scheduled Exam"></i>{% endif %}</td>
+  {% if vis %}
+  <td><span class="score-ok">{{ r.correct_answers }}</span></td>
+  <td><span class="score-err">{{ r.incorrect_answers }}</span></td>
+  <td>{{ r.unanswered_questions }}</td>
+  <td style="font-weight:600;color:var(--text-1)">{{ r.score }}/{{ r.max_score }}</td>
+  <td><span class="pct {% if pct>=80 %}pct-green{% elif pct>=60 %}pct-info{% elif pct>=40 %}pct-warn{% else %}pct-danger{% endif %}">{{ '%.1f'|format(pct) }}%</span></td>
+  <td><span class="grade-pill">{{ r.grade }}</span></td>
+  <td class="rh-time" style="color:var(--text-3);font-size:.73rem;white-space:nowrap">{{ r.time_taken_minutes | duration_min }}</td>
+  <td>
+    <a href="{{ url_for('result.result', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn view"><i class="fas fa-eye"></i> Result</a>
+    <a href="{{ url_for('result.response_page', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn resp"><i class="fas fa-clipboard-check"></i> Response</a>
+  </td>
+  {% else %}
+  <td colspan="7" style="color:var(--text-3);font-size:.77rem"><i class="fas fa-lock" style="color:var(--warning-text);margin-right:.3rem"></i>{{ r.pending_reason or 'Result not yet released' }}</td>
+  <td><a href="{{ url_for('result.result_pending', exam_id=r.exam_id, result_id=r.id) }}" class="tbl-btn pend"><i class="fas fa-clock"></i> Pending</a></td>
+  {% endif %}
+</tr>
+{% endfor %}
+{% endmacro %}
+
+{% macro cards(results) %}
+{% for r in results %}
+{% set pct = (r.percentage or 0)|float %}
+{% set vis = r.result_visible if r.result_visible is defined else true %}
+<div class="rh-card">
+  <div class="rh-card-top">
+    <div class="rh-card-name">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check sched-ico" title="Scheduled Exam"></i>{% endif %}</div>
+    <div class="rh-card-date">{{ r.completed_at | display_dt }}</div>
+  </div>
+  {% if vis %}
+  <div class="rh-card-meta">
+    <span>{{ r.score }}/{{ r.max_score }}</span>
+    <span class="pct {% if pct>=80 %}pct-green{% elif pct>=60 %}pct-info{% elif pct>=40 %}pct-warn{% else %}pct-danger{% endif %}">{{ '%.1f'|format(pct) }}%</span>
+    <span>Grade: <strong style="color:var(--text-1)">{{ r.grade }}</strong></span>
+    <span title="Time taken">{{ r.time_taken_minutes | duration_min }}</span>
+  </div>
+  <div class="rh-card-actions">
+    <a href="{{ url_for('result.result', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn view"><i class="fas fa-eye"></i> Result</a>
+    <a href="{{ url_for('result.response_page', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn resp"><i class="fas fa-clipboard-check"></i> Response</a>
+  </div>
+  {% else %}
+  <div style="font-size:.77rem;color:var(--text-3);margin-bottom:.55rem"><i class="fas fa-lock" style="color:var(--warning-text);margin-right:.3rem"></i>{{ r.pending_reason or 'Result not yet released' }}</div>
+  <a href="{{ url_for('result.result_pending', exam_id=r.exam_id, result_id=r.id) }}" class="tbl-btn pend"><i class="fas fa-clock"></i> Pending</a>
+  {% endif %}
+</div>
+{% endfor %}
+{% endmacro %}

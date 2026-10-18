@@ -21,10 +21,19 @@ _ROWS_TPL = (
 @admin_api_bp.route("/subjects", methods=["GET"])
 @require_admin_permission("subject_management")
 def api_subjects_list():
+    from app.services import subject_filters
+    try:
+        advanced = subject_filters.parse_advanced_filter(request.args.get("adv"))
+    except subject_filters.FilterError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    sort = request.args.get("sort") or "name"
+    if sort not in subject_filters.SORTS:
+        return jsonify({"success": False, "message": "Sort order is not valid."}), 400
     result = get_subjects_page(
         search=request.args.get("q", "").strip(),
         page=request.args.get("page", 1),
         per_page=request.args.get("per_page", 20),
+        advanced=advanced, sort=sort,
     )
 
     if request.args.get("partial"):

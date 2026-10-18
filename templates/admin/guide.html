@@ -180,8 +180,8 @@
 </style>
 
 <div class="gd-header">
-  <h1><i class="fas fa-book-open"></i> Admin Guide</h1>
-  <p>Everything you need to run the Exam Portal — how exams are organized, how to build one from scratch, and how to manage questions, images and users. Click a section below to expand it.</p>
+  <h1><i class="fas {{ nav_icon('guide') }}"></i> Admin Guide</h1>
+  <p>Everything you need to run the Exam Portal — how exams are organized, how to build and schedule one, how results are released, how to manage questions, images, files, AI and users. Click a section below to expand it. You only see the modules your administrator access includes (see Plans &amp; Access).</p>
 </div>
 
 <!-- ══ MASTER WORKFLOW ══ -->
@@ -207,14 +207,18 @@
   <a href="#gd-start">Getting Started</a>
   <a href="#gd-structure">Exam Structure</a>
   <a href="#gd-create">Creating an Exam</a>
+  <a href="#gd-manage-exams">Managing the Exam List</a>
+  <a href="#gd-results">Results &amp; Release</a>
   <a href="#gd-normal-availability">Normal Exam Availability</a>
   <a href="#gd-scheduled">Scheduled Exams</a>
   <a href="#gd-questions">Adding Questions</a>
   <a href="#gd-ai">AI Question Generation</a>
+  <a href="#gd-aiconfig">AI Configuration</a>
   <a href="#gd-images">Images</a>
+  <a href="#gd-storage">Object Storage</a>
   <a href="#gd-importexport">Import / Export</a>
   <a href="#gd-organize">Organizing Content</a>
-  <a href="#gd-users">Users &amp; Admin Management</a>
+  <a href="#gd-users">Users, Attempts &amp; Analytics</a>
   <a href="#gd-plans">Plans &amp; Access</a>
 </div>
 
@@ -231,16 +235,16 @@
   <div class="gd-body">
     <p>The sidebar on the left is grouped into sections, each covering one part of running the portal:</p>
     <h4>Content</h4>
-    <p>Everything used to build an exam — <strong>Manage Categories</strong>, <strong>Manage Exams</strong>, <strong>Manage Subjects</strong>, <strong>Manage Questions</strong>, <strong>Upload Images</strong>, <strong>Image Mapping</strong>, the <strong>LaTeX Editor</strong>, <strong>Object Storage</strong>, and the <strong>AI Command Centre</strong>.</p>
+    <p>Everything used to build an exam — <strong>Manage Categories</strong>, <strong>Manage Exams</strong>, <strong>Manage Subjects</strong>, <strong>Manage Questions</strong>, <strong>Upload Images</strong>, <strong>Image Mapping</strong>, the <strong>LaTeX Editor</strong>, <strong>Object Storage</strong>, the <strong>AI Command Centre</strong> and <strong>AI Configuration</strong>.</p>
     <h4>Management</h4>
-    <p><strong>Users &amp; Requests</strong> (approving new account requests) and <strong>Manage Attempts</strong> (every exam attempt taken on the portal).</p>
+    <p><strong>Users &amp; Requests</strong> (approving access requests, roles, plans and special access) and <strong>Manage Attempts</strong> (every student's attempts per exam, with reset / add / remove).</p>
     <h4>Analytics</h4>
-    <p><strong>Users Analytics</strong> — per-student performance, results, and individual question-by-question responses.</p>
+    <p><strong>Users Analytics</strong> — a Results table and an Analytics dashboard for the whole portal, plus each student's question-by-question response page.</p>
     <h4>Account</h4>
     <p>This guide, and your own <strong>Profile &amp; Account</strong> settings.</p>
     <div class="gd-callout tip">
       <i class="fas fa-lightbulb"></i>
-      <span>New here? The <strong>Complete Content Workflow</strong> diagram above shows the whole path at a glance. Read <strong>Exam Structure</strong> next for the "why", then follow <strong>Creating an Exam</strong> step by step.</span>
+      <span>The sidebar only lists modules you have been granted. If one is missing or shows a lock, ask an administrator with <strong>Access control</strong> to grant it. New here? The <strong>Complete Content Workflow</strong> diagram above shows the whole path at a glance. Read <strong>Exam Structure</strong> next for the "why", then follow <strong>Creating an Exam</strong> step by step.</span>
     </div>
   </div>
 </details>
@@ -290,17 +294,77 @@
     <ol class="gd-steps">
       <li><strong>Create or select a Category</strong><span>Open <strong>Manage Categories</strong>. If the right category doesn't exist yet (e.g. "SSC JE"), create it.</span></li>
       <li><strong>Create or select a Subcategory</strong><span>From the same page, open the category's Subcategories and add one if needed (e.g. "Civil").</span></li>
-      <li><strong>Create the Exam</strong><span>Open <strong>Manage Exams</strong> → Add Exam. Assign the Category/Subcategory, and set the name, duration, positive/negative marks, max attempts, result mode and passing percentage.</span></li>
+      <li><strong>Create the Exam</strong><span>Open <strong>Manage Exams</strong> → Add Exam. Assign the Category/Subcategory, and set the name, date and start time, duration, total questions, positive/negative marks, passing percentage and result mode. The Add and Edit forms have no attempts field: a new exam allows unlimited attempts until you set a limit with <strong>Bulk Update → Max Attempts</strong> (or adjust one student on <strong>Manage Attempts</strong>).</span></li>
       <li><strong>Set up a Subject (if the exam uses images)</strong><span>Only needed when questions will include images — create/reuse a subject on <strong>Manage Subjects</strong> to act as the image folder.</span></li>
       <li><strong>Add Questions</strong><span>Open <strong>Manage Questions</strong>, select your exam, and add questions using whichever method fits — see <a href="#gd-questions">Adding Questions</a>.</span></li>
-      <li><strong>Configure exam settings</strong><span>Double-check duration, marks, attempts and result mode on <strong>Manage Exams</strong> before publishing.</span></li>
+      <li><strong>Configure exam settings</strong><span>Double-check duration, marks, attempt limit and result mode on <strong>Manage Exams</strong> before publishing. Use <strong>Preview Exam</strong> (the eye icon) to see what a student will see; it records no attempt.</span></li>
       <li><strong>Review the questions</strong><span>Use the search and type/image filters on <strong>Manage Questions</strong> to check everything looks right.</span></li>
-      <li><strong>Publish the exam</strong><span>Set the exam's status to Published on <strong>Manage Exams</strong> so students can see and attempt it.</span></li>
+      <li><strong>Make it available</strong><span>A normal exam is controlled by its <strong>Status</strong> (Upcoming / Ongoing / Completed): set it to <strong>Ongoing</strong> to let students attempt it. A Scheduled Exam has no Status field; it opens and closes by the clock (see <a href="#gd-scheduled">Scheduled Exams</a>).</span></li>
     </ol>
     <div class="gd-callout warn">
       <i class="fas fa-triangle-exclamation"></i>
-      <span>An exam left in Draft status won't appear to students — if a finished exam still isn't showing up, check its status first.</span>
+      <span>If a finished exam isn't attemptable, check its Status first (normal exams) or its date, start time and Cancelled marker (Scheduled Exams). A student also needs attempts left: a limit of 0 or blank means unlimited.</span>
     </div>
+  </div>
+</details>
+
+<!-- ══ MANAGING THE EXAM LIST ══ -->
+<details class="gd-section" id="gd-manage-exams">
+  <summary>
+    <span class="gd-section-icon"><i class="fas fa-table-list"></i></span>
+    <span style="flex:1">
+      <span class="gd-section-title">Managing the Exam List</span>
+      <span class="gd-section-sub" style="display:block">Search, Advanced Filter, bulk update, release, cancel and delete</span>
+    </span>
+    <i class="fas fa-chevron-down gd-chevron"></i>
+  </summary>
+  <div class="gd-body">
+    <p><strong>Manage Exams</strong> lists every exam, newest first. It shows a table on desktop and compact cards on phones (the list/grid switch is shown on larger screens). Row actions: Preview, Edit, Cancel / Restore (Scheduled Exams only), Delete, and Release / Unrelease for manual-result exams.</p>
+    <h4>Search and the Advanced Filter</h4>
+    <p>The search box matches exam names. The single <strong>Filters</strong> button opens the Advanced Filter, where you add one or more conditions, each with a field, an operator and a value:</p>
+    <table class="gd-table">
+      <tr><th>Field</th><th>Operators</th></tr>
+      <tr><td>Exam name</td><td>contains words (every word, any order), does not contain, is exactly, starts with, ends with</td></tr>
+      <tr><td>Scheduled exam</td><td>is Scheduled / Not scheduled</td></tr>
+      <tr><td>Status</td><td>is / is not Upcoming, Ongoing, Completed, Cancelled or Draft (the same status the list shows; Scheduled Exams use their computed status)</td></tr>
+      <tr><td>Category, Subcategory</td><td>is / is not (a subcategory is listed with its category)</td></tr>
+      <tr><td>Questions (configured), Questions added</td><td>greater than, less than, equal to, between. "Configured" is the Total Questions field; "added" is how many questions the exam actually has.</td></tr>
+      <tr><td>Start date, End date, Start time</td><td>on / at, before, after, between (the end date is start plus duration)</td></tr>
+      <tr><td>Duration (min)</td><td>greater than, less than, equal to, between</td></tr>
+      <tr><td>Attempts allowed per student, Attempts made so far</td><td>greater than, less than, equal to, between. An exam with unlimited attempts has no number, so it matches none of these conditions. "Made so far" counts every attempt on record for the exam.</td></tr>
+      <tr><td>Result mode, Results released</td><td>is / is not Instant, Delayed or Manual; Released or Not released</td></tr>
+    </table>
+    <p><strong>How conditions combine:</strong> the <strong>Match ALL</strong> / <strong>Match ANY</strong> switch inside the panel decides it: ALL means an exam must satisfy every condition (AND), ANY means one is enough (OR). Conditions are applied only when you press <strong>Apply</strong>; <strong>Reset</strong> discards unapplied edits and <strong>Clear all</strong> removes every condition. Applied conditions appear as chips under the search box; click a chip's &times; to remove that one. The filter works together with the search box and pagination and is evaluated on the server.</p>
+    <h4>Bulk Update and Export</h4>
+    <p>Tick exams (or <em>Select all on page</em>) to get the selection bar. <strong>Bulk Update</strong> changes only the fields you explicitly switch on (Category, Date, Duration, Status, Marks, Max Attempts, Passing Percentage, Result Mode, Instructions), shows a review step, then applies everything in one transaction. A timing field is skipped for a Scheduled Exam whose schedule is locked, and the result tells you which exams were skipped. <strong>Export Selected</strong> builds an exam package (see <a href="#gd-importexport">Import / Export</a>).</p>
+    <h4>Cancel and delete</h4>
+    <p><strong>Cancel</strong> (Scheduled Exams only) stops new attempts and can be undone with Restore. <strong>Delete</strong> permanently removes the exam together with its questions, attempts, results and responses, and cannot be undone.</p>
+    <div class="gd-link-row">
+      <a href="{{ url_for('admin.exams') }}"><i class="fas fa-file-alt"></i> Manage Exams</a>
+    </div>
+  </div>
+</details>
+
+<!-- ══ RESULTS &AMP; RELEASE ══ -->
+<details class="gd-section" id="gd-results">
+  <summary>
+    <span class="gd-section-icon"><i class="fas fa-clock-rotate-left"></i></span>
+    <span style="flex:1">
+      <span class="gd-section-title">Results &amp; Release</span>
+      <span class="gd-section-sub" style="display:block">Instant, delayed and manual result modes, and what a student sees while waiting</span>
+    </span>
+    <i class="fas fa-chevron-down gd-chevron"></i>
+  </summary>
+  <div class="gd-body">
+    <p>Each exam has a <strong>Result Mode</strong> that decides when a student may see their result, score, grade and answer review.</p>
+    <table class="gd-table">
+      <tr><th>Mode</th><th>When the student sees the result</th></tr>
+      <tr><td><strong>Instant</strong></td><td>Immediately after submitting.</td></tr>
+      <tr><td><strong>Delayed</strong></td><td>A set number of minutes after the student finishes (the <em>Delay (minutes)</em> field; the list shows "N min delay"). The wait is counted from that attempt's own finish time.</td></tr>
+      <tr><td><strong>Manual</strong></td><td>Only after you press <strong>Release</strong> on the exam row. <strong>Unrelease</strong> hides the results again. The button appears only for manual exams.</td></tr>
+    </table>
+    <p>Until a result is visible, the student sees a <strong>Result Pending</strong> page instead of the score. For a delayed result it shows a live countdown to the exact release time (it keeps counting correctly after a refresh) and opens the result by itself when the time arrives; for a manual result it re-checks periodically and says the result has not been released yet. The same rule hides the result everywhere else: Result History, the response page, analytics and AI features never show a score or answer key early.</p>
+    <p>The exam's <strong>Passing Percentage</strong> is the cut-off the student's result page compares their score against.</p>
   </div>
 </details>
 
@@ -354,6 +418,13 @@
   </summary>
   <div class="gd-body">
     <p>A <strong>Scheduled Exam</strong> is the alternative to a Manual Exam's admin-controlled Status: instead of you flipping it to Ongoing/Completed yourself, you set a date, start time and duration once, and the portal computes its status automatically from the clock from then on — including an optional preparation/preload window before it goes live, a completion buffer right after the deadline, and server-side auto-submit enforcement that works even if a student's browser is closed.</p>
+    <p><strong>Rules to know:</strong></p>
+    <ul>
+      <li>The schedule form has the date, start time, duration, preparation window, completion buffer and <em>Allow manual submission</em>. There is <strong>no attempts field</strong> in it; the attempt limit is set with Bulk Update (or per student on Manage Attempts).</li>
+      <li>A new or moved start time must be <strong>in the future</strong>; the form rejects a start in the past.</li>
+      <li><strong>The schedule locks only when students have attempts on record and the exam is past Upcoming.</strong> An exam nobody attempted can always be rescheduled, even if it is already Ongoing or Completed (this also lets you reschedule a cancelled exam). Name, instructions, marks, result mode and questions stay editable regardless.</li>
+      <li>Switching an exam between Normal and Scheduled is blocked once any attempt exists.</li>
+    </ul>
     <p>This is enough to get you building one, but the full behaviour — every setting, exactly what locks once it's live, cancel/restore, and what a student experiences minute by minute — is covered in its own dedicated guide, linked below.</p>
     <div class="gd-callout tip">
       <i class="fas fa-lightbulb"></i>
@@ -401,6 +472,8 @@
       </div>
     </div>
     <div class="gd-converge"><i class="fas fa-arrow-down"></i> All four save into the exam you selected on Manage Questions</div>
+    <h4>Choosing an exam</h4>
+    <p>On <strong>Manage Questions</strong>, pick the exam in the picker and press <strong>Load Questions</strong> to show its questions. The button disables itself while loading so it cannot be fired twice. <strong>Export CSV</strong> is a separate action that downloads the selected exam's questions.</p>
     <h4>What each field means</h4>
     <p>Every method captures the same core fields: question text, up to four options, the correct answer, type (<strong>MCQ</strong> single-choice / <strong>MSQ</strong> multi-choice / <strong>Numerical</strong>), positive &amp; negative marks, an optional image path, and an optional Source / Previous Year Tag (e.g. "ESE 2021") shown as a small badge to students.</p>
     <div class="gd-callout tip">
@@ -425,17 +498,65 @@
   </summary>
   <div class="gd-body">
     <ol class="gd-steps">
-      <li><strong>Start a generation job</strong><span><strong>What to do:</strong> give it a topic or a source PDF. <strong>Where:</strong> the AI Command Centre. <strong>Then:</strong> it runs in the background with live progress — you can keep working while it generates.</span></li>
+      <li><strong>Start a generation job</strong><span><strong>What to do:</strong> choose a mode (Direct Extraction, Concept Mining or Pure Generation), the exam, difficulty, question counts and marks, then give a PDF or a topic. <strong>Where:</strong> the AI Command Centre. Work through its pre-generation checklist first. <strong>Then:</strong> the job runs on the server and a progress window opens.</span></li>
+      <li><strong>Watch the progress window</strong><span>It shows the real numbers from the server: total, completed, processing, queued and failed batches, the overall percentage, the current status message and the questions collected so far. Each batch has its own row. You can refresh the page and the window comes back. Only <strong>one generation per admin can run at a time</strong>, and there is no cancel button: a started job cannot be stopped, so check the settings before you start.</span></li>
+      <li><strong>If some batches fail</strong><span>The result is <em>Partially completed</em>: the questions that succeeded are kept, each failed batch shows its reason, and <strong>Retry Failed Batches</strong> re-runs only those without paying again for the ones that worked. If every batch fails, the job is <em>Failed</em> and says why.</span></li>
       <li><strong>Review the generated questions</strong><span><strong>What happens next:</strong> once complete, the questions load into the same CSV Editor used for CSV import — each one shown as a card with raw and rendered (LaTeX) views.</span></li>
       <li><strong>Edit anything that needs it</strong><span>Fix wording, adjust marks or tolerance, change the LaTeX size, delete a question you don't want, or add a Source / Previous Year Tag — the AI never invents one on its own.</span></li>
       <li><strong>Add to the exam</strong><span>Click <strong>Save to DB</strong> to add the reviewed questions to the selected exam, or <strong>Export CSV</strong> to keep them as a file instead.</span></li>
     </ol>
     <div class="gd-callout tip">
       <i class="fas fa-lightbulb"></i>
-      <span>Always review AI-generated questions before saving — check the correct answer and any LaTeX rendering, the same way you would for a manually written question.</span>
+      <span>Always review AI-generated questions before saving — check the correct answer and any LaTeX rendering, the same way you would for a manually written question. Your administrator may limit how many generations you can start per 24 hours.</span>
     </div>
     <div class="gd-link-row">
       <a href="{{ url_for('admin.ai_command_centre') }}"><i class="fas fa-robot"></i> AI Command Centre</a>
+    </div>
+  </div>
+</details>
+
+<!-- ══ AI CONFIGURATION ══ -->
+<details class="gd-section" id="gd-aiconfig">
+  <summary>
+    <span class="gd-section-icon"><i class="fas fa-sliders"></i></span>
+    <span style="flex:1">
+      <span class="gd-section-title">AI Configuration</span>
+      <span class="gd-section-sub" style="display:block">Which AI model powers each feature of the portal</span>
+    </span>
+    <i class="fas fa-chevron-down gd-chevron"></i>
+  </summary>
+  <div class="gd-body">
+    <p><strong>AI Configuration</strong> (administrators granted <em>AI configuration</em>) shows where AI is used and lets you choose the model behind each feature. Its tabs are <strong>Overview</strong>, <strong>Features</strong>, <strong>Model Assignments</strong>, <strong>Model Catalog</strong>, <strong>Comparison</strong> and <strong>Providers &amp; Configuration</strong>.</p>
+    <h4>The four ideas</h4>
+    <ul>
+      <li><strong>Provider</strong> — the service that serves a model. Currently <strong>Groq</strong> and <strong>Google Gemini</strong>.</li>
+      <li><strong>Model</strong> — for example GPT-OSS 120B, the Gemini 2.5 / 3.x Flash family and Gemma 4. Each model lists what it can do (text, vision, PDF, structured output) and its published rate limits.</li>
+      <li><strong>Offering</strong> — a provider serving a model, written <code>provider/model</code>.</li>
+      <li><strong>Assignment</strong> — which offering a feature uses.</li>
+    </ul>
+    <h4>The features you can assign</h4>
+    <table class="gd-table">
+      <tr><th>Feature</th><th>Used for</th><th>Model must support</th></tr>
+      <tr><td>Assistant Chat Replies</td><td>Answers in the student AI Assistant</td><td>text</td></tr>
+      <tr><td>Chat Title Generation</td><td>Short titles for conversations</td><td>text</td></tr>
+      <tr><td>Explanation (text questions)</td><td>AI Explanation of a wrong answer, no image</td><td>text</td></tr>
+      <tr><td>Explanation (image questions)</td><td>AI Explanation when the question has a diagram</td><td>vision</td></tr>
+      <tr><td>Generation from text</td><td>Question generation from text PDFs, concept mining and pure topics</td><td>text</td></tr>
+      <tr><td>Generation from scanned PDFs</td><td>Question generation from image-only PDFs</td><td>vision and PDF</td></tr>
+    </table>
+    <h4>Changing a model</h4>
+    <ol class="gd-steps">
+      <li><strong>Pick a feature</strong><span>Open <strong>Model Assignments</strong> and press <strong>Change model</strong> on the feature.</span></li>
+      <li><strong>Select a compatible model</strong><span>Only models that support what the feature needs can be chosen; a model whose provider has no API key configured is shown as unavailable.</span></li>
+      <li><strong>Review and save</strong><span>A review step shows the change and nothing is saved until you confirm. <strong>Reset to default</strong> returns the feature to the default model from the configuration file. Changing one feature never affects another.</span></li>
+    </ol>
+    <p>Use the <strong>Model Catalog</strong> to search and filter every model, open one for its details, and tick up to three to compare side by side. <strong>Providers &amp; Configuration</strong> shows whether each provider's key is set; key values are never displayed. <strong>Reload configuration</strong> re-reads the configuration file without a restart.</p>
+    <div class="gd-callout warn">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>Adding a provider or a model, editing limits or logos and setting API keys is done in the server's configuration (<code>config/ai_models.json</code> and the server environment), not on this page; API keys are never entered or shown here. The page's <em>AI Configuration Guide</em> button opens the full step-by-step manual.</span>
+    </div>
+    <div class="gd-link-row">
+      <a href="{{ url_for('admin.ai_configuration') }}"><i class="fas fa-sliders"></i> AI Configuration</a>
     </div>
   </div>
 </details>
@@ -556,7 +677,45 @@
     <p><strong>Do I still need to type the image path myself?</strong><br>Not when using Image Mapping — manual typing is only part of the classic method above.</p>
     <p><strong>What happens if Save All Mappings fails?</strong><br>Nothing is partially applied — a save either fully succeeds or fully fails, never something in between. An error message explains what went wrong (e.g. an image that could no longer be found), and the pending changes stay exactly as they were so the issue can be fixed and the save retried.</p>
 
-    <p style="margin-top:1rem">For direct browsing or cleanup of the underlying stored files, use <strong>Object Storage</strong>, which shows the raw folders and files as uploaded.</p>
+    <p style="margin-top:1rem">For direct browsing or cleanup of the underlying stored files, use <a href="#gd-storage">Object Storage</a>.</p>
+  </div>
+</details>
+
+<!-- ══ OBJECT STORAGE ══ -->
+<details class="gd-section" id="gd-storage">
+  <summary>
+    <span class="gd-section-icon"><i class="fas fa-hdd"></i></span>
+    <span style="flex:1">
+      <span class="gd-section-title">Object Storage</span>
+      <span class="gd-section-sub" style="display:block">Browse, download and clean up stored files and folders</span>
+    </span>
+    <i class="fas fa-chevron-down gd-chevron"></i>
+  </summary>
+  <div class="gd-body">
+    <p><strong>Object Storage</strong> (administrators granted <em>Storage management</em>) shows the files the portal keeps in its storage backend (local disk or an S3-compatible bucket; the badge at the top says which). Nothing here changes how the rest of the portal works; it is the raw view of what was uploaded.</p>
+    <ul>
+      <li><strong>Browse and search:</strong> click a folder to open it, use the breadcrumb to go back, and search keys inside the current folder. <strong>Calculate usage</strong> counts objects and bytes under the current folder.</li>
+      <li><strong>Files:</strong> preview images, download one file, or tick several and <strong>Download Selected</strong> as one ZIP. <strong>Delete Selected</strong> permanently removes the ticked files.</li>
+      <li><strong>On a phone</strong> each row stacks its name, size and date with the actions beside it.</li>
+    </ul>
+    <h4>Deleting folders</h4>
+    <ol class="gd-steps">
+      <li><strong>Tick the folders</strong><span>Use the checkbox on each folder row, then press <strong>Delete Folders</strong>.</span></li>
+      <li><strong>Review</strong><span>The dialog lists every selected folder with its file count and size, and tells you which cannot be deleted and why. This step deletes nothing.</span></li>
+      <li><strong>Confirm</strong><span>Tick the acknowledgement and type the phrase shown (for example <code>DELETE 2 FOLDERS</code>). The confirmation is tied to you and to exactly those folders and expires after ten minutes.</span></li>
+      <li><strong>Read the result</strong><span>Each folder is reported as deleted, partly deleted or not deleted. The portal never reports success unless every folder was fully deleted; if something failed (for example the storage provider rate-limited the request) you can run it again for what is left.</span></li>
+    </ol>
+    <div class="gd-callout warn">
+      <i class="fas fa-triangle-exclamation"></i>
+      <div><strong>Folders that are protected:</strong>
+        <ul style="margin:.4rem 0 0;padding-left:1.1rem">
+          <li>Folders the portal itself relies on: <code>Category/</code>, <code>Profile/</code>, <code>Group/</code>, <code>ChatBackground/</code> and the numbered Notes attachment folders.</li>
+          <li>Any folder holding an image that a question still uses. Remove or re-map those images first (Image Mapping).</li>
+          <li>Very large folders (over 5,000 files): delete their sub-folders in smaller steps.</li>
+        </ul>
+        Deleting is permanent and cannot be undone. Deleting a Subject's folder here keeps the Subject itself; deleting the Subject on Manage Subjects removes its folder as well.
+      </div>
+    </div>
     <div class="gd-link-row">
       <a href="{{ url_for('admin.object_storage') }}"><i class="fas fa-hdd"></i> Object Storage</a>
     </div>
@@ -574,7 +733,7 @@
     <i class="fas fa-chevron-down gd-chevron"></i>
   </summary>
   <div class="gd-body">
-    <h4>Import</h4>
+    <h4>Questions: CSV import</h4>
     <p>From <strong>Manage Questions → Import CSV</strong> (or from a completed AI generation job). Required columns:</p>
     <table class="gd-table">
       <tr><th>Column</th><th>Notes</th></tr>
@@ -588,8 +747,18 @@
       <tr><td><code>source_tag</code></td><td>Optional — e.g. "ESE 2021"; leave blank or omit the column entirely if not applicable</td></tr>
     </table>
     <p>Rows missing a required field are skipped, and you'll see how many rows were imported vs. skipped after saving. A "Sample CSV" download is available on the CSV Editor if you need a starting template.</p>
-    <h4>Export</h4>
+    <h4>Questions: CSV export</h4>
     <p>From <strong>Manage Questions → Export CSV</strong> for a selected exam, producing the same column set as import (so an export can always be edited and re-imported). The CSV Editor also has its own Export CSV for whatever set of questions is currently being reviewed there.</p>
+    <h4>Whole exams: export and import packages</h4>
+    <p>On <strong>Manage Exams</strong>, tick exams and press <strong>Export Selected</strong>. It builds a <code>.zip</code> (format <code>smartai-exams-export-v2</code>) with a manifest of the exams, their questions, the categories, subcategories and Subjects involved, and every image once. A progress bar shows the export; images that are missing in storage are listed as warnings instead of failing silently.</p>
+    <p><strong>Import Exams</strong> takes such a package. The whole file is validated first (structure, versions, counts, file types, sizes and checksums); a bad package changes nothing. Then each exam is imported in its own transaction, one at a time, so a failure rolls back just that exam and removes the images it created.</p>
+    <table class="gd-table">
+      <tr><th>Item</th><th>How it is matched on import</th></tr>
+      <tr><td>Category / Subcategory</td><td>Same name (a subcategory inside its category) is reused; if the spelling differs only by case, spacing or accents, that one match is reused and reported. Several possible matches fail that exam instead of guessing; no match creates a new one.</td></tr>
+      <tr><td>Subject (image folder)</td><td>Matched by name the same way. A new Subject is created only if you also have <em>Subject management</em>. Images are restored into their Subject's folder so Image Mapping can find them.</td></tr>
+      <tr><td>Older v1 packages</td><td>Still accepted, but they do not say which Subject an image belonged to, so those images go into a Subject named <strong>Imported</strong> (created if missing) and the report carries a warning.</td></tr>
+    </table>
+    <p><strong>Duplicates:</strong> use the dropdown next to <em>Import Exams</em> before importing. <em>Skip exams already imported</em> (default) recognises an exam with the same name and identical questions and leaves it alone; <em>Import again as a copy</em> imports it anyway under a renamed copy. Existing records are never renamed or overwritten. When the import ends, a report lists every exam as imported, skipped or failed, with warnings and the reason for each failure.</p>
   </div>
 </details>
 
@@ -628,9 +797,10 @@
     <h4>Users &amp; Requests</h4>
     <p>New account access requests appear here for approval or rejection, with a history of past requests, plus user role management.</p>
     <h4>Manage Attempts</h4>
-    <p>Every exam attempt taken across the portal, for monitoring and troubleshooting.</p>
+    <p>Search by student, exam and status. Each row is one student on one exam: attempts used, any attempt still running, the exam's limit and what is left. You can reset a student's attempts or add / remove attempts for one student or for several at once. Only attempts that have completed or were added by hand count against the limit; a running attempt is shown separately and is never deleted by these actions.</p>
     <h4>Users Analytics</h4>
-    <p>Per-student performance and results. From a student's result you can open their full response breakdown — every question they saw, their answer, the correct answer, and (where set) its Source / Previous Year Tag.</p>
+    <p>Two tabs. <strong>Results</strong> is a filterable table of every result (filter by user, exam and date range; the exam dropdown shows each exam's category, subcategory and question count and can be searched). <strong>Analytics</strong> shows portal-wide charts for a chosen period and exam, with PNG export of a chart or the whole dashboard.</p>
+    <p>From a result, <strong>View Result</strong> opens the score summary and <strong>View Response</strong> opens that student's own response page for the chosen attempt: every question, their answer, the correct answer, marks, status, images and (where set) the Source / Previous Year Tag. It is the same page the student sees, including Analysis-style layout, navigation and printing, but without AI Explanation, Discuss with AI or the student discussion thread. The result must belong to the exam in the link, otherwise it is not found.</p>
     <h4>Profile &amp; Account</h4>
     <p>Your own admin account settings.</p>
     <div class="gd-link-row">
@@ -704,7 +874,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <p>Only <em>AI configuration</em> and <em>Access control</em> are checked today; the others are listed so they can be restricted later without any redesign.</p>
+    <p>Every admin permission above is checked on the server for each page and API call, not just hidden in the menu. The Admin role alone opens none of them: an administrator is granted the features they need, and the sidebar and dashboard show only those.</p>
   {% endif %}
 
     <h4>Changing a plan and special access</h4>
@@ -719,7 +889,7 @@
     <p>Requests for admin access work as before: approving one sets the user&rsquo;s role. Requests for a plan or a single feature are not built yet; when they are, approving one will create the same grant described above, with its own expiry.</p>
 
     <h4>Sensitive admin actions and payments</h4>
-    <p>A feature can be marked in the configuration as needing a passkey (Windows Hello, fingerprint, phone or security key) for sensitive actions. The marker is recorded and reported with every access check, but passkey verification is not implemented, so no feature uses it yet. Payments and subscriptions are not implemented either: a future billing system will simply set a user&rsquo;s plan and expiry.</p>
+    <p>A feature can carry a passkey marker for sensitive actions, but passkey verification is not implemented and no feature uses it. Payments and subscriptions are not implemented either: a plan and its expiry are set by an administrator.</p>
 
     <h4>Changing what a plan contains</h4>
     <p>Plans, features and limits live in <code>config/entitlements.json</code>; the file&rsquo;s guide is <code>config/ENTITLEMENTS.md</code>. Moving a feature to another plan, changing a limit, or adding a plan is an edit to that one file: no code changes.</p>

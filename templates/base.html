@@ -267,6 +267,17 @@
     border-radius:7px; font-size:.85rem;
   }
   .sb-item.active .sb-ic { background:none; }
+  /* One icon treatment for every nav item: same box, same glyph size, same hover / active / focus behaviour */
+  .sb-ic i { width:1.15em; text-align:center; font-size:.92rem; line-height:1; transition:transform .15s ease, color .15s ease; }
+  .sb-item:hover .sb-ic i { transform:scale(1.1); }
+  .sb-item.active .sb-ic i { color:var(--accent); }
+  /* Profile row: the student's own photo in the icon slot (falls back to the user icon when none is set) */
+  .sb-ic-avatar { opacity:1; }
+  .sb-av-img { width:26px; height:26px; border-radius:50%; object-fit:cover; display:block; border:1px solid var(--border); }
+  .sb-item.active .sb-av-img, .sb-item:hover .sb-av-img { border-color:var(--accent); }
+  .sb-item:focus-visible { outline:2px solid var(--border-focus, var(--accent)); outline-offset:-2px; }
+  @media (pointer:coarse) { .sb-item { min-height:44px; } }
+  @media (prefers-reduced-motion: reduce) { .sb-ic i { transition:none; } .sb-item:hover .sb-ic i { transform:none; } }
   .sb.collapsed .sb-item:hover { background:transparent; }
   .sb.collapsed .sb-item:hover .sb-ic {
     background:var(--surface-2);
@@ -664,7 +675,7 @@
 
   {% if session.get('admin_id') %}
   <a href="{{ url_for('admin.dashboard') }}" style="font-size:.78rem;font-weight:600;color:var(--text-2);text-decoration:none;margin-right:.5rem">
-    <i class="fas fa-home"></i> Dashboard
+    <i class="fas {{ nav_icon('dashboard') }}"></i> Dashboard
   </a>
   <a href="{{ url_for('admin.logout') }}" style="font-size:.78rem;font-weight:600;color:var(--danger-text);text-decoration:none">
     <i class="fas fa-sign-out-alt"></i> Logout
@@ -723,13 +734,13 @@
 
     <a class="sb-item {{ 'active' if active_nav == 'categories' else '' }}"
        href="{{ url_for('categories.select_category') }}" data-tip="Categories">
-      <span class="sb-ic"><i class="fas fa-layer-group"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('categories') }}"></i></span>
       <span class="sb-lbl">Categories</span>
     </a>
 
     <a class="sb-item {{ 'active' if active_nav == 'dashboard' else '' }}"
        href="{{ url_for('dashboard.dashboard') }}" data-tip="Dashboard">
-      <span class="sb-ic"><i class="fas fa-home"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('dashboard') }}"></i></span>
       <span class="sb-lbl">Dashboard</span>
     </a>
 
@@ -737,13 +748,13 @@
 
     <a class="sb-item {{ 'active' if active_nav == 'results' else '' }}{{ ' locked' if not user_can('result_history') }}"
        href="{{ url_for('dashboard.results_history') }}" data-tip="Results History">
-      <span class="sb-ic"><i class="fas fa-history"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('results_history') }}"></i></span>
       <span class="sb-lbl">Results History</span>{% if not user_can('result_history') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
     <a class="sb-item {{ 'active' if active_nav == 'analytics' else '' }}{{ ' locked' if not user_can('analytics') }}"
        href="{{ url_for('dashboard.student_analytics') }}" data-tip="Analytics">
-      <span class="sb-ic"><i class="fas fa-chart-line"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('analytics') }}"></i></span>
       <span class="sb-lbl">Analytics</span>{% if not user_can('analytics') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
@@ -751,14 +762,14 @@
 
     <a class="sb-item {{ 'active' if active_nav == 'ai' else '' }}{{ ' locked' if not user_can('ai_assistant') }}"
        href="{{ url_for('ai.ai_assistant') }}" data-tip="AI Assistant">
-      <span class="sb-ic"><i class="fas fa-robot"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('ai') }}"></i></span>
       <span class="sb-lbl">AI Assistant</span>{% if not user_can('ai_assistant') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
     <a class="sb-item {{ 'active' if active_nav == 'chat' else '' }}{{ ' locked' if not user_can('chat') }}"
        href="{{ url_for('chat.chat_page') }}" data-tip="Chat">
       <span class="sb-ic">
-        <i class="fas fa-comment-dots"></i>
+        <i class="fas {{ nav_icon('chat') }}"></i>
         <span class="sb-badge" id="sbChatBadge" style="display:none">0</span>
       </span>
       <span class="sb-lbl">Chat</span>{% if not user_can('chat') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
@@ -766,13 +777,13 @@
 
     <a class="sb-item {{ 'active' if active_nav == 'notes' else '' }}{{ ' locked' if not user_can('notebook') }}"
        href="{{ url_for('notes.my_notes') }}" data-tip="My Notes">
-      <span class="sb-ic"><i class="fas fa-book-open"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('my_notes') }}"></i></span>
       <span class="sb-lbl">My Notes</span>{% if not user_can('notebook') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
     <a class="sb-item {{ 'active' if active_nav == 'notes_library' else '' }}{{ ' locked' if not user_can('notebook') }}"
        href="{{ url_for('notes.public_library_page') }}" data-tip="Public Notes Library">
-      <span class="sb-ic"><i class="fas fa-globe"></i></span>
+      <span class="sb-ic"><i class="fas {{ nav_icon('public_notes') }}"></i></span>
       <span class="sb-lbl">Public Notes</span>{% if not user_can('notebook') %}<i class="fas fa-lock sb-lock"></i>{% endif %}
     </a>
 
@@ -795,7 +806,7 @@
     <script src="{{ url_for('static', filename='shared/plan-validity.js') }}" defer></script>
     {% endif %}
     <a class="sb-item {{ 'active' if active_nav == 'profile' else '' }}" href="{{ url_for('profile.my_profile') }}" data-tip="Profile &amp; Account">
-      <span class="sb-ic"><i class="fas fa-user-circle"></i></span>
+      <span class="sb-ic{{ ' sb-ic-avatar' if NAV_AVATAR_URL else '' }}">{% if NAV_AVATAR_URL %}<img src="{{ NAV_AVATAR_URL }}" alt="" class="sb-av-img" loading="lazy">{% else %}<i class="fas {{ nav_icon('profile') }}"></i>{% endif %}</span>
       <span class="sb-lbl">Profile &amp; Account</span>
     </a>
 <button class="sb-item logout" onclick="openLogoutModal()">

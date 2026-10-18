@@ -654,7 +654,7 @@
 <div class="chat-wrap" id="chatWrap">
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <h6><i class="fas fa-comments"></i> Messages </h6>
+      <h6><i class="fas {{ nav_icon('chat') }}"></i> Messages </h6>
       <div style="display:flex;gap:0.5rem">
         <div class="icon-btn" id="inboxBtn" onclick="openInbox()" title="Chat Requests">
           <i class="fas fa-bell"></i>
@@ -706,7 +706,7 @@
       <div class="chat-bg-overlay" id="chatBgOverlay"></div>
     </div>
     <div class="empty-state" id="emptyState">
-      <div class="empty-state-icon"><i class="fas fa-comment-dots"></i></div>
+      <div class="empty-state-icon"><i class="fas {{ nav_icon('chat') }}"></i></div>
       <div>
         <p class="empty-title">Select a conversation</p>
         <p class="empty-sub">or search for someone to start chatting</p>

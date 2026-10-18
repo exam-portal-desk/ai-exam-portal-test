@@ -259,3 +259,20 @@ def get_exam_score_distribution(exam_id: int) -> List[Dict]:
     except Exception as e:
         print(f"[db.results] get_exam_score_distribution error: {e}")
         return []
+
+
+def get_response_stats_for_results(result_ids: List[int], user_id: int) -> List[Dict]:
+    """Per question type: how many questions, how many attempted / correct and the marks — for the student's OWN results only
+    (the result must belong to `user_id`, whatever ids are passed). Feeds the student Analytics question-type breakdown."""
+    if not result_ids:
+        return []
+    return fetch_all(
+        "SELECT question_type, COUNT(*) AS questions, "
+        "COUNT(*) FILTER (WHERE is_attempted) AS attempted, "
+        "COUNT(*) FILTER (WHERE is_attempted AND is_correct) AS correct, "
+        "COALESCE(SUM(marks_obtained), 0) AS marks "
+        "FROM responses WHERE result_id = ANY(%s) "
+        "AND result_id IN (SELECT id FROM results WHERE student_id=%s) "
+        "GROUP BY question_type",
+        (list(result_ids), user_id),
+    )

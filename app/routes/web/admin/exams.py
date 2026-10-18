@@ -19,6 +19,7 @@ from app.utils.helpers import (
 from app.utils.sanitize import sanitize_html
 from app.db.categories import get_all_categories
 from app.db.users import get_view_prefs
+from app.db.subcategories import get_all_subcategories
 
 EXAMS_PAGE_SIZE = 20
 
@@ -124,6 +125,7 @@ def exams():
         exams=page_data["exams"], categories=categories,
         exams_total=page_data["total"], exams_total_pages=page_data["total_pages"],
         exams_per_page=EXAMS_PAGE_SIZE,
+        all_subcategories=get_all_subcategories(),
         # Default 'list' (not 'grid') to preserve this page's original
         # default — the dense table, not the summary cards — for anyone
         # who hasn't explicitly chosen a view yet.

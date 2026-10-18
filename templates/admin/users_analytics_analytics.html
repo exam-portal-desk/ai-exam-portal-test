@@ -91,12 +91,15 @@
 
             <div>
                 <label class="anl-label">Exam</label>
+                {% from 'partials/_exam_meta.html' import exam_meta %}
                 <select id="examFilter" class="anl-select">
                     <option value="">All Exams</option>
-                    {% for exam in exams %}
-                        <option value="{{ exam.id }}">{{ exam.name }}</option>
+                    {% for e in exams %}
+                    <option value="{{ e.id }}" data-meta="{{ exam_meta(e) }}"
+                  data-search="{{ (e.name ~ ' ' ~ (e.category_name or '') ~ ' ' ~ (e.subcategory_name or '')) | lower }}">{{ e.name }}</option>
                     {% endfor %}
                 </select>
+                <script>window.enhanceSelect && enhanceSelect(document.getElementById('examFilter'), { icon: 'fas fa-file-alt', search: true, searchPlaceholder: 'Search exams by name, category\u2026' });</script>
             </div>
 
             <div style="align-self:flex-end;">

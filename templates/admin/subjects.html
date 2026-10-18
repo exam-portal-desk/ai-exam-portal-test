@@ -5,6 +5,9 @@
 {% block content %}
 
 <link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/advanced-filter.css') }}">
 <style>
 /* =========================
    PAGE HEADER
@@ -57,8 +60,8 @@
   background:var(--surface-2);
   color:var(--text-3);
   border-bottom:1px solid var(--border);
-  padding:.85rem 1.1rem;
-  font-size:.7rem;
+  padding:.65rem 1rem;
+  font-size:.68rem;
   font-weight:700;
   text-transform:uppercase;
   letter-spacing:.07em;
@@ -72,9 +75,9 @@
   background:var(--surface);
   color:var(--text-2);
   border-bottom:1px solid var(--border);
-  padding:.85rem 1.1rem;
+  padding:.6rem 1rem;
   vertical-align:middle;
-  font-size:.83rem;
+  font-size:.82rem;
 }
 
 .table tbody tr:last-child td{
@@ -90,9 +93,9 @@
 ========================= */
 
 .subject-avatar{
-  width:42px;
-  height:42px;
-  border-radius:14px;
+  width:32px;
+  height:32px;
+  border-radius:10px;
   background:var(--accent-subtle);
   border:1px solid var(--border);
   color:var(--accent);
@@ -100,7 +103,7 @@
   align-items:center;
   justify-content:center;
   font-weight:700;
-  font-size:1rem;
+  font-size:.85rem;
   flex-shrink:0;
 }
 
@@ -111,27 +114,42 @@
 }
 
 /* =========================
-   FOLDER BADGE
+   COMPACT ROWS + LIST STATES + PHONE CARDS
 ========================= */
-
-.folder-pill{
-  display:inline-flex;
-  align-items:center;
-  max-width:320px;
-  padding:.42rem .9rem;
-  border-radius:999px;
-  background:var(--surface-2);
-  border:1px solid var(--border);
-  color:var(--text-2);
-  font-size:.76rem;
-  font-weight:600;
-  transition:.15s ease;
-}
-
-.folder-pill:hover{
-  background:var(--accent-subtle);
-  border-color:var(--accent);
-  color:var(--accent);
+.sj-no{ color:var(--text-3); font-size:.78rem; font-weight:600; width:56px; }
+.sj-name{ display:flex; align-items:center; gap:.65rem; min-width:0; }
+.subject-name-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; max-width:420px; }
+.sj-created{ color:var(--text-3); font-size:.78rem; white-space:nowrap; }
+.sj-ico{ margin-right:.4rem; opacity:.7; }
+.sj-actions{ width:90px; }
+.sj-state{ text-align:center; padding:3rem 1.25rem; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius) + 2px); margin-bottom:1.25rem; }
+.sj-state[hidden]{ display:none; }
+.sj-state i.es-ico{ font-size:2.1rem; color:var(--text-3); opacity:.45; display:block; margin-bottom:.8rem; }
+.sj-state.is-error i.es-ico{ color:var(--danger-text); opacity:.8; }
+.sj-state h3{ font-size:.96rem; font-weight:700; color:var(--text-1); margin:0 0 .3rem; }
+.sj-state p{ font-size:.82rem; color:var(--text-3); margin:0 auto 1rem; max-width:440px; overflow-wrap:anywhere; }
+#subjectCard.is-loading{ opacity:.55; transition:opacity .15s; pointer-events:none; }
+#subjectCard[hidden]{ display:none; }
+.sj-toolbar{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem; }
+.sj-toolbar .admin-list-search{ flex:1 1 240px; min-width:0; }
+.sj-sort .sel-enh, .sj-sort .sel-enh-trigger{ min-width:0; }
+@media (max-width:640px){
+  .page-top{ flex-wrap:wrap; }
+  .page-top .btn-flat{ width:100%; justify-content:center; }
+  .sj-toolbar .admin-list-search{ flex:1 1 100%; font-size:16px; }
+  #subjectAdvMount, .sj-sort{ flex:1 1 100%; }
+  .sj-sort .sel-enh, .sj-sort .sel-enh-trigger{ width:100%; }
+  .subject-scroll-area table{ min-width:0 !important; }
+  .table thead{ display:none; }
+  .table, .table tbody{ display:block; width:100%; }
+  .table tbody tr{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"name actions" "created created"; gap:.35rem .5rem; padding:.7rem .85rem; border-bottom:1px solid var(--border); background:var(--surface); }
+  .table tbody tr:last-child{ border-bottom:none; }
+  .table tbody td{ display:block; padding:0; border:none; background:transparent !important; min-width:0; }
+  .sj-no{ display:none !important; }
+  .sj-name-cell{ grid-area:name; }
+  .sj-actions{ grid-area:actions; width:auto; }
+  .sj-created{ grid-area:created; padding-left:calc(32px + .65rem) !important; }
+  .icon-btn{ width:40px; height:40px; }
 }
 
 /* =========================
@@ -372,7 +390,7 @@
 
 <div class="page-top">
   <div>
-    <h1><i class="fas fa-book me-2" style="color:var(--accent)"></i>Manage Subjects</h1>
+    <h1><i class="fas {{ nav_icon('subjects') }} me-2" style="color:var(--accent)"></i>Manage Subjects</h1>
     <p>Organize question image folders by subject.</p>
   </div>
   <button class="btn-flat primary" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
@@ -380,20 +398,31 @@
   </button>
 </div>
 
-<div class="admin-list-toolbar">
+<div class="sj-toolbar">
   <input type="text" class="admin-list-search" id="subjectSearch" placeholder="Search subjects by name…">
+  <div id="subjectAdvMount"></div>
+  <div class="sj-sort">
+    <select id="subjectSort" aria-label="Sort subjects">
+      <option value="name">Name A–Z</option>
+      <option value="name_desc">Name Z–A</option>
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+    </select>
+  </div>
+  <input type="hidden" id="subjectAdvValue" value="">
 </div>
+<div class="adv-summary" id="subjectAdvSummary" aria-live="polite"></div>
 
-<div class="card">
+<div class="sj-state" id="subjectState" role="status" aria-live="polite" hidden></div>
+<div class="card" id="subjectCard">
   <div class="card-body p-0">
     <div class="table-responsive subject-scroll-area" id="subjectScrollArea">
-      <table class="table mb-0" style="min-width:500px">
+      <table class="table mb-0" style="min-width:480px">
         <thead>
           <tr>
-            <th>S.No.</th>
-            <th>Subject Name</th>
-            <th>Folder ID</th>
-            <th>Created At</th>
+            <th>#</th>
+            <th>Subject</th>
+            <th>Created</th>
             <th style="width:90px">Actions</th>
           </tr>
         </thead>
@@ -402,7 +431,7 @@
             {% for subject in subjects %}{{ render_subject_row(subject) }}{% endfor %}
           {% else %}
             <tr>
-              <td colspan="5">
+              <td colspan="4">
                 <div class="empty-state">
                   <i class="fas fa-book-open"></i>
                   <p>No subjects yet. Click <strong>Add Subject</strong> to create one.</p>
@@ -483,45 +512,89 @@ document.addEventListener('hidden.bs.modal', function(e) {
   });
 });
 
-document.addEventListener('click', async function(e) {
-  const pill = e.target.closest('.folder-pill');
-  if (!pill) return;
-  try {
-    await navigator.clipboard.writeText(pill.dataset.folder);
-    adminToast('Folder ID copied to clipboard', 'success');
-  } catch (err) {
-    adminToast('Failed to copy. Try again.', 'danger');
-  }
-});
 </script>
 
 <script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/advanced-filter.js') }}"></script>
 <script>
+const subjectSearchEl = document.getElementById('subjectSearch');
+const subjectAdvEl = document.getElementById('subjectAdvValue');
+const subjectSortEl = document.getElementById('subjectSort');
+const subjectStateEl = document.getElementById('subjectState');
+const subjectCardEl = document.getElementById('subjectCard');
+enhanceSelect(subjectSortEl, { icon: 'fas fa-arrow-down-wide-short' });
+
+const subjectFilter = AdvancedFilter.create({
+  mount: document.getElementById('subjectAdvMount'),
+  summaryEl: document.getElementById('subjectAdvSummary'),
+  dateFormat: {{ DISPLAY_DATE_FORMAT | default('%d-%m-%Y') | tojson }},
+  fields: [
+    { key: 'name', label: 'Subject name', kind: 'text' },
+    { key: 'created', label: 'Created on', kind: 'date' },
+  ],
+  onApply: json => { subjectAdvEl.value = json; subjectAdvEl.dispatchEvent(new Event('change')); },
+});
+
+/* loading / error / empty are kept distinct: a failed request is never shown as "no subjects" */
+function subjectFiltersActive() { return !!(subjectSearchEl.value.trim() || subjectAdvEl.value); }
+function setSubjectState(kind, message) {
+  subjectCardEl.classList.toggle('is-loading', kind === 'loading');
+  if (kind === 'loading') return;
+  const hide = kind === 'empty' || kind === 'error';
+  subjectCardEl.hidden = hide;
+  subjectStateEl.hidden = !hide;
+  subjectStateEl.classList.toggle('is-error', kind === 'error');
+  if (!hide) return;
+  const mk = (tag, text, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const actions = mk('div', null, 'es-actions'); actions.style.cssText = 'display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap';
+  const btn = (icon, label, cls, fn) => { const b = mk('button', null, 'btn-flat ' + cls); b.type = 'button'; b.innerHTML = '<i class="fas ' + icon + '"></i> '; b.appendChild(document.createTextNode(label)); b.addEventListener('click', fn); actions.appendChild(b); return b; };
+  let ico, title, text;
+  const q = subjectSearchEl.value.trim(), adv = !!subjectAdvEl.value;
+  if (kind === 'error') {
+    ico = 'fa-triangle-exclamation'; title = 'Could not load subjects'; text = message || 'Something went wrong while loading the list.';
+    btn('fa-rotate-right', 'Try again', 'primary', () => subjectList.reload());
+  } else if (subjectFiltersActive()) {
+    ico = 'fa-magnifying-glass'; title = 'No matching subjects found';
+    text = (q && adv) ? 'No subjects match the current search and filter combination.' : q ? 'No subject name matches \u201c' + q + '\u201d.' : 'No subject matches the current filters.';
+    btn('fa-filter-circle-xmark', 'Clear Filters', 'primary', () => { subjectSearchEl.value = ''; subjectFilter.clear(); });
+  } else {
+    ico = 'fa-book-bookmark'; title = 'No subjects yet'; text = 'Add a subject to start organising question images.';
+    const add = btn('fa-plus', 'Add Subject', 'primary', () => {}); add.setAttribute('data-bs-toggle', 'modal'); add.setAttribute('data-bs-target', '#addSubjectModal');
+  }
+  const i = mk('i', null, 'fas ' + ico + ' es-ico'); i.setAttribute('aria-hidden', 'true');
+  subjectStateEl.replaceChildren(i, mk('h3', title), mk('p', text), actions);
+}
+
 var subjectList = createAdminList({
   endpoint: '/api/v01/admin/subjects',
   paginatorEl: document.getElementById('subjectPaginator'),
   paginatorMode: 'loadmore',
-  searchInputEl: document.getElementById('subjectSearch'),
+  searchInputEl: subjectSearchEl,
   searchParam: 'q',
+  filters: { adv: subjectAdvEl, sort: subjectSortEl },
   perPage: {{ subjects_per_page | default(25) }},
   extraParams: function () { return { partial: 1 }; },
+  onLoadStart: function () { setSubjectState('loading'); },
+  onError: function (message) { setSubjectState('error', message); },
   onData: function (data) {
+    if (data && data.success === false) { adminToast(data.message || 'Could not apply the filter.', 'danger'); return; }
     const tbody = document.getElementById('subjectTbody');
     const modalsEl = document.getElementById('subjectEditModals');
+    if (!data.total) { setSubjectState('empty'); tbody.innerHTML = ''; modalsEl.innerHTML = ''; return; }
+    setSubjectState('ok');
     if (data.page && data.page > 1) {
       tbody.insertAdjacentHTML('beforeend', data.rows_html || '');
       modalsEl.insertAdjacentHTML('beforeend', data.modals_html || '');
-    } else if (data.rows_html) {
-      tbody.innerHTML = data.rows_html;
-      modalsEl.innerHTML = data.modals_html || '';
     } else {
-      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-book-open"></i>' +
-        '<p>No subjects match your search.</p></div></td></tr>';
-      modalsEl.innerHTML = '';
+      tbody.innerHTML = data.rows_html || '';
+      modalsEl.innerHTML = data.modals_html || '';
     }
     fitSubjectScrollHeight();
   },
 });
+if ({{ subjects_total | default(0) }} === 0) setSubjectState('empty');
 subjectList.hydrate({ page: 1, total_pages: {{ subjects_total_pages | default(1) }}, total: {{ subjects_total | default(0) }}, per_page: {{ subjects_per_page | default(25) }} });
 
 // Bounded scroll area sized to whatever room is actually left below it in

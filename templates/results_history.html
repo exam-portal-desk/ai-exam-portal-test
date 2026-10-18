@@ -2,6 +2,13 @@
 {% set active_nav = 'results' %}
 {% block title %}Results History - SmartAIExam{% endblock %}
 {% block content %}
+{% from "partials/_results_history_rows.html" import table_rows, cards %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/advanced-filter.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/advanced-filter.js') }}"></script>
 <style>
 .rh-main { flex:1; min-width:0; padding:1.5rem 1.75rem; }
 .rh-head { margin-bottom:1.25rem; }
@@ -24,7 +31,7 @@
 .rh-btn.ghost { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border); }
 .rh-btn.ghost:hover { border-color:var(--accent); color:var(--accent); }
 
-.rh-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.rh-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow-x:auto; }
 .rh-table { width:100%; border-collapse:collapse; }
 .rh-table thead th { background:var(--surface-2); padding:.65rem 1rem; text-align:left; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); border-bottom:1px solid var(--border); white-space:nowrap; }
 .rh-table tbody td { padding:.72rem 1rem; font-size:.82rem; color:var(--text-2); border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; }
@@ -78,8 +85,17 @@
 .rh-card-meta span { background:var(--surface-2); padding:.15rem .5rem; border-radius:20px; }
 .rh-card-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
 
+.rh-sort { display:flex; align-items:center; gap:.4rem; }
+.rh-lbl { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); margin:0; }
+.rh-none { border:none; border-radius:0; }
+.rh-none[hidden] { display:none; }
+#rhWrap[aria-busy="true"] { opacity:.55; transition:opacity .15s; pointer-events:none; }
+.rh-filters { justify-content:flex-start; }
+#rhAdvMount { display:flex; }
 @media(max-width:768px){
   .rh-main { padding:1rem; }
+  #rhAdvMount, .rh-sort { width:100%; }
+  .rh-sort .sel-enh, .rh-sort .sel-enh-trigger { width:100%; }
   .rh-table-wrap { display:none; }
   .rh-cards { display:block; }
   .rh-filters { flex-direction:column; gap:.5rem; }
@@ -89,109 +105,60 @@
 
 <main class="rh-main">
   <div class="rh-head">
-    <h1><i class="fas fa-history" style="color:var(--accent);margin-right:.45rem"></i>Results History</h1>
+    <h1><i class="fas {{ nav_icon('results_history') }}" style="color:var(--accent);margin-right:.45rem"></i>Results History</h1>
     <p>All your past exam attempts, scores and responses</p>
   </div>
 
-  {% if results %}
+  {% if total_all %}
   <div class="rh-filters">
-    <input class="rh-input" id="fDate"    placeholder="Search date…">
-    <input class="rh-input" id="fExam"    placeholder="Search exam…">
-    <input class="rh-input" id="fSubject" placeholder="Search subject…">
-    <select class="rh-select" id="fSort">
-      <option value="">Sort by date</option>
-      <option value="newest">Newest first</option>
-      <option value="oldest">Oldest first</option>
-    </select>
-    <button class="rh-btn primary" id="applyBtn"><i class="fas fa-search"></i> Filter</button>
-    <button class="rh-btn ghost"   id="clearBtn"><i class="fas fa-times"></i> Clear</button>
+    <div id="rhAdvMount"></div>
+    <div class="rh-sort"><label class="rh-lbl" for="rhSort">Sort</label>
+      <select id="rhSort">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="score_high">Highest percentage</option>
+        <option value="score_low">Lowest percentage</option>
+        <option value="exam">Exam name A–Z</option>
+      </select></div>
+    <button class="rh-btn ghost" id="clearBtn" type="button"><i class="fas fa-times"></i> Clear</button>
   </div>
+  <div class="adv-summary" id="rhAdvSummary" aria-live="polite"></div>
 
+  <div id="rhWrap" aria-busy="false">
   <div class="rh-table-wrap">
     <table class="rh-table" id="rhTable">
       <thead>
         <tr>
-          <th>Date</th><th>Exam</th><th>Subject</th>
+          <th>Date</th><th>Exam</th>
           <th>Correct</th><th>Wrong</th><th>Skipped</th>
           <th>Score</th><th>Pct</th><th>Grade</th><th>Time</th><th>Actions</th>
         </tr>
       </thead>
-      <tbody>
-        {% for r in results %}
-        {% set pct = (r.percentage or 0)|float %}
-        {% set vis = r.result_visible if r.result_visible is defined else true %}
-        <tr data-date="{{ r.completed_at }}" data-exam="{{ r.exam_name|lower }}" data-sub="{{ r.subject|lower }}">
-          <td style="color:var(--text-3);font-size:.73rem">{{ r.completed_at | display_dt }}</td>
-          <td class="exam-col">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check sched-ico" title="Scheduled Exam"></i>{% endif %}</td>
-          <td>{{ r.subject }}</td>
-          {% if vis %}
-          <td><span class="score-ok">{{ r.correct_answers }}</span></td>
-          <td><span class="score-err">{{ r.incorrect_answers }}</span></td>
-          <td>{{ r.unanswered_questions }}</td>
-          <td style="font-weight:600;color:var(--text-1)">{{ r.score }}/{{ r.max_score }}</td>
-          <td><span class="pct {% if pct>=80 %}pct-green{% elif pct>=60 %}pct-info{% elif pct>=40 %}pct-warn{% else %}pct-danger{% endif %}">{{ '%.1f'|format(pct) }}%</span></td>
-          <td><span class="grade-pill">{{ r.grade }}</span></td>
-          <td style="color:var(--text-3);font-size:.73rem">{{ r.time_taken_minutes }}m</td>
-          <td>
-            <a href="{{ url_for('result.result', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn view"><i class="fas fa-eye"></i> Result</a>
-            <a href="{{ url_for('result.response_page', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn resp"><i class="fas fa-clipboard-check"></i> Response</a>
-          </td>
-          {% else %}
-          <td colspan="7" style="color:var(--text-3);font-size:.77rem"><i class="fas fa-lock" style="color:var(--warning-text);margin-right:.3rem"></i>{{ r.pending_reason or 'Result not yet released' }}</td>
-          <td><a href="{{ url_for('result.result_pending', exam_id=r.exam_id, result_id=r.id) }}" class="tbl-btn pend"><i class="fas fa-clock"></i> Pending</a></td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody id="rhTbody">{{ table_rows(results) }}</tbody>
     </table>
+    <div class="rh-empty rh-none" id="rhNone" {% if results %}hidden{% endif %}><i class="fas fa-filter"></i><h3>No results match these filters</h3><p>Change or clear a condition to see more.</p></div>
     <div class="rh-pager">
       <div class="rh-pager-btns">
-        <button class="pg-btn" id="pgFirst"><i class="fas fa-angle-double-left"></i></button>
-        <button class="pg-btn" id="pgPrev"><i class="fas fa-angle-left"></i> Prev</button>
-        <button class="pg-btn" id="pgNext">Next <i class="fas fa-angle-right"></i></button>
-        <button class="pg-btn" id="pgLast"><i class="fas fa-angle-double-right"></i></button>
+        <button class="pg-btn" id="pgFirst" type="button"><i class="fas fa-angle-double-left"></i></button>
+        <button class="pg-btn" id="pgPrev" type="button"><i class="fas fa-angle-left"></i> Prev</button>
+        <button class="pg-btn" id="pgNext" type="button">Next <i class="fas fa-angle-right"></i></button>
+        <button class="pg-btn" id="pgLast" type="button"><i class="fas fa-angle-double-right"></i></button>
       </div>
       <span class="pg-info" id="pgInfo"></span>
       <div style="display:flex;align-items:center;gap:.45rem">
         <span style="font-size:.72rem;color:var(--text-3)">Rows:</span>
-        <select class="pg-size" id="pgSize">
+        <select id="pgSize">
           <option value="10" selected>10</option>
           <option value="25">25</option>
           <option value="50">50</option>
-          <option value="0">All</option>
+          <option value="100">100</option>
         </select>
       </div>
     </div>
   </div>
 
   {# Mobile cards #}
-  <div class="rh-cards" id="rhCards">
-    {% for r in results %}
-    {% set pct = (r.percentage or 0)|float %}
-    {% set vis = r.result_visible if r.result_visible is defined else true %}
-    <div class="rh-card" data-date="{{ r.completed_at }}" data-exam="{{ r.exam_name|lower }}" data-sub="{{ r.subject|lower }}">
-      <div class="rh-card-top">
-        <div class="rh-card-name">{{ r.exam_name }}{% if r.is_scheduled %}<i class="fas fa-calendar-check sched-ico" title="Scheduled Exam"></i>{% endif %}</div>
-        <div class="rh-card-date">{{ r.completed_at | display_dt }}</div>
-      </div>
-      {% if vis %}
-      <div class="rh-card-meta">
-        <span>{{ r.subject }}</span>
-        <span>{{ r.score }}/{{ r.max_score }}</span>
-        <span class="pct {% if pct>=80 %}pct-green{% elif pct>=60 %}pct-info{% elif pct>=40 %}pct-warn{% else %}pct-danger{% endif %}">{{ '%.1f'|format(pct) }}%</span>
-        <span>Grade: <strong style="color:var(--text-1)">{{ r.grade }}</strong></span>
-        <span>{{ r.time_taken_minutes }}m</span>
-      </div>
-      <div class="rh-card-actions">
-        <a href="{{ url_for('result.result', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn view"><i class="fas fa-eye"></i> Result</a>
-        <a href="{{ url_for('result.response_page', exam_id=r.exam_id, result_id=r.id, from_history=1) }}" class="tbl-btn resp"><i class="fas fa-clipboard-check"></i> Response</a>
-      </div>
-      {% else %}
-      <div style="font-size:.77rem;color:var(--text-3);margin-bottom:.55rem"><i class="fas fa-lock" style="color:var(--warning-text);margin-right:.3rem"></i>{{ r.pending_reason or 'Result not yet released' }}</div>
-      <a href="{{ url_for('result.result_pending', exam_id=r.exam_id, result_id=r.id) }}" class="tbl-btn pend"><i class="fas fa-clock"></i> Pending</a>
-      {% endif %}
-    </div>
-    {% endfor %}
+  <div class="rh-cards" id="rhCards">{{ cards(results) }}</div>
   </div>
 
   {% else %}
@@ -199,72 +166,91 @@
   {% endif %}
 </main>
 
+{% if total_all %}
 <script>
-document.addEventListener('DOMContentLoaded',function(){
-  var aR=Array.from(document.querySelectorAll('#rhTable tbody tr'));
-  var aC=Array.from(document.querySelectorAll('#rhCards .rh-card'));
-  var ps=10, pg=1;
+document.addEventListener('DOMContentLoaded', function () {
+  var API = '/api/v01/student/results-history';
+  var O = {{ options | tojson }};
+  var state = { adv: '', sort: 'newest', page: 1, per: {{ per_page }}, pages: {{ total_pages }}, total: {{ total }}, seq: 0 };
+  var $ = function (id) { return document.getElementById(id); };
+  var pick = function (rows, i, j) { return rows.map(function (r) { return [String(r[i]), r[j]]; }); };
 
-  function filt(items){
-    var d=(document.getElementById('fDate')||{}).value||'';
-    var e=(document.getElementById('fExam')||{}).value||'';
-    var s=(document.getElementById('fSubject')||{}).value||'';
-    return items.filter(function(el){
-      return(!d||(el.dataset.date||'').includes(d))&&(!e||(el.dataset.exam||'').includes(e.toLowerCase()))&&(!s||(el.dataset.sub||'').includes(s.toLowerCase()));
-    });
+  enhanceSelect($('rhSort'), { icon: 'fas fa-arrow-down-wide-short' });
+  enhanceSelect($('pgSize'));
+
+  var filter = AdvancedFilter.create({
+    mount: $('rhAdvMount'), summaryEl: $('rhAdvSummary'), dateFormat: {{ DISPLAY_DATE_FORMAT | default('%d-%m-%Y') | tojson }},
+    fields: [
+      { key: 'exam_name', label: 'Exam name', kind: 'text' },
+      { key: 'exam', label: 'Exam', kind: 'entity', options: function () { return pick(O.exams, 0, 1); } },
+      { key: 'category', label: 'Category', kind: 'entity', options: function () { return pick(O.categories, 0, 1); } },
+      { key: 'subcategory', label: 'Subcategory', kind: 'entity', options: function () { return O.subcategories.map(function (s) { return [String(s[0]), s[1]]; }); } },
+      { key: 'date', label: 'Date taken', kind: 'date' },
+      { key: 'time', label: 'Time of day', kind: 'time' },
+      { key: 'status', label: 'Result status', kind: 'enum', values: [['released', 'Released'], ['pending', 'Pending release']] },
+      { key: 'kind', label: 'Exam type', kind: 'enum', values: [['scheduled', 'Scheduled'], ['regular', 'Regular']] },
+      { key: 'grade', label: 'Grade', kind: 'enum', options: function () { return O.grades.map(function (g) { return [g, 'Grade ' + g]; }); } },
+      { key: 'percentage', label: 'Percentage', kind: 'number' },
+      { key: 'score', label: 'Marks scored', kind: 'number' },
+      { key: 'correct', label: 'Correct answers', kind: 'number' },
+      { key: 'incorrect', label: 'Wrong answers', kind: 'number' },
+      { key: 'unanswered', label: 'Skipped questions', kind: 'number' },
+      { key: 'time_taken', label: 'Time taken (min)', kind: 'number' },
+    ],
+    onApply: function (json) { state.adv = json; state.page = 1; load(); },
+  });
+
+  function load() {
+    var my = ++state.seq, q = new URLSearchParams({ sort: state.sort, page: state.page, per_page: state.per });
+    if (state.adv) q.set('adv', state.adv);
+    $('rhWrap').setAttribute('aria-busy', 'true');
+    fetch(API + '?' + q.toString(), { credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return { success: false, message: 'Unexpected response.' }; }); })
+      .then(function (d) {
+        if (my !== state.seq) return;
+        $('rhWrap').setAttribute('aria-busy', 'false');
+        if (!d.success) { window.alert(d.message || 'Could not update the list.'); return; }
+        $('rhTbody').innerHTML = d.rows_html; $('rhCards').innerHTML = d.cards_html;
+        state.page = d.page; state.pages = d.total_pages; state.total = d.total;
+        $('rhNone').hidden = d.total > 0;
+        paint();
+      })
+      .catch(function () { if (my === state.seq) { $('rhWrap').setAttribute('aria-busy', 'false'); window.alert('Could not update the list. Check your connection.'); } });
   }
-
-  function render(){
-    var fr=filt(aR), fc=filt(aC), tot=Math.max(fr.length,fc.length);
-    var sz=ps===0?tot||1:ps, pages=Math.max(1,Math.ceil(tot/sz));
-    if(pg>pages) pg=pages;
-    aR.forEach(function(r){r.style.display='none';}); aC.forEach(function(c){c.style.display='none';});
-    var s=(pg-1)*sz, en=ps===0?tot:s+sz;
-    fr.slice(s,en).forEach(function(r){r.style.display='';}); fc.slice(s,en).forEach(function(c){c.style.display='';});
-    var pi=document.getElementById('pgInfo'); if(pi) pi.textContent='Page '+pg+' of '+pages+' — '+tot+' results';
-    ['pgFirst','pgPrev'].forEach(function(id){var b=document.getElementById(id);if(b)b.disabled=pg<=1;});
-    ['pgNext','pgLast'].forEach(function(id){var b=document.getElementById(id);if(b)b.disabled=pg>=pages;});
+  function paint() {
+    $('pgInfo').textContent = state.total ? 'Page ' + state.page + ' of ' + state.pages + ' — ' + state.total + ' result' + (state.total === 1 ? '' : 's') : 'No results';
+    ['pgFirst', 'pgPrev'].forEach(function (id) { $(id).disabled = state.page <= 1; });
+    ['pgNext', 'pgLast'].forEach(function (id) { $(id).disabled = state.page >= state.pages; });
   }
-
-  function srt(){
-    var v=(document.getElementById('fSort')||{}).value||''; if(!v)return;
-    function cmp(a,b){var da=new Date(a.dataset.date||0),db=new Date(b.dataset.date||0);return v==='newest'?db-da:da-db;}
-    aR.sort(cmp); var tb=document.querySelector('#rhTable tbody'); if(tb)aR.forEach(function(r){tb.appendChild(r);});
-    aC.sort(cmp); var cl=document.getElementById('rhCards'); if(cl)aC.forEach(function(c){cl.appendChild(c);});
-  }
-
-  document.getElementById('applyBtn')&&document.getElementById('applyBtn').addEventListener('click',function(){srt();pg=1;render();});
-  document.getElementById('clearBtn')&&document.getElementById('clearBtn').addEventListener('click',function(){
-    ['fDate','fExam','fSubject'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-    var fs=document.getElementById('fSort');if(fs)fs.value=''; pg=1;render();
+  function go(p) { state.page = Math.max(1, Math.min(state.pages, p)); load(); }
+  $('pgFirst').addEventListener('click', function () { go(1); });
+  $('pgPrev').addEventListener('click', function () { go(state.page - 1); });
+  $('pgNext').addEventListener('click', function () { go(state.page + 1); });
+  $('pgLast').addEventListener('click', function () { go(state.pages); });
+  $('pgSize').addEventListener('change', function () { state.per = parseInt(this.value, 10); state.page = 1; load(); });
+  $('rhSort').addEventListener('change', function () { state.sort = this.value; state.page = 1; load(); });
+  $('clearBtn').addEventListener('click', function () {
+    $('rhSort').value = 'newest'; state.sort = 'newest'; state.page = 1;
+    filter.clear();                       // reloads through onApply
   });
-  ['fDate','fExam','fSubject'].forEach(function(id){
-    var el=document.getElementById(id); if(el)el.addEventListener('keydown',function(e){if(e.key==='Enter'){srt();pg=1;render();}});
-  });
-  document.getElementById('pgFirst')&&document.getElementById('pgFirst').addEventListener('click',function(){pg=1;render();});
-  document.getElementById('pgPrev')&&document.getElementById('pgPrev').addEventListener('click',function(){if(pg>1){pg--;render();}});
-  document.getElementById('pgNext')&&document.getElementById('pgNext').addEventListener('click',function(){pg++;render();});
-  document.getElementById('pgLast')&&document.getElementById('pgLast').addEventListener('click',function(){
-    var fr=filt(aR);var sz=ps===0?fr.length||1:ps;pg=Math.max(1,Math.ceil(fr.length/sz));render();
-  });
-  document.getElementById('pgSize')&&document.getElementById('pgSize').addEventListener('change',function(){ps=this.value==='0'?0:parseInt(this.value);pg=1;render();});
+  paint();
 
-  document.querySelectorAll('a.tbl-btn.resp').forEach(function(btn){
-    btn.addEventListener('click',function(e){
-      if(btn.classList.contains('loading')){e.preventDefault();return;}
-      e.preventDefault();
-      btn.classList.add('loading');
-      var href=btn.href;
-      var bar=document.createElement('div'); bar.className='tbl-btn-bar'; bar.innerHTML='<span></span>'; btn.appendChild(bar);
-      fetch(href,{credentials:'same-origin'}).then(function(r){return r.text();}).then(function(html){
-        var doc=new DOMParser().parseFromString(html,'text/html');
-        var srcs=Array.from(doc.images).map(function(im){return im.src;}).filter(Boolean);
-        return Promise.all(srcs.map(function(src){return new Promise(function(res){var im=new Image();im.onload=im.onerror=res;im.src=src;});}));
-      }).catch(function(){}).then(function(){window.location.href=href;});
-    });
+  // The Response page is preloaded (its images) before navigating; delegated so it survives every list reload.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('a.tbl-btn.resp');
+    if (!btn) return;
+    e.preventDefault();
+    if (btn.classList.contains('loading')) return;
+    btn.classList.add('loading');
+    var href = btn.href;
+    var bar = document.createElement('div'); bar.className = 'tbl-btn-bar'; bar.innerHTML = '<span></span>'; btn.appendChild(bar);
+    fetch(href, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (html) {
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var srcs = Array.from(doc.images).map(function (im) { return im.src; }).filter(Boolean);
+      return Promise.all(srcs.map(function (src) { return new Promise(function (res) { var im = new Image(); im.onload = im.onerror = res; im.src = src; }); }));
+    }).catch(function () {}).then(function () { window.location.href = href; });
   });
-
-  render();
 });
 </script>
+{% endif %}
 {% endblock %}

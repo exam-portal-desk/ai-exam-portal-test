@@ -89,66 +89,19 @@ def dashboard():
 @require_user_role
 @require_feature("result_history")
 def results_history():
-    from datetime import datetime
-    user_id  = session["user_id"]
-    results  = get_results_by_user(user_id)
-    exams    = get_all_exams()
-    exam_map = {int(e["id"]): e for e in exams}
-
-    result_list = []
-    for r in results:
-        eid       = int(r.get("exam_id", 0))
-        exam_data = exam_map.get(eid, {})
-
-        is_visible, pending_reason = can_user_see_result(exam_data, r)
-
-        result_list.append({
-            "id":                 int(r.get("id", 0)),
-            "exam_id":            eid,
-            "exam_name":          exam_data.get("name", f"Exam {eid}"),
-            "completed_at":       r.get("completed_at",""),
-            "score":              r.get("score", 0),
-            "max_score":          r.get("max_score", 0),
-            "percentage":         round(float(r.get("percentage", 0)), 2),
-            "grade":              r.get("grade", "N/A"),
-            "time_taken_minutes": r.get("time_taken_minutes", 0),
-            "correct_answers":    int(r.get("correct_answers", 0)),
-            "incorrect_answers":  int(r.get("incorrect_answers", 0)),
-            "unanswered_questions": int(r.get("unanswered_questions", 0)),
-            "result_visible":     is_visible,
-            "pending_reason":     pending_reason,
-            # UI-only — already on exam_data from the same get_all_exams()
-            # call above, just not previously surfaced to the template.
-            "is_scheduled":       bool(exam_data.get("scheduled_mode")),
-        })
-
-    result_list.sort(key=lambda x: x["completed_at"], reverse=True)
-    return render_template("results_history.html", results=result_list)
+    """Results History shell + its first page. Filtering, sorting and paging happen on the server
+    (GET /api/v01/student/results-history, app/services/results_history_service.py)."""
+    from app.services import results_history_service as svc
+    data = svc.history_page(session["user_id"], {})
+    return render_template("results_history.html", results=data["results"], total=data["total"], total_all=data["total_all"],
+                           total_pages=data["total_pages"], per_page=data["per_page"], options=data["options"])
 
 
 @dashboard_bp.route("/analytics")
 @require_user_role
 @require_feature("analytics")
 def student_analytics():
-    user_id = session["user_id"]
-    results = get_results_by_user(user_id)
-    exams   = get_all_exams()
-    exam_map = {str(e["id"]): e for e in exams}
-
-    # Only include results the user can currently see
-    visible = [
-        r for r in results
-        if can_user_see_result(exam_map.get(str(r.get("exam_id","")), {}), r)[0]
-    ]
-
-    if not visible:
-        flash("No results data available yet.", "info")
-        return render_template("student_analytics.html", analytics_data={}, has_data=False)
-
-    analytics = calculate_student_analytics(visible, exams, user_id)
-    return render_template(
-        "student_analytics.html",
-        analytics_data=analytics,
-        has_data=True,
-        username=session.get("username"),
-    )
+    """The Analytics page is a shell: its data (the signed-in student's own results only) is loaded, and re-loaded when a
+    filter changes, from GET /api/v01/student/analytics."""
+    return render_template("student_analytics.html", username=session.get("username"),
+                           full_name=session.get("full_name") or session.get("username") or "")

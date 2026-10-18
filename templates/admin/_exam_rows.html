@@ -1,3 +1,4 @@
+{% from "admin/_instr_toolbar.html" import instr_toolbar %}
 {# templates/admin/_exam_rows.html
    Shared macros for rendering one exam as a table row, a grid card, and
    its edit modal — used both by the initial server-render (admin/exams.html)
@@ -9,8 +10,13 @@
 <tr data-id="{{ exam.id }}" data-name="{{ exam.name }}" data-scheduled="{{ '1' if exam.scheduled_mode else '0' }}" data-effective-status="{{ exam.effective_status or exam.status }}">
   <td><input type="checkbox" class="row-checkbox enhanced-checkbox" data-id="{{ exam.id }}" onchange="toggleExamSelect(this)" title="Select for bulk update"></td>
   <td><span class="exam-id-badge">{{ exam.row_no if exam.row_no is not none else exam.id }}</span></td>
-  <td><div class="exam-name-text">{{ exam.name }}</div></td>
   <td>
+    <div class="exam-name-text" title="{{ exam.name }}">{{ exam.name }}</div>
+    <div class="exam-meta-line">
+      <span title="Duration">{{ exam.duration }} min</span><span class="dot">·</span><span title="Questions">{{ exam.total_questions }}Q</span><span class="dot">·</span><span title="Marks per correct / wrong answer"><span class="marks-pos">+{{ exam.positive_marks }}</span> / <span class="marks-neg">−{{ exam.negative_marks }}</span></span><span class="dot">·</span><span title="Maximum attempts">Max {{ exam.max_attempts if exam.max_attempts else '∞' }}</span>
+    </div>
+  </td>
+  <td class="col-cat">
     {% if exam.category_name %}
       <span class="cat-pill">{{ exam.category_name }}</span>{% if exam.subcategory_name %} <span class="cat-pill" style="opacity:.72">{{ exam.subcategory_name }}</span>{% endif %}
     {% else %}
@@ -21,27 +27,10 @@
     <div class="meta-pill">{{ exam.date | calendar_date if exam.date else exam.date }}</div>
     <div style="font-size:.75rem;color:var(--text-3);margin-top:3px">{{ exam.start_time | calendar_time }}</div>
   </td>
-  <td><span class="meta-pill">{{ exam.duration }} min</span></td>
-  <td>
-    <span class="meta-pill">{{ exam.total_questions }}Q</span>
-    <div style="font-size:.72rem;color:var(--text-3);margin-top:3px">
-      Max: <strong style="color:var(--text-2)">{{ exam.max_attempts if exam.max_attempts else '∞' }}</strong>
-    </div>
-  </td>
-  <td>
+  <td class="col-status">
     <span class="status-badge status-{{ exam.effective_status or exam.status }}">{{ exam.effective_status or exam.status }}</span>
     {% if exam.scheduled_mode %}<span class="sched-pill" title="Scheduled Exam — status is computed automatically"><i class="fas fa-clock"></i> Scheduled</span>{% endif %}
     {% if not exam.scheduled_mode and exam.available_after_datetime %}<span class="sched-pill" title="Available After Selected Date/Time is ON — this exam stays attemptable while Ongoing, even after its configured date/time has passed"><i class="fas fa-infinity"></i> No Expiry</span>{% endif %}
-  </td>
-  <td>
-    <div class="instructions-text" title="{{ exam.instructions }}">
-      {{ exam.instructions or '—' }}
-    </div>
-  </td>
-  <td>
-    <span class="marks-pos">+{{ exam.positive_marks }}</span>
-    <span style="color:var(--text-3);margin:0 2px">/</span>
-    <span class="marks-neg">−{{ exam.negative_marks }}</span>
   </td>
   <td>
     {% set rmode = exam.result_mode or 'instant' %}
@@ -291,15 +280,10 @@
             </div>
             <div class="col-12">
               <label class="form-label">Instructions <span style="color:var(--danger-text)">*</span></label>
-              <div class="instr-toolbar">
-                <button type="button" class="instr-tb-btn" data-instr-cmd="bullet" title="Bullet list"><i class="fas fa-list-ul"></i></button>
-                <button type="button" class="instr-tb-btn" data-instr-cmd="number" title="Numbered list"><i class="fas fa-list-ol"></i></button>
-                <button type="button" class="instr-tb-btn" data-instr-cmd="bold" title="Bold"><i class="fas fa-bold"></i></button>
-                <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Warning callout"><i class="fas fa-triangle-exclamation"></i></button>
-              </div>
+              {{ instr_toolbar() }}
               <textarea class="form-control" name="instructions" rows="6" required>{{ exam.instructions }}</textarea>
               <div class="instr-preview-label">Preview</div>
-              <div class="instr-preview">{{ exam.instructions | format_instructions if exam.instructions else '<span class="instr-preview-empty">Nothing to preview yet.</span>' | safe }}</div>
+              <div class="instr-preview instr-rich">{{ exam.instructions | format_instructions if exam.instructions else '<span class="instr-preview-empty">Nothing to preview yet.</span>' | safe }}</div>
             </div>
             <div class="col-md-4 col-sm-6 col-12">
               <label class="form-label">Positive Marks</label>

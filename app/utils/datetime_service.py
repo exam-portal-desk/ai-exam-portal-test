@@ -120,3 +120,21 @@ def daily_reset_message() -> str:
         when = f"in {hours}h {minutes}m"
 
     return f"Resets {when} at 12:00 AM {tz_label}"
+
+
+def format_duration_minutes(value) -> str:
+    """A stored whole-minutes duration (results.time_taken_minutes) as readable text. The value is truncated to whole minutes when
+    an attempt is submitted (app/services/exam_service.py), so 0 only means "under a minute" - the seconds were never stored and
+    are not invented here. Missing / unreadable / negative values give an em dash, never a misleading 0."""
+    try:
+        minutes = int(float(value))
+    except (TypeError, ValueError):
+        return "—"
+    if minutes < 0:
+        return "—"
+    if minutes == 0:
+        return "< 1 min"
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} hr" if rest == 0 else f"{hours} hr {rest} min"

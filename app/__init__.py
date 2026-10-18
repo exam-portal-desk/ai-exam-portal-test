@@ -107,15 +107,22 @@ def create_app() -> Flask:
             return redirect(url_for("auth.login"))
 
     # ── Date/time — central service + Jinja filters ────────────────────────
-    from app.utils.datetime_service import now_app_tz, format_display, format_display_date, format_calendar_date, format_calendar_time
+    from app.utils.datetime_service import now_app_tz, format_display, format_display_date, format_calendar_date, format_calendar_time, format_duration_minutes
 
     app.jinja_env.filters["display_dt"] = format_display
     app.jinja_env.filters["display_date"] = format_display_date
     app.jinja_env.filters["calendar_date"] = format_calendar_date
     app.jinja_env.filters["calendar_time"] = format_calendar_time
+    app.jinja_env.filters["duration_min"] = format_duration_minutes
+    from app.utils.nav_icons import nav_icon
+    app.jinja_env.globals["nav_icon"] = nav_icon      # one icon per portal section: menus and page headings both read it
 
     from app.utils.instructions_formatter import render_exam_instructions
     app.jinja_env.filters["format_instructions"] = render_exam_instructions
+    from app.utils.instructions_formatter import plain_instructions
+    app.jinja_env.filters["plain_instructions"] = plain_instructions      # one-line preview (dashboard cards): no raw # / ** markers
+    from app.utils.instructions_template import GENERAL_INSTRUCTIONS_TEMPLATE
+    app.jinja_env.globals["general_instructions_template"] = GENERAL_INSTRUCTIONS_TEMPLATE   # the editor's "Template" button
 
     # {{ ai_identity("assistant_chat") }} — which provider + model a feature uses right now, from the central
     # AI registry (safe display data only). Used by templates/partials/_ai_badge.html. A problem in the AI

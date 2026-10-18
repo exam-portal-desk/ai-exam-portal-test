@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 from urllib.parse import quote
 
 import app.config as config
-from app.storage.service import StorageProvider
+from app.storage.service import StorageProvider, classify_storage_error
 
 
 class LocalStorageProvider(StorageProvider):
@@ -67,6 +67,12 @@ class LocalStorageProvider(StorageProvider):
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
+
+    def exists_strict(self, key: str) -> bool:
+        try:
+            return self._path(key).is_file()
+        except Exception as e:
+            raise classify_storage_error(e, key) from e
 
     def signed_url(self, key: str, expires_in: int = 3600) -> str:
         return f"{config.STORAGE_LOCAL_URL_PREFIX}/{quote(key)}"

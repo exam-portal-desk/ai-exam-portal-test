@@ -248,7 +248,8 @@ def parse_instructions_field(raw) -> str:
     bypasses the frontend's `required` attribute (e.g. a direct POST)
     still can't create/save an exam without instructions.
     """
-    s = str(raw or "").strip()
+    # browsers post textarea line breaks as CRLF; store one canonical form so every editor/renderer sees the same text
+    s = str(raw or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     if not s:
         raise ValueError("Exam instructions are required.")
     return s

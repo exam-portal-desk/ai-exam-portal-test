@@ -2,6 +2,7 @@
 {% block title %}{{ exam.name }} — Exam Kiosk - SmartAIExam{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/instructions.css') }}">
 {#
   Scheduled Exam Kiosk — a dedicated window for the whole
   preparation -> exam -> completion lifecycle of a Scheduled Exam.
@@ -111,16 +112,7 @@ html, body { overflow:hidden !important; height:100% !important; }
 }
 .kiosk-instr-title { font-size:.92rem; font-weight:700; color:var(--text-1); margin-bottom:.85rem; display:flex; align-items:center; gap:.45rem; }
 .kiosk-instr-title i { color:var(--accent); }
-.ei-instr { font-size:.85rem; color:var(--text-2); line-height:1.65; text-align:left; }
-.ei-instr p { margin:0 0 .8rem; }
-.instr-list { margin:0 0 .8rem 1.1rem; padding:0; text-align:left; }
-.instr-list li { margin-bottom:.4rem; }
-.ei-instr .instr-warning {
-  display:flex; align-items:flex-start; gap:.5rem;
-  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
-  border-radius:var(--radius); padding:.65rem .85rem; font-size:.82rem; font-weight:600; margin-bottom:.8rem;
-}
-.ei-instr .instr-warning i { margin-top:.15rem; flex-shrink:0; }
+.ei-instr { text-align:left; min-width:0; }
 .kiosk-prep-error {
   margin-top:1rem; background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger-text);
   border-radius:var(--radius); padding:.65rem .9rem; font-size:.83rem; font-weight:600; display:none;
@@ -197,7 +189,7 @@ html, body { overflow:hidden !important; height:100% !important; }
     </div>
     <div class="kiosk-instr-card">
       <div class="kiosk-instr-title"><i class="fas fa-info-circle"></i> Exam Instructions</div>
-      <div class="ei-instr">{{ exam.instructions | format_instructions }}</div>
+      <div class="ei-instr instr-rich">{{ exam.instructions | format_instructions }}</div>
     </div>
     <div id="kioskPrepError" class="kiosk-prep-error"></div>
   </div></div>

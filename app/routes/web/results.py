@@ -129,72 +129,8 @@ def response_page(exam_id, result_id):
         flash(access.message, "warning")
         return redirect(url_for("dashboard.results_history"))
 
-    rid       = int(result_data["id"])
-    responses = get_responses_by_result(rid)
-    questions = get_questions_by_exam(exam_id)
-    q_map     = {int(q["id"]): q for q in questions}
-
-    from app.services.image_storage_service import resolve_question_image_urls_bulk
-
-    # ── Bulk-resolve unique image paths first (concurrently — see
-    #    resolve_question_image_urls_bulk docstring for why) ──
-    unique_paths = set()
-    for resp in responses:
-        qid = int(resp.get("question_id", 0))
-        q   = q_map.get(qid, {})
-        if not q:
-            continue
-        ip = q.get("image_path", "")
-        if ip and str(ip).strip() not in ("", "nan", "None"):
-            unique_paths.add(str(ip).strip())
-
-    image_url_map = resolve_question_image_urls_bulk(unique_paths)
-
-    parsed_responses = []
-    for resp in responses:
-        qid    = int(resp.get("question_id", 0))
-        q      = q_map.get(qid, {})
-        if not q:
-            continue
-        image_path = q.get("image_path", "")
-        if image_path and str(image_path).strip() not in ("", "nan", "None"):
-            has_img, img_url = image_url_map.get(str(image_path).strip(), (False, None))
-            q["has_image"] = has_img
-            q["image_url"] = img_url
-        else:
-            q["has_image"] = False
-            q["image_url"] = None
-        qtype  = str(resp.get("question_type","MCQ"))
-        given  = str(resp.get("given_answer","") or "")
-        corr   = str(resp.get("correct_answer","") or "")
-
-        def _parse_ans(raw, qt):
-            if not raw or raw in ("None","nan",""):
-                return None
-            try:
-                if qt == "MSQ":
-                    return json.loads(raw) if raw.startswith("[") else [x.strip() for x in raw.split(",")]
-            except Exception:
-                pass
-            return raw
-
-        given_parsed = _parse_ans(given, qtype) or "Not Answered"
-        corr_parsed  = _parse_ans(corr, qtype) or "N/A"
-
-        is_att = resp.get("is_attempted", True)
-        if isinstance(is_att, str): is_att = is_att.lower() in ("true","1","yes")
-        is_cor = resp.get("is_correct", False)
-        if isinstance(is_cor, str): is_cor = is_cor.lower() in ("true","1","yes")
-
-        parsed_responses.append({
-            "question":      q,
-            "given_answer":  given_parsed,
-            "correct_answer": corr_parsed,
-            "is_correct":    is_cor,
-            "is_attempted":  is_att,
-            "marks_obtained": float(resp.get("marks_obtained",0) or 0),
-            "question_type": qtype,
-        })
+    from app.services.response_view_service import build_response_rows
+    parsed_responses = build_response_rows(int(result_data["id"]), exam_id)
 
     standalone = request.args.get("popup", "0") == "1"
     # "View Question" in the Assistant opens this page marked from=assistant; Discuss with AI is hidden only there (it would

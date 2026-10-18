@@ -292,13 +292,19 @@ _ADMIN_LIST_COLS = ",".join(f"e.{c}" for c in _ALL_COLS.split(","))
 
 
 def get_exams_page(search: str = "", category_id=None, subcategory_id=None, status: str = "",
-                    page=1, per_page=20) -> Dict:
+                    page=1, per_page=20, advanced=None) -> Dict:
     """Admin exam list: search/category/subcategory filter in SQL (cheap,
     indexed); the status filter/badge uses each exam's EFFECTIVE status —
     see _filter_paginate_by_effective_status() — so a Scheduled Exam shows
     up under the right status filter without its `status` column ever
-    being written automatically."""
+    being written automatically.
+
+    `advanced` is an already-validated app.services.exam_filters filter
+    ({"match","conditions"}); it is evaluated in Python over these same
+    bounded rows, on top of (AND) the search/category/status controls."""
     try:
+        from app.services import exam_filters
+        extras = exam_filters.needed_extras(advanced)
         where, params = [], []
         if search:
             where.append("e.name ILIKE %s")
@@ -319,6 +325,23 @@ def get_exams_page(search: str = "", category_id=None, subcategory_id=None, stat
             f"{where_sql} ORDER BY e.id",
             params,
         )
+        if advanced:
+            if "questions_added" in extras and rows:
+                qc = {int(r["exam_id"]): int(r["n"]) for r in fetch_all(
+                    "SELECT exam_id, COUNT(*) AS n FROM questions WHERE exam_id = ANY(%s) GROUP BY exam_id",
+                    ([r["id"] for r in rows],))}
+                for r in rows:
+                    r["questions_added"] = qc.get(int(r["id"]), 0)
+            if "attempts_made" in extras and rows:
+                from app.db.attempts import get_attempt_counts as _counts
+                ac = _counts([r["id"] for r in rows])
+                for r in rows:
+                    r["attempts_made"] = ac.get(int(r["id"]), 0)
+            # the status condition needs effective_status, which the tail below also sets (idempotent)
+            from app.services.exam_service import get_effective_status
+            for r in rows:
+                r["effective_status"] = get_effective_status(r)
+            rows = exam_filters.apply_advanced_filter(rows, advanced)
         result = _filter_paginate_by_effective_status(rows, status, page, per_page, reverse=True)
         # UI-facing S.No., not the DB id — see attach_row_numbers(). Admin-
         # list-only: get_exams_by_subcategory_page() (student dashboard)

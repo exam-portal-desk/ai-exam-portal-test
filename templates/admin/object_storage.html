@@ -84,14 +84,16 @@ table.os-table td { padding: .6rem 1rem; border-bottom: 1px solid var(--border);
 table.os-table tr:last-child td { border-bottom: none; }
 table.os-table tr.folder-row { cursor: pointer; }
 table.os-table tr.folder-row:hover { background: var(--surface-2); }
-.os-name { color: var(--text-1); font-weight: 500; word-break: break-all; }
+.os-name { color: var(--text-1); font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+.os-meta { display: none; font-size: .72rem; color: var(--text-3); margin-top: .15rem; }
+.os-name-wrap { min-width: 0; flex: 1 1 auto; }
 .os-thumb {
   width: 34px; height: 34px; border-radius: 6px; object-fit: cover;
   border: 1px solid var(--border); background: var(--surface-2); flex-shrink: 0;
 }
 .os-icon { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
   border-radius: 6px; background: var(--surface-2); color: var(--text-3); flex-shrink: 0; }
-.os-name-cell { display: flex; align-items: center; gap: .6rem; }
+.os-name-cell { display: flex; align-items: center; gap: .6rem; min-width: 0; }
 .os-row-actions { display: flex; gap: .4rem; justify-content: flex-end; }
 .os-icon-btn {
   background: none; border: 1px solid var(--border); border-radius: 6px;
@@ -100,6 +102,19 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
 }
 .os-icon-btn:hover { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-bg); }
 
+.os-ftag { display: inline-block; font-size: .66rem; font-weight: 700; padding: .05rem .45rem; border-radius: 20px; border: 1px solid; margin-left: .35rem; vertical-align: middle; }
+.os-ftag.ok { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.os-ftag.bad { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+.os-ftag.warn { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+.fd-list { list-style: none; margin: 0 0 .85rem; padding: 0; max-height: 34vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.fd-list li { padding: .55rem .75rem; border-bottom: 1px solid var(--border); font-size: .82rem; color: var(--text-2); }
+.fd-list li:last-child { border-bottom: none; }
+.fd-name { color: var(--text-1); font-weight: 700; overflow-wrap: anywhere; }
+.fd-sub { display: block; font-size: .74rem; color: var(--text-3); margin-top: .15rem; overflow-wrap: anywhere; }
+.fd-sub.bad { color: var(--danger-text); }
+.fd-sub.warn { color: var(--warning-text); }
+.fd-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem .7rem; font-size: .85rem; color: var(--text-1); font-family: monospace; }
+.fd-input:focus { outline: none; border-color: var(--danger); }
 .os-empty { padding: 3rem 1rem; text-align: center; color: var(--text-3); }
 .os-empty i { font-size: 2rem; opacity: .4; display: block; margin-bottom: .75rem; }
 
@@ -109,11 +124,30 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
 }
 .del-warn-t { font-size: .82rem; font-weight: 700; color: var(--danger-text); margin-bottom: .35rem; display: flex; align-items: center; gap: .35rem; }
 .del-warn ul { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--text-2); line-height: 1.85; }
+@media (max-width: 720px) {
+  .os-toolbar { padding: .75rem; }
+  .os-search { min-width: 0; flex: 1 1 100%; font-size: 16px; }
+  .os-stats { white-space: normal; flex: 1 1 100%; }
+  .os-toolbar .btn-flat, .os-selectbar .btn-flat { flex: 1 1 auto; justify-content: center; white-space: normal; }
+  .os-selectbar { padding: .6rem .75rem; }
+  .os-sel-count { flex: 1 1 100%; margin-right: 0; }
+  .os-breadcrumb { padding: .6rem .75rem; }
+  table.os-table, table.os-table tbody { display: block; width: 100%; }
+  table.os-table thead { display: none; }
+  table.os-table tr { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: .1rem .5rem; padding: .6rem .75rem; border-bottom: 1px solid var(--border); }
+  table.os-table tr:last-child { border-bottom: none; }
+  table.os-table td { display: block; padding: 0; border: none; min-width: 0; }
+  table.os-table td.os-c-size, table.os-table td.os-c-mod, table.os-table td.os-c-spacer { display: none; }
+  .os-meta { display: block; }
+  .os-row-actions { flex-wrap: nowrap; }
+  .os-icon-btn { width: 34px; height: 34px; }
+  .os-check, .os-fcheck { width: 18px; height: 18px; }
+}
 </style>
 
 <div class="page-top">
   <div>
-    <h1><i class="fas fa-hdd" style="color:var(--accent)"></i>Object Storage</h1>
+    <h1><i class="fas {{ nav_icon('object_storage') }}" style="color:var(--accent)"></i>Object Storage</h1>
     <p>Browse, search, and manage objects in the active storage backend.</p>
   </div>
   <span class="backend-pill"><i class="fas fa-server"></i>{{ backend_label }} &middot; {{ bucket }}</span>
@@ -129,9 +163,10 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
   <div class="os-selectbar">
     <button class="btn-flat secondary" id="osSelectAll"><i class="fas fa-check-double"></i> Select All</button>
     <button class="btn-flat secondary" id="osClearSelection"><i class="fas fa-times"></i> Clear Selection</button>
-    <span class="os-sel-count"><span id="osSelCount">0</span> object(s) selected</span>
+    <span class="os-sel-count"><span id="osSelCount">0</span> object(s), <span id="osFolderSelCount">0</span> folder(s) selected</span>
     <button class="btn-flat secondary" id="osBulkDownload" disabled><i class="fas fa-download"></i> Download Selected</button>
     <button class="btn-flat danger" id="osBulkDelete" disabled><i class="fas fa-trash"></i> Delete Selected</button>
+    <button class="btn-flat danger" id="osBulkDeleteFolders" disabled><i class="fas fa-folder-minus"></i> Delete Folders</button>
   </div>
   <div class="os-breadcrumb" id="osBreadcrumb"></div>
   <div id="osTableWrap"></div>
@@ -169,6 +204,26 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
   </div>
 </div>
 
+<!-- Delete folders: review + typed confirmation (same principles as Delete Account: irreversible warning, explicit
+     acknowledgement, typed phrase; the server re-validates every folder and a signed token ties it to this review) -->
+<div class="modal fade" id="osFolderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:560px">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--danger-bg);border-bottom:1px solid var(--danger-border)!important">
+        <h5 class="modal-title" style="font-size:.92rem;font-weight:700;color:var(--danger-text);display:flex;align-items:center;gap:.45rem">
+          <i class="fas fa-folder-minus"></i> Delete folders
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="osFolderBody"></div>
+      <div class="modal-footer" id="osFolderFooter">
+        <button class="btn-flat secondary" data-bs-dismiss="modal" id="osFolderCancel">Cancel</button>
+        <button class="btn-flat danger" id="osFolderConfirm" disabled><i class="fas fa-trash"></i> Delete folders</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -178,11 +233,20 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
   var DELETE_URL = '{{ url_for("admin_api.delete_storage_objects") }}';
   var DOWNLOAD_URL = '{{ url_for("admin_api.download_storage_object") }}';
   var DOWNLOAD_ZIP_URL = '{{ url_for("admin_api.download_storage_objects_zip") }}';
+  var FOLDER_PREVIEW_URL = '{{ url_for("admin_api.preview_storage_folder_delete") }}';
+  var FOLDER_DELETE_URL = '{{ url_for("admin_api.delete_storage_folders") }}';
 
   var state = { prefix: '', cursor: null, objects: [], prefixes: [], searching: false };
   var selected = new Set();
+  var selectedFolders = new Set();
+  var folderReview = null;
+  var folderModal;
   var pendingDeleteKeys = [];
   var delModal;
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
 
   function fmtBytes(n) {
     if (!n) return '0 B';
@@ -197,7 +261,7 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
     var acc = '';
     parts.forEach(function (p) {
       acc += p + '/';
-      html += '<span class="sep">/</span><button data-go="' + acc + '">' + p + '</button>';
+      html += '<span class="sep">/</span><button data-go="' + esc(acc) + '">' + esc(p) + '</button>';
     });
     el.innerHTML = html;
     el.querySelectorAll('button').forEach(function (b) {
@@ -221,32 +285,34 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
         var label = p.key.replace(state.prefix, '').replace(/\/$/, '');
         var sizeText = fmtBytes(p.size) + (p.truncated ? '+' : '');
         var modText = p.last_modified || '&mdash;';
-        rows += '<tr class="folder-row" data-folder="' + p.key + '">' +
-          '<td></td>' +
+        rows += '<tr class="folder-row" data-folder="' + esc(p.key) + '">' +
+          '<td><input type="checkbox" class="os-fcheck" data-folder-key="' + esc(p.key) + '" title="Select folder" ' + (selectedFolders.has(p.key) ? 'checked' : '') + '></td>' +
           '<td><div class="os-name-cell"><div class="os-icon"><i class="fas fa-folder"></i></div>' +
-          '<span class="os-name">' + label + '/</span></div></td>' +
-          '<td>' + sizeText + '</td>' +
-          '<td>' + modText + '</td>' +
-          '<td></td>' +
+          '<div class="os-name-wrap"><span class="os-name">' + esc(label) + '/</span>' +
+          '<div class="os-meta">' + p.object_count + (p.truncated ? '+' : '') + ' file(s) &middot; ' + sizeText + '</div></div></div></td>' +
+          '<td class="os-c-size">' + sizeText + '</td>' +
+          '<td class="os-c-mod">' + modText + '</td>' +
+          '<td class="os-c-spacer"></td>' +
           '<td></td></tr>';
       });
     }
 
     state.objects.forEach(function (o) {
       var thumb = o.is_image
-        ? '<img class="os-thumb" src="' + o.preview_url + '" loading="lazy">'
+        ? '<img class="os-thumb" src="' + esc(o.preview_url) + '" loading="lazy">'
         : '<div class="os-icon"><i class="fas fa-file"></i></div>';
       var checked = selected.has(o.key) ? 'checked' : '';
       rows += '<tr>' +
-        '<td><input type="checkbox" class="os-check" data-key="' + o.key.replace(/"/g, '&quot;') + '" ' + checked + '></td>' +
-        '<td><div class="os-name-cell">' + thumb + '<span class="os-name">' + o.key + '</span></div></td>' +
-        '<td>' + fmtBytes(o.size) + '</td>' +
-        '<td>' + (o.last_modified || '&mdash;') + '</td>' +
-        '<td></td>' +
+        '<td><input type="checkbox" class="os-check" data-key="' + esc(o.key) + '" ' + checked + '></td>' +
+        '<td><div class="os-name-cell">' + thumb + '<div class="os-name-wrap"><span class="os-name">' + esc(o.key) + '</span>' +
+        '<div class="os-meta">' + fmtBytes(o.size) + ' &middot; ' + esc(o.last_modified || '\u2014') + '</div></div></div></td>' +
+        '<td class="os-c-size">' + fmtBytes(o.size) + '</td>' +
+        '<td class="os-c-mod">' + esc(o.last_modified || '\u2014') + '</td>' +
+        '<td class="os-c-spacer"></td>' +
         '<td><div class="os-row-actions">' +
-        (o.is_image ? '<a class="os-icon-btn" href="' + o.preview_url + '" target="_blank" rel="noopener" title="Preview"><i class="fas fa-eye"></i></a>' : '') +
+        (o.is_image ? '<a class="os-icon-btn" href="' + esc(o.preview_url) + '" target="_blank" rel="noopener" title="Preview"><i class="fas fa-eye"></i></a>' : '') +
         '<a class="os-icon-btn" href="' + DOWNLOAD_URL + '?key=' + encodeURIComponent(o.key) + '" title="Download"><i class="fas fa-download"></i></a>' +
-        '<button class="os-icon-btn" data-del="' + o.key.replace(/"/g, '&quot;') + '" title="Delete"><i class="fas fa-trash"></i></button>' +
+        '<button class="os-icon-btn" data-del="' + esc(o.key) + '" title="Delete"><i class="fas fa-trash"></i></button>' +
         '</div></td></tr>';
     });
 
@@ -255,8 +321,8 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
     } else {
       wrap.innerHTML =
         '<table class="os-table"><thead><tr>' +
-        '<th style="width:34px"></th><th>Object</th><th style="width:100px">Size</th>' +
-        '<th style="width:160px">Modified</th><th style="width:1px"></th><th style="width:80px"></th>' +
+        '<th style="width:34px"></th><th>Object</th><th class="os-c-size" style="width:100px">Size</th>' +
+        '<th class="os-c-mod" style="width:160px">Modified</th><th class="os-c-spacer" style="width:1px"></th><th style="width:80px"></th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
@@ -267,6 +333,14 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
   function wireRowEvents() {
     document.querySelectorAll('tr.folder-row').forEach(function (tr) {
       tr.addEventListener('click', function () { navigateTo(tr.getAttribute('data-folder')); });
+    });
+    document.querySelectorAll('.os-fcheck').forEach(function (cb) {
+      cb.addEventListener('click', function (e) { e.stopPropagation(); });
+      cb.addEventListener('change', function () {
+        var key = cb.getAttribute('data-folder-key');
+        if (cb.checked) selectedFolders.add(key); else selectedFolders.delete(key);
+        updateSelectionUI();
+      });
     });
     document.querySelectorAll('.os-check').forEach(function (cb) {
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -286,19 +360,23 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
 
   function updateSelectionUI() {
     document.getElementById('osSelCount').textContent = selected.size;
+    document.getElementById('osFolderSelCount').textContent = selectedFolders.size;
+    document.getElementById('osBulkDeleteFolders').disabled = selectedFolders.size === 0;
     document.getElementById('osBulkDelete').disabled = selected.size === 0;
     document.getElementById('osBulkDownload').disabled = selected.size === 0;
   }
 
   function selectAllVisible() {
     state.objects.forEach(function (o) { selected.add(o.key); });
-    document.querySelectorAll('.os-check').forEach(function (cb) { cb.checked = true; });
+    state.prefixes.forEach(function (p) { selectedFolders.add(p.key); });
+    document.querySelectorAll('.os-check, .os-fcheck').forEach(function (cb) { cb.checked = true; });
     updateSelectionUI();
   }
 
   function clearSelection() {
     selected.clear();
-    document.querySelectorAll('.os-check').forEach(function (cb) { cb.checked = false; });
+    selectedFolders.clear();
+    document.querySelectorAll('.os-check, .os-fcheck').forEach(function (cb) { cb.checked = false; });
     updateSelectionUI();
   }
 
@@ -348,6 +426,7 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
     state.prefix = prefix || '';
     state.cursor = null;
     selected.clear();
+    selectedFolders.clear();
     updateSelectionUI();
     document.getElementById('osSearch').value = '';
     renderBreadcrumb();
@@ -402,8 +481,115 @@ table.os-table tr.folder-row:hover { background: var(--surface-2); }
       .finally(function () { btn.disabled = false; });
   }
 
+  function jsonFetch(url, method, body) {
+    return fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return { success: false, message: 'Unexpected server response.' }; }); });
+  }
+
+  function setFolderFooter(confirmVisible, cancelLabel) {
+    document.getElementById('osFolderConfirm').style.display = confirmVisible ? '' : 'none';
+    document.getElementById('osFolderCancel').textContent = cancelLabel || 'Cancel';
+  }
+
+  function openFolderDelete() {
+    var folders = Array.from(selectedFolders);
+    if (!folders.length) return;
+    folderReview = null;
+    var body = document.getElementById('osFolderBody');
+    body.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Checking the selected folders…</div>';
+    setFolderFooter(true);
+    document.getElementById('osFolderConfirm').disabled = true;
+    folderModal.show();
+    jsonFetch(FOLDER_PREVIEW_URL, 'POST', { folders: folders }).then(function (d) {
+      if (!d.success) { body.innerHTML = '<div class="del-warn"><div class="del-warn-t"><i class="fas fa-exclamation-triangle"></i> ' + esc(d.message || 'Could not check the folders.') + '</div></div>'; setFolderFooter(false, 'Close'); return; }
+      renderFolderReview(d);
+    }).catch(function () {
+      body.innerHTML = '<div class="del-warn"><div class="del-warn-t"><i class="fas fa-exclamation-triangle"></i> Network error. Nothing was deleted.</div></div>';
+      setFolderFooter(false, 'Close');
+    });
+  }
+
+  function renderFolderReview(d) {
+    folderReview = d;
+    var items = d.folders.map(function (f) {
+      var tag = f.status === 'deletable' ? '<span class="os-ftag ok">Will be deleted</span>'
+        : f.status === 'blocked' ? '<span class="os-ftag bad">Blocked</span>' : '<span class="os-ftag warn">Nothing to delete</span>';
+      var sub = f.status === 'deletable' ? f.object_count + ' file(s) · ' + fmtBytes(f.total_bytes) : '';
+      var extra = f.reason ? '<span class="fd-sub bad">' + esc(f.reason) + '</span>' : '';
+      (f.warnings || []).forEach(function (w) { extra += '<span class="fd-sub warn">' + esc(w) + '</span>'; });
+      return '<li><span class="fd-name"><i class="fas fa-folder"></i> ' + esc(f.key) + '</span>' + tag +
+        (sub ? '<span class="fd-sub">' + esc(sub) + '</span>' : '') + extra + '</li>';
+    }).join('');
+    var html = '<ul class="fd-list">' + items + '</ul>';
+    if (!d.deletable_count) {
+      document.getElementById('osFolderBody').innerHTML = html + '<div class="os-empty" style="padding:.5rem">None of the selected folders can be deleted.</div>';
+      setFolderFooter(false, 'Close');
+      return;
+    }
+    html += '<div class="del-warn"><div class="del-warn-t"><i class="fas fa-exclamation-triangle"></i> This is IRREVERSIBLE</div><ul>' +
+      '<li><strong>' + d.deletable_count + '</strong> folder(s) with <strong>' + d.total_objects + '</strong> file(s) (' + esc(fmtBytes(d.total_bytes)) + ') will be permanently deleted</li>' +
+      '<li>Files are removed from storage immediately and cannot be recovered</li>' +
+      (d.deletable_count < d.folders.length ? '<li>Blocked folders above will be left untouched</li>' : '') +
+      '</ul></div>' +
+      '<label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.8rem;color:var(--text-2);margin-bottom:.85rem;cursor:pointer;line-height:1.5">' +
+      '<input type="checkbox" id="fdAck" style="margin-top:.2rem;accent-color:var(--danger)"><span>I understand these folders and their files will be permanently deleted.</span></label>' +
+      '<div style="font-size:.8rem;color:var(--text-2);font-weight:600;margin-bottom:.4rem">Type <span style="color:var(--danger-text);font-family:monospace">' + esc(d.phrase) + '</span> to confirm:</div>' +
+      '<input class="fd-input" id="fdPhrase" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="' + esc(d.phrase) + '">';
+    document.getElementById('osFolderBody').innerHTML = html;
+    setFolderFooter(true);
+    var check = function () {
+      document.getElementById('osFolderConfirm').disabled =
+        !(document.getElementById('fdAck').checked && document.getElementById('fdPhrase').value === d.phrase);
+    };
+    document.getElementById('fdAck').addEventListener('change', check);
+    document.getElementById('fdPhrase').addEventListener('input', check);
+    document.getElementById('osFolderConfirm').disabled = true;
+  }
+
+  function performFolderDelete() {
+    if (!folderReview) return;
+    var btn = document.getElementById('osFolderConfirm');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting…';
+    var keys = folderReview.folders.filter(function (f) { return f.status === 'deletable'; }).map(function (f) { return f.key; });
+    jsonFetch(FOLDER_DELETE_URL, 'DELETE', {
+      folders: keys, token: folderReview.token, confirm: document.getElementById('fdPhrase').value, acknowledge: document.getElementById('fdAck').checked,
+    }).then(function (d) {
+      btn.innerHTML = '<i class="fas fa-trash"></i> Delete folders';
+      if (!d.results) {
+        document.getElementById('osFolderBody').insertAdjacentHTML('afterbegin', '<div class="del-warn"><div class="del-warn-t"><i class="fas fa-exclamation-triangle"></i> ' + esc(d.message || 'Deletion failed.') + '</div></div>');
+        btn.disabled = false;
+        return;
+      }
+      var items = d.results.map(function (r) {
+        var tag = r.status === 'deleted' ? '<span class="os-ftag ok">Deleted</span>'
+          : (r.status === 'partial' ? '<span class="os-ftag warn">Partly deleted</span>' : '<span class="os-ftag bad">' + (r.status === 'skipped' ? 'Not attempted' : 'Not deleted') + '</span>');
+        return '<li><span class="fd-name"><i class="fas fa-folder"></i> ' + esc(r.key) + '</span>' + tag +
+          '<span class="fd-sub ' + (r.status === 'deleted' ? '' : 'bad') + '">' + esc(r.message || '') + '</span></li>';
+      }).join('');
+      var head = d.all_deleted ? 'All selected folders were deleted.'
+        : (d.deleted_folders + ' folder(s) deleted, ' + d.failed_folders + ' not fully deleted.');
+      document.getElementById('osFolderBody').innerHTML =
+        '<div class="del-warn" style="' + (d.all_deleted ? 'background:var(--success-bg);border-color:var(--success-border)' : '') + '"><div class="del-warn-t" style="' + (d.all_deleted ? 'color:var(--success-text)' : '') + '">' +
+        esc(head) + '</div></div><ul class="fd-list">' + items + '</ul>';
+      setFolderFooter(false, 'Close');
+      adminToast(head + (d.deleted_files ? ' ' + d.deleted_files + ' file(s) removed.' : ''), d.all_deleted ? 'success' : 'warning');
+      selectedFolders.clear();
+      folderReview = null;
+      updateSelectionUI();
+      load(false);
+    }).catch(function () {
+      btn.innerHTML = '<i class="fas fa-trash"></i> Delete folders';
+      btn.disabled = false;
+      adminToast('Network error. Refresh to see what was deleted.', 'danger');
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     delModal = new bootstrap.Modal(document.getElementById('osDeleteModal'));
+    folderModal = new bootstrap.Modal(document.getElementById('osFolderModal'));
+    document.getElementById('osBulkDeleteFolders').addEventListener('click', openFolderDelete);
+    document.getElementById('osFolderConfirm').addEventListener('click', performFolderDelete);
     renderBreadcrumb();
     load(false);
 

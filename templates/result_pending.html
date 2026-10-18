@@ -101,10 +101,10 @@
       </button>
       {% endif %}
       <a href="{{ url_for('dashboard.results_history') }}" class="pend-btn ghost">
-        <i class="fas fa-history"></i> Results History
+        <i class="fas {{ nav_icon('results_history') }}"></i> Results History
       </a>
       <a href="{{ url_for('dashboard.dashboard') }}" class="pend-btn ghost">
-        <i class="fas fa-home"></i> Dashboard
+        <i class="fas {{ nav_icon('dashboard') }}"></i> Dashboard
       </a>
     </div>
 

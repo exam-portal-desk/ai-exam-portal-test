@@ -3,271 +3,537 @@
 {% block title %}Analytics - SmartAIExam{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
+<script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
 <style>
-.an-main { flex:1; min-width:0; padding:1.5rem 1.75rem; }
-.an-head { margin-bottom:1.5rem; }
+.an-main { flex:1; min-width:0; padding:1.5rem 1.75rem; max-width:1400px; }
+.an-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1.1rem; }
 .an-head h1 { font-size:1.2rem; font-weight:700; color:var(--text-1); letter-spacing:-.02em; margin-bottom:.2rem; }
-.an-head p  { font-size:.8rem; color:var(--text-3); }
+.an-head p  { font-size:.8rem; color:var(--text-3); margin:0; }
+.an-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+.an-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.45rem .9rem; border-radius:var(--radius); font:inherit; font-size:.78rem; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); }
+.an-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.an-btn:disabled { opacity:.5; cursor:not-allowed; }
+.an-btn.primary { background:var(--accent); color:var(--accent-on); border-color:var(--accent); }
+.an-btn.primary:hover:not(:disabled) { background:var(--accent-hover); color:var(--accent-on); }
+
+/* Filters */
+.an-filters { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); padding:.9rem 1rem; margin-bottom:.8rem; }
+.an-presets { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.an-chip { border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); border-radius:999px; padding:.28rem .8rem; font:inherit; font-size:.76rem; font-weight:600; cursor:pointer; }
+.an-chip:hover { border-color:var(--accent); color:var(--accent); }
+.an-chip.active { background:var(--accent); border-color:var(--accent); color:var(--accent-on); }
+.an-frow { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:.6rem; align-items:end; }
+.an-field label { display:block; font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); margin-bottom:.25rem; }
+.an-field .sel-enh, .an-field .sel-enh-trigger { width:100%; min-width:0; }
+.an-field .sel-enh-trigger { background:var(--bg); padding:.45rem .6rem; font-size:.82rem; }
+.an-field select, .an-field input { width:100%; min-width:0; padding:.45rem .6rem; border-radius:var(--radius); border:1px solid var(--border); background:var(--bg); color:var(--text-1); font:inherit; font-size:.82rem; color-scheme:light dark; }
+.an-field select:focus, .an-field input:focus { outline:none; border-color:var(--border-focus, var(--accent)); box-shadow:0 0 0 3px var(--accent-subtle); }
+.an-scope { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; font-size:.78rem; color:var(--text-3); margin:0 0 .9rem; min-height:1.4em; }
+.an-scope strong { color:var(--text-1); }
+.an-note { display:flex; gap:.5rem; align-items:flex-start; background:var(--info-bg); border:1px solid var(--info-border); color:var(--info-text); border-radius:var(--radius); padding:.5rem .75rem; font-size:.76rem; margin-bottom:.9rem; }
+.an-note[hidden], .an-state[hidden], #anBody[hidden], .an-highlights[hidden] { display:none; }
 
 /* Stat cards */
-.an-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.25rem; }
-.an-stat {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:calc(var(--radius)+2px); padding:1.1rem 1.2rem;
-  position:relative; overflow:hidden;
-}
-.an-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
-.an-stat.c1::before { background:linear-gradient(90deg,var(--accent),#6366f1); }
-.an-stat.c2::before { background:linear-gradient(90deg,var(--success),#06b6d4); }
-.an-stat.c3::before { background:linear-gradient(90deg,var(--warning),#ef4444); }
-.an-stat.c4::before { background:linear-gradient(90deg,#7c3aed,#db2777); }
-.an-stat-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); margin-bottom:.45rem; }
-.an-stat-val { font-size:1.9rem; font-weight:800; color:var(--text-1); line-height:1; margin-bottom:.3rem; }
-.an-stat-sub { font-size:.72rem; color:var(--text-3); }
-.trend {
-  display:inline-flex; align-items:center; gap:.25rem;
-  font-size:.7rem; font-weight:700; padding:.18rem .45rem;
-  border-radius:6px; margin-top:.3rem;
-}
+.an-stats { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:.85rem; margin-bottom:1rem; }
+.an-stat { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); padding:.95rem 1.05rem; position:relative; overflow:hidden; min-width:0; }
+.an-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--accent); opacity:.8; }
+.an-stat-lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); margin-bottom:.4rem; display:flex; align-items:center; gap:.35rem; }
+.an-stat-val { font-size:1.65rem; font-weight:800; color:var(--text-1); line-height:1.05; margin-bottom:.25rem; font-variant-numeric:tabular-nums; }
+.an-stat-sub { font-size:.72rem; color:var(--text-3); min-height:1.1em; }
+.trend { display:inline-flex; align-items:center; gap:.25rem; font-size:.7rem; font-weight:700; padding:.15rem .45rem; border-radius:6px; }
 .trend-up   { background:var(--success-bg); color:var(--success-text); }
 .trend-down { background:var(--danger-bg);  color:var(--danger-text); }
 .trend-flat { background:var(--surface-2);  color:var(--text-3); }
 
-/* Charts row */
-.an-charts { display:grid; grid-template-columns:1fr 300px; gap:1rem; margin-bottom:1.25rem; }
-.an-card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:calc(var(--radius)+2px); padding:1.1rem 1.25rem;
-}
-.an-card-title {
-  font-size:.72rem; font-weight:700; text-transform:uppercase;
-  letter-spacing:.06em; color:var(--text-3);
-  margin-bottom:.85rem; display:flex; align-items:center; gap:.4rem;
-}
-.an-card-title i { color:var(--accent); }
+/* Metric explanation tooltip */
+.an-info { position:relative; display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); background:var(--surface-2); color:var(--text-3); font-size:.55rem; cursor:help; padding:0; font-family:inherit; text-transform:none; letter-spacing:0; }
+.an-info:hover, .an-info:focus-visible { border-color:var(--accent); color:var(--accent); outline:none; }
+.an-info::after { content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:max-content; max-width:min(240px, 70vw); background:var(--surface); color:var(--text-1); border:1px solid var(--border); border-radius:var(--radius); padding:.45rem .6rem; font-size:.7rem; font-weight:500; line-height:1.45; text-align:left; box-shadow:var(--shadow-md); opacity:0; pointer-events:none; transition:opacity .12s; z-index:30; white-space:normal; }
+.an-info:hover::after, .an-info:focus-visible::after, .an-info.open::after { opacity:1; }
 
-/* Bar chart */
-.bars-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:.6rem; }
-.bars-nav-btn {
-  background:var(--surface-2); border:1px solid var(--border);
-  color:var(--text-3); width:26px; height:26px;
-  border-radius:7px; cursor:pointer; display:flex;
-  align-items:center; justify-content:center; font-size:.65rem;
-  transition:all .12s;
+/* Cards / charts */
+.an-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.85rem; margin-bottom:.85rem; }
+.an-card { background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); padding:1rem 1.1rem; min-width:0; }
+.an-card.wide { grid-column:1 / -1; }
+.an-card-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); margin-bottom:.8rem; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+.an-card-title i.ic { color:var(--accent); }
+.an-card-title .spacer { flex:1; }
+.an-seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.an-seg button { border:none; background:var(--surface-2); color:var(--text-3); font:inherit; font-size:.68rem; font-weight:700; padding:.2rem .6rem; cursor:pointer; text-transform:none; letter-spacing:0; }
+.an-seg button.active { background:var(--accent); color:var(--accent-on); }
+.an-chart { position:relative; height:260px; }
+.an-chart.tall { height:300px; }
+.an-chart canvas { max-width:100%; }
+.an-card-empty { display:none; text-align:center; color:var(--text-3); font-size:.8rem; padding:2.2rem 1rem; }
+.an-card.is-empty .an-chart, .an-card.is-empty .an-table-wrap, .an-card.is-empty .an-legend { display:none; }
+.an-card.is-empty .an-card-empty { display:block; }
+.an-legend { display:flex; flex-wrap:wrap; gap:.4rem .9rem; margin-top:.6rem; font-size:.73rem; color:var(--text-2); }
+.an-legend span { display:inline-flex; align-items:center; gap:.4rem; }
+.an-legend i { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.an-highlights { margin:0 0 .9rem; padding:0; list-style:none; display:grid; gap:.4rem; }
+.an-highlights li { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:var(--radius); padding:.5rem .75rem; font-size:.8rem; color:var(--text-2); }
+
+/* Tables */
+.an-table-wrap { overflow-x:auto; }
+.an-table { width:100%; border-collapse:collapse; min-width:520px; }
+.an-table th { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); padding:.5rem .7rem; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap; }
+.an-table td { font-size:.8rem; color:var(--text-2); padding:.6rem .7rem; border-bottom:1px solid var(--border); vertical-align:middle; }
+.an-table tr:last-child td { border-bottom:none; }
+.an-table tbody tr:hover td { background:var(--surface-2); }
+.an-name { max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:var(--text-1); }
+.an-pct { display:flex; align-items:center; gap:.5rem; }
+.an-pct-bg { flex:1; height:5px; background:var(--border); border-radius:3px; min-width:48px; }
+.an-pct-fg { height:100%; border-radius:3px; background:var(--accent); }
+.an-grade { display:inline-flex; align-items:center; justify-content:center; min-width:26px; height:26px; padding:0 .3rem; border-radius:13px; font-size:.7rem; font-weight:800; background:var(--accent-subtle); color:var(--accent); border:1px solid var(--border); }
+.an-link { color:var(--accent); font-weight:600; text-decoration:none; font-size:.76rem; white-space:nowrap; }
+.an-link:hover { text-decoration:underline; }
+.up { color:var(--success-text); font-weight:700; } .down { color:var(--danger-text); font-weight:700; }
+
+/* States */
+.an-state { text-align:center; padding:3.2rem 1.5rem; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); }
+.an-state i.big { font-size:2rem; color:var(--text-3); opacity:.4; display:block; margin-bottom:.8rem; }
+.an-state h3 { font-size:.95rem; font-weight:700; color:var(--text-2); margin-bottom:.3rem; }
+.an-state p { font-size:.8rem; color:var(--text-3); margin:0 0 .9rem; }
+.an-skel { display:grid; gap:.85rem; }
+.an-skel div { border-radius:calc(var(--radius)+2px); background:linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%); background-size:200% 100%; animation:an-shimmer 1.3s linear infinite; border:1px solid var(--border); }
+.an-skel .r1 { height:92px; } .an-skel .r2 { height:280px; }
+@keyframes an-shimmer { to { background-position:-200% 0; } }
+#anMain[aria-busy="true"] #anBody { opacity:.55; transition:opacity .15s; pointer-events:none; }
+
+@media (max-width:1000px) { .an-stats { grid-template-columns:repeat(2, minmax(0, 1fr)); } .an-grid { grid-template-columns:minmax(0, 1fr); } }
+@media (max-width:768px) { .an-main { padding:1rem; } .an-stat-val { font-size:1.4rem; } .an-chart { height:230px; } .an-field select, .an-field input { font-size:16px; } }
+@media (max-width:420px) { .an-stats { gap:.55rem; } .an-stat { padding:.75rem .8rem; } .an-actions { width:100%; } .an-actions .an-btn { flex:1; justify-content:center; } }
+@media (prefers-reduced-motion: reduce) { .an-skel div { animation:none; } }
+
+@media print {
+  .sb, .sb-overlay, .t-nav, .app-footer, .an-actions, .an-filters, .an-seg, .an-info, .an-state, .an-note { display:none !important; }
+  .app-shell, .page-main { display:block !important; margin:0 !important; padding:0 !important; min-height:0 !important; }
+  .an-main { padding:0; max-width:100%; }
+  body { background:#fff !important; }
+  .an-card, .an-stat { break-inside:avoid; box-shadow:none !important; }
+  .an-grid { grid-template-columns:1fr 1fr; }
+  .an-stats { grid-template-columns:repeat(4, 1fr); }
+  .an-table-wrap { overflow:visible; }
+  .an-scope { color:#444; }
 }
-.bars-nav-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
-.bars-nav-btn:disabled { opacity:.25; cursor:default; }
-.bars-pg { font-size:.7rem; color:var(--text-3); }
-.score-bars { display:flex; align-items:flex-end; gap:.5rem; height:180px; padding:.5rem 0 0; }
-.score-bar-wrap { display:flex; flex-direction:column; align-items:center; gap:.3rem; flex:1; min-width:0; }
-.score-bar-outer { width:100%; max-width:42px; background:var(--surface-2); border-radius:5px 5px 0 0; position:relative; display:flex; align-items:flex-end; }
-.score-bar-fill { width:100%; border-radius:5px 5px 0 0; transition:height .4s ease; cursor:pointer; }
-.score-bar-pct { font-size:.62rem; font-weight:700; color:var(--text-3); }
-.score-bar-name { font-size:.6rem; color:var(--text-3); text-align:center; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.bar-tip {
-  position:fixed; background:var(--surface); border:1px solid var(--border);
-  color:var(--text-1); font-size:.72rem; font-weight:600;
-  padding:.4rem .65rem; border-radius:var(--radius);
-  white-space:nowrap; pointer-events:none; opacity:0;
-  transition:opacity .12s; z-index:999; line-height:1.6;
-  box-shadow:var(--shadow-md);
-}
-.bar-tip.show { opacity:1; }
-
-/* Donut */
-.donut-box { height:200px; position:relative; }
-.donut-legend { display:flex; flex-direction:column; gap:.4rem; margin-top:.65rem; }
-.donut-legend-item { display:flex; align-items:center; gap:.45rem; font-size:.73rem; color:var(--text-2); }
-.donut-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
-
-/* Performance table */
-.perf-table-wrap { overflow-x:auto; }
-.perf-table { width:100%; border-collapse:collapse; min-width:420px; }
-.perf-table th { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); padding:.55rem .85rem; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap; }
-.perf-table td { font-size:.82rem; color:var(--text-2); padding:.65rem .85rem; border-bottom:1px solid var(--border); vertical-align:middle; }
-.perf-table tr:last-child td { border-bottom:none; }
-.perf-table tr:hover td { background:var(--surface-2); }
-.perf-exam-name { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:var(--text-1); }
-.pct-bar-wrap { display:flex; align-items:center; gap:.5rem; }
-.pct-bar-bg { flex:1; height:4px; background:var(--border); border-radius:3px; min-width:50px; }
-.pct-bar-fg { height:100%; border-radius:3px; background:var(--accent); }
-.pct-text { font-size:.73rem; font-weight:700; color:var(--text-3); white-space:nowrap; min-width:36px; }
-.grade-pill {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:26px; height:26px; border-radius:50%;
-  font-size:.7rem; font-weight:800;
-  background:var(--accent-subtle); color:var(--accent);
-  border:1px solid var(--border);
-}
-
-/* No data */
-.an-empty { text-align:center; padding:4rem 2rem; background:var(--surface); border:1px solid var(--border); border-radius:calc(var(--radius)+2px); }
-.an-empty i { font-size:2rem; color:var(--text-3); opacity:.3; display:block; margin-bottom:.85rem; }
-.an-empty h3 { font-size:.95rem; font-weight:700; color:var(--text-2); margin-bottom:.3rem; }
-.an-empty p  { font-size:.8rem; color:var(--text-3); }
-
-@media(max-width:900px){ .an-stats{grid-template-columns:repeat(2,1fr);} .an-charts{grid-template-columns:1fr;} }
-@media(max-width:768px){ .an-main{padding:1rem;} .an-stats{grid-template-columns:repeat(2,1fr);gap:.6rem;} }
 </style>
 
-<main class="an-main">
+<main class="an-main" id="anMain" aria-busy="true">
   <div class="an-head">
-    <h1><i class="fas fa-chart-line" style="color:var(--accent);margin-right:.45rem"></i>Performance Analytics</h1>
-    <p>Track your exam results and improvement over time</p>
-  </div>
-
-  {% if has_data %}
-
-  <div class="an-stats">
-    <div class="an-stat c1">
-      <div class="an-stat-lbl">Total Exams</div>
-      <div class="an-stat-val">{{ analytics_data.total_exams }}</div>
-      <div class="an-stat-sub">Completed</div>
+    <div>
+      <h1><i class="fas {{ nav_icon('analytics') }}" style="color:var(--accent);margin-right:.45rem"></i>Performance Analytics</h1>
+      <p>Your results and improvement over time. Only your own attempts are ever used.</p>
     </div>
-    <div class="an-stat c2">
-      <div class="an-stat-lbl">Average Score</div>
-      <div class="an-stat-val">{{ analytics_data.average_score }}%</div>
-      {% set t = analytics_data.improvement_trend %}
-      {% if t > 0 %}
-        <div class="trend trend-up"><i class="fas fa-arrow-up"></i> +{{ t }}%</div>
-      {% elif t < 0 %}
-        <div class="trend trend-down"><i class="fas fa-arrow-down"></i> {{ t }}%</div>
-      {% else %}
-        <div class="trend trend-flat"><i class="fas fa-minus"></i> Stable</div>
-      {% endif %}
-    </div>
-    <div class="an-stat c3">
-      <div class="an-stat-lbl">Highest Score</div>
-      <div class="an-stat-val">{{ analytics_data.highest_score }}%</div>
-      <div class="an-stat-sub">Best attempt</div>
-    </div>
-    <div class="an-stat c4">
-      <div class="an-stat-lbl">Lowest Score</div>
-      <div class="an-stat-val">{{ analytics_data.lowest_score }}%</div>
-      <div class="an-stat-sub">Needs focus</div>
+    <div class="an-actions">
+      <button type="button" class="an-btn" id="anPrint" disabled><i class="fas fa-print"></i> Print</button>
+      <button type="button" class="an-btn primary" id="anExport" disabled><i class="fas fa-image"></i> Export PNG</button>
     </div>
   </div>
 
-  <div class="an-charts">
-    <div class="an-card">
-      <div class="an-card-title"><i class="fas fa-chart-bar"></i> Score Trends</div>
-      <div class="bars-nav">
-        <button class="bars-nav-btn" id="barsPrev" onclick="barsPage(-1)"><i class="fas fa-chevron-left"></i></button>
-        <span class="bars-pg" id="barsPgInfo"></span>
-        <button class="bars-nav-btn" id="barsNext" onclick="barsPage(1)"><i class="fas fa-chevron-right"></i></button>
+  <section class="an-filters" aria-label="Filters">
+    <div class="an-presets" role="group" aria-label="Date range">
+      <button type="button" class="an-chip" data-preset="7">Last 7 days</button>
+      <button type="button" class="an-chip" data-preset="30">Last 30 days</button>
+      <button type="button" class="an-chip" data-preset="90">Last 90 days</button>
+      <button type="button" class="an-chip" data-preset="year">This year</button>
+      <button type="button" class="an-chip active" data-preset="all">All time</button>
+      <button type="button" class="an-chip" data-preset="custom">Custom</button>
+    </div>
+    <div class="an-frow">
+      <div class="an-field"><label for="anFrom">From</label><div class="dt-field"><input type="text" id="anFrom" class="dt-date-input" placeholder="Select date" readonly autocomplete="off"><i class="fas fa-calendar-days dt-field-icon"></i></div></div>
+      <div class="an-field"><label for="anTo">To</label><div class="dt-field"><input type="text" id="anTo" class="dt-date-input" placeholder="Select date" readonly autocomplete="off"><i class="fas fa-calendar-days dt-field-icon"></i></div></div>
+      <div class="an-field"><label for="anCategory">Category</label><select id="anCategory"><option value="">All categories</option></select></div>
+      <div class="an-field"><label for="anSubcategory">Subcategory</label><select id="anSubcategory"><option value="">All subcategories</option></select></div>
+      <div class="an-field"><label for="anExam">Exam</label><select id="anExam"><option value="">All exams</option></select></div>
+      <div class="an-field"><label for="anKind">Exam type</label>
+        <select id="anKind"><option value="">All types</option><option value="scheduled">Scheduled exams</option><option value="regular">Regular exams</option></select></div>
+      <div class="an-field"><button type="button" class="an-btn" id="anReset" style="width:100%;justify-content:center"><i class="fas fa-rotate-left"></i> Reset filters</button></div>
+    </div>
+  </section>
+
+  <div class="an-scope" id="anScope" aria-live="polite"></div>
+  <div class="an-note" id="anHidden" hidden><i class="fas fa-eye-slash" style="margin-top:.15rem"></i><span id="anHiddenText"></span></div>
+
+  <div class="an-state" id="anLoading"><div class="an-skel"><div class="r1"></div><div class="r2"></div></div></div>
+  <div class="an-state" id="anError" hidden><i class="fas fa-triangle-exclamation big"></i><h3>Could not load your analytics</h3><p id="anErrorText">Please try again.</p><button type="button" class="an-btn primary" id="anRetry"><i class="fas fa-rotate-right"></i> Try again</button></div>
+  <div class="an-state" id="anEmpty" hidden><i class="fas fa-chart-line big"></i><h3 id="anEmptyTitle">No analytics yet</h3><p id="anEmptyText">Complete some exams to see your performance here.</p><button type="button" class="an-btn" id="anEmptyReset" hidden>Reset filters</button></div>
+
+  <div id="anBody" hidden>
+    <ul class="an-highlights" id="anHighlights" hidden></ul>
+
+    <div class="an-stats" id="anStats"></div>
+
+    <div class="an-grid">
+      <div class="an-card wide" id="card-trend">
+        <div class="an-card-title"><i class="fas fa-chart-line ic"></i> Score over time
+          <button type="button" class="an-info" data-tip="Each point is one attempt: the percentage you scored. The dashed line is your average for the attempts currently shown." aria-label="About this chart"><i class="fas fa-info"></i></button></div>
+        <div class="an-chart tall"><canvas id="chTrend" role="img" aria-label="Score percentage per attempt over time"></canvas></div>
+        <div class="an-card-empty">Not enough attempts to draw a trend (at least 2 are needed).</div>
       </div>
-      <div class="score-bars" id="scoreBars"></div>
-      <div class="bar-tip" id="barTip"></div>
+      <div class="an-card" id="card-answers">
+        <div class="an-card-title"><i class="fas fa-list-check ic"></i> Answers per attempt
+          <button type="button" class="an-info" data-tip="Correct, incorrect and unanswered questions in each of your latest attempts (up to 20)." aria-label="About this chart"><i class="fas fa-info"></i></button></div>
+        <div class="an-chart"><canvas id="chAnswers" role="img" aria-label="Correct, incorrect and unanswered questions per attempt"></canvas></div>
+        <div class="an-card-empty">No attempts to show.</div>
+      </div>
+      <div class="an-card" id="card-grades">
+        <div class="an-card-title"><i class="fas fa-chart-pie ic"></i> Grade distribution
+          <button type="button" class="an-info" data-tip="How many of the attempts shown received each grade." aria-label="About this chart"><i class="fas fa-info"></i></button></div>
+        <div class="an-chart"><canvas id="chGrades" role="img" aria-label="Number of attempts per grade"></canvas></div>
+        <div class="an-card-empty">No grades to show.</div>
+        <div class="an-legend" id="gradeLegend"></div>
+      </div>
+      <div class="an-card" id="card-groups">
+        <div class="an-card-title"><i class="fas fa-layer-group ic"></i> Average by <span id="groupWord">category</span>
+          <span class="spacer"></span>
+          <span class="an-seg" role="group" aria-label="Group by"><button type="button" data-g="category" class="active">Category</button><button type="button" data-g="subcategory">Subcategory</button></span>
+          <button type="button" class="an-info" data-tip="Your average percentage across the attempts shown, grouped by the category (or subcategory) of the exam." aria-label="About this chart"><i class="fas fa-info"></i></button></div>
+        <div class="an-chart"><canvas id="chGroups" role="img" aria-label="Average score by category"></canvas></div>
+        <div class="an-card-empty">These exams have no category to group by.</div>
+      </div>
+      <div class="an-card" id="card-qtypes">
+        <div class="an-card-title"><i class="fas fa-bullseye ic"></i> Accuracy by question type
+          <button type="button" class="an-info" data-tip="Of the questions you attempted, the share you got right, per question type (single choice, multiple choice, numerical)." aria-label="About this chart"><i class="fas fa-info"></i></button></div>
+        <div class="an-chart"><canvas id="chQTypes" role="img" aria-label="Accuracy per question type"></canvas></div>
+        <div class="an-card-empty">No question-level data for these attempts.</div>
+      </div>
+      <div class="an-card wide" id="card-exams">
+        <div class="an-card-title"><i class="fas fa-scale-balanced ic"></i> Exam comparison
+          <button type="button" class="an-info" data-tip="Average and best percentage per exam across the attempts shown. 'Change' compares your first and latest attempt of that exam." aria-label="About this table"><i class="fas fa-info"></i></button></div>
+        <div class="an-chart" id="examChartBox"><canvas id="chExams" role="img" aria-label="Average and best score per exam"></canvas></div>
+        <div class="an-table-wrap" style="margin-top:.9rem"><table class="an-table" id="examTable"><thead><tr><th>Exam</th><th>Attempts</th><th>Average</th><th>Best</th><th>Change</th><th>Avg time</th></tr></thead><tbody></tbody></table></div>
+        <div class="an-card-empty">No exams to compare.</div>
+      </div>
     </div>
-    <div class="an-card">
-      <div class="an-card-title"><i class="fas fa-chart-pie"></i> Grade Distribution</div>
-      <div class="donut-box"><canvas id="gradeChart"></canvas></div>
-      <div class="donut-legend" id="donutLegend"></div>
+
+    <div class="an-card" id="card-recent">
+      <div class="an-card-title"><i class="fas fa-history ic"></i> Recent attempts</div>
+      <div class="an-table-wrap"><table class="an-table" id="recentTable"><thead><tr><th>Exam</th><th>Score</th><th>Percentage</th><th>Grade</th><th>Date</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
-
-  <div class="an-card">
-    <div class="an-card-title"><i class="fas fa-history"></i> Recent Performance</div>
-    <div class="perf-table-wrap">
-      <table class="perf-table">
-        <thead>
-          <tr><th>Exam</th><th>Score</th><th>Percentage</th><th>Grade</th><th>Date</th></tr>
-        </thead>
-        <tbody>
-          {% for r in analytics_data.recent_performance %}
-          <tr>
-            <td class="perf-exam-name" title="{{ r.exam_name }}">{{ r.exam_name }}</td>
-            <td style="font-weight:700;color:var(--text-1)">{{ r.score }}</td>
-            <td>
-              <div class="pct-bar-wrap">
-                <div class="pct-bar-bg"><div class="pct-bar-fg" style="width:{{ r.percentage }}%"></div></div>
-                <span class="pct-text">{{ r.percentage }}%</span>
-              </div>
-            </td>
-            <td><span class="grade-pill">{{ r.grade }}</span></td>
-            <td style="font-size:.75rem;color:var(--text-3)">{{ r.date if r.date and r.date != 'Unknown' else '—' }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  {% else %}
-  <div class="an-empty">
-    <i class="fas fa-chart-line"></i>
-    <h3>No Analytics Data Yet</h3>
-    <p>Complete some exams to see your performance analytics here.</p>
-  </div>
-  {% endif %}
-
 </main>
+{% endblock %}
 
-{% if has_data %}
+{% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="{{ url_for('static', filename='shared/chart-export.js') }}"></script>
 <script>
-const _sd = {{ analytics_data.score_trend | tojson }};
-const _gd = {{ analytics_data.grade_distribution | tojson }};
-const _gc = { A:'rgba(99,102,241,.75)', B:'rgba(6,182,212,.75)', C:'rgba(245,158,11,.75)', D:'rgba(239,68,68,.65)', F:'rgba(220,38,38,.55)' };
+(function () {
+'use strict';
+var API = '/api/v01/student/analytics';
+var STUDENT = {{ full_name | tojson }};
+var $ = function (id) { return document.getElementById(id); };
+var main = $('anMain');
+var state = { preset: 'all', data: null, options: null, group: 'category', seq: 0 };
+var charts = {};
+var dateFmt = {{ DISPLAY_DATE_FORMAT | default('%d-%m-%Y') | tojson }};
+var pFrom = createDatePicker($('anFrom'), { displayFormat: dateFmt, onChange: function () { setPreset('custom'); load(); } });
+var pTo = createDatePicker($('anTo'), { displayFormat: dateFmt, onChange: function () { setPreset('custom'); load(); } });
+[['anCategory', 'fas fa-layer-group'], ['anSubcategory', 'fas fa-sitemap'], ['anExam', 'fas fa-file-alt'], ['anKind', 'fas fa-calendar-check']].forEach(function (x) { enhanceSelect($(x[0]), { icon: x[1] }); });
 
-function barColor(p){ return p>=75?'linear-gradient(180deg,var(--accent),#6366f1)':p>=50?'linear-gradient(180deg,#06b6d4,#3b82f6)':p>=35?'linear-gradient(180deg,var(--warning),#ef4444)':'linear-gradient(180deg,var(--danger),#dc2626)'; }
+/* ── helpers ─────────────────────────────────────────────────────────────── */
+function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function iso(d) { var m = d.getMonth() + 1, day = d.getDate(); return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day; }
+function fmtDay(s) { if (!s) return ''; var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+function num(v, d) { return v == null ? '—' : Number(v).toFixed(d == null ? 1 : d).replace(/\.0$/, ''); }
+function pctTxt(v) { return v == null ? '—' : num(v) + '%'; }
+function mins(v) { return v == null ? '—' : (v >= 60 ? Math.floor(v / 60) + 'h ' + Math.round(v % 60) + 'm' : Math.round(v) + ' min'); }
+function css(name, fallback) { var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fallback; }
+function theme() { return { text: css('--text-1', '#222'), tick: css('--text-3', '#777'), grid: css('--border', '#ddd'), accent: css('--accent', '#4c6ef5'),
+  ok: css('--success-text', '#2b8a3e'), bad: css('--danger-text', '#e03131'), warn: css('--warning-text', '#e8590c'), tipBg: css('--surface', '#fff'), tipText: css('--text-1', '#222') }; }
+var GRADE_COL = ['#6366f1', '#06b6d4', '#f59e0b', '#ef4444', '#b91c1c', '#8b5cf6', '#10b981'];
 
-const BPP = window.innerWidth < 500 ? 4 : 7;
-let bPg = 0, bTot = Math.ceil(_sd.length / BPP);
-const tip = document.getElementById('barTip');
-
-function showTip(e, item){
-  tip.innerHTML = `<strong>${item.exam_name}</strong><br>${item.score}% &middot; Grade ${item.grade}`;
-  tip.classList.add('show'); moveTip(e);
+/* ── filters ─────────────────────────────────────────────────────────────── */
+function currentFilters() {
+  return { from: $('anFrom').dataset.iso || '', to: $('anTo').dataset.iso || '', category_id: $('anCategory').value, subcategory_id: $('anSubcategory').value,
+    exam_id: $('anExam').value, kind: $('anKind').value };
 }
-function moveTip(e){ tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY-50)+'px'; }
-function hideTip(){ tip.classList.remove('show'); }
-
-function buildBars(){
-  const wrap=document.getElementById('scoreBars');
-  const info=document.getElementById('barsPgInfo');
-  if(!wrap||!_sd.length) return;
-  const start=bPg*BPP, slice=_sd.slice(start,start+BPP), maxH=160;
-  if(info) info.textContent=bTot>1?`${bPg+1}/${bTot}`:`${_sd.length} exam${_sd.length!==1?'s':''}`;
-  document.getElementById('barsPrev').disabled=bPg===0;
-  document.getElementById('barsNext').disabled=bPg>=bTot-1;
-  wrap.innerHTML=slice.map((item,i)=>{
-    const p=Math.min(100,Math.max(0,item.score));
-    const h=Math.max(6,Math.round(p/100*maxH));
-    const idx=start+i;
-    const short=item.exam_name.length>9?item.exam_name.slice(0,8)+'…':item.exam_name;
-    return `<div class="score-bar-wrap">
-      <div class="score-bar-pct">${p}%</div>
-      <div class="score-bar-outer" style="height:${maxH}px">
-        <div class="score-bar-fill" style="height:${h}px;background:${barColor(p)}"
-          onmouseenter="showTip(event,_sd[${idx}])" onmousemove="moveTip(event)" onmouseleave="hideTip()"></div>
-      </div>
-      <div class="score-bar-name" title="${item.exam_name}">${short}</div>
-    </div>`;
-  }).join('');
+function setPreset(p) {
+  state.preset = p;
+  document.querySelectorAll('.an-chip').forEach(function (b) { b.classList.toggle('active', b.dataset.preset === p); });
+  var today = new Date(), from = '', to = '';
+  if (p === '7' || p === '30' || p === '90') { var d = new Date(); d.setDate(d.getDate() - (+p - 1)); from = iso(d); to = iso(today); }
+  else if (p === 'year') { from = today.getFullYear() + '-01-01'; to = iso(today); }
+  if (p !== 'custom') { pFrom.setValue(from); pTo.setValue(to); }
 }
-function barsPage(d){ bPg=Math.max(0,Math.min(bTot-1,bPg+d)); buildBars(); }
-buildBars();
+function resetFilters() {
+  ['anCategory', 'anSubcategory', 'anExam', 'anKind'].forEach(function (id) { $(id).value = ''; });
+  setPreset('all');
+  fillOptions(true);
+  load();
+}
+function fillSelect(sel, items, allLabel, keep) {
+  var prev = keep ? sel.value : '';
+  sel.replaceChildren();
+  var o = document.createElement('option'); o.value = ''; o.textContent = allLabel; sel.appendChild(o);
+  items.forEach(function (it) { var op = document.createElement('option'); op.value = String(it.id); op.textContent = it.name; sel.appendChild(op); });
+  sel.value = items.some(function (it) { return String(it.id) === prev; }) ? prev : '';
+}
+/* Category narrows the subcategory and exam lists; options come from the student's own attempts. */
+function fillOptions(keep) {
+  var o = state.options; if (!o) return;
+  fillSelect($('anCategory'), o.categories, 'All categories', keep);
+  var cat = $('anCategory').value;
+  var subs = o.subcategories.filter(function (s) { return !cat || String(s.category_id) === cat; });
+  fillSelect($('anSubcategory'), subs, 'All subcategories', keep);
+  var sub = $('anSubcategory').value;
+  var exams = o.exams.filter(function (e) { return (!cat || String(e.category_id) === cat) && (!sub || String(e.subcategory_id) === sub); })
+    .map(function (e) { return { id: e.id, name: e.name + (e.attempts > 1 ? ' (' + e.attempts + ' attempts)' : '') }; });
+  fillSelect($('anExam'), exams, 'All exams', keep);
+}
 
-(function buildDonut(){
-  const labels=Object.keys(_gd); if(!labels.length) return;
-  const ctx=document.getElementById('gradeChart').getContext('2d');
-  new Chart(ctx,{
-    type:'doughnut',
-    data:{ labels, datasets:[{ data:labels.map(g=>_gd[g].count), backgroundColor:labels.map(g=>_gc[g]||'rgba(102,126,234,.7)'), borderColor:'rgba(0,0,0,.3)', borderWidth:3, hoverOffset:6 }] },
-    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
-      plugins:{ legend:{display:false},
-        tooltip:{ callbacks:{ label:c=>` ${c.label}: ${_gd[c.label].count} (${_gd[c.label].percentage}%)` },
-          backgroundColor:'var(--surface)', borderColor:'var(--border)', borderWidth:1,
-          titleColor:'var(--text-1)', bodyColor:'var(--text-2)', padding:10, cornerRadius:8
-        }
-      }
+/* ── loading ─────────────────────────────────────────────────────────────── */
+function show(which) {
+  $('anLoading').hidden = which !== 'loading';
+  $('anError').hidden = which !== 'error';
+  $('anEmpty').hidden = which !== 'empty';
+  $('anBody').hidden = which !== 'body';
+}
+function params() {
+  var f = currentFilters(), q = new URLSearchParams();
+  Object.keys(f).forEach(function (k) { if (f[k]) q.set(k, f[k]); });
+  return q;
+}
+function load() {
+  var mySeq = ++state.seq;
+  main.setAttribute('aria-busy', 'true');
+  if (!state.data) show('loading');
+  $('anExport').disabled = $('anPrint').disabled = true;
+  fetch(API + '?' + params().toString(), { credentials: 'same-origin' })
+    .then(function (r) { return r.json().catch(function () { return { success: false, message: 'Unexpected response.' }; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (mySeq !== state.seq) return;
+      main.setAttribute('aria-busy', 'false');
+      if (!res.ok || !res.d.success) { $('anErrorText').textContent = res.d.message || 'Please try again.'; if (!state.data) show('error'); else window.alert(res.d.message || 'Could not update.'); return; }
+      var firstLoad = !state.options;
+      state.data = res.d;
+      state.options = res.d.options;
+      if (firstLoad) fillOptions(false);
+      render(res.d);
+    })
+    .catch(function () {
+      if (mySeq !== state.seq) return;
+      main.setAttribute('aria-busy', 'false');
+      $('anErrorText').textContent = 'Check your connection and try again.';
+      if (!state.data) show('error'); else window.alert('Could not update. Check your connection.');
+    });
+}
+
+/* ── render ──────────────────────────────────────────────────────────────── */
+function scopeText(d) {
+  var f = d.filters, bits = [];
+  if (f.from || f.to) bits.push((f.from ? fmtDay(f.from) : 'start') + ' – ' + (f.to ? fmtDay(f.to) : 'today'));
+  else bits.push('All time');
+  var pick = function (sel) { return sel.value ? sel.options[sel.selectedIndex].text.replace(/ \(\d+ attempts\)$/, '') : ''; };
+  if (f.category_id) bits.push('Category: ' + pick($('anCategory')));
+  if (f.subcategory_id) bits.push('Subcategory: ' + pick($('anSubcategory')));
+  if (f.exam_id) bits.push('Exam: ' + pick($('anExam')));
+  if (f.kind) bits.push(f.kind === 'scheduled' ? 'Scheduled exams' : 'Regular exams');
+  return bits.join(' · ');
+}
+function render(d) {
+  $('anScope').innerHTML = '<span><strong>' + d.attempts + '</strong> attempt' + (d.attempts === 1 ? '' : 's') + ' · ' + esc(scopeText(d)) + '</span>';
+  $('anHidden').hidden = !d.hidden_results;
+  if (d.hidden_results) $('anHiddenText').textContent = d.hidden_results + ' result' + (d.hidden_results === 1 ? ' is' : 's are') + ' not shown yet because the exam’s results have not been released to you.';
+  if (!d.total_visible_attempts) { $('anEmptyTitle').textContent = 'No analytics yet'; $('anEmptyText').textContent = 'Complete some exams to see your performance here.'; $('anEmptyReset').hidden = true; show('empty'); destroyCharts(); return; }
+  if (!d.summary) { $('anEmptyTitle').textContent = 'No attempts match these filters'; $('anEmptyText').textContent = 'Try a wider date range or clear a filter.'; $('anEmptyReset').hidden = false; show('empty'); destroyCharts(); return; }
+  show('body');
+  $('anExport').disabled = $('anPrint').disabled = false;
+  renderHighlights(d); renderStats(d); renderCharts(d); renderTables(d);
+}
+function renderHighlights(d) {
+  var ul = $('anHighlights'); ul.replaceChildren();
+  (d.highlights || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+  ul.hidden = !ul.children.length;
+}
+function statCard(label, tip, value, sub) {
+  return '<div class="an-stat"><div class="an-stat-lbl">' + esc(label) + '<button type="button" class="an-info" data-tip="' + esc(tip) + '" aria-label="About ' + esc(label) + '"><i class="fas fa-info"></i></button></div>' +
+    '<div class="an-stat-val">' + value + '</div><div class="an-stat-sub">' + sub + '</div></div>';
+}
+function trendBadge(v) {
+  if (v == null) return '<span class="trend trend-flat">Not enough attempts</span>';
+  if (v > 0) return '<span class="trend trend-up"><i class="fas fa-arrow-up"></i> +' + num(v) + ' pts</span>';
+  if (v < 0) return '<span class="trend trend-down"><i class="fas fa-arrow-down"></i> ' + num(v) + ' pts</span>';
+  return '<span class="trend trend-flat"><i class="fas fa-minus"></i> Stable</span>';
+}
+function renderStats(d) {
+  var s = d.summary, p = d.previous_period, prevDelta = null;
+  if (p && p.average != null && s.average != null) prevDelta = Math.round((s.average - p.average) * 10) / 10;
+  $('anStats').innerHTML =
+    statCard('Attempts', 'Number of completed attempts in the current filters.', s.attempts, s.exams + ' exam' + (s.exams === 1 ? '' : 's')) +
+    statCard('Average score', 'The mean of your percentage scores across these attempts.', pctTxt(s.average), p ? (prevDelta == null ? 'No attempts in the previous period' : trendBadge(prevDelta) + ' vs previous period') : 'Select a date range to compare') +
+    statCard('Best / lowest', 'Your highest and lowest percentage among these attempts.', pctTxt(s.best), 'Lowest ' + pctTxt(s.lowest)) +
+    statCard('Improvement', 'Average of your last 3 attempts minus the average of the ones before them (needs at least 2 attempts).', s.improvement == null ? '—' : (s.improvement > 0 ? '+' : '') + num(s.improvement) + ' pts', trendBadge(s.improvement)) +
+    statCard('Accuracy', 'Correct answers divided by the questions you answered (correct + incorrect). Unanswered questions are not counted.', pctTxt(s.accuracy), s.correct + ' correct · ' + s.incorrect + ' incorrect') +
+    statCard('Attempt rate', 'Share of all questions you answered rather than skipped.', pctTxt(s.attempt_rate), s.unanswered + ' unanswered of ' + s.questions) +
+    statCard('Marks', 'Total marks you scored out of the total marks available across these attempts.', num(s.score) + ' / ' + num(s.max_score), 'Total across attempts') +
+    statCard('Average time', 'Mean time taken per attempt, from attempts that recorded a time.', mins(s.avg_minutes), 'Per attempt');
+}
+
+function tip(t, callbacks) {
+  return { backgroundColor: t.tipBg, titleColor: t.tipText, bodyColor: t.tipText, borderColor: t.grid, borderWidth: 1, padding: 10, cornerRadius: 8, callbacks: callbacks || {} };
+}
+function cfgTrend(d, t) {
+  var tr = d.trend, avg = d.summary.average;
+  return { type: 'line', data: { labels: tr.map(function (x) { return x.date ? fmtDay(x.date) : '#' + x.result_id; }),
+    datasets: [
+      { label: 'Score %', data: tr.map(function (x) { return x.percentage; }), borderColor: t.accent, backgroundColor: t.accent, pointRadius: 4, pointHoverRadius: 6, tension: .25, borderWidth: 2 },
+      { label: 'Average', data: tr.map(function () { return avg; }), borderColor: t.tick, borderDash: [6, 5], pointRadius: 0, borderWidth: 1.5 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 350 }, interaction: { mode: 'nearest', intersect: false },
+      plugins: { legend: { display: true, labels: { color: t.tick, boxWidth: 12 } },
+        tooltip: tip(t, { title: function (it) { return tr[it[0].dataIndex].exam; }, label: function (c) {
+          var x = tr[c.dataIndex]; return c.datasetIndex === 1 ? 'Average: ' + num(avg) + '%' : ['Score: ' + num(x.percentage) + '% (' + num(x.score) + '/' + num(x.max_score) + ')', 'Grade ' + x.grade + ' · ' + x.label]; } }) },
+      scales: { x: { ticks: { color: t.tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } }, y: { min: 0, max: 100, ticks: { color: t.tick, callback: function (v) { return v + '%'; } }, grid: { color: t.grid } } } } };
+}
+function cfgAnswers(d, t) {
+  var tr = d.trend.slice(-20);
+  return { type: 'bar', data: { labels: tr.map(function (x) { return x.date ? fmtDay(x.date) : '#' + x.result_id; }),
+    datasets: [{ label: 'Correct', data: tr.map(function (x) { return x.correct; }), backgroundColor: t.ok }, { label: 'Incorrect', data: tr.map(function (x) { return x.incorrect; }), backgroundColor: t.bad },
+      { label: 'Unanswered', data: tr.map(function (x) { return x.unanswered; }), backgroundColor: t.tick }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+      plugins: { legend: { display: true, labels: { color: t.tick, boxWidth: 12 } }, tooltip: tip(t, { title: function (it) { return tr[it[0].dataIndex].exam; } }) },
+      scales: { x: { stacked: true, ticks: { color: t.tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }, grid: { display: false } }, y: { stacked: true, ticks: { color: t.tick, precision: 0 }, grid: { color: t.grid } } } } };
+}
+function cfgGrades(d, t) {
+  var g = d.grades;
+  return { type: 'doughnut', data: { labels: g.map(function (x) { return 'Grade ' + x.grade; }), datasets: [{ data: g.map(function (x) { return x.count; }), backgroundColor: g.map(function (x, i) { return GRADE_COL[i % GRADE_COL.length]; }), borderColor: t.tipBg, borderWidth: 3, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', animation: { duration: 350 }, plugins: { legend: { display: false },
+      tooltip: tip(t, { label: function (c) { var x = g[c.dataIndex]; return ' ' + x.count + ' attempt' + (x.count === 1 ? '' : 's') + ' (' + x.percentage + '%)'; } }) } } };
+}
+function cfgGroups(d, t) {
+  var rows = (state.group === 'category' ? d.by_category : d.by_subcategory).slice(0, 12);
+  return { type: 'bar', data: { labels: rows.map(function (x) { return x.name; }), datasets: [{ label: 'Average %', data: rows.map(function (x) { return x.average; }), backgroundColor: t.accent, borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+      plugins: { legend: { display: false }, tooltip: tip(t, { label: function (c) { var x = rows[c.dataIndex]; return ['Average: ' + num(x.average) + '%', 'Best: ' + num(x.best) + '%', x.attempts + ' attempt' + (x.attempts === 1 ? '' : 's')]; } }) },
+      scales: { x: { min: 0, max: 100, ticks: { color: t.tick, callback: function (v) { return v + '%'; } }, grid: { color: t.grid } }, y: { ticks: { color: t.tick }, grid: { display: false } } } } };
+}
+function cfgQTypes(d, t) {
+  var rows = d.by_question_type, label = { MCQ: 'Single choice', MSQ: 'Multiple choice', NUMERIC: 'Numerical' };
+  return { type: 'bar', data: { labels: rows.map(function (x) { return label[x.type] || x.type; }), datasets: [{ label: 'Accuracy %', data: rows.map(function (x) { return x.accuracy == null ? 0 : x.accuracy; }), backgroundColor: t.accent, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+      plugins: { legend: { display: false }, tooltip: tip(t, { label: function (c) { var x = rows[c.dataIndex]; return [x.accuracy == null ? 'Nothing attempted' : 'Accuracy: ' + num(x.accuracy) + '%', x.correct + ' correct of ' + x.attempted + ' attempted', x.questions + ' question' + (x.questions === 1 ? '' : 's') + ' in total']; } }) },
+      scales: { x: { ticks: { color: t.tick }, grid: { display: false } }, y: { min: 0, max: 100, ticks: { color: t.tick, callback: function (v) { return v + '%'; } }, grid: { color: t.grid } } } } };
+}
+function cfgExams(d, t) {
+  var rows = d.by_exam.slice(0, 10);
+  return { type: 'bar', data: { labels: rows.map(function (x) { return x.name.length > 28 ? x.name.slice(0, 27) + '…' : x.name; }),
+    datasets: [{ label: 'Average %', data: rows.map(function (x) { return x.average; }), backgroundColor: t.accent, borderRadius: 4 }, { label: 'Best %', data: rows.map(function (x) { return x.best; }), backgroundColor: t.ok, borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+      plugins: { legend: { display: true, labels: { color: t.tick, boxWidth: 12 } }, tooltip: tip(t, { title: function (it) { return rows[it[0].dataIndex].name; }, afterBody: function (it) { var x = rows[it[0].dataIndex]; return x.attempts + ' attempt' + (x.attempts === 1 ? '' : 's'); } }) },
+      scales: { x: { min: 0, max: 100, ticks: { color: t.tick, callback: function (v) { return v + '%'; } }, grid: { color: t.grid } }, y: { ticks: { color: t.tick }, grid: { display: false } } } } };
+}
+
+var SPECS = {
+  trend:   { canvas: 'chTrend', card: 'card-trend', has: function (d) { return d.trend.length >= 2; }, cfg: cfgTrend, title: function () { return 'Score over time'; }, h: 320 },
+  answers: { canvas: 'chAnswers', card: 'card-answers', has: function (d) { return d.trend.length >= 1; }, cfg: cfgAnswers, title: function () { return 'Answers per attempt'; }, h: 300 },
+  grades:  { canvas: 'chGrades', card: 'card-grades', has: function (d) { return d.grades.length >= 1; }, cfg: cfgGrades, title: function () { return 'Grade distribution'; }, h: 300 },
+  groups:  { canvas: 'chGroups', card: 'card-groups', has: function (d) { return (state.group === 'category' ? d.by_category : d.by_subcategory).length >= 1; }, cfg: cfgGroups, title: function () { return 'Average by ' + state.group; }, h: 300 },
+  qtypes:  { canvas: 'chQTypes', card: 'card-qtypes', has: function (d) { return d.by_question_type.length >= 1; }, cfg: cfgQTypes, title: function () { return 'Accuracy by question type'; }, h: 300 },
+  exams:   { canvas: 'chExams', card: 'card-exams', has: function (d) { return d.by_exam.length >= 1; }, cfg: cfgExams, title: function () { return 'Exam comparison'; }, h: 340 },
+};
+function destroyCharts() { Object.keys(charts).forEach(function (k) { try { charts[k].destroy(); } catch (e) {} delete charts[k]; }); }
+function renderCharts(d) {
+  var t = theme();
+  Object.keys(SPECS).forEach(function (k) {
+    var sp = SPECS[k], card = $(sp.card), ok = sp.has(d);
+    card.classList.toggle('is-empty', !ok);
+    if (!ok) { if (charts[k]) { charts[k].destroy(); delete charts[k]; } return; }
+    var cfg = sp.cfg(d, t);
+    if (charts[k] && charts[k].config.type === cfg.type) {          // update in place: no flicker, animates between filter states
+      charts[k].data = cfg.data; charts[k].options = cfg.options; charts[k].update();
+    } else {
+      if (charts[k]) charts[k].destroy();
+      charts[k] = new Chart($(sp.canvas), cfg);
     }
   });
-  document.getElementById('donutLegend').innerHTML=labels.map(g=>
-    `<div class="donut-legend-item"><div class="donut-dot" style="background:${_gc[g]||'var(--accent)'}"></div><span>Grade ${g} — ${_gd[g].count} (${_gd[g].percentage}%)</span></div>`
-  ).join('');
+  $('gradeLegend').innerHTML = d.grades.map(function (x, i) { return '<span><i style="background:' + GRADE_COL[i % GRADE_COL.length] + '"></i>Grade ' + esc(x.grade) + ' — ' + x.count + ' (' + x.percentage + '%)</span>'; }).join('');
+  $('groupWord').textContent = state.group;
+  $('examChartBox').style.height = Math.max(180, 70 + Math.min(d.by_exam.length, 10) * 34) + 'px';
+}
+function renderTables(d) {
+  $('examTable').querySelector('tbody').innerHTML = d.by_exam.map(function (x) {
+    var ch = x.change == null ? '—' : '<span class="' + (x.change >= 0 ? 'up' : 'down') + '">' + (x.change >= 0 ? '+' : '') + num(x.change) + ' pts</span>';
+    return '<tr><td class="an-name" title="' + esc(x.name) + '">' + esc(x.name) + '</td><td>' + x.attempts + '</td><td>' + pctTxt(x.average) + '</td><td>' + pctTxt(x.best) + '</td><td>' + ch + '</td><td>' + mins(x.avg_minutes) + '</td></tr>';
+  }).join('');
+  $('recentTable').querySelector('tbody').innerHTML = d.recent.map(function (x) {
+    return '<tr><td class="an-name" title="' + esc(x.exam) + '">' + esc(x.exam) + '</td><td style="font-weight:700;color:var(--text-1)">' + num(x.score) + '/' + num(x.max_score) + '</td>' +
+      '<td><div class="an-pct"><div class="an-pct-bg"><div class="an-pct-fg" style="width:' + Math.min(100, Math.max(0, x.percentage)) + '%"></div></div><span>' + num(x.percentage) + '%</span></div></td>' +
+      '<td><span class="an-grade">' + esc(x.grade) + '</span></td><td style="white-space:nowrap;color:var(--text-3)">' + esc(x.label || '—') + '</td>' +
+      '<td><a class="an-link" href="/response/' + x.exam_id + '/' + x.result_id + '?from_history=1">Response</a></td></tr>';
+  }).join('');
+}
+
+/* ── export / print ──────────────────────────────────────────────────────── */
+/* The filters that produced this report, for the PNG: the date range is always stated (an "All time" default is labelled as
+   such, not as an applied filter); every other filter is listed only when it is actually active. */
+function exportFilters(d) {
+  var f = d.filters, out = [];
+  var pick = function (sel) { return sel.value ? sel.options[sel.selectedIndex].text.replace(/ \(\d+ attempts\)$/, '') : ''; };
+  var chip = document.querySelector('.an-chip.active'), preset = chip ? chip.textContent.trim() : '';
+  if (f.from || f.to) out.push({ label: 'Date range', value: (preset && preset !== 'Custom' ? preset + ': ' : '') + (f.from ? fmtDay(f.from) : 'start') + ' – ' + (f.to ? fmtDay(f.to) : 'today') });
+  else out.push({ label: 'Date range', value: 'All time (no date filter applied)' });
+  if (f.category_id) out.push({ label: 'Category', value: pick($('anCategory')) });
+  if (f.subcategory_id) out.push({ label: 'Subcategory', value: pick($('anSubcategory')) });
+  if (f.exam_id) out.push({ label: 'Exam', value: pick($('anExam')) });
+  if (f.kind) out.push({ label: 'Exam type', value: f.kind === 'scheduled' ? 'Scheduled exams' : 'Regular exams' });
+  if (d.hidden_results) out.push({ label: 'Not included', value: d.hidden_results + ' result' + (d.hidden_results === 1 ? '' : 's') + ' not yet released to you' });
+  return out;
+}
+/* The metric cards are read from the dashboard itself, so the image shows exactly the values on screen. */
+function exportCards() {
+  return Array.prototype.map.call(document.querySelectorAll('#anStats .an-stat'), function (c) {
+    var q = function (sel) { var e = c.querySelector(sel); return e ? e.textContent.replace(/\s+/g, ' ').trim() : ''; };
+    return { label: q('.an-stat-lbl'), value: q('.an-stat-val'), sub: q('.an-stat-sub') };
+  });
+}
+async function exportPng() {
+  var d = state.data; if (!d || !d.summary) return;
+  var btn = $('anExport'), orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing…';
+  var made = [];
+  try {
+    await ChartExport.ready();                       // web fonts loaded before anything is measured or drawn
+    var W = 900, pal = ChartExport.palette;
+    var tl = { text: pal.text, tick: pal.tick, grid: pal.grid, accent: '#3b5bdb', ok: '#2b8a3e', bad: '#c92a2a', warn: '#e8590c', tipBg: pal.tipBg, tipText: pal.tipText };
+    var parts = [];
+    Object.keys(SPECS).forEach(function (k) {
+      var sp = SPECS[k]; if (!sp.has(d)) return;
+      var m = ChartExport.offscreen(Chart, sp.cfg(d, tl), W, k === 'exams' ? Math.max(240, 90 + Math.min(d.by_exam.length, 10) * 36) : sp.h);
+      made.push(m); parts.push({ canvas: m.canvas, w: m.w, h: m.h, caption: sp.title() });
+    });
+    var sub = (STUDENT ? STUDENT + ' · ' : '') + d.attempts + ' attempt' + (d.attempts === 1 ? '' : 's') + ' in this report';
+    var out = ChartExport.compose(parts, 'Performance analytics report', sub, 960, { filters: exportFilters(d), cards: exportCards() });
+    await ChartExport.download(out, 'performance-analytics-' + ChartExport.stamp() + '.png');
+  } catch (e) {
+    console.error(e); window.alert('Could not export the image.');
+  } finally {
+    made.forEach(function (m) { m.dispose(); });
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+}
+
+/* ── wiring ──────────────────────────────────────────────────────────────── */
+document.querySelectorAll('.an-chip').forEach(function (b) { b.addEventListener('click', function () { setPreset(b.dataset.preset); if (b.dataset.preset !== 'custom') load(); else pFrom.open(); }); });
+$('anCategory').addEventListener('change', function () { $('anSubcategory').value = ''; $('anExam').value = ''; fillOptions(true); load(); });
+$('anSubcategory').addEventListener('change', function () { $('anExam').value = ''; fillOptions(true); load(); });
+['anExam', 'anKind'].forEach(function (id) { $(id).addEventListener('change', load); });
+$('anReset').addEventListener('click', resetFilters);
+$('anEmptyReset').addEventListener('click', resetFilters);
+$('anRetry').addEventListener('click', function () { state.data = null; load(); });
+$('anExport').addEventListener('click', exportPng);
+$('anPrint').addEventListener('click', function () { window.print(); });
+document.querySelectorAll('.an-seg button').forEach(function (b) { b.addEventListener('click', function () {
+  state.group = b.dataset.g; document.querySelectorAll('.an-seg button').forEach(function (x) { x.classList.toggle('active', x === b); });
+  if (state.data && state.data.summary) renderCharts(state.data); }); });
+document.addEventListener('click', function (e) {
+  var info = e.target.closest && e.target.closest('.an-info');
+  document.querySelectorAll('.an-info.open').forEach(function (x) { if (x !== info) x.classList.remove('open'); });
+  if (info) info.classList.toggle('open');
+});
+setPreset('all');
+load();
 })();
 </script>
-{% endif %}
 {% endblock %}

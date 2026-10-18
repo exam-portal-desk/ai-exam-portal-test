@@ -223,7 +223,7 @@
 
 <!-- ── Header ── -->
 <div class="dash-header">
-  <h1><i class="fas fa-home"></i> <span id="dashGreetWord">{{ greeting }}</span>, {{ session.get('full_name','').split()[0] }}</h1>
+  <h1><i class="fas {{ nav_icon('dashboard') }}"></i> <span id="dashGreetWord">{{ greeting }}</span>, {{ session.get('full_name','').split()[0] }}</h1>
   <p>Here's what's happening today.</p>
 </div>
 

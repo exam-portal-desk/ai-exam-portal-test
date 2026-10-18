@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% block title %}Manage Exams{% endblock %}
+{% from "admin/_instr_toolbar.html" import instr_toolbar %}
 {% from "admin/_exam_rows.html" import render_exam_row, render_exam_card, render_exam_edit_modal %}
 
 {% block content %}
@@ -7,6 +8,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/view-toggle.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='admin/list-controller.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='admin/select-enhance.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/instructions.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/instructions-editor.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/date-picker.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/advanced-filter.css') }}">
 <style>
 /* ── Manage Exams — layout + structure only, all colors via tokens ── */
 
@@ -57,10 +62,10 @@
 }
 
 /* ── Table ── */
-.exam-tbl { width: 100%; border-collapse: collapse; min-width: 1100px; white-space: nowrap; }
+.exam-tbl { width: 100%; border-collapse: collapse; min-width: 0; white-space: nowrap; }
 .exam-tbl th {
   background: var(--surface-2);
-  padding: .62rem 1rem;
+  padding: .62rem .8rem;
   text-align: left;
   font-size: .67rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .07em;
@@ -68,7 +73,7 @@
   border-bottom: 1px solid var(--border);
 }
 .exam-tbl td {
-  padding: .72rem 1rem;
+  padding: .72rem .8rem;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
   color: var(--text-2);
@@ -86,9 +91,18 @@
 }
 .exam-name-text {
   font-weight: 600; color: var(--text-1);
-  font-size: .85rem; max-width: 200px;
+  font-size: .85rem; max-width: 230px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.exam-meta-line { margin-top: 3px; font-size: .72rem; color: var(--text-3); display: flex; flex-wrap: wrap; align-items: center; gap: 0 .35rem; }
+.exam-meta-line .dot { opacity: .6; }
+.exam-meta-line .marks-pos, .exam-meta-line .marks-neg { font-size: .72rem; }
+.exam-tbl th:last-child, .exam-tbl td:last-child { width: 1%; white-space: nowrap; }       /* action buttons never wrap or get clipped */
+.exam-tbl .action-btns { flex-wrap: nowrap; }
+.exam-tbl .col-cat { white-space: normal; max-width: 150px; }
+.exam-tbl .col-cat .cat-pill { margin: 0 .25rem .25rem 0; }
+.exam-tbl .col-status { white-space: normal; max-width: 170px; }
+.exam-tbl .col-status .status-badge, .exam-tbl .col-status .sched-pill { margin: 0 .3rem .25rem 0; }
 .meta-pill {
   display: inline-flex; align-items: center;
   background: var(--surface-2); border: 1px solid var(--border);
@@ -107,28 +121,7 @@
   font-size: .78rem; color: var(--text-3);
   cursor: default;
 }
-.instr-toolbar { display:flex; gap:.35rem; margin-bottom:.4rem; }
-.instr-tb-btn {
-  width:30px; height:30px; border-radius:7px; border:1px solid var(--border);
-  background:var(--surface-2); color:var(--text-2); cursor:pointer; font-size:.78rem;
-  display:inline-flex; align-items:center; justify-content:center;
-}
-.instr-tb-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
-.instr-preview-label { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin:.6rem 0 .3rem; }
-.instr-preview {
-  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);
-  padding:.75rem .9rem; font-size:.82rem; color:var(--text-2); line-height:1.6; max-height:220px; overflow-y:auto;
-}
-.instr-preview-empty { color:var(--text-3); font-style:italic; }
-.instr-preview .instr-list { margin:0 0 .6rem 1.1rem; padding:0; }
-.instr-preview .instr-list li { margin-bottom:.3rem; }
-.instr-preview p { margin:0 0 .6rem; }
-.instr-preview .instr-warning {
-  display:flex; align-items:flex-start; gap:.5rem;
-  background:var(--warning-bg); border:1px solid var(--warning-border); color:var(--warning-text);
-  border-radius:var(--radius); padding:.6rem .75rem; font-size:.8rem; font-weight:600; margin-bottom:.6rem;
-}
-.instr-preview .instr-warning i { margin-top:.15rem; flex-shrink:0; }
+/* Instructions editor styles live in static/admin/instructions-editor.css + shared/instructions.css */
 .marks-pos { color: var(--success-text); font-weight: 700; font-size: .82rem; }
 .marks-neg { color: var(--danger-text);  font-weight: 700; font-size: .82rem; }
 
@@ -221,6 +214,16 @@
 .icon-btn:hover { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
 .icon-btn.danger:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
 .action-btns { display: flex; gap: .35rem; }
+
+/* ── List state (empty / filtered-empty / error) shown in place of the list ── */
+.exam-state { text-align: center; padding: 3.2rem 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); margin-bottom: 1.5rem; }
+.exam-state[hidden] { display: none; }
+.exam-state i.es-ico { font-size: 2.2rem; color: var(--text-3); opacity: .45; display: block; margin-bottom: .9rem; }
+.exam-state.is-error i.es-ico { color: var(--danger-text); opacity: .8; }
+.exam-state h3 { font-size: .98rem; font-weight: 700; color: var(--text-1); margin: 0 0 .35rem; }
+.exam-state p { font-size: .82rem; color: var(--text-3); margin: 0 auto 1.1rem; max-width: 460px; overflow-wrap: anywhere; }
+.exam-state .es-actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+#examViewWrapper.is-loading { opacity: .55; transition: opacity .15s; pointer-events: none; }
 
 /* ── Empty state ── */
 .empty-state {
@@ -496,15 +499,41 @@
 .bulk-field-row:not(.bulk-field-active) .bulk-field-input { opacity: .45; pointer-events: none; }
 .bulk-review-list { margin: 0 0 1rem; padding-left: 1.2rem; font-size: .85rem; color: var(--text-2); line-height: 1.9; }
 .bulk-review-notes { display: flex; flex-direction: column; gap: .4rem; }
+/* ── Mobile: cards instead of the wide table, nothing may overflow ── */
+.page-top-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.exam-grid-item, .exam-grid-item > * { min-width: 0; }
+.egi-name { overflow-wrap: anywhere; }
+@media (max-width: 767.98px) {
+  .page-top { margin-bottom: 1rem; }
+  .page-top > div:first-child { min-width: 0; flex: 1 1 100%; }
+  .page-top-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .page-top-actions .sel-enh { grid-column: 1 / -1; display: flex; }
+  .page-top-actions .sel-enh-trigger { width: 100%; }
+  .page-top-actions .btn-flat { justify-content: center; }
+  .admin-list-toolbar { gap: .5rem; }
+  .admin-list-search { flex: 1 1 100%; min-width: 0; font-size: 16px; }
+  #examAdvMount { flex: 1 1 auto; }
+  #examViewToggle { display: none; }
+  #examViewWrapper .exam-table-wrap { display: none !important; }
+  #examViewWrapper .exam-grid-wrap { display: grid !important; grid-template-columns: minmax(0, 1fr); }
+  .exam-bulk-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .exam-bulk-actions .btn-flat { justify-content: center; white-space: normal; text-align: center; }
+  .egi-actions { flex-wrap: wrap; }
+  .icon-btn { width: 36px; height: 36px; }
+  .modal-body { padding: 1rem !important; }
+  .result-visibility-row { flex-direction: column; gap: .5rem; }
+  .bulk-field-toggle { min-width: 0; }
+  .bulk-field-input { min-width: 0; flex-basis: 100%; }
+}
 </style>
 
 <!-- ── Page Header ── -->
 <div class="page-top">
   <div>
-    <h1><i class="fas fa-file-alt"></i> Manage Exams</h1>
+    <h1><i class="fas {{ nav_icon('exams') }}"></i> Manage Exams</h1>
     <p>Create, edit and manage all exams on the portal.</p>
   </div>
-  <div style="display:flex;gap:.5rem">
+  <div class="page-top-actions">
     <select id="examImportDuplicate" class="admin-list-filter" aria-label="If an exam was already imported"
             title="What to do with an exam that already exists here with the same name and identical questions">
       <option value="skip">Skip exams already imported</option>
@@ -523,26 +552,15 @@
 <!-- ── Search / Filter / View toggle toolbar ── -->
 <div class="admin-list-toolbar">
   <input type="text" class="admin-list-search" id="examSearch" placeholder="Search exams by name…">
-  <select class="admin-list-filter" id="examCategoryFilter">
-    <option value="">All Categories</option>
-    {% for cat in categories %}
-    <option value="{{ cat.id }}">{{ cat.name }}</option>
-    {% endfor %}
-  </select>
-  <select class="admin-list-filter" id="examSubcategoryFilter">
-    <option value="">All Subcategories</option>
-  </select>
-  <select class="admin-list-filter" id="examStatusFilter">
-    <option value="">All Statuses</option>
-    <option value="upcoming">Upcoming</option>
-    <option value="ongoing">Ongoing</option>
-    <option value="completed">Completed</option>
-  </select>
+  <div id="examAdvMount"></div>
+    <input type="hidden" id="examAdvValue" value="">
   <div class="view-toggle" id="examViewToggle" role="group" aria-label="Exam view">
     <button type="button" data-view="list" class="{{ 'active' if view_mode != 'grid' else '' }}" title="List view" aria-label="List view" aria-pressed="{{ 'true' if view_mode != 'grid' else 'false' }}"><i class="fas fa-list"></i></button>
     <button type="button" data-view="grid" class="{{ 'active' if view_mode == 'grid' else '' }}" title="Grid view" aria-label="Grid view" aria-pressed="{{ 'true' if view_mode == 'grid' else 'false' }}"><i class="fas fa-th-large"></i></button>
   </div>
 </div>
+
+<div class="adv-summary" id="examAdvSummary" aria-live="polite"></div>
 
 <!-- ── Bulk selection toolbar — hidden until >=1 exam is selected ── -->
 <div class="exam-bulk-bar" id="examBulkBar">
@@ -556,6 +574,7 @@
 </div>
 
 <!-- ── Table / Grid Card ── -->
+<div class="exam-state" id="examState" role="status" aria-live="polite" hidden></div>
 <div id="examViewWrapper" class="{{ 'list-view' if view_mode != 'grid' else '' }}">
   <div class="exam-card exam-table-wrap">
     <div style="overflow-x:auto">
@@ -564,14 +583,10 @@
           <tr>
             <th style="width:36px"><input type="checkbox" id="examSelectAllHeader" class="enhanced-checkbox" onchange="toggleSelectAllOnPage(this)" title="Select all on this page"></th>
             <th>S.No.</th>
-            <th>Exam Name</th>
+            <th>Exam</th>
             <th>Category</th>
             <th>Date &amp; Time</th>
-            <th>Duration</th>
-            <th>Questions</th>
             <th>Status</th>
-            <th>Instructions</th>
-            <th>Marks</th>
             <th>Result Mode</th>
             <th style="width:110px">Actions</th>
           </tr>
@@ -581,7 +596,7 @@
             {% for exam in exams %}{{ render_exam_row(exam) }}{% endfor %}
           {% else %}
           <tr>
-            <td colspan="12">
+            <td colspan="8">
               <div class="empty-state">
                 <i class="fas fa-file-alt"></i>
                 <p>No exams found. Click <strong>Add Exam</strong> to create one.</p>
@@ -715,15 +730,10 @@
             </div>
             <div class="col-12">
               <label class="form-label">Instructions <span style="color:var(--danger-text)">*</span></label>
-              <div class="instr-toolbar">
-                <button type="button" class="instr-tb-btn" data-instr-cmd="bullet" title="Bullet list"><i class="fas fa-list-ul"></i></button>
-                <button type="button" class="instr-tb-btn" data-instr-cmd="number" title="Numbered list"><i class="fas fa-list-ol"></i></button>
-                <button type="button" class="instr-tb-btn" data-instr-cmd="bold" title="Bold"><i class="fas fa-bold"></i></button>
-                <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Warning callout"><i class="fas fa-triangle-exclamation"></i></button>
-              </div>
+              {{ instr_toolbar() }}
               <textarea class="form-control" name="instructions" rows="6" required placeholder="1. Read all questions carefully before answering.&#10;2. The exam will be submitted automatically when time expires.&#10;&#10;IMPORTANT: Once started, the timer cannot be paused."></textarea>
               <div class="instr-preview-label">Preview</div>
-              <div class="instr-preview"><span class="instr-preview-empty">Nothing to preview yet.</span></div>
+              <div class="instr-preview instr-rich"><span class="instr-preview-empty">Nothing to preview yet.</span></div>
             </div>
             <div class="col-md-4 col-sm-6 col-12">
               <label class="form-label">Positive Marks</label>
@@ -794,15 +804,10 @@
                 <span>Instructions</span>
               </label>
               <div class="bulk-field-input" data-field-input="instructions">
-                <div class="instr-toolbar">
-                  <button type="button" class="instr-tb-btn" data-instr-cmd="bullet" title="Bullet list"><i class="fas fa-list-ul"></i></button>
-                  <button type="button" class="instr-tb-btn" data-instr-cmd="number" title="Numbered list"><i class="fas fa-list-ol"></i></button>
-                  <button type="button" class="instr-tb-btn" data-instr-cmd="bold" title="Bold"><i class="fas fa-bold"></i></button>
-                  <button type="button" class="instr-tb-btn" data-instr-cmd="warning" title="Warning callout"><i class="fas fa-triangle-exclamation"></i></button>
-                </div>
+                {{ instr_toolbar() }}
                 <textarea class="form-control" name="instructions" rows="5" disabled placeholder="New instructions to apply to every selected exam…"></textarea>
                 <div class="instr-preview-label">Preview</div>
-                <div class="instr-preview"><span class="instr-preview-empty">Nothing to preview yet.</span></div>
+                <div class="instr-preview instr-rich"><span class="instr-preview-empty">Nothing to preview yet.</span></div>
               </div>
             </div>
           </div>
@@ -1094,6 +1099,9 @@
 <script src="{{ url_for('static', filename='shared/view-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='admin/list-controller.js') }}"></script>
 <script src="{{ url_for('static', filename='admin/select-enhance.js') }}"></script>
+<script src="{{ url_for('static', filename='admin/instructions-editor.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/date-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/advanced-filter.js') }}"></script>
 <script>
 let _examIdToDelete = null;
 
@@ -1750,81 +1758,16 @@ document.addEventListener('show.bs.modal', function (e) {
   loadSubcategoriesFor(catSelect, subcatSelect);
 });
 
-/* ── Instructions editor: toolbar (bullet/number/bold/warning) + a live
-   preview rendered by the SAME server-side function students will see
-   (POST /api/v01/admin/exams/preview-instructions) — see
-   app/utils/instructions_formatter.py. Wired for the static Add-exam
-   form on load, and for each per-row Edit modal's own textarea the first
-   time that modal opens (its markup — including a fresh, unwired
-   textarea — is re-fetched over AJAX on every pagination/search, so this
-   can't just run once on DOMContentLoaded). ── */
-function instrApplyCommand(textarea, cmd) {
-  if (cmd === 'bold') {
-    const s = textarea.selectionStart, e = textarea.selectionEnd, v = textarea.value;
-    const sel = v.slice(s, e) || 'bold text';
-    textarea.value = v.slice(0, s) + '**' + sel + '**' + v.slice(e);
-    textarea.focus();
-    textarea.setSelectionRange(s + 2, s + 2 + sel.length);
-  } else if (cmd === 'warning') {
-    const s = textarea.selectionStart, v = textarea.value;
-    const prefix = (v.slice(0, s).match(/\n\n$/) || v === '') ? '' : (v && !v.endsWith('\n\n') ? '\n\n' : '');
-    const insert = prefix + 'IMPORTANT: Your message here';
-    textarea.value = v.slice(0, s) + insert + v.slice(s);
-    textarea.focus();
-    textarea.setSelectionRange(s + insert.length - 'Your message here'.length, s + insert.length);
-  } else {
-    const s = textarea.selectionStart, e = textarea.selectionEnd, v = textarea.value;
-    let lineStart = v.lastIndexOf('\n', s - 1) + 1;
-    let lineEnd = v.indexOf('\n', e);
-    if (lineEnd === -1) lineEnd = v.length;
-    const lines = v.slice(lineStart, lineEnd).split('\n');
-    const out = lines.map((ln, i) => cmd === 'bullet'
-      ? '- ' + ln.replace(/^[-*]\s+/, '')
-      : (i + 1) + '. ' + ln.replace(/^\d+[.)]\s+/, '')
-    ).join('\n');
-    textarea.value = v.slice(0, lineStart) + out + v.slice(lineEnd);
-    textarea.focus();
-  }
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-const _instrPreviewTimers = new WeakMap();
-function instrRenderPreview(textarea, previewEl) {
-  clearTimeout(_instrPreviewTimers.get(textarea));
-  _instrPreviewTimers.set(textarea, setTimeout(async () => {
-    const text = textarea.value;
-    if (!text.trim()) { previewEl.innerHTML = '<span class="instr-preview-empty">Nothing to preview yet.</span>'; return; }
-    try {
-      const r = await fetch('/api/v01/admin/exams/preview-instructions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instructions: text }),
-      });
-      const data = await r.json();
-      previewEl.innerHTML = data.html || '<span class="instr-preview-empty">Nothing to preview yet.</span>';
-    } catch (e) { /* preview is a convenience — a failed fetch just leaves the last preview shown */ }
-  }, 350));
-}
-
-function wireInstructionsEditor(textarea) {
-  if (!textarea || textarea.dataset.instrWired) return;
-  const field = textarea.closest('.col-12');
-  if (!field) return;
-  const previewEl = field.querySelector('.instr-preview');
-  if (!previewEl) return;
-  textarea.dataset.instrWired = '1';
-  field.querySelectorAll('[data-instr-cmd]').forEach(btn => {
-    btn.addEventListener('click', () => instrApplyCommand(textarea, btn.dataset.instrCmd));
-  });
-  textarea.addEventListener('input', () => instrRenderPreview(textarea, previewEl));
-  instrRenderPreview(textarea, previewEl);
-}
-
-document.querySelectorAll('#addExamForm textarea[name="instructions"]').forEach(wireInstructionsEditor);
-document.querySelectorAll('#bulkUpdateModal textarea[name="instructions"]').forEach(wireInstructionsEditor);
+/* ── Instructions editor: toolbar, template, live preview — static/admin/instructions-editor.js. Wired for the static Add
+   form and Bulk modal on load, and for each per-row Edit modal's own textarea the first time that modal opens (its markup is
+   re-fetched over AJAX on every pagination/search, so this can't just run once). ── */
+window.INSTR_GENERAL_TEMPLATE = {{ general_instructions_template|tojson }};
+document.querySelectorAll('#addExamForm textarea[name="instructions"]').forEach(InstructionsEditor.wire);
+document.querySelectorAll('#bulkUpdateModal textarea[name="instructions"]').forEach(InstructionsEditor.wire);
 document.addEventListener('show.bs.modal', function (e) {
   const modal = e.target;
   if (!modal.id || modal.id.indexOf('editExamModal') !== 0) return;
-  wireInstructionsEditor(modal.querySelector('textarea[name="instructions"]'));
+  InstructionsEditor.wire(modal.querySelector('textarea[name="instructions"]'));
 });
 // Required-but-blank (whitespace-only bypasses the plain `required`
 // attribute) guard — shared by the Add form and every Edit modal form.
@@ -1853,21 +1796,41 @@ createViewToggle({
 
 /* ── Search / filter / pagination (reusable component) — bounded initial
    load (server-rendered page 1), everything after that via AJAX. ── */
-const examCategoryFilterEl = document.getElementById('examCategoryFilter');
-const examSubcategoryFilterEl = document.getElementById('examSubcategoryFilter');
-const examStatusFilterEl = document.getElementById('examStatusFilter');
-examCategoryFilterEl.addEventListener('change', () => {
-  loadSubcategoriesFor(examCategoryFilterEl, examSubcategoryFilterEl);
-  examSubcategoryFilterEl.querySelectorAll('option').forEach(o => { if (o.value === '') o.textContent = 'All Subcategories'; });
+const examAdvValueEl = document.getElementById('examAdvValue');
+
+/* ── Advanced Filter — the shared component (static/shared/advanced-filter.js); the server validates and applies the
+   conditions (app/services/exam_filters.py). ── */
+const _ADV_CATEGORIES = {{ (categories | map(attribute='id') | list) | tojson }}.map((id, i) => [String(id), {{ (categories | map(attribute='name') | list) | tojson }}[i]]);
+const _ADV_CAT_NAME = Object.fromEntries(_ADV_CATEGORIES);
+const _ADV_SUBCATS = {{ (all_subcategories or []) | tojson }}.map(s => [String(s.id), (_ADV_CAT_NAME[String(s.category_id)] ? _ADV_CAT_NAME[String(s.category_id)] + ' › ' : '') + s.name]);
+const examFilter = AdvancedFilter.create({
+  mount: document.getElementById('examAdvMount'),
+  summaryEl: document.getElementById('examAdvSummary'),
+  dateFormat: {{ DISPLAY_DATE_FORMAT | default('%d-%m-%Y') | tojson }},
+  fields: [
+    { key: 'name', label: 'Exam name', kind: 'text' },
+    { key: 'scheduled', label: 'Scheduled exam', kind: 'enum', values: [['scheduled', 'Scheduled'], ['not_scheduled', 'Not scheduled']] },
+    { key: 'status', label: 'Status', kind: 'enum', values: [['upcoming', 'Upcoming'], ['ongoing', 'Ongoing'], ['completed', 'Completed'], ['cancelled', 'Cancelled'], ['draft', 'Draft']] },
+    { key: 'category', label: 'Category', kind: 'entity', values: _ADV_CATEGORIES },
+    { key: 'subcategory', label: 'Subcategory', kind: 'entity', values: _ADV_SUBCATS },
+    { key: 'total_questions', label: 'Questions (configured)', kind: 'number' },
+    { key: 'questions_added', label: 'Questions added', kind: 'number' },
+    { key: 'date', label: 'Start date', kind: 'date' },
+    { key: 'end_date', label: 'End date', kind: 'date' },
+    { key: 'start_time', label: 'Start time', kind: 'time' },
+    { key: 'duration', label: 'Duration (min)', kind: 'number' },
+    { key: 'max_attempts', label: 'Attempts allowed per student', kind: 'number' },
+    { key: 'attempts_made', label: 'Attempts made so far', kind: 'number' },
+    { key: 'result_mode', label: 'Result mode', kind: 'enum', values: [['instant', 'Instant'], ['delayed', 'Delayed'], ['manual', 'Manual']] },
+    { key: 'results_released', label: 'Results released', kind: 'enum', values: [['released', 'Released'], ['not_released', 'Not released']] },
+  ],
+  onApply: json => { examAdvValueEl.value = json; examAdvValueEl.dispatchEvent(new Event('change')); },
 });
 
 // Themed dropdown-button in place of the native <select> list for these
 // three filters — see static/admin/select-enhance.js. The underlying
 // <select> elements above are unchanged and still what list-controller.js
 // reads/listens to; this is presentation only.
-enhanceSelect(examCategoryFilterEl, { icon: 'fas fa-layer-group' });
-enhanceSelect(examSubcategoryFilterEl, { icon: 'fas fa-sitemap' });
-enhanceSelect(examStatusFilterEl, { icon: 'fas fa-circle-half-stroke' });
 enhanceSelect(document.getElementById('examImportDuplicate'), { icon: 'fas fa-clone' });
 
 // Same treatment for the Add/Edit Exam form selects — full-width "block"
@@ -2377,19 +2340,56 @@ document.getElementById('confirmBulkUpdateBtn').addEventListener('click', functi
   });
 });
 
+/* The four list states are kept distinct: loading (list dimmed), error (request failed: never shown as "no results"),
+   empty (request succeeded with zero rows: "no exams yet" or "no matches" depending on whether a search/filter is active)
+   and ok. */
+const examSearchEl = document.getElementById('examSearch');
+const examStateEl = document.getElementById('examState');
+const examWrapEl = document.getElementById('examViewWrapper');
+function examFiltersActive() { return !!(examSearchEl.value.trim() || examAdvValueEl.value); }
+function setExamState(kind, message) {
+  examWrapEl.classList.toggle('is-loading', kind === 'loading');
+  if (kind === 'loading') return;
+  const hide = kind === 'empty' || kind === 'error';
+  examWrapEl.hidden = hide;
+  examStateEl.hidden = !hide;
+  examStateEl.classList.toggle('is-error', kind === 'error');
+  if (!hide) return;
+  const q = examSearchEl.value.trim(), adv = !!examAdvValueEl.value;
+  const mk = (tag, text, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const actions = mk('div', null, 'es-actions');
+  const btn = (icon, label, cls, fn) => { const b = mk('button', null, 'btn-flat ' + cls); b.type = 'button'; b.innerHTML = '<i class="fas ' + icon + '"></i> '; b.appendChild(document.createTextNode(label)); b.addEventListener('click', fn); actions.appendChild(b); return b; };
+  let ico, title, text;
+  if (kind === 'error') {
+    ico = 'fa-triangle-exclamation'; title = 'Could not load exams'; text = message || 'Something went wrong while loading the exam list.';
+    btn('fa-rotate-right', 'Try again', 'primary', () => examList.reload());
+  } else if (examFiltersActive()) {
+    ico = 'fa-magnifying-glass'; title = 'No matching exams found';
+    text = (q && adv) ? 'No exams match the current search and filter combination.'
+         : q ? 'No exam name matches “' + q + '”.' : 'None of your exams match the current filters.';
+    btn('fa-filter-circle-xmark', 'Clear Filters', 'primary', () => { examSearchEl.value = ''; examFilter.clear(); });
+  } else {
+    ico = 'fa-file-circle-plus'; title = 'No exams yet'; text = 'There are no exams on the portal. Add the first one to get started.';
+    const add = btn('fa-plus', 'Add Exam', 'primary', () => {}); add.setAttribute('data-bs-toggle', 'modal'); add.setAttribute('data-bs-target', '#addExamModal');
+  }
+  const i = mk('i', null, 'fas ' + ico + ' es-ico'); i.setAttribute('aria-hidden', 'true');
+  examStateEl.replaceChildren(i, mk('h3', title), mk('p', text), actions);
+}
+
 const examList = createAdminList({
   endpoint: '/api/v01/admin/exams',
   paginatorEl: document.getElementById('examPaginator'),
   searchInputEl: document.getElementById('examSearch'),
   searchParam: 'q',
-  filters: {
-    category_id: examCategoryFilterEl,
-    subcategory_id: examSubcategoryFilterEl,
-    status: examStatusFilterEl,
-  },
+  filters: { adv: examAdvValueEl },
   perPage: {{ exams_per_page | default(20) }},
   extraParams: () => ({ partial: 1 }),
+  onLoadStart: () => setExamState('loading'),
+  onError: message => setExamState('error', message),
   onData: data => {
+    if (data && data.success === false) { adminToast(data.message || 'Could not apply the filter.', 'danger'); return; }
+    if (!data.total) { setExamState('empty'); return; }
+    setExamState('ok');
     document.getElementById('examTbody').innerHTML = data.rows_html || '';
     document.getElementById('examGrid').innerHTML = data.cards_html || '';
     const modalsEl = document.getElementById('examEditModals');
@@ -2398,6 +2398,7 @@ const examList = createAdminList({
     _syncExamSelectionUI(); // re-apply bulk-selection checkbox state wiped out by the innerHTML replace above
   },
 });
+if ({{ exams_total | default(0) }} === 0) setExamState('empty');
 examList.hydrate({ page: 1, total_pages: {{ exams_total_pages | default(1) }}, total: {{ exams_total | default(0) }}, per_page: {{ exams_per_page | default(20) }} });
 </script>
 

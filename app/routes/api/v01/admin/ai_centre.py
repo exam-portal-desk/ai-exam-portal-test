@@ -88,6 +88,26 @@ def _set_batch(job: dict, n: int, **fields):
         batches[n - 1].update(fields)
 
 
+ACTIVE_STATUSES = ("queued", "processing")
+
+
+def _active_job_id_for(admin_id) -> str | None:
+    """A generation this admin already has running, or None. Memory first (this process), then the durable table (another
+    worker). Used to refuse a second generation / retry while one is active."""
+    with _jobs_lock:
+        for jid, job in _jobs.items():
+            if job.get("admin_id") == admin_id and job.get("status") in ACTIVE_STATUSES:
+                return jid
+    from app.db.ai import get_active_generation_job
+    row = get_active_generation_job(admin_id)
+    return row["id"] if isinstance(row, dict) and row.get("id") else None
+
+
+def _already_running_response(job_id: str):
+    return jsonify({"success": False, "already_running": True, "job_id": job_id,
+                    "message": "A generation is already running. Wait for it to finish, or reopen its progress window."}), 409
+
+
 def _compute_final_status(job: dict) -> str:
     batches = job.get("batches", [])
     questions = job.get("questions", [])
@@ -256,6 +276,10 @@ def ai_generate_questions():
         mode    = request.form.get("mode")
         exam_id = int(request.form.get("exam_id") or 0)
 
+        running = _active_job_id_for(session.get("user_id"))
+        if running:
+            return _already_running_response(running)
+
         from app.db.exams import get_exam_by_id
         target_exam = get_exam_by_id(exam_id) if exam_id else None
         if not target_exam:
@@ -349,6 +373,7 @@ def ai_generate_questions():
                 # one, as the authoritative target exam for Save to DB.
                 "exam_id":   exam_id,
                 "exam_name": target_exam.get("name", ""),
+                "admin_id":  admin_id,
                 "mode": mode,
                 "config": {**config_data, "topic": topic},
                 "batch_configs": batch_configs,
@@ -394,7 +419,7 @@ def ai_generation_status(job_id: str):
             "questions": row.get("questions") or [],
             "batches": row.get("batches") or [],
             "error": row.get("error"), "error_type": row.get("error_type"),
-            "exam_id": row.get("exam_id"), "exam_name": row.get("exam_name"),
+            "exam_id": row.get("exam_id"), "exam_name": row.get("exam_name"), "admin_id": row.get("admin_id"),
             "mode": row.get("mode"), "config": row.get("config"),
             "batch_configs": row.get("batch_configs"),
             "pdf_context": row.get("pdf_context"), "pdf_file_uri": row.get("pdf_file_uri"),
@@ -405,7 +430,7 @@ def ai_generation_status(job_id: str):
 
     # Don't ship the (potentially large) cached PDF text/URI to the browser —
     # it's only needed server-side for retry.
-    public_job = {k: v for k, v in job.items() if k not in ("pdf_context", "pdf_file_uri")}
+    public_job = {k: v for k, v in job.items() if k not in ("pdf_context", "pdf_file_uri", "admin_id")}
     return jsonify(public_job)
 
 
@@ -435,12 +460,18 @@ def ai_retry_failed_batches(job_id: str):
                 "questions": row.get("questions") or [],
                 "batches": row.get("batches") or [],
                 "error": row.get("error"), "error_type": row.get("error_type"),
-                "exam_id": row.get("exam_id"), "exam_name": row.get("exam_name"),
+                "exam_id": row.get("exam_id"), "exam_name": row.get("exam_name"), "admin_id": row.get("admin_id"),
                 "mode": row.get("mode"), "config": row.get("config") or {},
                 "batch_configs": row.get("batch_configs") or [],
                 "pdf_context": row.get("pdf_context"), "pdf_file_uri": row.get("pdf_file_uri"),
                 "pdf_is_vision": row.get("pdf_is_vision"),
             }
+
+    if job.get("status") in ACTIVE_STATUSES:
+        return _already_running_response(job_id)
+    running = _active_job_id_for(session.get("user_id"))
+    if running and running != job_id:
+        return _already_running_response(running)
 
     failed = [b for b in job.get("batches", []) if b.get("status") == "failed"]
     if not failed:

@@ -324,13 +324,13 @@
         <li><strong>Turn on "Scheduled Exam"</strong><span>This single toggle switches the form: the <strong>Status</strong> dropdown disappears (it's computed automatically from here on) and three new fields appear — Preparation Window, Completion Buffer, and Allow Manual Submission.</span></li>
         <li><strong>Set Preparation Window and Completion Buffer</strong><span>Both are optional minute values, blank meaning 0. See sections 3 and 5 below for exactly what each one does.</span></li>
         <li><strong>Decide Allow Manual Submission</strong><span>On (the default) lets students submit early; off hides the Submit button and relies entirely on the deadline. See section 6.</span></li>
-        <li><strong>Fill in the rest as usual</strong><span>Instructions, Positive/Negative Marks, Max Attempts, Passing Percentage, and Result Mode — unchanged from a Manual Exam.</span></li>
+        <li><strong>Fill in the rest as usual</strong><span>Instructions, Positive/Negative Marks, Passing Percentage, and Result Mode — unchanged from a Manual Exam. There is no attempts field in this form: the attempt limit is set afterwards with Bulk Update → Max Attempts (or per student on Manage Attempts).</span></li>
         <li><strong>Add questions afterward</strong><span>Same as any exam — Manage Questions, using whichever method you'd normally use.</span></li>
       </ol>
 
       <div class="sg-callout warn">
         <i class="fas fa-triangle-exclamation"></i>
-        <span>The form does <strong>not</strong> stop you from picking a date/time that's already in the past — nothing validates that Date/Start Time is in the future. If you save one by mistake, the exam will immediately compute as Ongoing or even Completed the moment you save it, since its effective status is derived purely from the clock. Double-check the date and time before saving.</span>
+        <span>A Scheduled Exam's start must be in the future: a new or moved start time that is already in the past is rejected with a message, and changing only the duration or the windows must still leave the exam ending in the future. A schedule you did not touch is never re-checked, so an older exam can still have its name or marks edited.</span>
       </div>
 
       <h3 style="font-size:.9rem;font-weight:800;color:var(--text-1);margin:1.4rem 0 .3rem;">Field-by-field reference</h3>
@@ -699,14 +699,14 @@
         <table class="sg-table">
           <tr><th>State</th><th>Timing fields<br><span style="font-weight:400;text-transform:none;">(Date, Start Time, Duration, Prep, Buffer, Allow Manual Submission)</span></th><th>Everything else<br><span style="font-weight:400;text-transform:none;">(Name, Instructions, Marks, Category, Result Mode, Questions…)</span></th></tr>
           <tr><td><strong>Upcoming</strong> (incl. Preparation Available)</td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
-          <tr><td><strong>Ongoing / Live</strong> (incl. buffer)</td><td><span class="sg-pill no"><i class="fas fa-xmark"></i> Locked</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
-          <tr><td><strong>Completed</strong></td><td><span class="sg-pill no"><i class="fas fa-xmark"></i> Locked</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
+          <tr><td><strong>Ongoing / Live</strong> (incl. buffer)</td><td><span class="sg-pill no"><i class="fas fa-xmark"></i> Locked once attempts exist</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
+          <tr><td><strong>Completed</strong></td><td><span class="sg-pill no"><i class="fas fa-xmark"></i> Locked once attempts exist</span></td><td><span class="sg-pill yes"><i class="fas fa-check"></i> Editable</span></td></tr>
         </table>
       </div>
 
       <div class="sg-callout tip">
         <i class="fas fa-lightbulb"></i>
-        <span><strong>Why timing locks once it's no longer Upcoming:</strong> once the exam has gone live, some students may already have started — or completed — an attempt built entirely around the original date/time/duration. Silently rewriting that schedule underneath them would make their attempt inconsistent with what they actually experienced. Saving a timing change here is rejected with a message naming the exam's current state; non-timing details save normally.</span>
+        <span><strong>Why timing locks:</strong> the schedule is locked only when students have attempts on record <em>and</em> the exam is no longer Upcoming, because those attempts were made under the original date, time and duration and silently rewriting them would make them inconsistent. An exam nobody attempted is never locked, whatever its status, so a Completed or Cancelled exam with no attempts can be rescheduled. Saving a timing change on a locked exam is rejected with a message; non-timing details save normally.</span>
       </div>
 
       <div class="sg-card">

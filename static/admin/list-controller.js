@@ -21,6 +21,8 @@
  *                           // json.page tells you whether this is a fresh search (page===1,
  *                           // replace) or a "Load more" continuation (page>1, append).
  *   extraParams(),          // optional fn returning {paramName: value} computed at fetch time
+ *   onLoadStart(),          // optional: a request is starting (show a loading state)
+ *   onError(message),       // optional: the request failed (network error, non-2xx, or success:false); onData is NOT called
  * })
  * returns { load(page), reload() }
  */
@@ -28,7 +30,7 @@
   function createAdminList(opts) {
     const {
       endpoint, paginatorEl, paginatorMode = 'pages', searchInputEl, searchParam = 'q',
-      filters = {}, perPage = 20, debounceMs = 400, onData, extraParams,
+      filters = {}, perPage = 20, debounceMs = 400, onData, extraParams, onLoadStart, onError,
     } = opts;
 
     let currentPage = 1;
@@ -90,8 +92,22 @@
       currentPage = page || 1;
       const params = buildParams(currentPage);
       const mySeq = ++requestSeq;
-      const res = await fetch(`${endpoint}?${params.toString()}`);
-      const data = await res.json();
+      if (onLoadStart) onLoadStart();
+      let data;
+      try {
+        const res = await fetch(`${endpoint}?${params.toString()}`, { credentials: 'same-origin' });
+        try { data = await res.json(); } catch (e) { data = null; }
+        if (!res.ok || !data || data.success === false) {
+          // an API / server problem is reported as an error, never rendered as "no results"
+          if (mySeq !== requestSeq) return null;
+          if (onError) onError((data && data.message) || 'The list could not be loaded (server error).');
+          return null;
+        }
+      } catch (e) {
+        if (mySeq !== requestSeq) return null;
+        if (onError) onError('The list could not be loaded. Check your connection.');
+        return null;
+      }
       if (mySeq !== requestSeq) return data; // stale — a newer load() superseded this one
       onData(data);
       renderPaginator(data);

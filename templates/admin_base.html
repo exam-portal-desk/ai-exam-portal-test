@@ -305,6 +305,10 @@
     transition: background 0.15s, opacity 0.15s;
   }
   .nav-icon i { font-size: 0.88rem; line-height: 1; }
+  .nav-icon i { width: 1.15em; text-align: center; transition: transform .15s ease; }
+  .sb-nav .nav-link:hover .nav-icon i { transform: scale(1.1); }
+  .sb-nav .nav-link:focus-visible { outline: 2px solid var(--border-focus, var(--accent)); outline-offset: -2px; }
+  @media (prefers-reduced-motion: reduce) { .nav-icon i { transition: none; } .sb-nav .nav-link:hover .nav-icon i { transform: none; } }
 
   /* Profile & Account's real photo (NAV_AVATAR_URL) instead of a generic glyph — sits in the
      exact same fixed 36x36 .nav-icon slot every other nav item uses, which doesn't change size
@@ -514,7 +518,7 @@
         <li>
           <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.dashboard') %}active{% endif %}"
              href="{{ url_for('admin.dashboard') }}" data-tooltip="Dashboard" aria-label="Dashboard">
-            <span class="nav-icon"><i class="fas fa-home"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('dashboard') }}"></i></span>
             <span class="nav-label">Dashboard</span>
           </a>
         </li>
@@ -524,69 +528,69 @@
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('category_management') }} {% if request.endpoint and request.endpoint.startswith('admin.categories') %}active{% endif %}"
              href="{{ url_for('admin.categories') }}" data-tooltip="Manage Categories"{{ lock_attrs('category_management') }} aria-label="Manage Categories">
-            <span class="nav-icon"><i class="fas fa-layer-group"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('categories') }}"></i></span>
             <span class="nav-label">Manage Categories</span>{{ lock_icon('category_management') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('exam_management') }} {% if request.endpoint and request.endpoint.startswith('admin.exams') %}active{% endif %}"
              href="{{ url_for('admin.exams') }}" data-tooltip="Manage Exams"{{ lock_attrs('exam_management') }} aria-label="Manage Exams">
-            <span class="nav-icon"><i class="fas fa-file-alt"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('exams') }}"></i></span>
             <span class="nav-label">Manage Exams</span>{{ lock_icon('exam_management') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('subject_management') }} {% if request.endpoint and request.endpoint.startswith('admin.subjects') %}active{% endif %}"
              href="{{ url_for('admin.subjects') }}" data-tooltip="Manage Subjects"{{ lock_attrs('subject_management') }} aria-label="Manage Subjects">
-            <span class="nav-icon"><i class="fas fa-book"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('subjects') }}"></i></span>
             <span class="nav-label">Manage Subjects</span>{{ lock_icon('subject_management') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('question_management') }} {% if request.endpoint and (request.endpoint.startswith('admin.questions') or request.endpoint == 'admin.questions_index') %}active{% endif %}"
              href="{{ url_for('admin.questions_index') }}" data-tooltip="Manage Questions"{{ lock_attrs('question_management') }} aria-label="Manage Questions">
-            <span class="nav-icon"><i class="fas fa-question-circle"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('questions') }}"></i></span>
             <span class="nav-label">Manage Questions</span>{{ lock_icon('question_management') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('question_management') }} {% if request.endpoint and request.endpoint.startswith('admin.upload_images') %}active{% endif %}"
              href="{{ url_for('admin.upload_images_page') }}" data-tooltip="Upload Images"{{ lock_attrs('question_management') }} aria-label="Upload Images">
-            <span class="nav-icon"><i class="fas fa-images"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('upload_images') }}"></i></span>
             <span class="nav-label">Upload Images</span>{{ lock_icon('question_management') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('question_management') }} {% if request.endpoint and request.endpoint.startswith('admin.image_mapping') %}active{% endif %}"
              href="{{ url_for('admin.image_mapping_page') }}" data-tooltip="Image Mapping"{{ lock_attrs('question_management') }} aria-label="Image Mapping">
-            <span class="nav-icon"><i class="fas fa-link"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('image_mapping') }}"></i></span>
             <span class="nav-label">Image Mapping</span>{{ lock_icon('question_management') }}
           </a>
         </li>
         <li>
           <button id="open-latex-editor-admin-base" class="nav-link{{ ' locked' if not admin_can('question_management') }}" data-tooltip="LaTeX Editor"{{ lock_attrs('question_management') }} aria-label="LaTeX Editor">
-            <span class="nav-icon"><i class="fas fa-square-root-alt"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('latex_editor') }}"></i></span>
             <span class="nav-label">LaTeX Editor</span>{{ lock_icon('question_management') }}
           </button>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('storage_management') }} {% if request.endpoint and request.endpoint.startswith('admin.object_storage') %}active{% endif %}"
              href="{{ url_for('admin.object_storage') }}" data-tooltip="Object Storage"{{ lock_attrs('storage_management') }} aria-label="Object Storage">
-            <span class="nav-icon"><i class="fas fa-hdd"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('object_storage') }}"></i></span>
             <span class="nav-label">Object Storage</span>{{ lock_icon('storage_management') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('question_generation') }} {% if request.endpoint and request.endpoint.startswith('admin.ai_command_centre') %}active{% endif %}"
              href="{{ url_for('admin.ai_command_centre') }}" data-tooltip="AI Command Centre"{{ lock_attrs('question_generation') }} aria-label="AI Command Centre">
-            <span class="nav-icon"><i class="fas fa-robot"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('ai') }}"></i></span>
             <span class="nav-label">AI Command Centre</span>{{ lock_icon('question_generation') }}
           </a>
         </li>
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('ai_configuration') }} {% if request.endpoint and request.endpoint.startswith('admin.ai_configuration') %}active{% endif %}"
              href="{{ url_for('admin.ai_configuration') }}" data-tooltip="AI Configuration"{{ lock_attrs('ai_configuration') }} aria-label="AI Configuration">
-            <span class="nav-icon"><i class="fas fa-sliders-h"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('ai_configuration') }}"></i></span>
             <span class="nav-label">AI Configuration</span>{{ lock_icon('ai_configuration') }}
           </a>
         </li>
@@ -596,7 +600,7 @@
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('user_management') }} {% if request.endpoint and (request.endpoint.startswith('admin.requests') or request.endpoint.startswith('admin.new_requests') or request.endpoint.startswith('admin.requests_history')) %}active{% endif %}"
              href="{{ url_for('admin.requests_dashboard') }}" data-tooltip="Users & Requests"{{ lock_attrs('user_management') }} aria-label="Users & Requests">
-            <span class="nav-icon"><i class="fas fa-user-plus"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('users') }}"></i></span>
             <span class="nav-label">Users &amp; Requests</span>{{ lock_icon('user_management') }}
             <span class="nav-badge" id="requestsBadge" style="display:none">0</span>
           </a>
@@ -604,7 +608,7 @@
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('attempt_management') }} {% if request.endpoint and request.endpoint.startswith('admin.attempts') %}active{% endif %}"
              href="{{ url_for('admin.attempts') }}" data-tooltip="Manage Attempts"{{ lock_attrs('attempt_management') }} aria-label="Manage Attempts">
-            <span class="nav-icon"><i class="fas fa-list-ol"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('attempts') }}"></i></span>
             <span class="nav-label">Manage Attempts</span>{{ lock_icon('attempt_management') }}
           </a>
         </li>
@@ -614,7 +618,7 @@
         <li>
           <a class="nav-link{{ ' locked' if not admin_can('user_analytics') }} {% if request.endpoint and request.endpoint.startswith('admin.users_analytics') %}active{% endif %}"
              href="{{ url_for('admin.users_analytics') }}" data-tooltip="Users Analytics"{{ lock_attrs('user_analytics') }} aria-label="Users Analytics">
-            <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('analytics') }}"></i></span>
             <span class="nav-label">Users Analytics</span>{{ lock_icon('user_analytics') }}
           </a>
         </li>
@@ -624,7 +628,7 @@
         <li>
           <a class="nav-link {% if request.endpoint == 'admin.guide' %}active{% endif %}"
              href="{{ url_for('admin.guide') }}" data-tooltip="Admin Guide" aria-label="Admin Guide">
-            <span class="nav-icon"><i class="fas fa-book-open"></i></span>
+            <span class="nav-icon"><i class="fas {{ nav_icon('guide') }}"></i></span>
             <span class="nav-label">Admin Guide</span>
           </a>
         </li>
@@ -632,7 +636,7 @@
           <a class="nav-link {% if request.endpoint == 'admin.profile' %}active{% endif %}"
              href="{{ url_for('admin.profile') }}" data-tooltip="Profile &amp; Account" aria-label="Profile &amp; Account">
             <span class="nav-icon{{ ' nav-icon-avatar' if NAV_AVATAR_URL else '' }}">
-              {% if NAV_AVATAR_URL %}<img src="{{ NAV_AVATAR_URL }}" alt="" class="nav-avatar-img">{% else %}<i class="fas fa-user-circle"></i>{% endif %}
+              {% if NAV_AVATAR_URL %}<img src="{{ NAV_AVATAR_URL }}" alt="" class="nav-avatar-img">{% else %}<i class="fas {{ nav_icon('profile') }}"></i>{% endif %}
             </span>
             <span class="nav-label">Profile &amp; Account</span>
           </a>

@@ -97,6 +97,13 @@ window.MathJax = {
    it exactly as before — this is a presentation layer on top of it, not a
    replacement for it. ── */
 .exam-picker { position: relative; flex: 1; min-width: 0; }
+.load-questions-btn { height: 42px; padding: 0 1.1rem; flex-shrink: 0; white-space: nowrap; }
+.load-questions-btn:disabled { opacity: .65; cursor: progress; transform: none; }
+@media (max-width: 575.98px) {
+  #exam-select-form { flex-wrap: wrap; }
+  #exam-select-form .exam-picker { flex: 1 1 100%; }
+  .load-questions-btn { width: 100%; justify-content: center; }
+}
 .exam-picker-trigger {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .6rem;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
@@ -483,7 +490,7 @@ window.MathJax = {
 <!-- Page Top -->
 <div class="page-top">
   <div>
-    <h1><i class="fas fa-question-circle me-2" style="color:var(--accent)"></i>Questions Management</h1>
+    <h1><i class="fas {{ nav_icon('questions') }} me-2" style="color:var(--accent)"></i>Questions Management</h1>
     <p>Manage, batch-add, and bulk-update exam questions.</p>
   </div>
   <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
@@ -558,9 +565,9 @@ window.MathJax = {
       {% endfor %}
     </select>
 
-    <button id="reload-btn" type="button" class="btn-flat primary" title="Load questions for the selected exam"
-            style="width:42px;height:42px;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <i class="fas fa-download"></i>
+    <button id="reload-btn" type="button" class="btn-flat primary load-questions-btn" title="Load the questions of the selected exam into this page"
+            aria-label="Load Questions">
+      <i class="fas fa-list-check" aria-hidden="true"></i><span class="lq-label">Load Questions</span>
     </button>
   </form>
 </div>
@@ -1210,11 +1217,25 @@ window.MathJax = {
 
   const examSelect = document.getElementById('exam-select');
   const reloadBtn  = document.getElementById('reload-btn');
-  if (reloadBtn) reloadBtn.addEventListener('click', () => {
-    const id = examSelect.value;
-    reloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(id);
-  });
+  if (reloadBtn) {
+    const reloadIdle = reloadBtn.innerHTML;
+    // Load Questions navigates to this page for the chosen exam (unchanged). Once clicked it stays disabled so a second
+    // click cannot start a second navigation; a page restored from the back/forward cache resets it.
+    reloadBtn.addEventListener('click', () => {
+      if (reloadBtn.disabled) return;
+      const id = examSelect.value;
+      reloadBtn.disabled = true;
+      reloadBtn.setAttribute('aria-busy', 'true');
+      reloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span class="lq-label">Loading…</span>';
+      window.location = "{{ url_for('admin.questions_index') }}" + '?exam_id=' + encodeURIComponent(id);
+    });
+    window.addEventListener('pageshow', ev => {
+      if (!ev.persisted) return;
+      reloadBtn.disabled = false;
+      reloadBtn.removeAttribute('aria-busy');
+      reloadBtn.innerHTML = reloadIdle;
+    });
+  }
 
   /* ── Batch UI ── */
   const addRowBtn    = document.getElementById('add-row');
