@@ -91,7 +91,7 @@
 
     <div class="pend-reason">
       <i class="fas fa-info-circle"></i>
-      <span>{{ reason }}</span>
+      <span id="pendReason"{% if release_iso %} data-release="{{ release_iso }}" data-now="{{ server_now_iso }}"{% endif %}>{{ reason }}</span>
     </div>
 
     <div class="pend-actions">
@@ -118,6 +118,24 @@
 
 <script>
 (function(){
+  // Live "available in …": counts down to the real release instant (UTC) using the server's clock, so a wrong device clock
+  // cannot make it lie, and reloads the page the moment the result is released.
+  var reasonEl = document.getElementById('pendReason');
+  if (reasonEl && reasonEl.dataset.release) {
+    var releaseMs = Date.parse(reasonEl.dataset.release);
+    var skew = Date.parse(reasonEl.dataset.now) - Date.now();
+    if (!isNaN(releaseMs) && !isNaN(skew)) {
+      var tick = function () {
+        var left = Math.max(0, Math.round((releaseMs - (Date.now() + skew)) / 1000));
+        if (left <= 0) { window.location.reload(); return; }
+        var h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), s = left % 60;
+        var text = h > 0 ? h + 'h ' + m + 'm' : (m > 0 ? m + 'm ' + s + 's' : s + 's');
+        reasonEl.textContent = reasonEl.textContent.replace(/available in [^(]+\(/, 'available in ' + text + ' (');
+      };
+      setInterval(tick, 1000);
+    }
+  }
+
   var rem = 30;
   var el  = document.getElementById('countdown');
   var t   = setInterval(function(){

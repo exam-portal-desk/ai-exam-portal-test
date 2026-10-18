@@ -78,6 +78,13 @@ def exams():
             return redirect(url_for("admin.exams"))
         available_after_datetime = _parse_available_after_datetime(form, scheduled_mode)
 
+        from app.services.exam_service import schedule_error
+        problem = schedule_error({"scheduled_mode": scheduled_mode, "date": exam_date, "start_time": start_time, "duration": duration,
+                                  "prep_window_minutes": prep_min, "completion_buffer_minutes": buffer_min})
+        if problem:
+            flash(problem, "danger")
+            return redirect(url_for("admin.exams"))
+
         create_exam({
             "name":           form.get("name","").strip(),
             "date":           exam_date,
@@ -136,7 +143,8 @@ def edit_exam(exam_id):
     if request.method == "POST":
         form = request.form
         try:
-            max_att = parse_max_attempts(form.get("max_attempts",""))
+            # the edit form no longer shows an attempts field: an absent field keeps the limit already stored
+            max_att = parse_max_attempts(form.get("max_attempts")) if "max_attempts" in form else exam.get("max_attempts")
             passing_pct = parse_passing_percentage(form.get("passing_percentage",""))
             exam_date = parse_exam_date(form.get("date",""))
             start_time = parse_start_time(form.get("start_time",""))
@@ -159,17 +167,15 @@ def edit_exam(exam_id):
             flash("This exam already has attempts on record, so its Manual/Scheduled mode can no longer be changed.", "danger")
             return redirect(url_for("admin.exams"))
 
-        # SAFETY: once a Scheduled Exam's window has opened (live/closing),
-        # ended (completed), or been cancelled, its schedule can no longer
-        # be silently rewritten out from under students who may already
-        # have — or have already completed — an attempt under the old
-        # timing. Non-timing fields (name, instructions, marks, ...) stay
-        # freely editable regardless; a still-Upcoming scheduled exam, or
-        # any manual exam (which never had this restriction), is
-        # unaffected.
+        # SAFETY: once students have attempts on record under a Scheduled
+        # Exam's timing (it is past Upcoming), that schedule can no longer be
+        # silently rewritten out from under them. Non-timing fields (name,
+        # instructions, marks, ...) stay freely editable regardless. An exam
+        # nobody attempted is never locked, whatever its computed status, so
+        # a completed or cancelled one can be rescheduled; a still-Upcoming
+        # scheduled exam, or any manual exam, is unaffected.
         if was_scheduled:
-            from app.services.exam_service import get_effective_status
-            current_effective = get_effective_status(exam)
+            from app.services.exam_service import schedule_locked
             timing_changed = (
                 exam_date != exam.get("date")
                 or start_time != exam.get("start_time")
@@ -182,13 +188,20 @@ def edit_exam(exam_id):
                 # locked alongside the schedule itself for the same reason.
                 or bool(allow_manual_submission) != bool(exam.get("allow_manual_submission", True))
             )
-            if current_effective != "upcoming" and timing_changed:
+            if timing_changed and schedule_locked(exam, get_exam_attempts_count(exam_id)):
                 flash(
-                    f"This scheduled exam is already {current_effective} — its schedule can no "
+                    "This scheduled exam already has attempts on record, so its schedule can no "
                     "longer be changed. Other details can still be edited.",
                     "danger",
                 )
                 return redirect(url_for("admin.exams"))
+
+        from app.services.exam_service import schedule_error
+        problem = schedule_error({**exam, "scheduled_mode": scheduled_mode, "date": exam_date, "start_time": start_time, "duration": dur,
+                                  "prep_window_minutes": prep_min, "completion_buffer_minutes": buffer_min}, exam)
+        if problem:
+            flash(problem, "danger")
+            return redirect(url_for("admin.exams"))
 
         updates = {
             "name":           form.get("name","").strip(),

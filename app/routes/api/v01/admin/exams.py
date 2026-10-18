@@ -27,7 +27,8 @@ from app.utils.instructions_formatter import render_exam_instructions
 from app.utils.helpers import (
     parse_max_attempts, parse_passing_percentage, parse_instructions_field, parse_exam_date,
 )
-from app.services.exam_service import get_effective_status
+from app.services.exam_service import get_effective_status, schedule_error, schedule_locked
+from app.db.attempts import get_attempt_counts
 from app.services import exam_export_service
 
 _ROWS_TPL = (
@@ -261,20 +262,23 @@ def bulk_update_exams_route():
 
     warnings = []
     date_ids, duration_ids, status_ids = [], [], []
+    attempt_counts = get_attempt_counts([e["id"] for e in exam_rows]) if ("date" in parsed or "duration" in parsed) else {}
     for exam in exam_rows:
         is_scheduled = bool(exam.get("scheduled_mode"))
         # Date and Duration are both "schedule" fields — a Scheduled Exam
         # locks them together the instant it's no longer Upcoming (mirrors
         # edit_exam()'s timing_changed guard), so they share one check.
         if "date" in parsed or "duration" in parsed:
-            eff = get_effective_status(exam)
-            locked = is_scheduled and eff != "upcoming"
-            if locked:
+            locked = schedule_locked(exam, attempt_counts.get(int(exam["id"]), 0))
+            moved = {**exam, **{k: parsed[k] for k in ("date", "duration") if k in parsed}}
+            problem = None if locked else schedule_error(moved, exam)
+            if locked or problem:
                 for field in ("date", "duration"):
                     if field in parsed:
                         warnings.append({
                             "exam_id": exam["id"], "exam_name": exam["name"], "field": field,
-                            "reason": f"This scheduled exam is already {eff} — its schedule can no longer be changed.",
+                            "reason": ("This scheduled exam already has attempts on record — its schedule can no longer be changed."
+                                       if locked else problem),
                         })
             else:
                 if "date" in parsed:

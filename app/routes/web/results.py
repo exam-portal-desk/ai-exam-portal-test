@@ -19,7 +19,8 @@ from app.db.questions import get_questions_by_exam
 from app.db.results import (
     get_result_by_id, get_latest_result_by_user_exam, get_responses_by_result,
 )
-from app.services.result_service import can_user_see_result
+from app.services.result_service import can_user_see_result, result_release_iso
+from app.utils.datetime_service import now_utc_naive
 from app.services.question_access import check_result_access, resolve_result
 from app.services.ranking_service import build_exam_performance, get_more_leaderboard_rows
 from app.db.dashboard_events import mark_event_seen
@@ -51,7 +52,8 @@ def result(exam_id, result_id):
     if not visible:
         return render_template("result_pending.html", exam=exam,
                                reason=reason, result_id=result_data["id"],
-                               from_history=False)
+                               from_history=False,
+                               release_iso=result_release_iso(exam, result_data), server_now_iso=now_utc_naive().isoformat() + "Z")
 
     mark_event_seen(user_id, "result", result_data["id"])
 
@@ -195,9 +197,12 @@ def response_page(exam_id, result_id):
         })
 
     standalone = request.args.get("popup", "0") == "1"
+    # "View Question" in the Assistant opens this page marked from=assistant; Discuss with AI is hidden only there (it would
+    # lead straight back to the conversation it came from). The Result page's own popup shows it like Result History does.
+    from_assistant = request.args.get("from", "") == "assistant"
     return render_template("response.html", exam=exam, result=result_data,
                            responses=parsed_responses, from_history=from_history,
-                           standalone=standalone)
+                           standalone=standalone, from_assistant=from_assistant)
 
 
 # ─────────────────────────────────────────────
@@ -233,7 +238,8 @@ def result_pending(exam_id, result_id):
         return redirect(url_for("result.result", exam_id=exam_id, result_id=result_id))
 
     return render_template("result_pending.html", exam=exam, reason=reason,
-                           result_id=result_id, from_history=False)
+                           result_id=result_id, from_history=False,
+                           release_iso=result_release_iso(exam, result_data), server_now_iso=now_utc_naive().isoformat() + "Z")
 
 
 # ─────────────────────────────────────────────

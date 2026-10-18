@@ -231,13 +231,12 @@
 
       <div class="ei-section">
         <div class="ei-section-title"><i class="fas fa-clipboard-list"></i>Exam Overview</div>
-        {% set ov_n = 6 + (1 if exam.passing_percentage is not none else 0) + (1 if is_scheduled else 0) %}
+        {% set ov_n = 5 + (1 if exam.passing_percentage is not none else 0) + (1 if is_scheduled else 0) %}
         <div class="ei-overview-grid" data-r3="{{ ov_n % 3 }}" data-r2="{{ ov_n % 2 }}">
           <div class="ei-ov-item"><span class="ei-ov-label">Exam Date</span><span class="ei-ov-value">{{ exam.date | calendar_date }}</span></div>
           <div class="ei-ov-item"><span class="ei-ov-label">Start Time</span><span class="ei-ov-value">{{ exam.start_time | calendar_time }}</span></div>
           <div class="ei-ov-item"><span class="ei-ov-label">Duration</span><span class="ei-ov-value">{{ exam.duration }} minutes</span></div>
           <div class="ei-ov-item"><span class="ei-ov-label">Questions</span><span class="ei-ov-value">{{ actual_question_count }}</span></div>
-          <div class="ei-ov-item"><span class="ei-ov-label">Attempts</span><span class="ei-ov-value">{{ max_attempts_display }}</span></div>
           {% if exam.passing_percentage is not none %}
           <div class="ei-ov-item"><span class="ei-ov-label">Passing Score</span><span class="ei-ov-value">{{ exam.passing_percentage }}%</span></div>
           {% endif %}
@@ -361,11 +360,6 @@
 
       {% if not can_start and not active_attempt and not attempts_exhausted and not has_started and window and window.start_dt and (not is_scheduled or effective_status != 'cancelled') %}
       <div class="attempts-info">Scheduled for: <strong>{{ exam.date | calendar_date }} at {{ window.start_time_ampm }}</strong></div>
-      {% endif %}
-      {% if attempts_left is not none and attempts_left >= 0 %}
-      <div class="attempts-info">Attempts left: <strong>{{ attempts_left }}</strong> / {{ max_attempts }}</div>
-      {% elif max_attempts == 0 %}
-      <div class="attempts-info">Attempts: <strong>Unlimited</strong></div>
       {% endif %}
       {% if attempts_message %}<div class="attempts-warn">{{ attempts_message }}</div>{% endif %}
 

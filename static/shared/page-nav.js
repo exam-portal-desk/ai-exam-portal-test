@@ -31,9 +31,10 @@
     var RING = 2 * Math.PI * 18;
     var nav = el('div', { id: 'pgNav', 'class': 'pgnav', role: 'group', 'aria-label': 'Page navigation' });
     nav.hidden = true;
-    var up = el('button', { type: 'button', 'class': 'pgnav-btn', 'data-dir': 'up', 'data-tooltip': 'Page Up', title: 'Page Up', 'aria-label': 'Page up' },
+    var upLabel = opts.edges ? 'Scroll to top' : 'Page Up', downLabel = opts.edges ? 'Scroll to bottom' : 'Page Down';
+    var up = el('button', { type: 'button', 'class': 'pgnav-btn', 'data-dir': 'up', 'data-tooltip': upLabel, title: upLabel, 'aria-label': upLabel },
       '<svg class="pgnav-ring" viewBox="0 0 40 40" aria-hidden="true"><circle class="bg" cx="20" cy="20" r="18"></circle><circle class="fg" cx="20" cy="20" r="18"></circle></svg><i class="fas fa-chevron-up" aria-hidden="true"></i>');
-    var down = el('button', { type: 'button', 'class': 'pgnav-btn', 'data-dir': 'down', 'data-tooltip': 'Page Down', title: 'Page Down', 'aria-label': 'Page down' },
+    var down = el('button', { type: 'button', 'class': 'pgnav-btn', 'data-dir': 'down', 'data-tooltip': downLabel, title: downLabel, 'aria-label': downLabel },
       '<i class="fas fa-chevron-down" aria-hidden="true"></i>');
     nav.appendChild(up); nav.appendChild(down);
     document.body.appendChild(nav);
@@ -55,7 +56,8 @@
         .sort(function (x, z) { return x.top - z.top; });
     }
 
-    function target(dir) {                                                  // -> { el, y }: the section to land on (el is null for the very top / bottom)
+    function target(dir) {
+      if (opts.edges) return { el: null, y: dir > 0 ? maxY() : 0 };         // edge mode: the buttons mean "top" and "bottom"                                                  // -> { el, y }: the section to land on (el is null for the very top / bottom)
       var cur = curY(), vh = window.innerHeight, max = maxY(), secs = sections(), i, hit = null;
       if (dir > 0) {
         for (i = 0; i < secs.length; i++) { if (secs[i].top > cur + AT_TOP) { hit = secs[i]; break; } }

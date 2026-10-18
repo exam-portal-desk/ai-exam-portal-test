@@ -9,12 +9,42 @@ from datetime import datetime, timedelta
 from typing import Tuple, List, Dict, Optional
 
 import pandas as pd
-from app.utils.datetime_service import now_utc_naive, format_display
+from app.utils.datetime_service import now_utc_naive, format_display, to_app_tz
 
 
 # ─────────────────────────────────────────────
 # Visibility gating
 # ─────────────────────────────────────────────
+
+def result_release_at(exam: dict, result: dict) -> Optional[datetime]:
+    """When a Delayed result is released, as naive UTC (how every stored timestamp is held): completed_at + the exam's delay.
+    None when there is nothing to wait for (not Delayed, no delay) or the submission time is missing or unreadable; nothing
+    is ever invented for those, and the caller keeps treating such a result as visible."""
+    if (exam.get("result_mode") or "instant").strip().lower() != "delayed":
+        return None
+    try:
+        delay_minutes = int(exam.get("result_delay") or 0)
+    except (ValueError, TypeError):
+        return None
+    completed_at = result.get("completed_at")
+    if delay_minutes <= 0 or not completed_at:
+        return None
+    try:
+        if isinstance(completed_at, str):
+            submitted = datetime.fromisoformat(completed_at.replace("Z", "+00:00").replace("+00:00", ""))
+        else:
+            submitted = completed_at
+        return submitted + timedelta(minutes=delay_minutes)
+    except Exception as e:
+        print(f"[result_service] result_release_at error: {e}")
+        return None
+
+
+def result_release_iso(exam: dict, result: dict) -> Optional[str]:
+    """The release instant as an explicit-UTC ISO string for the browser's countdown, or None."""
+    release = result_release_at(exam, result)
+    return release.isoformat() + "Z" if release else None
+
 
 def can_user_see_result(exam: dict, result: dict) -> Tuple[bool, str]:
     """
@@ -32,49 +62,27 @@ def can_user_see_result(exam: dict, result: dict) -> Tuple[bool, str]:
         return False, "Results have not been released by your instructor yet. Please check back later."
 
     if mode == "delayed":
-        delay_minutes = 0
-        try:
-            delay_minutes = int(exam.get("result_delay") or 0)
-        except (ValueError, TypeError):
-            delay_minutes = 0
-
-        if delay_minutes <= 0:
+        visible_after = result_release_at(exam, result)
+        if visible_after is None:
             return True, ""
 
-        completed_at = result.get("completed_at")
-        if not completed_at:
+        now = now_utc_naive()
+        if now >= visible_after:
             return True, ""
 
-        try:
-            if isinstance(completed_at, str):
-                submitted_dt = datetime.fromisoformat(
-                    completed_at.replace("Z", "+00:00").replace("+00:00", "")
-                )
-            else:
-                submitted_dt = completed_at
+        remaining_secs = int((visible_after - now).total_seconds())
+        h = remaining_secs // 3600
+        m = (remaining_secs % 3600) // 60
+        s = remaining_secs % 60
 
-            visible_after = submitted_dt + timedelta(minutes=delay_minutes)
-            now = now_utc_naive()
-
-            if now >= visible_after:
-                return True, ""
-
-            remaining_secs = int((visible_after - now).total_seconds())
-            h = remaining_secs // 3600
-            m = (remaining_secs % 3600) // 60
-            s = remaining_secs % 60
-
-            time_str = (
-                f"{h}h {m}m" if h > 0
-                else f"{m}m {s}s" if m > 0
-                else f"{remaining_secs}s"
-            )
-            unlock = visible_after.strftime("%d %B %Y at %I:%M %p")
-            return False, f"Your result will be available in {time_str} (at {unlock})."
-
-        except Exception as e:
-            print(f"[result_service] can_user_see_result error: {e}")
-            return True, ""
+        time_str = (
+            f"{h}h {m}m" if h > 0
+            else f"{m}m {s}s" if m > 0
+            else f"{remaining_secs}s"
+        )
+        local = to_app_tz(visible_after)                      # the stored instant is UTC; show it in the application's timezone
+        unlock = f"{local.strftime('%d %B %Y at %I:%M %p')} {local.tzname() or ''}".strip()
+        return False, f"Your result will be available in {time_str} (at {unlock})."
 
     # Unknown mode — safe fallback
     return True, ""

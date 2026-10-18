@@ -94,7 +94,7 @@ def build_card(ctx: Dict) -> Dict:
         "has_image": question_has_image(q),
         "has_explanation": bool(ctx.get("explanation")),
         # the existing response page (its popup layout), scrolled to this question
-        "view_url": f"/response/{ctx.get('exam_id')}/{ctx.get('result_id')}?popup=1#rq-{int(q['id'])}",
+        "view_url": f"/response/{ctx.get('exam_id')}/{ctx.get('result_id')}?popup=1&from=assistant#rq-{int(q['id'])}",
     }
 
 

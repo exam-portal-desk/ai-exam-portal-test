@@ -99,6 +99,19 @@ def get_used_attempts_count(user_id: int, exam_id: int) -> int:
         return 0
 
 
+def get_attempt_counts(exam_ids) -> Dict[int, int]:
+    """Attempts on record (any status) per exam, for the admin list: one grouped query."""
+    ids = [int(i) for i in exam_ids]
+    if not ids:
+        return {}
+    try:
+        rows = fetch_all("SELECT exam_id, COUNT(*) AS count FROM exam_attempts WHERE exam_id = ANY(%s) GROUP BY exam_id", (ids,))
+        return {int(r["exam_id"]): int(r["count"]) for r in rows}
+    except Exception as e:
+        print(f"[db.attempts] get_attempt_counts error: {e}")
+        return {}
+
+
 def get_completed_attempts_count(user_id: int, exam_id: int) -> int:
     try:
         row = fetch_one(

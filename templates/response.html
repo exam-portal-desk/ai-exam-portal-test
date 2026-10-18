@@ -438,6 +438,29 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 }
 @keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
+/* ── Analysis mode: off = a clean page (no AI / discussion controls), also what gets printed ── */
+.analysis-switch { display:inline-flex; align-items:center; gap:.5rem; cursor:pointer; margin:0 .35rem 0 0; font-size:.78rem; font-weight:600; color:var(--text-2); user-select:none; }
+.analysis-switch input { position:absolute; opacity:0; width:1px; height:1px; }
+.analysis-track { position:relative; width:34px; height:20px; border-radius:999px; background:var(--border); transition:background .15s; flex-shrink:0; }
+.analysis-track::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:var(--surface); box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .15s; }
+.analysis-switch input:checked + .analysis-track { background:var(--accent); }
+.analysis-switch input:checked + .analysis-track::after { transform:translateX(14px); }
+.analysis-switch input:focus-visible + .analysis-track { outline:2px solid var(--border-focus, var(--accent)); outline-offset:2px; }
+.visually-hidden { position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+html[data-analysis="off"] .ai-discuss-row,
+html[data-analysis="off"] .ai-explain-trigger,
+html[data-analysis="off"] .disc-section { display:none !important; }
+@media (max-width:575.98px) { .analysis-switch { flex:1 0 100%; margin:0 0 .4rem; } }
+
+@media print {
+  .sb, .sb-overlay, .t-nav, .app-footer, .pgnav, .icon-toolbar, .analysis-switch,
+  .ai-discuss-row, .ai-explain-trigger, .disc-section { display:none !important; }
+  .app-shell, .page-main { display:block !important; margin:0 !important; padding:0 !important; min-height:0 !important; }
+  .container { max-width:100% !important; width:100% !important; margin:0 !important; padding:0 !important; }
+  body { background:#fff !important; }
+  .card, .question-response-card { box-shadow:none !important; break-inside:avoid; }
+}
+
 /* Responsive */
 @media(max-width:768px){
   .col-md-8,.col-md-4,.col-md-6,.col-md-12,.col-md-2 { flex:0 0 100%; max-width:100%; }
@@ -450,6 +473,24 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 }
 </style>
 
+<script>
+/* Analysis mode defaults to on; the choice is remembered in this browser only and is applied before the page paints. It only
+   toggles visibility: no permission, plan, stored data or AI call is touched. */
+(function () {
+  var on = true;
+  try { on = localStorage.getItem('responseAnalysisMode') !== 'off'; } catch (e) {}
+  document.documentElement.setAttribute('data-analysis', on ? 'on' : 'off');
+  document.addEventListener('DOMContentLoaded', function () {
+    var box = document.getElementById('analysisMode');
+    if (!box) return;
+    box.checked = on;
+    box.addEventListener('change', function () {
+      document.documentElement.setAttribute('data-analysis', box.checked ? 'on' : 'off');
+      try { localStorage.setItem('responseAnalysisMode', box.checked ? 'on' : 'off'); } catch (e) {}
+    });
+  });
+})();
+</script>
 <div class="container mt-4" id="responseContainer">
   <div class="card">
     <div class="card-body">
@@ -469,6 +510,12 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
                 <p class="mb-0 text-muted-light">Completed: {{ result.completed_at | display_dt if result.completed_at else '—' }}</p>
               </div>
               <div class="icon-toolbar">
+                <label class="analysis-switch" title="Show or hide the AI and discussion panels. Hide them for a clean page to read or print.">
+                  <input type="checkbox" id="analysisMode" role="switch" checked aria-describedby="analysisModeHint">
+                  <span class="analysis-track" aria-hidden="true"></span>
+                  <span class="analysis-label">Analysis mode</span>
+                  <span class="visually-hidden" id="analysisModeHint">Off hides AI and discussion panels</span>
+                </label>
                 {% if from_history %}
                 <a href="{{ url_for('dashboard.dashboard') }}" class="icon-btn ib-accent" title="Back to Dashboard"><i class="fas fa-arrow-left"></i></a>
                 {% endif %}
@@ -703,8 +750,8 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 
               {# Discuss with AI: every question (correct, incorrect or skipped) of a result the student may see — this page
                  is only ever rendered for one. It opens the Assistant on this question; the server decides again on every
-                 message. Hidden in the popup layout, which is what the Assistant itself opens for "View Question". #}
-              {% if not standalone and user_can('response_ai_discussion') %}
+                 message. Hidden only in the window the Assistant itself opens for "View Question" (from_assistant). #}
+              {% if not from_assistant and user_can('response_ai_discussion') %}
               <div class="ai-discuss-row">
                 <a class="btn-discuss" href="{{ url_for('ai.ai_assistant') }}?q={{ response.question.id }}&amp;r={{ result.id }}"
                    target="_blank" rel="noopener" data-discuss-qid="{{ response.question.id }}">
@@ -2172,7 +2219,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Floating Page Up / Page Down (static/shared/page-nav.js): pages the whole document, question by question.
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.PageNav) PageNav.init({ sections: '.question-response-card', offset: 64 });
+  if (window.PageNav) PageNav.init({ edges: true });
 });
 
 //]]>

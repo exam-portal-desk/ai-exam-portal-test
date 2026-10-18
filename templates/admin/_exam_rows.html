@@ -238,10 +238,17 @@
             </div>
             <div class="col-12">
               {% if exam.scheduled_mode and exam.effective_status and exam.effective_status != 'upcoming' %}
+              {% if exam.attempt_count %}
               <div class="sched-locked-hint" style="margin-bottom:.75rem">
                 <i class="fas fa-lock"></i>
-                This exam is already {{ exam.effective_status }} — its schedule (date, time, duration, preparation window, completion buffer) can no longer be changed. Other details can still be edited.
+                This exam is already {{ exam.effective_status }} and has attempts on record — its schedule (date, time, duration, preparation window, completion buffer) can no longer be changed. Other details can still be edited.
               </div>
+              {% else %}
+              <div class="sched-locked-hint" style="margin-bottom:.75rem">
+                <i class="fas fa-calendar-plus"></i>
+                This exam is {{ exam.effective_status }} and nobody has attempted it. Choose a new date and start time in the future to run it again.
+              </div>
+              {% endif %}
               {% endif %}
               <div class="sched-toggle-box">
                 <label class="sched-toggle-switch">
@@ -301,14 +308,6 @@
             <div class="col-md-4 col-sm-6 col-12">
               <label class="form-label">Negative Marks</label>
               <input type="text" class="form-control" name="negative_marks" value="{{ exam.negative_marks }}">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">
-                Max Attempts
-                <span style="font-weight:400;color:var(--text-3);font-size:.72rem">(blank = unlimited)</span>
-              </label>
-              <input type="number" class="form-control" name="max_attempts"
-                     min="0" step="1" value="{{ exam.max_attempts or '' }}" placeholder="e.g. 3">
             </div>
             <div class="col-md-4">
               <label class="form-label">

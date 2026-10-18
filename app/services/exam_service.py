@@ -404,6 +404,36 @@ def get_effective_status(exam: Dict) -> str:
     return "completed"
 
 
+def schedule_locked(exam: Dict, attempt_count: int) -> bool:
+    """May this Scheduled Exam's schedule no longer be changed? Only when students have attempts on record and the exam is past
+    Upcoming: those attempts were made under the old timing. An exam nobody attempted can always be rescheduled, whatever
+    its computed status (a completed or cancelled one included)."""
+    return bool(exam.get("scheduled_mode")) and attempt_count > 0 and get_effective_status(exam) != "upcoming"
+
+
+def schedule_error(exam: Dict, previous: Optional[Dict] = None) -> Optional[str]:
+    """Why a Scheduled Exam's schedule cannot be saved, or None. `exam` is the exam as it would be saved, `previous` as it is
+    stored (None for a new exam). A schedule that was not touched is never re-checked, so a past one can still have its name
+    or marks edited. A new or moved start time must be in the future; changing only the duration or the prep/buffer windows
+    must still leave the exam ending in the future."""
+    if not exam.get("scheduled_mode"):
+        return None
+    window = get_exam_time_window(exam)
+    start, end, now = window.get("start_dt"), window.get("end_dt"), window["now"]
+    if start is None:
+        return "Choose a valid date and start time for a Scheduled Exam."
+    prev = previous or {}
+    moved = (not prev.get("scheduled_mode")) or exam.get("date") != prev.get("date") or exam.get("start_time") != prev.get("start_time")
+    resized = (safe_int(exam.get("duration"), 0) != safe_int(prev.get("duration"), 0)
+               or exam.get("prep_window_minutes") != prev.get("prep_window_minutes")
+               or exam.get("completion_buffer_minutes") != prev.get("completion_buffer_minutes"))
+    if moved and start <= now:
+        return "The scheduled start time is in the past. Choose a date and time in the future."
+    if not moved and resized and end <= now:
+        return "This schedule would end in the past. Move the date forward or lengthen the exam."
+    return None
+
+
 def get_effective_deadline(exam: Dict, attempt_start):
     """The authoritative instant this attempt's timer must reach zero.
     Manual exams: attempt_start + duration, exactly as before — untouched.

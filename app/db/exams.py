@@ -324,6 +324,10 @@ def get_exams_page(search: str = "", category_id=None, subcategory_id=None, stat
         # list-only: get_exams_by_subcategory_page() (student dashboard)
         # never shows a row number, so it doesn't call this.
         attach_row_numbers(result["exams"], result["page"], result["per_page"])
+        from app.db.attempts import get_attempt_counts
+        counts = get_attempt_counts([e["id"] for e in result["exams"]])
+        for e in result["exams"]:
+            e["attempt_count"] = counts.get(int(e["id"]), 0)       # lets the edit form say whether a schedule is locked
         return result
     except Exception as e:
         print(f"[db.exams] get_exams_page error: {e}")
