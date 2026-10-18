@@ -473,6 +473,13 @@
 .exam-job-report-list { margin: 0; padding-left: 1.1rem; font-size: .8rem; line-height: 1.7; }
 .exam-job-report-list .fail { color: #ef4444; }
 .exam-job-report-list .ok { color: #22c55e; }
+.exam-job-report-list .warn { color: #f59e0b; }
+.exam-job-summary { font-size: .8rem; line-height: 1.7; margin-bottom: .75rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text-2); }
+.exam-job-summary b { color: var(--text-1); }
+.exam-job-summary b.fail { color: #ef4444; }
+.exam-job-detail { display: block; font-size: .74rem; color: var(--text-3); line-height: 1.5; }
+.exam-job-detail.fail { color: #ef4444; }
+.exam-job-scroll { max-height: 45vh; overflow: auto; }
 
 /* ── Bulk Update modal: per-field "Change this field" toggle. The checkbox
    enables/disables (and visually dims) its own paired input(s) only —
@@ -498,6 +505,11 @@
     <p>Create, edit and manage all exams on the portal.</p>
   </div>
   <div style="display:flex;gap:.5rem">
+    <select id="examImportDuplicate" class="admin-list-filter" aria-label="If an exam was already imported"
+            title="What to do with an exam that already exists here with the same name and identical questions">
+      <option value="skip">Skip exams already imported</option>
+      <option value="rename">Import again as a copy</option>
+    </select>
     <button class="btn-flat secondary" onclick="document.getElementById('examImportFile').click()">
       <i class="fas fa-file-import"></i> Import Exams
     </button>
@@ -1856,6 +1868,7 @@ examCategoryFilterEl.addEventListener('change', () => {
 enhanceSelect(examCategoryFilterEl, { icon: 'fas fa-layer-group' });
 enhanceSelect(examSubcategoryFilterEl, { icon: 'fas fa-sitemap' });
 enhanceSelect(examStatusFilterEl, { icon: 'fas fa-circle-half-stroke' });
+enhanceSelect(document.getElementById('examImportDuplicate'), { icon: 'fas fa-clone' });
 
 // Same treatment for the Add/Edit Exam form selects — full-width "block"
 // mode so they sit flush with their sibling .form-control inputs. The
@@ -2003,6 +2016,13 @@ async function _pollExamJob(statusUrl) {
     if (job.status === 'failed') {
       _examJobUpdate({ message: job.error || 'Failed.', percent: job.percent || 0 });
       _examJobFinish(false);
+      if (Array.isArray(job.errors) && job.errors.length) {
+        const el = document.getElementById('examJobReport');
+        el.style.display = 'block';
+        el.innerHTML = '<div class="exam-job-scroll"><ul class="exam-job-report-list">' +
+          job.errors.map(m => `<li class="fail">${_escHtmlExam(m)}</li>`).join('') + '</ul></div>' +
+          '<div class="exam-job-detail">Nothing was imported. Fix the package (or re-export it) and try again.</div>';
+      }
       return null;
     }
     await new Promise(r => setTimeout(r, 800));
@@ -2026,8 +2046,18 @@ async function startExamExport() {
     }
     const job = await _pollExamJob('/api/v01/admin/exams/export/status/' + startData.job_id);
     if (!job) return;
-    _examJobUpdate({ message: `Export ready — ${job.summary.exam_count} exam(s), ${job.summary.question_count} question(s).`, percent: 100 });
+    const s = job.summary || {};
+    _examJobUpdate({ message: `Export ready — ${s.exam_count} exam(s), ${s.question_count} question(s), ${s.image_count || 0} image(s)` +
+                              `${s.warning_count ? ', ' + s.warning_count + ' warning(s)' : ''}.`, percent: 100 });
     _examJobFinish(true);
+    if (s.warning_count) {
+      const el = document.getElementById('examJobReport');
+      el.style.display = 'block';
+      el.innerHTML = '<div class="exam-job-detail" style="margin-bottom:.4rem">The file was created, but these things were not perfect in the source:</div>' +
+        '<div class="exam-job-scroll"><ul class="exam-job-report-list">' +
+        (s.warnings || []).map(w => `<li class="warn">${_escHtmlExam(w.message)}</li>`).join('') + '</ul></div>' +
+        (s.warning_count > (s.warnings || []).length ? `<div class="exam-job-detail">…and ${s.warning_count - s.warnings.length} more (all are listed in the file's manifest.json).</div>` : '');
+    }
     // A real request to a real URL, via a hidden iframe — the server's own
     // Content-Disposition: attachment decides "download", never a client-synthesized blob:
     // URL, which a browser's built-in file viewer can intercept and show inline instead.
@@ -2048,6 +2078,7 @@ async function startExamImport(file) {
   try {
     const form = new FormData();
     form.append('file', file);
+    form.append('on_duplicate', document.getElementById('examImportDuplicate').value);
     const startResp = await fetch('/api/v01/admin/exams/import', { method: 'POST', body: form });
     const startData = await startResp.json();
     if (!startResp.ok || !startData.success) {
@@ -2057,18 +2088,40 @@ async function startExamImport(file) {
     }
     const job = await _pollExamJob('/api/v01/admin/exams/import/status/' + startData.job_id);
     if (!job) return;
-    const report = job.report || { imported: [], failed: [] };
-    _examJobUpdate({
-      message: `Imported ${report.imported.length} exam(s)${report.failed.length ? ', ' + report.failed.length + ' failed' : ''}.`,
-      percent: 100,
-    });
-    _examJobFinish(report.failed.length === 0);
+    const report = job.report || { imported: [], failed: [], exams: [], totals: {}, status: 'failed' };
+    const t = report.totals || {};
+    const headline = {
+      complete: 'Import complete', warnings: 'Imported with warnings', partial: 'Partly imported — some exams failed',
+      failed: 'Import failed — nothing was imported', skipped: 'Nothing new to import — everything was already here',
+    }[report.status] || 'Import finished';
+    _examJobUpdate({ message: `${headline} (${t.exams_imported || 0} imported, ${t.exams_failed || 0} failed, ${t.exams_skipped || 0} skipped).`, percent: 100 });
+    _examJobFinish(report.status === 'complete' || report.status === 'warnings' || report.status === 'skipped');
+    const e = _escHtmlExam, list = a => (a && a.length ? a.map(e).join(', ') : 'none');
+    const subj = report.subjects || {}, cats = report.categories || {}, subs = report.subcategories || {};
+    const icon = { complete: ['fa-check', 'ok'], warnings: ['fa-exclamation-triangle', 'warn'], skipped: ['fa-forward', 'warn'], failed: ['fa-times', 'fail'] };
     const reportEl = document.getElementById('examJobReport');
     reportEl.style.display = 'block';
-    reportEl.innerHTML = '<ul class="exam-job-report-list">' +
-      report.imported.map(name => `<li class="ok"><i class="fas fa-check"></i> ${_escHtmlExam(name)}</li>`).join('') +
-      report.failed.map(f => `<li class="fail"><i class="fas fa-times"></i> ${_escHtmlExam(f.name)}: ${_escHtmlExam(f.error)}</li>`).join('') +
-      '</ul>';
+    reportEl.innerHTML =
+      `<div class="exam-job-summary"><b>${headline}</b><br>` +
+      `Questions: <b>${t.questions_imported || 0}</b> imported of ${t.questions_expected || 0} expected<br>` +
+      `Images: <b>${t.images_restored || 0}</b> restored of ${t.images_expected || 0} expected` +
+      `${t.images_reused ? ' (' + t.images_reused + ' already in storage)' : ''}${t.images_missing ? ', <b class="fail">' + t.images_missing + ' missing</b>' : ''}<br>` +
+      `Image mappings restored: <b>${t.mappings_restored || 0}</b>${t.mappings_unresolved ? ', <b class="fail">' + t.mappings_unresolved + ' unresolved</b>' : ''}<br>` +
+      `Subjects — created: ${list(subj.created)}; reused: ${list((subj.reused || []).concat(subj.matched_normalized || []))}<br>` +
+      `Categories — created: ${list(cats.created)}; reused: ${list(cats.reused)} · Subcategories — created: ${list(subs.created)}; reused: ${list(subs.reused)}</div>` +
+      ((report.warnings || []).length ? '<ul class="exam-job-report-list">' + report.warnings.map(w => `<li class="warn">${e(w.message)}</li>`).join('') + '</ul>' : '') +
+      '<div class="exam-job-scroll"><ul class="exam-job-report-list">' +
+      (report.exams || []).map(x => {
+        const bits = [];
+        if (x.status !== 'failed' && x.status !== 'skipped') {
+          bits.push(`${x.questions.imported}/${x.questions.expected} questions`, `${x.images.restored}/${x.images.expected} images`);
+        }
+        const details = (x.warnings || []).map(w => `<span class="exam-job-detail">${e(w.message)}</span>`).join('') +
+          (x.error ? `<span class="exam-job-detail fail">${e(x.error)}</span>` : '') +
+          (x.cleanup && x.cleanup.removed.length ? `<span class="exam-job-detail">Cleaned up ${x.cleanup.removed.length} uploaded file(s) after the failure.</span>` : '');
+        const ic = icon[x.status] || ['fa-question', ''];
+        return `<li class="${ic[1]}"><i class="fas ${ic[0]}"></i> ${e(x.name)}${bits.length ? ' — ' + bits.join(', ') : ''}${details}</li>`;
+      }).join('') + '</ul></div>';
     // The page's own exam list only reloads once the admin has actually seen this report and
     // dismissed the modal themselves (see the hidden.bs.modal listener above) — never yanked
     // out from under them mid-read.
