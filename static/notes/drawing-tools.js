@@ -1,4 +1,5 @@
 /* Dedicated drawing and shape controls for the Notes Fabric canvas. */
+import { EXTRA_SHAPES, SHAPE_MENU, LINE_MENU, WEIGHTS, DASH_STYLES, OPACITIES, dashArray, roundCapFor, constrainBox, constrainLine, iconSvg, rrect, circle as circlePath, poly as polyPath } from './shape-library.js';
 setTimeout(() => {
   const canvas = window.__notesCanvas;
   const toolbar = document.querySelector('.object-toolbar');
@@ -25,7 +26,7 @@ setTimeout(() => {
   // because it can't represent an rgba() string at all, so the two never agreed. A plain,
   // opaque, professional default (the same blue already used elsewhere in this file/palette)
   // fixes both at once: the shape now renders exactly what the swatch shows.
-  window.__notesShapeColor = window.__notesShapeColor || '#4a86e8';
+  window.__notesShapeColor = window.__notesShapeColor === undefined ? null : window.__notesShapeColor;   // new shapes start with NO fill; a colour is only applied when the user picks one
   window.__notesStickyBgColor = window.__notesStickyBgColor || getComputedStyle(document.documentElement).getPropertyValue('--warning-bg').trim();
   /* Ink tool state — 'pen' | 'pencil' | 'highlighter' | 'eraser'. Exposed on window (like the
      other __notes* flags already used across editor.js/drawing-tools.js) so editor.js's single
@@ -100,14 +101,17 @@ setTimeout(() => {
      `noFillSupport` is passed, i.e. the Shape Fill control) — every place a color is read here
      treats null as its own state, never coerced to a real hex, so it round-trips exactly
      through sync/open/preset-selection instead of silently becoming some fallback color. */
-  const createColorControl = ({ key, title, ariaLabel, group, heading, getColor, applyColor, fallback, noFillSupport }) => {
+  const createColorControl = ({ key, title, ariaLabel, group, heading, getColor, applyColor, fallback, noFillSupport, icon }) => {
     const btn = document.createElement('button');
     btn.type = 'button'; btn.title = title; btn.setAttribute('aria-label', ariaLabel);
     btn.className = 'notes-swatch-btn';
-    btn.style.background = fallback;
+    let bar = null;
+    if (icon) { btn.classList.add('notes-fill-btn'); btn.innerHTML = '<i class="' + icon + '"></i><span class="notes-fill-bar"></span>'; bar = btn.querySelector('.notes-fill-bar'); }
+    else btn.style.background = fallback;
     btn.addEventListener('mousedown', event => event.preventDefault());
     insert(btn, group);
-    const sync = () => { const value = getColor(); btn.style.background = value === null ? NO_FILL_SWATCH_BG : value; };
+    const sync = () => { const value = getColor(); (bar || btn).style.background = value === null || value === undefined ? NO_FILL_SWATCH_BG : value; };
+    if (icon) setTimeout(sync, 0);
     const open = () => {
       if (window.__notesReadOnly) return;
       const current = window.__notesGetActiveFloatingPanel?.();
@@ -314,6 +318,13 @@ setTimeout(() => {
      source of truth for "this control's current value" (what color.value implicitly held
      before it was a real DOM element). */
   window.__notesInkColor = window.__notesInkColor || '#000000';
+  // false = the default ink (drawn to suit the page, stored as black); true = a colour the user picked on purpose.
+  // The app's own near-blacks (#000000, #1a1a1a — the first quick swatch) ARE the default ink, so picking them keeps it adaptive.
+  window.__notesInkExplicit = !!window.__notesInkExplicit;
+  const isDefaultInkHex = hex => ['#000000', '#000', '#1a1a1a'].includes(String(hex || '').toLowerCase());
+  const paperInfo = () => (window.__notesPaperInfo ? window.__notesPaperInfo() : { light: true, ink: '#1a1a1a' });
+  // The colour the Pen/Pencil brush paints with right now (the live stroke must already look the way it will be drawn).
+  const inkBrushHex = () => { if (window.__notesInkExplicit) return window.__notesInkColor || '#000000'; const p = paperInfo(); return p.light ? '#000000' : (/^#[0-9a-f]{6}$/i.test(p.ink) ? p.ink : '#ececf1'); };
   // A freehand stroke (Pen/Pencil/Highlighter path) or a stroke-only shape (Line/Arrow) is
   // "ink-recolorable" — its visible color is its stroke, changeable after the fact via this
   // control. Shared by both the single- and multi-selection paths below so they can never
@@ -346,12 +357,18 @@ setTimeout(() => {
   // applyInkColor below share the identical translucency-preserving logic.
   const recolorInkObject = (object, hex) => {
     const currentAlpha = object.objectType === 'drawing' && /^rgba\(/.test(String(object.stroke || '')) ? parseFloat(String(object.stroke).split(',')[3]) : NaN;
-    object.set({ stroke: currentAlpha >= 0 && currentAlpha < 1 ? hexToRgba(hex, currentAlpha) : hex });
+    const next = currentAlpha >= 0 && currentAlpha < 1 ? hexToRgba(hex, currentAlpha) : hex;
+    if (object.objectType === 'drawing') {                      // the new colour becomes the stored one; default-ink picks stay adaptive
+      const dflt = isDefaultInkHex(hex);
+      object.baseStroke = next; object.themeInk = dflt; object.customColor = !dflt;
+      const p = paperInfo(); object.set({ stroke: dflt && !p.light ? hexToRgba(p.ink.startsWith('#') ? p.ink : '#ececf1', currentAlpha >= 0 && currentAlpha < 1 ? currentAlpha : 1) : next });
+    } else object.set({ stroke: next });
     if (object.objectType === 'drawing') object.dirty = true;
   };
   const applyInkColor = hex => {
     if (window.__notesReadOnly) return;
     window.__notesInkColor = hex;
+    window.__notesInkExplicit = !isDefaultInkHex(hex);
     const active = canvas.getActiveObject();
     if (active?.type === 'activeSelection') {
       const members = active.getObjects ? active.getObjects() : [];
@@ -402,7 +419,7 @@ setTimeout(() => {
     // (see Highlight color below) and must never be overwritten by this one. Pencil keeps its
     // live-preview alpha baked in here too (see activateBrush) — otherwise switching color
     // mid-session would arm the brush with a fully-opaque color for the next stroke.
-    if (canvas.freeDrawingBrush && window.__notesInkTool !== 'highlighter') canvas.freeDrawingBrush.color = window.__notesInkTool === 'pencil' ? hexToRgba(hex, .82) : hex;
+    if (canvas.freeDrawingBrush && window.__notesInkTool !== 'highlighter') canvas.freeDrawingBrush.color = window.__notesInkTool === 'pencil' ? hexToRgba(inkBrushHex(), .82) : inkBrushHex();
   };
   const inkColorControl = createColorControl({
     key: 'ink', title: 'Text / ink color', ariaLabel: 'Text / ink color', group: 'color',
@@ -498,7 +515,7 @@ setTimeout(() => {
   };
   const fillColorControl = createColorControl({
     key: 'fill', title: 'Fill / background color (shapes, sticky note background)', ariaLabel: 'Fill / background color', group: 'shape',
-    heading: 'Fill color', getColor: getActiveShapeColor, applyColor: applyShapeFillColor, fallback: '#4a86e8', noFillSupport: true,
+    heading: 'Fill color', getColor: getActiveShapeColor, applyColor: applyShapeFillColor, fallback: '#4a86e8', noFillSupport: true, icon: 'fas fa-fill-drip',
   });
   canvas.on('selection:created', fillColorControl.sync);
   canvas.on('selection:updated', fillColorControl.sync);
@@ -610,6 +627,7 @@ setTimeout(() => {
   // bounding-box drag sizing rather than direction+length — currently just the X-Y axis, whose
   // two arms need to size independently along width/height, not rotate/scale as one rigid line.
   const NO_FILL_SHAPES = new Set(['X-Y Axis']);
+  const DIRECTIONAL_SHAPES = new Set();      // connectors/curves: run from the press point to the release point, so they flip with the drag direction
   /* Each shape gets a recognizable Unicode glyph — used both as the picker button's own face
      (below) and each grid cell's icon inside the picker popover. */
   // 'X-Y Axis' deliberately does NOT use '└' — that box-drawing corner glyph reads as the LETTER
@@ -783,21 +801,60 @@ setTimeout(() => {
      face; it deliberately does NOT auto-arm placement mode — the separate "Draw shape" button
      (shapeButton, wired further below) still owns that step exactly as before, so the two-step
      "pick shape, then click Draw Shape, then drag on canvas" flow is unchanged from today. */
-  const SHAPE_CATEGORIES = [
-    { name: 'Basic Shapes', shapes: ['Rectangle', 'Rounded Rectangle', 'Circle', 'Ellipse', 'Triangle', 'Right Triangle', 'Diamond', 'Parallelogram', 'Trapezoid'] },
-    { name: 'Polygons & Stars', shapes: ['Pentagon', 'Hexagon', 'Octagon', 'Star', 'Star 6', 'Cross', 'Heart'] },
-    { name: '3D & Special', shapes: ['Semicircle', 'Cylinder', 'Cube', 'Cloud'] },
-    { name: 'Lines & Arrows', shapes: ['Line', 'Arrow', 'Double Arrow', 'Curved Arrow', 'Block Arrow'] },
-    { name: 'Callouts', shapes: ['Callout', 'Rounded Callout'] },
-    { name: 'Diagrams', shapes: ['X-Y Axis'] },
-  ];
+  /* ══ SHAPE TOOLKIT ══
+     Pick a shape once (menu, Lines menu or the "Draw shape" button) and the tool stays armed: press-drag-release draws a shape and the
+     next drag draws another, until Esc / the Select tool / another tool ends it. All shapes share one drag engine (updateShapeDraft):
+     page coordinates only, so zoom and scroll never matter; Shift = square/circle (lines snap to 15 degrees), Alt = from the centre;
+     any drag direction gives the same geometry; lines run exactly from the press point to the release point. The catalogue lives in
+     shape-library.js (one path per shape); the menu icons are drawn from the same paths/factories as the shapes themselves. */
+  Object.entries(EXTRA_SHAPES).forEach(([name, spec]) => {
+    shapes[name] = () => new fabric.Path(spec.d);
+    if (spec.noFill) NO_FILL_SHAPES.add(name);
+    if (spec.directional) DIRECTIONAL_SHAPES.add(name);
+  });
   let selectedShapeName = 'Rectangle';
+  const shapeIconHtml = (name, size = 22) => {
+    try {
+      const extra = EXTRA_SHAPES[name];
+      if (extra) return iconSvg(extra.d, { noFill: !!extra.noFill, size });
+      const o = shapes[name]();
+      const w = o.width || 100, h = o.height || 100;
+      let d = '';
+      if (o.type === 'rect') d = o.rx ? rrect(w, h, Math.min(o.rx, w / 2, h / 2)) : 'M 0 0 H ' + w + ' V ' + h + ' H 0 Z';
+      else if (o.type === 'circle') d = circlePath(o.radius, o.radius, o.radius);
+      else if (o.type === 'ellipse') d = 'M 0 ' + o.ry + ' A ' + o.rx + ' ' + o.ry + ' 0 1 1 ' + (2 * o.rx) + ' ' + o.ry + ' A ' + o.rx + ' ' + o.ry + ' 0 1 1 0 ' + o.ry + ' Z';
+      else if (o.type === 'triangle') d = polyPath([[w / 2, 0], [w, h], [0, h]]);
+      else if (o.type === 'polygon') d = polyPath(o.points.map(p => [p.x, p.y]));
+      else if (o.type === 'path') d = o.path.map(c => c.join(' ')).join(' ');
+      if (!d) throw new Error('no icon');
+      return iconSvg(d, { noFill: LINE_SHAPES.has(name) || NO_FILL_SHAPES.has(name), size });
+    } catch (e) { return '<span>' + (shapeGlyphs[name] || name[0]) + '</span>'; }
+  };
   const shapePickerBtn = document.createElement('button');
-  shapePickerBtn.type = 'button'; shapePickerBtn.title = 'Shape library'; shapePickerBtn.setAttribute('aria-label', 'Shape library');
-  shapePickerBtn.className = 'notes-swatch-btn';
-  shapePickerBtn.textContent = shapeGlyphs[selectedShapeName];
+  shapePickerBtn.type = 'button'; shapePickerBtn.title = 'Shapes'; shapePickerBtn.setAttribute('aria-label', 'Shapes'); shapePickerBtn.setAttribute('aria-haspopup', 'dialog');
+  shapePickerBtn.className = 'notes-swatch-btn notes-shape-btn';
   shapePickerBtn.addEventListener('mousedown', event => event.preventDefault());
   insert(shapePickerBtn, 'shape');
+  const linesBtn = document.createElement('button');
+  linesBtn.type = 'button'; linesBtn.title = 'Lines and connectors'; linesBtn.setAttribute('aria-label', 'Lines and connectors'); linesBtn.setAttribute('aria-haspopup', 'dialog');
+  linesBtn.className = 'notes-swatch-btn notes-shape-btn';
+  linesBtn.innerHTML = '<i class="fas fa-slash" style="transform:scaleX(-1)"></i><i class="fas fa-caret-down" style="font-size:.6rem;margin-left:3px"></i>';
+  linesBtn.addEventListener('mousedown', event => event.preventDefault());
+  insert(linesBtn, 'shape');
+  const lineIconHtml = name => name === 'Scribble'
+    ? '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 17c3-9 5 3 8-5s4 4 7-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+    : name === 'Polyline'
+      ? '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 18 L9 7 L15 15 L21 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="3" cy="18" r="1.6" fill="currentColor"/><circle cx="9" cy="7" r="1.6" fill="currentColor"/><circle cx="15" cy="15" r="1.6" fill="currentColor"/><circle cx="21" cy="5" r="1.6" fill="currentColor"/></svg>'
+      : shapeIconHtml(name);
+  const paintShapeButtons = () => {
+    const isLineTool = LINE_MENU.includes(selectedShapeName) || polyActive;
+    shapePickerBtn.innerHTML = shapeIconHtml(isLineTool ? 'Rectangle' : selectedShapeName, 22) + '<i class="fas fa-caret-down" style="font-size:.6rem;margin-left:3px"></i>';
+    shapePickerBtn.title = 'Shapes — ' + (isLineTool ? 'Rectangle' : selectedShapeName);
+    shapePickerBtn.classList.toggle('active', (placingShape || polyActive) && !isLineTool);
+    linesBtn.classList.toggle('active', (placingShape || polyActive) && isLineTool);
+  };
+  const armShape = name => { selectedShapeName = name; polyActive = false; beginShapePlacement(); paintShapeButtons(); };
+  const armPolyline = () => { selectedShapeName = 'Polyline'; beginPolyline(); paintShapeButtons(); };
   const openShapePicker = () => {
     if (window.__notesReadOnly) return;
     const current = window.__notesGetActiveFloatingPanel?.();
@@ -806,38 +863,69 @@ setTimeout(() => {
     if (alreadyOpen) return;
     const panel = document.createElement('div');
     panel.dataset.notesShapePicker = '1';
-    panel.className = 'notes-popover';
-    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Shape library');
-    panel.style.cssText = 'width:288px;max-height:400px;overflow-y:auto';
+    panel.className = 'notes-popover notes-shape-menu';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Shapes');
     panel.addEventListener('click', event => event.stopPropagation());
-    SHAPE_CATEGORIES.forEach(category => {
-      const heading = document.createElement('div');
-      heading.textContent = category.name;
-      heading.className = 'notes-popover-group-label';
-      panel.append(heading);
-      const grid = document.createElement('div');
-      grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:4px';
-      category.shapes.forEach(name => {
-        const isSelected = name === selectedShapeName;
+    const tabs = document.createElement('div'); tabs.className = 'notes-shape-tabs'; tabs.setAttribute('role', 'tablist');
+    const grid = document.createElement('div'); grid.className = 'notes-shape-grid'; grid.setAttribute('role', 'listbox');
+    const heading = document.createElement('div'); heading.className = 'notes-shape-heading';
+    let tabId = window.__notesShapeMenuTab || (SHAPE_MENU.find(c => c.items.includes(selectedShapeName))?.id) || 'shapes';
+    const renderGrid = () => {
+      const cat = SHAPE_MENU.find(c => c.id === tabId) || SHAPE_MENU[0];
+      heading.textContent = cat.name;
+      tabs.querySelectorAll('button').forEach(b => { const on = b.dataset.tab === cat.id; b.classList.toggle('active', on); b.setAttribute('aria-selected', String(on)); });
+      grid.innerHTML = '';
+      cat.items.forEach(name => {
         const cell = document.createElement('button');
-        cell.type = 'button'; cell.title = name; cell.setAttribute('aria-label', name);
-        cell.style.cssText = `width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:7px;cursor:pointer;background:${isSelected ? 'var(--accent-subtle)' : 'transparent'};border:1px solid ${isSelected ? 'var(--accent)' : 'transparent'};color:var(--text-1);transition:background .08s ease`;
-        cell.textContent = shapeGlyphs[name] || name[0];
+        cell.type = 'button'; cell.title = name; cell.setAttribute('aria-label', name); cell.setAttribute('role', 'option');
+        cell.className = 'notes-shape-cell' + (name === selectedShapeName && (placingShape || !polyActive) ? ' selected' : '');
+        cell.innerHTML = shapeIconHtml(name, 26);
         cell.addEventListener('mousedown', event => event.preventDefault());
-        cell.addEventListener('mouseenter', () => { if (name !== selectedShapeName) cell.style.background = 'var(--surface-2)'; });
-        cell.addEventListener('mouseleave', () => { if (name !== selectedShapeName) cell.style.background = 'transparent'; });
-        cell.addEventListener('click', () => {
-          selectedShapeName = name;
-          shapePickerBtn.textContent = shapeGlyphs[name] || name[0];
-          window.__notesCloseFloatingPanels?.();
-        });
+        cell.addEventListener('click', () => { armShape(name); window.__notesCloseFloatingPanels?.(); });
         grid.append(cell);
       });
-      panel.append(grid);
+    };
+    SHAPE_MENU.forEach(cat => {
+      const tab = document.createElement('button');
+      tab.type = 'button'; tab.dataset.tab = cat.id; tab.setAttribute('role', 'tab'); tab.title = cat.name;
+      tab.innerHTML = '<i class="' + cat.icon + '"></i><span>' + cat.name + '</span>';
+      tab.addEventListener('mousedown', event => event.preventDefault());
+      tab.addEventListener('click', () => { tabId = cat.id; window.__notesShapeMenuTab = tabId; renderGrid(); });
+      tabs.append(tab);
     });
+    panel.append(tabs, heading, grid);
+    renderGrid();
     window.__notesPlaceFloatingPanel?.(panel, shapePickerBtn);
   };
+  const openLinesMenu = () => {
+    if (window.__notesReadOnly) return;
+    const current = window.__notesGetActiveFloatingPanel?.();
+    const alreadyOpen = current?.dataset.notesLinesMenu === '1';
+    window.__notesCloseFloatingPanels?.();
+    if (alreadyOpen) return;
+    const panel = document.createElement('div');
+    panel.dataset.notesLinesMenu = '1'; panel.className = 'notes-popover notes-lines-menu';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Lines and connectors');
+    panel.addEventListener('click', event => event.stopPropagation());
+    const LABELS = { Line: 'Line', Arrow: 'Arrow', 'Double Arrow': 'Double arrow', 'Curved Arrow': 'Curved arrow', 'Elbow Connector': 'Elbow connector', 'Curved Connector': 'Curved connector',
+      Curve: 'Curve', Polyline: 'Polyline (click points, double-click to finish)', Scribble: 'Scribble (freehand pen)' };
+    LINE_MENU.forEach(name => {
+      const row = document.createElement('button');
+      row.type = 'button'; row.className = 'notes-lines-row' + (name === selectedShapeName && (placingShape || polyActive) ? ' selected' : '');
+      row.innerHTML = '<span class="ic">' + lineIconHtml(name) + '</span><span>' + (LABELS[name] || name) + '</span>';
+      row.addEventListener('mousedown', event => event.preventDefault());
+      row.addEventListener('click', () => {
+        window.__notesCloseFloatingPanels?.();
+        if (name === 'Scribble') { exitShapePlacement(); activateBrush('pen'); paintShapeButtons(); }
+        else if (name === 'Polyline') armPolyline();
+        else armShape(name);
+      });
+      panel.append(row);
+    });
+    window.__notesPlaceFloatingPanel?.(panel, linesBtn);
+  };
   shapePickerBtn.addEventListener('click', event => { event.stopPropagation(); openShapePicker(); });
+  linesBtn.addEventListener('click', event => { event.stopPropagation(); openLinesMenu(); });
   /* Arrowhead size + on/off — a small stepper (same look as the text-size stepper) plus a toggle
      button, placed right next to the shape picker. Works identically for BOTH arrow families
      (line: Arrow/Double Arrow/Curved Arrow; boxed: X-Y Axis/Block Arrow) purely by branching on
@@ -1066,7 +1154,7 @@ setTimeout(() => {
      handler via window.__notesInkTool, so eraser/save/undo logic needs zero special-casing:
      every stroke is still just an objectType:'drawing' fabric.Path). */
   const activateBrush = kind => {
-    erasing = false; window.__notesEraserActive = false; window.__notesInkTool = kind;
+    exitShapePlacement(); clearToolHighlight(); setErasing(false); window.__notesInkTool = kind;
     canvas.selection = false; canvas.isDrawingMode = true;
     canvas.freeDrawingCursor = inkCursor; canvas.defaultCursor = inkCursor; canvas.hoverCursor = inkCursor;
     canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
@@ -1077,23 +1165,110 @@ setTimeout(() => {
        live preview never went through. Baking the same alpha into the brush's own color (exactly
        how Highlighter already gets its live translucency below) makes the live preview and the
        finished stroke identical from the very first pixel, with no post-hoc opacity step needed. */
-    canvas.freeDrawingBrush.color = kind === 'highlighter' ? hexToRgba(window.__notesHighlightColor || '#ffff00', .35) : kind === 'pencil' ? hexToRgba(window.__notesInkColor || '#000000', .82) : (window.__notesInkColor || '#000000');
+    canvas.freeDrawingBrush.color = kind === 'highlighter' ? hexToRgba(window.__notesHighlightColor || '#ffff00', .35) : kind === 'pencil' ? hexToRgba(inkBrushHex(), .82) : inkBrushHex();
     canvas.freeDrawingBrush.width = currentInkSize();
     setActiveInkButton(kind);
     refreshWidthButtons();
   };
-  const eraseAt = pointer => {
-    const radius = currentInkSize() / 2;
-    canvas.getObjects().filter(object => object.objectType === 'drawing').filter(object => {
-      const box = object.getBoundingRect(true, true); const nearestX = Math.max(box.left, Math.min(pointer.x, box.left + box.width)); const nearestY = Math.max(box.top, Math.min(pointer.y, box.top + box.height)); return (pointer.x - nearestX) ** 2 + (pointer.y - nearestY) ** 2 <= radius ** 2;
-    }).forEach(object => canvas.remove(object));
-    canvas.requestRenderAll();
+  document.addEventListener('notes:paper', () => { if (canvas.freeDrawingBrush && ['pen', 'pencil'].includes(window.__notesInkTool)) canvas.freeDrawingBrush.color = window.__notesInkTool === 'pencil' ? hexToRgba(inkBrushHex(), .82) : inkBrushHex(); });
+  /* ── Eraser ── (what was wrong)
+     1. The hit test used the stroke's BOUNDING BOX, so a diagonal or curly stroke vanished when the eraser was merely near its
+        box, nowhere near the ink. It now measures the distance to the stroke's own path (in page coordinates, whatever the zoom).
+     2. A drag only erased where a mouse-move event happened to land (fast drags skipped strokes between samples) and only while
+        `event.e.buttons` was set, which touch events do not have — continuous erasing never worked on a phone/tablet. Each move now
+        sweeps the whole segment from the previous pointer position, and "dragging" is tracked by our own pointer-down flag.
+     3. Objects stayed interactive, so pressing on a stroke could select/move it instead of erasing; mouse-up even switched
+        rubber-band selection back on while the Eraser was still active. The Eraser now turns object targeting off while it is active.
+     4. The only feedback was a fixed 24px eraser icon cursor, unrelated to the chosen size. A ring of exactly the erasing diameter
+        (size x zoom) now follows the pointer, including while dragging and on touch.
+     5. Every removed stroke created its own undo step; one drag is now one step (see __notesHistoryBatch in editor.js). */
+  let eraserDown = false, eraserLast = null, eraserRing = null;
+  const ensureEraserRing = () => {
+    if (eraserRing) return eraserRing;
+    eraserRing = document.createElement('div'); eraserRing.className = 'notes-eraser-ring'; eraserRing.setAttribute('aria-hidden', 'true');
+    canvas.wrapperEl.appendChild(eraserRing);
+    return eraserRing;
   };
-  const activateEraser = () => { erasing = true; window.__notesEraserActive = true; window.__notesInkTool = 'eraser'; canvas.isDrawingMode = false; canvas.selection = false; canvas.defaultCursor = eraserCursor; canvas.hoverCursor = eraserCursor; setActiveInkButton('eraser'); refreshWidthButtons(); };
+  const eraserRadius = () => Math.max(1, currentInkSize() / 2);
+  const placeEraserRing = pointer => {
+    if (!erasing || !pointer) return;
+    const ring = ensureEraserRing(), z = canvas.getZoom() || 1, d = Math.max(4, currentInkSize() * z);
+    ring.style.width = ring.style.height = d + 'px';
+    ring.style.left = (pointer.x * z) + 'px'; ring.style.top = (pointer.y * z) + 'px';
+    ring.style.display = 'block';
+  };
+  const hideEraserRing = () => { if (eraserRing) eraserRing.style.display = 'none'; };
+  // distance from point p to the segment a-b
+  const distToSegment = (p, a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+    let t = len2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2 : 0; t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+  };
+  // The stroke's own path as page-coordinate points (curves sampled), cached until the object changes.
+  const strokePoints = object => {
+    const key = [object.left, object.top, object.scaleX, object.scaleY, object.angle, object.flipX, object.flipY, object.path && object.path.length].join('|');
+    if (object.__erasePts && object.__erasePts.key === key) return object.__erasePts.pts;
+    const m = object.calcTransformMatrix(), off = object.pathOffset || { x: 0, y: 0 }, pts = [];
+    const push = (x, y) => pts.push(fabric.util.transformPoint({ x: x - off.x, y: y - off.y }, m));
+    let cx = 0, cy = 0;
+    (object.path || []).forEach(cmd => {
+      const c = cmd[0];
+      if (c === 'M' || c === 'L') { cx = cmd[1]; cy = cmd[2]; push(cx, cy); }
+      else if (c === 'Q') { for (let i = 1; i <= 4; i++) { const t = i / 4, u = 1 - t; push(u * u * cx + 2 * u * t * cmd[1] + t * t * cmd[3], u * u * cy + 2 * u * t * cmd[2] + t * t * cmd[4]); } cx = cmd[3]; cy = cmd[4]; }
+      else if (c === 'C') { for (let i = 1; i <= 6; i++) { const t = i / 6, u = 1 - t; push(u * u * u * cx + 3 * u * u * t * cmd[1] + 3 * u * t * t * cmd[3] + t * t * t * cmd[5], u * u * u * cy + 3 * u * u * t * cmd[2] + 3 * u * t * t * cmd[4] + t * t * t * cmd[6]); } cx = cmd[5]; cy = cmd[6]; }
+    });
+    object.__erasePts = { key, pts };
+    return pts;
+  };
+  const strokeHit = (object, pointer, radius) => {
+    const half = (object.strokeWidth || 1) * Math.max(Math.abs(object.scaleX || 1), Math.abs(object.scaleY || 1)) / 2;
+    const reach = radius + half;
+    const box = object.getBoundingRect(true, true);
+    if (pointer.x < box.left - reach || pointer.x > box.left + box.width + reach || pointer.y < box.top - reach || pointer.y > box.top + box.height + reach) return false;
+    const pts = strokePoints(object);
+    if (pts.length === 1) return Math.hypot(pointer.x - pts[0].x, pointer.y - pts[0].y) <= reach;
+    for (let i = 1; i < pts.length; i++) if (distToSegment(pointer, pts[i - 1], pts[i]) <= reach) return true;
+    return false;
+  };
+  const eraseAt = pointer => {
+    const radius = eraserRadius();
+    const hit = canvas.getObjects().filter(object => object.objectType === 'drawing' && strokeHit(object, pointer, radius));
+    hit.forEach(object => canvas.remove(object));
+    if (hit.length) canvas.requestRenderAll();
+  };
+  const eraseSweep = (from, to) => {                           // every point between two pointer samples, so a fast drag cannot skip a stroke
+    const step = Math.max(2, eraserRadius() / 2), dist = Math.hypot(to.x - from.x, to.y - from.y), n = Math.max(1, Math.ceil(dist / step));
+    for (let i = 1; i <= n; i++) eraseAt({ x: from.x + (to.x - from.x) * i / n, y: from.y + (to.y - from.y) * i / n });
+  };
+  const beginErase = event => {
+    const p = canvas.getPointer(event.e);
+    eraserDown = true; eraserLast = p; window.__notesHistoryBatch?.begin();
+    placeEraserRing(p); eraseAt(p);
+  };
+  const moveErase = event => {
+    const p = canvas.getPointer(event.e);
+    placeEraserRing(p);
+    if (eraserDown) { eraseSweep(eraserLast || p, p); eraserLast = p; }
+  };
+  const endErase = () => {
+    if (!eraserDown) return;
+    eraserDown = false; eraserLast = null; window.__notesHistoryBatch?.end();      // one undo step for the whole drag
+  };
+  const setErasing = on => {
+    if (!on) { endErase(); hideEraserRing(); }
+    erasing = !!on; window.__notesEraserActive = !!on;
+    canvas.skipTargetFind = !!on;                              // objects are not selectable/draggable while erasing
+  };
+  window.addEventListener('blur', endErase); window.addEventListener('touchcancel', endErase, true); window.addEventListener('pointercancel', endErase, true);
+  canvas.wrapperEl.addEventListener('mouseleave', () => { if (!eraserDown) hideEraserRing(); });
+  canvas.on('mouse:over', () => {}); canvas.on('mouse:out', () => {});
+  document.addEventListener('mouseup', endErase, true); document.addEventListener('touchend', () => setTimeout(() => { endErase(); }, 0), true);
+  document.addEventListener('touchend', () => setTimeout(hideEraserRing, 600), true);
+  const activateEraser = () => { exitShapePlacement(); clearToolHighlight(); setErasing(true); window.__notesInkTool = 'eraser'; canvas.isDrawingMode = false; canvas.selection = false; canvas.defaultCursor = 'crosshair'; canvas.hoverCursor = 'crosshair'; setActiveInkButton('eraser'); refreshWidthButtons(); };
   // Called by editor.js's setTool() when switching to Select/Text/Sticky/Image — otherwise
   // the Pen/Eraser highlighting (and the eraser's own armed state) would stay stuck "active"
   // even though the canvas is no longer in drawing/erasing mode.
-  window.__notesDeactivateInkTools = () => { erasing = false; setActiveInkButton(null); };
+  window.__notesDeactivateInkTools = () => { setErasing(false); exitShapePlacement(); setActiveInkButton(null); };
   /* Text Highlight (background on the SELECTED characters only) — distinct from the freehand
      Highlighter ink tool above, which draws translucent strokes on the canvas itself. Reads the
      selection the same live way applyTextColor() does (window.__notesGetNativeEditor's overlay,
@@ -1144,16 +1319,86 @@ setTimeout(() => {
      the user then drags out the shape's bounding box on the canvas, and the
      tool automatically returns to normal/select mode once it's placed. */
   let placingShape = false, shapeDraft = null, shapeButton = null;
+  /* One undo step per shape: the draft is added on pointer-down and resized while dragging, so history is held until the gesture ends
+     (before, undoing a shape stopped at its half-drawn draft, and cancelling with Esc left junk steps). */
+  let shapeBatchOpen = false;
+  const closeShapeBatch = () => { if (shapeBatchOpen) { shapeBatchOpen = false; window.__notesHistoryBatch?.end(); } };
+  const toolButtons = () => document.querySelectorAll('[data-tool]');
+  const clearToolHighlight = () => toolButtons().forEach(b => b.classList.remove('active'));
+  // Ends shape drawing without touching which other tool is being switched to (callers switching tools use this one).
   const exitShapePlacement = () => {
-    placingShape = false; shapeDraft = null; window.__notesShapeToolActive = false;
-    canvas.selection = true; canvas.defaultCursor = 'default'; canvas.hoverCursor = 'move';
+    if (!placingShape && !polyActive) return;
+    cancelPolyline();
+    placingShape = false; shapeDraft = null; window.__notesShapeToolActive = false; closeShapeBatch();
+    canvas.skipTargetFind = erasing; canvas.selection = true; canvas.defaultCursor = 'default'; canvas.hoverCursor = 'move';
     shapeButton?.classList.remove('active');
+    paintShapeButtons(); syncShapeContext();
   };
+  // The user leaving the shape tool (Esc, the Draw-shape toggle): back to Select, with its button lit.
+  const leaveShapeTool = () => { if (shapeDraft) canvas.remove(shapeDraft.shape); exitShapePlacement(); document.querySelector('[data-tool="select"]')?.click(); canvas.requestRenderAll(); };
+  window.__notesExitShapePlacement = exitShapePlacement;
   const beginShapePlacement = () => {
-    erasing = false; window.__notesEraserActive = false; canvas.isDrawingMode = false; canvas.selection = false;
+    if (!shapes[selectedShapeName]) selectedShapeName = 'Rectangle';
+    setErasing(false); cancelPolyline(); canvas.isDrawingMode = false; canvas.selection = false; canvas.skipTargetFind = true; canvas.discardActiveObject();
+    clearToolHighlight(); setActiveInkButton(null);
     placingShape = true; window.__notesShapeToolActive = true;
     canvas.defaultCursor = 'crosshair'; canvas.hoverCursor = 'crosshair';
     shapeButton?.classList.add('active');
+    paintShapeButtons(); syncShapeContext();
+    canvas.requestRenderAll();
+  };
+  /* ── Polyline: click to add points (Shift snaps to 15°), double-click / Enter / the Done button to finish, Esc to cancel, Backspace removes the last
+     point. The rubber-band is painted on top of the canvas after each render (it is not an object, so it can never leak into history/saves). ── */
+  let polyActive = false, polyPts = [], polyCursor = null, polyHint = null;
+  const polyStyle = () => ({ stroke: window.__notesShapeBorderColor || '#4a86e8', width: window.__notesShapeWeight ?? 3 });
+  canvas.on('after:render', () => {
+    if (!polyActive || !polyPts.length) return;
+    const ctx = canvas.getContext(), v = canvas.viewportTransform, st = polyStyle();
+    ctx.save(); ctx.transform(v[0], v[1], v[2], v[3], v[4], v[5]);
+    ctx.strokeStyle = st.stroke; ctx.lineWidth = st.width; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath(); polyPts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    if (polyCursor) { ctx.setLineDash([st.width * 2, st.width * 2]); ctx.lineTo(polyCursor.x, polyCursor.y); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = st.stroke; polyPts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(3, st.width * 1.2), 0, 6.2832); ctx.fill(); });
+    ctx.restore();
+  });
+  const showPolyHint = on => {
+    if (!polyHint) {
+      polyHint = document.createElement('div'); polyHint.className = 'notes-poly-hint'; polyHint.hidden = true;
+      polyHint.innerHTML = '<span>Click to add points</span><button type="button" data-poly="done">Done</button><button type="button" data-poly="cancel">Cancel</button>';
+      polyHint.addEventListener('mousedown', e => e.preventDefault());
+      polyHint.addEventListener('click', e => { const b = e.target.closest('[data-poly]'); if (!b) return; if (b.dataset.poly === 'done') finishPolyline(); else leaveShapeTool(); });
+      (document.getElementById('canvasShell') || document.body).appendChild(polyHint);
+    }
+    polyHint.hidden = !on;
+  };
+  const cancelPolyline = () => { if (!polyActive && !polyPts.length) return; polyActive = false; polyPts = []; polyCursor = null; showPolyHint(false); canvas.requestRenderAll(); };
+  const beginPolyline = () => {
+    setErasing(false); if (placingShape) { placingShape = false; shapeDraft = null; closeShapeBatch(); }
+    canvas.isDrawingMode = false; canvas.selection = false; canvas.skipTargetFind = true; canvas.discardActiveObject();
+    clearToolHighlight(); setActiveInkButton(null);
+    polyActive = true; polyPts = []; polyCursor = null; window.__notesShapeToolActive = true;
+    canvas.defaultCursor = 'crosshair'; canvas.hoverCursor = 'crosshair';
+    shapeButton?.classList.remove('active'); showPolyHint(true); paintShapeButtons(); syncShapeContext();
+  };
+  const polyPoint = (event, last) => {
+    const p = canvas.getPointer(event.e);
+    if (event.e.shiftKey && last) { const l = constrainLine(last, p, { shift: true }); return { x: l.x2, y: l.y2 }; }
+    return p;
+  };
+  const finishPolyline = () => {
+    if (polyPts.length < 2) { polyPts = []; canvas.requestRenderAll(); return; }
+    const st = polyStyle();
+    const d = 'M ' + polyPts.map(p => Math.round(p.x * 10) / 10 + ' ' + Math.round(p.y * 10) / 10).join(' L ');
+    polyPts = []; polyCursor = null;
+    window.__notesHistoryBatch?.begin();
+    const path = new fabric.Path(d, { fill: null, stroke: st.stroke, strokeWidth: st.width, strokeLineCap: 'round', strokeLineJoin: 'round', strokeUniform: true,
+      opacity: window.__notesShapeOpacity ?? 1, objectId: id(), objectType: 'shape' });
+    path.strokeOnly = true;
+    applyDashTo(path, window.__notesShapeDash || 'solid');
+    finalizeShape(path, path.left + (path.width * (path.scaleX || 1)) / 2, path.top + (path.height * (path.scaleY || 1)) / 2);
+    window.__notesHistoryBatch?.end();
+    canvas.discardActiveObject(); canvas.requestRenderAll();                 // the tool stays armed for the next polyline
   };
   /* ROOT CAUSE of "text/ink goes behind a shape and becomes hidden": every object's stacking
      order is purely creation-order (Fabric appends canvas.add() to the TOP of the draw stack,
@@ -1251,10 +1496,98 @@ setTimeout(() => {
     shape.set(keepOrigin ? { left: centerX, top: centerY, objectId: shapeId, objectType: 'shape' } : { left: centerX, top: centerY, originX: 'center', originY: 'center', objectId: shapeId, objectType: 'shape' });
     shape.setCoords();
     sendBehindOverlappingText(shape);
-    const label = new fabric.Textbox('', { left: shape.left, top: shape.top, originX: 'center', originY: 'center', width: Math.max(80, (shape.width || 160) * Math.abs(shape.scaleX || 1) * .78), fontFamily: 'DM Sans', fontSize: 18, lineHeight: 1.2, textAlign: 'center', fill: getComputedStyle(document.documentElement).getPropertyValue('--text-1').trim(), editable: false, objectCaching: false, charSpacing: 1, objectId: id(), objectType: 'shape', shapeTextFor: shapeId });
-    shape.shapeTextId = label.objectId; canvas.add(label); canvas.setActiveObject(shape); canvas.requestRenderAll();
+    canvas.setActiveObject(shape); canvas.requestRenderAll();
   };
+  /* The ONE drag engine behind every shape tool (preview while moving AND the final result on release use the same call). */
+  const updateShapeDraft = (pointer, e) => {
+    const d = shapeDraft; if (!d) return null;
+    const mods = { shift: !!(e && e.shiftKey), alt: !!(e && e.altKey) }, start = { x: d.startX, y: d.startY };
+    if (d.isLine) {
+      const ln = constrainLine(start, pointer, mods), length = Math.max(ln.length, 4);
+      if (d.shape.arrowKind) {
+        // Arrow/Double Arrow/Curved Arrow: rebuild the real path at this length (fixed arrowHeadSize) instead of stretching a template.
+        rebuildArrowPath(d.shape, length, 0, d.shape.arrowHeadSize, d.shape.arrowHeadsEnabled !== false, { left: ln.x1, top: ln.y1 });
+        d.shape.set({ angle: ln.angle });
+        // The path's own first point (not its bounding-box edge — a curve bulges) is pinned to where the drag began.
+        d.shape.setCoords(); const first = d.shape.path && d.shape.path[0];
+        if (first) { const p0 = fabric.util.transformPoint(new fabric.Point(first[1] - d.shape.pathOffset.x, first[2] - d.shape.pathOffset.y), d.shape.calcTransformMatrix()); d.shape.set({ left: d.shape.left + (ln.x1 - p0.x), top: d.shape.top + (ln.y1 - p0.y) }); }
+      } else {
+        d.shape.set({ left: ln.x1, top: ln.y1, scaleX: length / d.naturalWidth, scaleY: 1, angle: ln.angle });
+      }
+      d.shape.setCoords(); canvas.requestRenderAll();
+      return { line: ln };
+    }
+    const box = constrainBox(start, pointer, mods);
+    if (d.shape.arrowFamily === 'boxed') {
+      rebuildArrowPath(d.shape, Math.max(box.width, 8), Math.max(box.height, 8), d.shape.arrowHeadSize, d.shape.arrowHeadsEnabled !== false, { left: box.left, top: box.top });
+    } else {
+      d.shape.set({ left: box.left, top: box.top, scaleX: Math.max(box.width, 4) / d.naturalWidth, scaleY: Math.max(box.height, 4) / d.naturalHeight });
+      if (DIRECTIONAL_SHAPES.has(d.name)) d.shape.set({ flipX: box.flipX, flipY: box.flipY });
+    }
+    d.shape.setCoords(); canvas.requestRenderAll();
+    return { box };
+  };
+  const afterShapePlaced = () => { shapeDraft = null; closeShapeBatch(); };      // the tool stays armed: the next drag draws the next shape
+  /* ══ TRANSFORM SAFETY + ROTATION GUIDES ══
+     1. Fabric turns Shift+drag on a side handle into SKEW, which smeared thin lines into huge slanted bands. Skewing is off for every
+        object (Shift now simply scales), and Lines — zero height — lose their top/bottom handles, which could only distort them.
+     2. Rotation snaps to 15° when close (and strictly while Shift is held) so exact horizontal/vertical/diagonal is easy; anywhere else
+        stays free for deliberate angles. A live angle badge plus an accent guide line show when an object is exactly axis-aligned. */
+  fabric.Object.prototype.lockSkewingX = true; fabric.Object.prototype.lockSkewingY = true;
+  fabric.Object.prototype.snapAngle = 15; fabric.Object.prototype.snapThreshold = 5;
+  canvas.altActionKey = '__noSkewKey';
+  const tidyTransform = o => {
+    if (!o) return;
+    if (o.skewX || o.skewY) o.set({ skewX: 0, skewY: 0 });
+    if (o.type === 'line') { o.setControlsVisibility({ mt: false, mb: false }); o.lockScalingY = true; }
+  };
+  canvas.getObjects().forEach(tidyTransform);
+  canvas.on('object:added', event => tidyTransform(event.target));
+  let rotGuide = null, rotBadge = null;
+  const hideRotGuide = () => { rotGuide = null; if (rotBadge) rotBadge.hidden = true; canvas.requestRenderAll(); };
+  canvas.on('object:rotating', event => {
+    const o = event.target; if (!o) return;
+    let a = ((o.angle % 360) + 360) % 360;
+    if (event.e && event.e.shiftKey) { a = (Math.round(a / 15) * 15) % 360; o.rotate(a); }
+    const nearest = k => Math.abs(((a - k + 180) % 360 + 360) % 360 - 180) < 0.01;
+    const axis = [0, 90, 180, 270].some(nearest), diagonal = [45, 135, 225, 315].some(nearest);
+    const c = o.getCenterPoint();
+    rotGuide = { x: c.x, y: c.y, a, axis, diagonal };
+    if (!rotBadge) { rotBadge = document.createElement('div'); rotBadge.className = 'notes-rot-badge'; document.body.appendChild(rotBadge); }
+    rotBadge.hidden = false; rotBadge.textContent = (Math.round(a * 10) / 10) + '°' + (axis ? ' · aligned' : diagonal ? ' · diagonal' : '');
+    rotBadge.classList.toggle('aligned', axis || diagonal);
+    if (event.e) { rotBadge.style.left = (event.e.clientX + 16) + 'px'; rotBadge.style.top = (event.e.clientY + 16) + 'px'; }
+  });
+  canvas.on('mouse:up', () => { if (rotGuide) hideRotGuide(); });
+  canvas.on('after:render', () => {
+    if (!rotGuide) return;
+    const ctx = canvas.getContext(), v = canvas.viewportTransform, zoom = canvas.getZoom() || 1;
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4a86e8';
+    ctx.save(); ctx.setTransform(v[0], v[1], v[2], v[3], v[4], v[5]);
+    ctx.lineWidth = 1 / zoom; ctx.strokeStyle = accent; ctx.setLineDash([6 / zoom, 5 / zoom]); ctx.globalAlpha = rotGuide.axis ? 1 : rotGuide.diagonal ? .6 : .0;
+    const L = 4000, rad = rotGuide.a * Math.PI / 180;
+    ctx.beginPath(); ctx.moveTo(rotGuide.x - Math.cos(rad) * L, rotGuide.y - Math.sin(rad) * L); ctx.lineTo(rotGuide.x + Math.cos(rad) * L, rotGuide.y + Math.sin(rad) * L); ctx.stroke();
+    if (rotGuide.axis) { ctx.beginPath(); ctx.moveTo(rotGuide.x - Math.sin(rad) * L, rotGuide.y + Math.cos(rad) * L); ctx.lineTo(rotGuide.x + Math.sin(rad) * L, rotGuide.y - Math.cos(rad) * L); ctx.stroke(); }
+    ctx.restore();
+  });
   const syncShapeLabel = shape => { if (!shape?.shapeTextId) return; const label = canvas.getObjects().find(object => object.objectId === shape.shapeTextId); if (!label) return; label.set({ left: shape.left, top: shape.top, width: Math.max(80, (shape.width || 160) * Math.abs(shape.scaleX || 1) * .78), scaleX: 1, scaleY: 1, angle: shape.angle }); label.initDimensions(); label.setCoords(); };
+  /* A shape's caption box is created only when the user double-clicks the shape to type in it (and dropped again if left empty),
+     so a plain shape is one clean object instead of a shape plus an invisible text box. */
+  const ensureShapeLabel = shape => {
+    if (!shape || shape.objectType !== 'shape' || shape.shapeTextFor || shape.strokeOnly) return null;
+    let label = shape.shapeTextId && canvas.getObjects().find(object => object.objectId === shape.shapeTextId);
+    if (label) return label;
+    const shapeId = shape.objectId || id(); shape.objectId = shapeId;
+    label = new fabric.Textbox('', { left: shape.left, top: shape.top, originX: 'center', originY: 'center', width: Math.max(80, (shape.width || 160) * Math.abs(shape.scaleX || 1) * .78), fontFamily: 'DM Sans', fontSize: 18, lineHeight: 1.2, textAlign: 'center', fill: getComputedStyle(document.documentElement).getPropertyValue('--text-1').trim(), editable: false, objectCaching: false, charSpacing: 1, objectId: id(), objectType: 'shape', shapeTextFor: shapeId });
+    shape.shapeTextId = label.objectId; canvas.add(label); syncShapeLabel(shape);
+    return label;
+  };
+  canvas.on('text:editing:exited', event => {
+    const label = event.target; if (!label?.shapeTextFor || (label.text || '').trim()) return;
+    const owner = canvas.getObjects().find(object => object.objectId === label.shapeTextFor);
+    if (owner) owner.shapeTextId = null;
+    canvas.remove(label); canvas.requestRenderAll(); canvas.fire('object:modified', { target: owner || label });
+  });
   const selectedText = () => { const object = canvas.getActiveObject(); return object && ['i-text', 'textbox'].includes(object.type) ? object : null; };
   /* fontSize/fontFamily have no document.execCommand equivalent that maps to real CSS pixel
      sizes/font names (the legacy 'fontSize'/'fontName' commands only support HTML's 1-7 relative
@@ -1327,11 +1660,18 @@ setTimeout(() => {
     return styles.length > 0 && styles.every(s => s[prop] === value);
   };
   canvas.on('object:scaling', event => syncShapeLabel(event.target)); canvas.on('object:modified', event => { settleArrowGeometry(event.target); syncShapeLabel(event.target); bringAboveOverlappingShapes(event.target); });
-  canvas.on('mouse:dblclick', event => { if (window.__notesReadOnly) return; const shape = event.target; if (!shape?.shapeTextId) return; const label = canvas.getObjects().find(object => object.objectId === shape.shapeTextId); if (!label) return; canvas.setActiveObject(label); window.__notesBeginNativeTextEdit?.(label); });
+  canvas.on('mouse:dblclick', event => { if (window.__notesReadOnly) return; const shape = event.target; if (!shape || polyActive) return; const label = ensureShapeLabel(shape); if (!label) return; canvas.setActiveObject(label); window.__notesBeginNativeTextEdit?.(label); });
   canvas.on('mouse:down', event => {
     if (window.__notesReadOnly) return;
-    if (erasing) { eraseAt(canvas.getPointer(event.e)); return; }
+    if (erasing) { beginErase(event); return; }
+    if (polyActive) {
+      const last = polyPts[polyPts.length - 1], p = polyPoint(event, last);
+      if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 3 / (canvas.getZoom() || 1)) polyPts.push(p);
+      polyCursor = null; canvas.requestRenderAll(); return;
+    }
     if (placingShape) {
+      canvas.discardActiveObject();
+      if (!shapes[selectedShapeName]) selectedShapeName = 'Rectangle';
       const pointer = canvas.getPointer(event.e);
       const shape = shapes[selectedShapeName]();
       const isLine = LINE_SHAPES.has(selectedShapeName);
@@ -1361,55 +1701,31 @@ setTimeout(() => {
       // regardless of the shape's current scale/aspect ratio. Applies to every shape (not just
       // No-Fill ones) since the distortion isn't fill-state-specific, only most visible on a
       // stroke-only shape where the border IS the whole visual.
-      shape.set({ left: pointer.x, top: pointer.y, fill: noFill ? null : fillDefault, stroke: strokeDefault, strokeWidth: isLine ? 3 : 2, strokeUniform: true });
+      shape.set({ left: pointer.x, top: pointer.y, fill: noFill ? null : fillDefault, stroke: strokeDefault, strokeWidth: window.__notesShapeWeight ?? (isLine ? 3 : 2), strokeUniform: true,
+        opacity: window.__notesShapeOpacity ?? 1 });
+      applyDashTo(shape, window.__notesShapeDash || 'solid');
       if (isLine) shape.set({ originX: 'left', originY: 'center' });
       else shape.set({ originX: 'left', originY: 'top' });
+      if (!shapeBatchOpen) { shapeBatchOpen = true; window.__notesHistoryBatch?.begin(); }
       canvas.add(shape);
-      shapeDraft = { shape, isLine, startX: pointer.x, startY: pointer.y, naturalWidth: Math.max(shape.width || 1, 1), naturalHeight: Math.max(shape.height || 1, 1) };
+      shapeDraft = { shape, isLine, name: selectedShapeName, startX: pointer.x, startY: pointer.y, naturalWidth: Math.max(shape.width || 1, 1), naturalHeight: Math.max(shape.height || 1, 1) };
       canvas.requestRenderAll();
     }
   });
   canvas.on('mouse:move', event => {
     if (window.__notesReadOnly) return;
-    if (erasing && event.e.buttons) { eraseAt(canvas.getPointer(event.e)); return; }
-    if (placingShape && shapeDraft) {
-      const pointer = canvas.getPointer(event.e);
-      if (shapeDraft.isLine) {
-        // Line-type shapes: point along the actual drag direction/length, not a bbox stretch.
-        const dx = pointer.x - shapeDraft.startX, dy = pointer.y - shapeDraft.startY;
-        const length = Math.max(Math.hypot(dx, dy), 4);
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        if (shapeDraft.shape.arrowKind) {
-          // Arrow/Double Arrow/Curved Arrow: rebuild the actual path at this length (fixed
-          // arrowHeadSize) instead of stretching a template via scaleX — see the registry
-          // comment above for why a scale-based approach can't keep the arrowhead a constant size.
-          rebuildArrowPath(shapeDraft.shape, length, 0, shapeDraft.shape.arrowHeadSize, shapeDraft.shape.arrowHeadsEnabled !== false, { left: shapeDraft.startX, top: shapeDraft.startY });
-          shapeDraft.shape.set({ angle });
-        } else {
-          shapeDraft.shape.set({ left: shapeDraft.startX, top: shapeDraft.startY, scaleX: length / shapeDraft.naturalWidth, scaleY: 1, angle });
-        }
-      } else {
-        const left = Math.min(pointer.x, shapeDraft.startX), top = Math.min(pointer.y, shapeDraft.startY);
-        const width = Math.abs(pointer.x - shapeDraft.startX), height = Math.abs(pointer.y - shapeDraft.startY);
-        if (shapeDraft.shape.arrowFamily === 'boxed') {
-          // X-Y Axis / Block Arrow: same "rebuild the real geometry, don't scale a template"
-          // treatment as the line-arrow branch above, just driven by independent width+height
-          // instead of one direction+length.
-          rebuildArrowPath(shapeDraft.shape, Math.max(width, 8), Math.max(height, 8), shapeDraft.shape.arrowHeadSize, shapeDraft.shape.arrowHeadsEnabled !== false, { left, top });
-        } else {
-          shapeDraft.shape.set({ left, top, scaleX: Math.max(width, 4) / shapeDraft.naturalWidth, scaleY: Math.max(height, 4) / shapeDraft.naturalHeight });
-        }
-      }
-      shapeDraft.shape.setCoords();
-      canvas.requestRenderAll();
-    }
+    if (erasing) { moveErase(event); return; }
+    if (polyActive) { polyCursor = polyPoint(event, polyPts[polyPts.length - 1]); if (polyPts.length) canvas.requestRenderAll(); return; }
+    if (placingShape && shapeDraft) updateShapeDraft(canvas.getPointer(event.e), event.e);
   });
+
   canvas.on('mouse:up', event => {
     if (window.__notesReadOnly) return;
-    if (erasing) { canvas.selection = true; return; }
+    if (erasing) { endErase(); return; }
     if (placingShape && shapeDraft) {
       const { shape, startX, startY, isLine } = shapeDraft;
       const pointer = canvas.getPointer(event.e);
+      const result = updateShapeDraft(pointer, event.e);                          // the final position, from the same maths as the live preview
       const draggedWidth = Math.abs(pointer.x - startX), draggedHeight = Math.abs(pointer.y - startY);
       const isClick = draggedWidth < 6 && draggedHeight < 6;
       if (isLine) {
@@ -1419,8 +1735,8 @@ setTimeout(() => {
         }
         finalizeShape(shape, shape.left, shape.top, true);
       } else {
-        const centerX = isClick ? startX : Math.min(pointer.x, startX) + draggedWidth / 2;
-        const centerY = isClick ? startY : Math.min(pointer.y, startY) + draggedHeight / 2;
+        const centerX = isClick ? startX : result.box.left + result.box.width / 2;
+        const centerY = isClick ? startY : result.box.top + result.box.height / 2;
         if (isClick) {
           // A plain click (no drag) places the shape at a sensible default size — for
           // X-Y Axis/Block Arrow that's a real path rebuild (matching how every other
@@ -1432,14 +1748,15 @@ setTimeout(() => {
         }
         finalizeShape(shape, centerX, centerY);
       }
-      exitShapePlacement();
+      afterShapePlaced();
     }
   });
+  canvas.on('mouse:dblclick', () => { if (polyActive && polyPts.length) finishPolyline(); });
   document.addEventListener('keydown', event => {
-    if (event.key !== 'Escape' || !placingShape) return;
-    if (shapeDraft) canvas.remove(shapeDraft.shape);
-    exitShapePlacement();
-    canvas.requestRenderAll();
+    if (!placingShape && !polyActive) return;
+    if (event.key === 'Escape') { if (polyActive && polyPts.length) { polyPts = []; polyCursor = null; canvas.requestRenderAll(); return; } leaveShapeTool(); }
+    else if (polyActive && event.key === 'Enter') { event.preventDefault(); finishPolyline(); }
+    else if (polyActive && event.key === 'Backspace' && polyPts.length) { event.preventDefault(); polyPts.pop(); canvas.requestRenderAll(); }
   });
   formatButtons = {
     bold: button('Bold selected text', 'fas fa-bold', () => { const text = selectedText(); if (text) updateText({ fontWeight: selectionHasFormat(text, 'fontWeight', 'bold') ? 'normal' : 'bold' }); }, 'format'),
@@ -1477,11 +1794,110 @@ setTimeout(() => {
   // editor.html) — no ink tool is actually engaged yet, so none of these show as active
   // until the user picks one. Only the width row needs an initial render.
   refreshWidthButtons();
-  shapeButton = button('Draw shape (click-drag on canvas)', 'far fa-square', beginShapePlacement, 'shape');
+  shapeButton = button('Draw shape — arms the selected shape (click again, Esc or Select to stop)', 'far fa-square', () => { if (placingShape || polyActive) leaveShapeTool(); else if (selectedShapeName === 'Polyline') armPolyline(); else armShape(selectedShapeName); }, 'shape');
+  /* ══ SHAPE FORMATTING — contextual (shown while a shape tool is armed or a shape is selected); every control does what its icon says ══ */
+  window.__notesShapeWeight = window.__notesShapeWeight ?? null;       // null = the per-kind default (2px shapes, 3px lines)
+  window.__notesShapeDash = window.__notesShapeDash || 'solid';
+  window.__notesShapeOpacity = window.__notesShapeOpacity ?? 1;
+  const applyDashTo = (o, style) => {
+    o.dashStyle = style;
+    o.set({ strokeDashArray: dashArray(style, o.strokeWidth), strokeLineCap: roundCapFor(style) ? 'round' : 'butt' });
+    o.dirty = true;
+  };
+  const shapeTargets = () => {
+    const a = canvas.getActiveObject(); if (!a) return [];
+    return (a.type === 'activeSelection' ? a.getObjects() : [a]).filter(o => o.objectType === 'shape' && !o.shapeTextFor);
+  };
+  const commitShapeStyle = fn => {
+    const t = shapeTargets(); if (!t.length) return;
+    t.forEach(fn); canvas.requestRenderAll(); canvas.fire('object:modified', { target: canvas.getActiveObject() });
+  };
+  const applyWeight = w => { window.__notesShapeWeight = w; commitShapeStyle(o => { o.set({ strokeWidth: w }); if (o.dashStyle && o.dashStyle !== 'solid') applyDashTo(o, o.dashStyle); o.dirty = true; }); syncShapeFormat(); };
+  const applyDash = style => { window.__notesShapeDash = style; commitShapeStyle(o => applyDashTo(o, style)); syncShapeFormat(); };
+  const applyOpacity = v => { window.__notesShapeOpacity = v; commitShapeStyle(o => { o.set({ opacity: v }); }); syncShapeFormat(); };
+  const fmtValue = (prop, fallback) => { const t = shapeTargets(); return t.length ? (prop === 'weight' ? t[0].strokeWidth : prop === 'dash' ? (t[0].dashStyle || 'solid') : (t[0].opacity ?? 1)) : fallback; };
+  const currentWeight = () => fmtValue('weight', window.__notesShapeWeight ?? (LINE_MENU.includes(selectedShapeName) ? 3 : 2));
+  const currentDash = () => fmtValue('dash', window.__notesShapeDash);
+  const currentOpacity = () => fmtValue('opacity', window.__notesShapeOpacity);
+  const fmtButton = (title, html) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'notes-swatch-btn notes-fmt-btn'; b.title = title; b.setAttribute('aria-label', title); b.setAttribute('aria-haspopup', 'dialog');
+    b.innerHTML = html; b.addEventListener('mousedown', e => e.preventDefault()); return b;
+  };
+  const fmtMenu = (key, anchor, build) => () => {
+    if (window.__notesReadOnly) return;
+    const cur = window.__notesGetActiveFloatingPanel?.(), already = cur?.dataset.notesFmt === key;
+    window.__notesCloseFloatingPanels?.(); if (already) return;
+    const panel = document.createElement('div'); panel.dataset.notesFmt = key; panel.className = 'notes-popover notes-fmt-menu';
+    panel.setAttribute('role', 'dialog'); panel.addEventListener('click', e => e.stopPropagation());
+    build(panel); window.__notesPlaceFloatingPanel?.(panel, anchor);
+  };
+  const menuRow = (inner, selected, onPick) => {
+    const r = document.createElement('button'); r.type = 'button'; r.className = 'notes-fmt-row' + (selected ? ' selected' : ''); r.innerHTML = inner + '<i class="fas fa-check notes-fmt-check"></i>';
+    r.addEventListener('mousedown', e => e.preventDefault()); r.addEventListener('click', () => { onPick(); window.__notesCloseFloatingPanels?.(); }); return r;
+  };
+  const weightBtn = fmtButton('Line weight', '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="1.2"/><path d="M3 11h18" stroke="currentColor" stroke-width="2.4"/><path d="M3 17h18" stroke="currentColor" stroke-width="4"/></svg>');
+  const dashBtn = fmtButton('Line style (dashes)', '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M2 7h20" stroke="currentColor" stroke-width="2"/><path d="M2 12h20" stroke="currentColor" stroke-width="2" stroke-dasharray="1 3" stroke-linecap="round"/><path d="M2 17h20" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/></svg>');
+  const opacityBtn = fmtButton('Opacity', '<i class="fas fa-droplet"></i>');
+  const lineEndsBtn = fmtButton('Line ends (arrowheads)', '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 12h15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 7l6 5-6 5z" fill="currentColor"/></svg>');
+  weightBtn.addEventListener('click', e => { e.stopPropagation(); fmtMenu('weight', weightBtn, panel => {
+    const now = currentWeight();
+    WEIGHTS.forEach(w => panel.append(menuRow('<span class="notes-weight-sample"><span style="height:' + w + 'px"></span></span><span class="lbl">' + w + 'px</span>', Math.abs(now - w) < 0.01, () => applyWeight(w))));
+  })(); });
+  dashBtn.addEventListener('click', e => { e.stopPropagation(); fmtMenu('dash', dashBtn, panel => {
+    const now = currentDash();
+    DASH_STYLES.forEach(st => {
+      const arr = dashArray(st.id, 3), da = arr ? arr.map(n => Math.round(n * 100) / 100).join(' ') : 'none';
+      panel.append(menuRow('<svg class="notes-dash-sample" viewBox="0 0 80 8" width="80" height="8" aria-hidden="true"><path d="M2 4h76" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="' + (roundCapFor(st.id) ? 'round' : 'butt') + '" stroke-dasharray="' + da + '"/></svg><span class="lbl">' + st.label + '</span>', now === st.id, () => applyDash(st.id)));
+    });
+  })(); });
+  opacityBtn.addEventListener('click', e => { e.stopPropagation(); fmtMenu('opacity', opacityBtn, panel => {
+    const now = currentOpacity();
+    OPACITIES.forEach(v => panel.append(menuRow('<span class="notes-opacity-sample" style="opacity:' + v + '"></span><span class="lbl">' + Math.round(v * 100) + '%</span>', Math.abs(now - v) < 0.01, () => applyOpacity(v))));
+  })(); });
+  const setLineEnds = mode => {
+    const a = canvas.getActiveObject(); if (!a || a.arrowFamily !== 'line') return;
+    const size = a.arrowHeadSize || window.__notesArrowHeadSize;
+    if (mode === 'none') rebuildActiveArrow(a, size, false);
+    else { if (mode === 'both' && a.arrowKind !== 'curved') a.arrowKind = 'double'; else if (mode === 'end' && a.arrowKind === 'double') a.arrowKind = 'single'; rebuildActiveArrow(a, size, true); }
+    syncShapeFormat();
+  };
+  lineEndsBtn.addEventListener('click', e => { e.stopPropagation(); fmtMenu('ends', lineEndsBtn, panel => {
+    const a = canvas.getActiveObject(); const heads = a && a.arrowHeadsEnabled !== false, kind = a && a.arrowKind;
+    const cur = !heads ? 'none' : kind === 'double' ? 'both' : 'end';
+    panel.append(menuRow('<svg viewBox="0 0 60 12" width="60" height="12" aria-hidden="true"><path d="M2 6h56" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="lbl">No arrowheads</span>', cur === 'none', () => setLineEnds('none')));
+    panel.append(menuRow('<svg viewBox="0 0 60 12" width="60" height="12" aria-hidden="true"><path d="M2 6h46" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M46 1l12 5-12 5z" fill="currentColor"/></svg><span class="lbl">Arrow at the end</span>', cur === 'end', () => setLineEnds('end')));
+    if (kind !== 'curved') panel.append(menuRow('<svg viewBox="0 0 60 12" width="60" height="12" aria-hidden="true"><path d="M12 6h36" stroke="currentColor" stroke-width="2"/><path d="M14 1L2 6l12 5z" fill="currentColor"/><path d="M46 1l12 5-12 5z" fill="currentColor"/></svg><span class="lbl">Arrows at both ends</span>', cur === 'both', () => setLineEnds('both')));
+  })(); });
+  // Visibility: a control only appears when it can act on what is armed/selected.
+  const showCtl = (el, on) => { el.hidden = !on; };
+  const syncShapeContext = () => {
+    const a = canvas.getActiveObject();
+    const targets = shapeTargets(), sticky = a && a.objectType === 'sticky_note';
+    const placing = placingShape || polyActive;
+    const armedLine = placing && (LINE_MENU.includes(selectedShapeName) || NO_FILL_SHAPES.has(selectedShapeName) || polyActive);
+    const shapeCtx = placing || targets.length > 0;
+    const fillable = placing ? !armedLine : targets.some(o => !o.strokeOnly);
+    showCtl(fillColorControl.button, fillable || sticky);
+    showCtl(borderColorControl.button, shapeCtx);
+    showCtl(weightBtn, shapeCtx); showCtl(dashBtn, shapeCtx); showCtl(opacityBtn, shapeCtx);
+    const arrowSel = !!(a && a.arrowKind);
+    showCtl(lineEndsBtn, !!(a && a.arrowFamily === 'line'));
+    showCtl(arrowHeadStepper, arrowSel || (placing && (LINE_ARROW_KINDS[selectedShapeName] || BOXED_ARROW_KINDS[selectedShapeName])));
+    showCtl(headsToggleBtn, arrowSel || (placing && (LINE_ARROW_KINDS[selectedShapeName] || BOXED_ARROW_KINDS[selectedShapeName])));
+  };
+  const syncShapeFormat = () => {
+    weightBtn.title = 'Line weight — ' + currentWeight() + 'px';
+    dashBtn.title = 'Line style — ' + (DASH_STYLES.find(s => s.id === currentDash()) || DASH_STYLES[0]).label;
+    opacityBtn.title = 'Opacity — ' + Math.round(currentOpacity() * 100) + '%';
+  };
+  ['selection:created', 'selection:updated', 'selection:cleared'].forEach(ev => canvas.on(ev, () => { syncShapeContext(); syncShapeFormat(); }));
+  canvas.on('object:modified', () => { syncShapeContext(); syncShapeFormat(); });
+
   // Shapes group reading order: pick a shape, draw it, then its Fill/Border/Width — the pieces
   // are built in a different order above (Fill/Border exist before the shape picker does), so
   // reorder once now that the whole group exists.
-  document.querySelector('[data-group="shape"]')?.append(shapePickerBtn, shapeButton, fillColorControl.button, borderColorControl.button, arrowHeadStepper, headsToggleBtn);
+  document.querySelector('[data-group="shape"]')?.append(shapePickerBtn, linesBtn, shapeButton, fillColorControl.button, borderColorControl.button, weightBtn, dashBtn, opacityBtn, lineEndsBtn, arrowHeadStepper, headsToggleBtn);
+  paintShapeButtons(); syncShapeContext(); syncShapeFormat();
   // Text/ink, Highlight, and Fill/background colors' own apply paths (applyInkColor,
   // applyHighlightColor, applyShapeFillColor) and their selection-sync (…Control.sync) are all
   // wired up above, right where each swatch button/popover is built — see the "COLOR PICKER

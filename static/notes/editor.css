@@ -185,3 +185,144 @@
    placeFloatingPanel already clamps horizontal position; this keeps a menu's own intrinsic width
    from forcing overflow on a phone-width toolbar. */
 @media(max-width:480px){.notes-dd-menu{max-width:calc(100vw - 1.5rem)}}
+
+/* ════════════════════════════════════════════════════════════════
+   PAGE PAPER (viewer preference) + PHONE / TOUCH LAYOUT
+   ink-theme.js explains the ink side. The paper colours below are the same constants as PAPERS there (a test keeps them equal).
+   ════════════════════════════════════════════════════════════════ */
+.canvas-shell[data-paper="light"]{background-color:#fbfbfa;background-image:radial-gradient(#d9d9d6 1px,transparent 1px)}
+.canvas-shell[data-paper="dark"]{background-color:#16161d;background-image:radial-gradient(#2b2b36 1px,transparent 1px)}
+.canvas-container{touch-action:none}            /* the canvas handles touch itself (editor.js: pinch / pan / draw) */
+.mobile-pages-btn{display:none}
+.rail-scrim{display:none}
+@media(pointer:coarse){
+  :root{--notes-ctrl-h:40px}
+  .editor-top-actions .sbtn,.editor-back{min-width:40px;min-height:40px}
+  .page-item{min-height:42px}
+  .notes-dd-option{min-height:42px}
+  .object-toolbar{padding:.45rem;overscroll-behavior-x:contain}
+  .canvas-shell::-webkit-scrollbar{width:8px;height:8px}
+}
+@media(max-width:768px){
+  .note-editor{height:calc(100vh - 48px);height:calc(100dvh - 48px)}
+  .editor-top{height:auto;flex-wrap:wrap;padding:.4rem .6rem;gap:.35rem .5rem}
+  .editor-title-wrap{flex:1 1 120px;min-width:0}
+  .editor-title-wrap input{max-width:none}
+  .save-state{font-size:.64rem}
+  .mobile-pages-btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;width:auto;min-width:40px;height:40px;padding:0 .7rem;font-weight:700;font-size:.78rem}
+  .editor-back{width:40px;height:40px}
+  /* every top action stays reachable: one swipeable row under the title instead of overflowing off-screen */
+  .editor-top-actions{order:3;flex:1 0 100%;overflow-x:auto;flex-wrap:nowrap;gap:.3rem;padding-bottom:3px;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain}
+  .editor-top-actions::-webkit-scrollbar{display:none}
+  .editor-top-actions>*{flex-shrink:0}
+  .editor-layout{position:relative}
+  /* Pages sidebar -> drawer over the canvas (opened by #mobilePagesBtn) */
+  .page-rail,.page-rail.collapsed{position:absolute;top:0;bottom:0;left:0;z-index:40;width:min(260px,82vw);transform:translateX(-105%);transition:transform .2s ease;box-shadow:var(--shadow-lg)}
+  .page-rail.mobile-open{transform:none}
+  .page-rail.collapsed .page-rail-head span,.page-rail.collapsed .page-list{display:revert}
+  .page-rail.collapsed #newPageBtn{display:inline-flex}
+  .page-rail.collapsed .page-rail-collapsed-controls{display:none}
+  .page-rail-collapse-btn{display:none!important}
+  .rail-scrim{display:block;position:absolute;inset:0;z-index:39;background:rgba(0,0,0,.45)}
+  .rail-scrim[hidden]{display:none}
+  .editor-workspace{min-width:0;width:100%}
+}
+@media(prefers-reduced-motion:reduce){.page-rail{transition:none}}
+
+/* Eraser size preview: a ring of exactly the erasing diameter (size x zoom), following the pointer (drawing-tools.js). */
+.notes-eraser-ring{position:absolute;display:none;pointer-events:none;z-index:6;transform:translate(-50%,-50%);border-radius:50%;box-sizing:border-box;
+  border:1.5px solid var(--text-1);background:color-mix(in srgb,var(--text-1) 9%,transparent);box-shadow:0 0 0 1px var(--surface)}
+
+/* ════════════════════════════════════════════════════════════════
+   NOTEBOOK UI — one set of dimensions for every control
+   Before: icon buttons 30px, dropdown chips 30px with their own padding, stepper inputs 28px, swatches 30px, quick swatches 16px,
+   groups separated by hairline dividers that wrapped unpredictably, and the active tool differed only by a faint tint. Now: a single
+   control height (--notes-ctrl-h), tool groups are small rounded segments, the active tool is unmistakable, and the save state is a
+   readable status pill. Tokens only, so light/dark (and every theme) stay in step.
+   ════════════════════════════════════════════════════════════════ */
+:root{--notes-ctrl-h:34px;--notes-radius:8px}
+.object-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .5rem;padding:.5rem .75rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.object-toolbar .tool-divider{display:none}
+.object-toolbar .tool-group{display:inline-flex;align-items:center;gap:2px;padding:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;min-height:calc(var(--notes-ctrl-h) + 6px)}
+.object-toolbar .tool-group:empty{display:none}
+.object-toolbar button{width:var(--notes-ctrl-h);height:var(--notes-ctrl-h);border-radius:var(--notes-radius);font-size:.82rem}
+.object-toolbar button:hover{background:var(--surface);color:var(--text-1);border-color:var(--border)}
+.object-toolbar button.active{background:var(--accent);color:var(--accent-on);border-color:var(--accent);box-shadow:0 1px 3px color-mix(in srgb,var(--accent) 45%,transparent)}
+.object-toolbar button.active:hover{background:var(--accent-hover);color:var(--accent-on)}
+.object-toolbar button:disabled{opacity:.4;cursor:not-allowed}
+.object-toolbar button.notes-dd{height:var(--notes-ctrl-h);border-radius:var(--notes-radius);background:var(--surface);font-size:.76rem}
+.notes-swatch-btn{width:var(--notes-ctrl-h);height:var(--notes-ctrl-h);border-radius:var(--notes-radius)}
+.object-toolbar .notes-swatch-btn,.object-toolbar button[aria-label^="Ink color"]{border:1px solid var(--border)}
+.object-toolbar button[aria-label^="Ink color"]{width:22px;height:22px;border-radius:50%;padding:0;margin:0 1px}
+.object-toolbar button[aria-label^="Ink color"]:hover{transform:scale(1.12);border-color:var(--text-2)}
+.notes-size-stepper{height:var(--notes-ctrl-h)}
+.notes-size-stepper button,.notes-size-stepper input[type="number"]{height:calc(var(--notes-ctrl-h) - 4px);border-radius:6px}
+.notes-width-row{gap:2px}
+.notes-auto-save{padding:0 .4rem;font-size:.7rem}
+/* top bar: same control size, tidy rhythm */
+.editor-top{height:auto;min-height:54px;padding:.35rem .85rem}
+.editor-top-actions .sbtn,.editor-back{min-width:var(--notes-ctrl-h);height:var(--notes-ctrl-h);padding:0 .55rem;border-radius:var(--notes-radius);display:inline-flex;align-items:center;justify-content:center}
+.editor-top-actions .tool-divider{height:20px;margin:0 .15rem}
+.editor-top-actions .sbtn.active{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
+.editor-top-actions .sbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.editor-top-actions .sbtn.active:hover:not(:disabled){color:var(--accent-on)}
+/* save status = a pill that reads at a glance (saved / saving / failed) and is a button when it failed */
+.save-state{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .6rem;border-radius:20px;font-size:.7rem;font-weight:600;background:var(--success-bg);border:1px solid var(--success-border);color:var(--success-text);white-space:nowrap}
+.save-state.saving{background:var(--warning-bg);border-color:var(--warning-border);color:var(--warning-text)}
+.save-state.failed{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-text);cursor:pointer}
+.save-state.failed:hover{filter:brightness(1.05)}
+/* popovers / menus never leave the screen */
+.notes-popover{max-width:calc(100vw - 16px);max-height:min(72vh,520px);overflow:auto;border-radius:12px}
+.notes-dd-option,.page-item{border-radius:var(--notes-radius)}
+.page-rail{background:var(--surface)}
+.canvas-shell{background-color:var(--bg)}
+/* Phones: the toolbar is ONE swipeable row of tool groups (all tools stay reachable, nothing shrinks), with a soft fade where more is hidden */
+@media(max-width:768px){
+  .object-toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:.4rem;padding:.4rem .5rem;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain;
+    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+  .object-toolbar::-webkit-scrollbar{display:none}
+  .object-toolbar .tool-group{flex-shrink:0;scroll-snap-align:start}
+  .editor-top-actions .sbtn{min-width:40px;height:40px}
+  :root{--notes-ctrl-h:40px}
+}
+
+/* ── SHAPE TOOLKIT: categorized picker, Lines menu, formatting menus, polyline hint ── */
+.notes-shape-menu{width:min(344px,calc(100vw - 16px));padding:.5rem}
+.notes-shape-tabs{display:flex;gap:2px;margin-bottom:.4rem;overflow-x:auto;scrollbar-width:none}
+.notes-shape-tabs::-webkit-scrollbar{display:none}
+.notes-shape-tabs button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.3rem;min-height:32px;padding:0 .55rem;border:0;border-radius:8px;background:transparent;color:var(--text-2);font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+.notes-shape-tabs button:hover{background:var(--surface-2,rgba(128,128,128,.12))}
+.notes-shape-tabs button.active{background:var(--accent);color:#fff}
+.notes-shape-heading{font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;font-size:.62rem;margin:.2rem .25rem .35rem}
+.notes-shape-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px;max-height:min(46vh,300px);overflow-y:auto;overscroll-behavior:contain}
+.notes-shape-cell{display:flex;align-items:center;justify-content:center;height:40px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--text-1);cursor:pointer}
+.notes-shape-cell:hover{background:var(--surface-2,rgba(128,128,128,.12));border-color:var(--border)}
+.notes-shape-cell.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.notes-shape-cell svg{display:block;pointer-events:none}
+.notes-lines-menu,.notes-fmt-menu{display:flex;flex-direction:column;gap:1px;min-width:190px;padding:.35rem}
+.notes-lines-row,.notes-fmt-row{display:flex;align-items:center;gap:.6rem;min-height:36px;padding:0 .6rem;border:0;border-radius:8px;background:transparent;color:var(--text-1);font:inherit;text-align:left;cursor:pointer}
+.notes-lines-row:hover,.notes-fmt-row:hover{background:var(--surface-2,rgba(128,128,128,.12))}
+.notes-lines-row.selected,.notes-fmt-row.selected{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.notes-lines-row .ic{display:inline-flex;width:24px;justify-content:center}
+.notes-fmt-row .lbl{flex:1}
+.notes-fmt-check{visibility:hidden;font-size:.7rem;color:var(--accent)}
+.notes-fmt-row.selected .notes-fmt-check{visibility:visible}
+.notes-weight-sample{display:inline-flex;align-items:center;width:80px}
+.notes-weight-sample span{display:block;width:100%;background:currentColor;border-radius:2px}
+.notes-opacity-sample{display:inline-block;width:22px;height:22px;border-radius:50%;background:currentColor;border:1px solid var(--border)}
+.notes-fmt-btn[hidden],.notes-shape-btn[hidden]{display:none}
+.notes-poly-hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem .4rem .8rem;background:var(--surface);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-lg);font-size:.78rem;color:var(--text-2)}
+.notes-poly-hint[hidden]{display:none}
+.notes-poly-hint button{min-height:34px;padding:0 .9rem;border:0;border-radius:999px;font:inherit;font-weight:700;cursor:pointer;background:var(--accent);color:#fff}
+.notes-poly-hint button.ghost{background:transparent;color:var(--text-2);border:1px solid var(--border)}
+@media (pointer:coarse){.notes-shape-cell{height:46px}.notes-lines-row,.notes-fmt-row{min-height:44px}.notes-shape-grid{grid-template-columns:repeat(auto-fill,minmax(46px,1fr))}}
+
+.mobile-pages-label{display:none}
+@media (max-width:900px){.mobile-pages-label{display:inline}}
+.notes-fill-btn{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--surface)}
+.notes-fill-btn i{font-size:.95rem;color:var(--text-1);line-height:1}
+.notes-fill-bar{display:block;width:18px;height:4px;border-radius:2px;border:1px solid var(--border);background-clip:padding-box}
+
+.notes-rot-badge{position:fixed;z-index:1300;pointer-events:none;padding:.2rem .55rem;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-lg);font-size:.72rem;font-weight:700;color:var(--text-1);font-variant-numeric:tabular-nums}
+.notes-rot-badge[hidden]{display:none}
+.notes-rot-badge.aligned{background:var(--accent);border-color:var(--accent);color:#fff}

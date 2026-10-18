@@ -51,8 +51,11 @@
 /* Metric explanation tooltip */
 .an-info { position:relative; display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); background:var(--surface-2); color:var(--text-3); font-size:.55rem; cursor:help; padding:0; font-family:inherit; text-transform:none; letter-spacing:0; }
 .an-info:hover, .an-info:focus-visible { border-color:var(--accent); color:var(--accent); outline:none; }
-.an-info::after { content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:max-content; max-width:min(240px, 70vw); background:var(--surface); color:var(--text-1); border:1px solid var(--border); border-radius:var(--radius); padding:.45rem .6rem; font-size:.7rem; font-weight:500; line-height:1.45; text-align:left; box-shadow:var(--shadow-md); opacity:0; pointer-events:none; transition:opacity .12s; z-index:30; white-space:normal; }
-.an-info:hover::after, .an-info:focus-visible::after, .an-info.open::after { opacity:1; }
+.an-info::after { content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:max-content; max-width:min(240px, 70vw); background:var(--surface); color:var(--text-1); border:1px solid var(--border); border-radius:var(--radius); padding:.45rem .6rem; font-size:.7rem; font-weight:500; line-height:1.45; text-align:left; box-shadow:var(--shadow-md); display:none; pointer-events:none; z-index:30; white-space:normal; }
+/* A closed tooltip is display:none, not just transparent: an invisible box still counts as scrollable overflow, and these sit near
+   the right edge of cards, which made the whole page scroll sideways on a phone. */
+.an-info:hover::after, .an-info:focus-visible::after, .an-info.open::after { display:block; animation:an-tip .12s ease-out; }
+@keyframes an-tip { from { opacity:0; } to { opacity:1; } }
 
 /* Cards / charts */
 .an-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.85rem; margin-bottom:.85rem; }
@@ -104,6 +107,11 @@
 #anMain[aria-busy="true"] #anBody { opacity:.55; transition:opacity .15s; pointer-events:none; }
 
 @media (max-width:1000px) { .an-stats { grid-template-columns:repeat(2, minmax(0, 1fr)); } .an-grid { grid-template-columns:minmax(0, 1fr); } }
+/* Phones: a tooltip is a bar pinned to the bottom of the screen (fixed = never clipped by a card, never wider than the screen). */
+@media (max-width:768px) {
+  .an-info::after { position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); top:auto; transform:none; width:auto; max-width:none; font-size:.78rem; z-index:2000; box-shadow:var(--shadow-lg, 0 10px 30px rgba(0,0,0,.35)); }
+  .an-info { width:22px; height:22px; font-size:.65rem; }
+}
 @media (max-width:768px) { .an-main { padding:1rem; } .an-stat-val { font-size:1.4rem; } .an-chart { height:230px; } .an-field select, .an-field input { font-size:16px; } }
 @media (max-width:420px) { .an-stats { gap:.55rem; } .an-stat { padding:.75rem .8rem; } .an-actions { width:100%; } .an-actions .an-btn { flex:1; justify-content:center; } }
 @media (prefers-reduced-motion: reduce) { .an-skel div { animation:none; } }

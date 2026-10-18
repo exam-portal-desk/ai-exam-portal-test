@@ -396,6 +396,7 @@ def replace_page_objects_versioned(
                 updated_ids.add(str(row["id"]))
 
         deleted_ids: set = set()
+        inserted_ids: set = set()
         if deletions:
             values_sql = ", ".join(["(%s::uuid,%s::int)"] * len(deletions))
             params = []
@@ -420,24 +421,30 @@ def replace_page_objects_versioned(
                 params += [item["id"], page_id, item["object_type"], item["z_index"], item["transform"], item["payload"], item["asset_id"]]
             cur.execute(
                 "INSERT INTO notes_objects (id,page_id,object_type,z_index,transform,payload,asset_id) "
-                f"VALUES {values_sql} RETURNING *",
+                f"VALUES {values_sql} ON CONFLICT (id) DO NOTHING RETURNING *",
                 params,
             )
             for row in cur.fetchall():
-                saved.append(_normalize_row(dict(row)))
+                row = _normalize_row(dict(row))
+                saved.append(row)
+                inserted_ids.add(str(row["id"]))
 
         # Anything requested but not applied is a conflict — resolved with ONE batched lookup
         # covering every such id, instead of a SELECT per miss.
         unresolved_update_ids = {item["id"] for item in updates} - updated_ids
         unresolved_delete_ids = {item["id"] for item in deletions} - deleted_ids
-        lookup_ids = list(unresolved_update_ids | unresolved_delete_ids)
+        # A "new" object whose id already exists is a client retrying a save whose first attempt did commit (its response was lost).
+        # That used to be a duplicate-key error -> HTTP 500 on every later save; now it is reported like any other conflict, with
+        # the row's current state, so the client can tell "this is exactly what I sent" from a real clash and carry on.
+        unresolved_new_ids = {item["id"] for item in new_objects} - inserted_ids
+        lookup_ids = list(unresolved_update_ids | unresolved_delete_ids | unresolved_new_ids)
         current_by_id: Dict[str, Dict[str, Any]] = {}
         if lookup_ids:
             cur.execute("SELECT * FROM notes_objects WHERE id = ANY(%s::uuid[]) AND page_id=%s", (lookup_ids, page_id))
             for row in cur.fetchall():
                 row = _normalize_row(dict(row))
                 current_by_id[str(row["id"])] = row
-        for oid in unresolved_update_ids:
+        for oid in unresolved_update_ids | unresolved_new_ids:
             conflicts.append({"id": oid, "current": current_by_id.get(oid)})
         for oid in unresolved_delete_ids:
             if oid in current_by_id:  # still exists at a different version — a real conflict

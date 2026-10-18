@@ -7,19 +7,12 @@
    dot-grid background from (the editor reads its own live canvas shell; the other two read the
    document root). Extracted here so none of the three callers keeps its own copy.
 
-   PDF export is entirely client-side (jsPDF — see exportNotebookAsPdf below): every page is
-   still rasterized locally via an off-screen Fabric canvas (unchanged), but the PDF itself is now
-   also assembled in the browser and saved directly, with NO request to the server at all. This
-   replaced an earlier design that POSTed every rendered page's PNG to a /export-pdf route for
-   ReportLab to assemble server-side — on a large notebook, that meant holding the entire
-   multi-page image payload (request body + decoded images + the finished PDF) in the memory of
-   the single Gunicorn worker this app runs on Render, which could OOM-crash the whole app for
-   every user, not just the one exporting. Moving assembly client-side also drops what that old
-   design had to do to force a reliable download: POST the same full payload a SECOND time into a
-   hidden iframe (a blob: URL from a single fetch has no Content-Disposition of its own, so
-   Chrome's built-in PDF viewer could intercept it and show it inline instead of saving it) —
-   jsPDF's own save() sidesteps that entirely by driving a real `<a download>` click itself, so
-   there's exactly one PNG-rasterize pass and no network round-trip at all now.
+   PDF export is entirely client-side and no longer flattens a page into one bitmap. Each page is built by pdf-writer.js (a streaming
+   PDF writer: finished pages and images go straight into Blob parts, so peak memory follows ONE page, not the document) and
+   pdf-render.js (strokes, lines, shapes and the grid become real vector PDF paths; photographs are embedded as image assets, JPEG
+   bytes untouched where safe; only what cannot be drawn exactly as vector — text boxes, shadows, clip paths, gradients — is
+   rasterised, one object at a time, at an adaptive scale under a pixel budget). There is NO request to the server for the PDF itself.
+   Practical limits are documented at buildNotebookPdf() below.
 
    createExportProgress's bar tracks a `target` that ONLY ever moves via advance()/complete()
    calls fed by real signals from the caller (pages actually rendered, bytes actually read off
@@ -57,6 +50,10 @@ export function createExportProgress(btn, label) {
 // Same fixed page geometry as editor.js's PAGE_WIDTH/PAGE_HEIGHT (and pdf_service.py's
 // _CANVAS_PX_W/H) — must match so a page renders identically regardless of which page it's
 // exported from.
+import { PAPERS, chooseExportPaper, resolveForExport, parseColor } from './ink-theme.js';
+import { PdfWriter, isWinAnsi } from './pdf-writer.js';
+import { ObjectPainter } from './pdf-render.js';
+
 export const EXPORT_PAGE_WIDTH = 2400, EXPORT_PAGE_HEIGHT = 1600;
 
 export function constrainObjectToExportPage(object) {
@@ -84,7 +81,7 @@ export function withExportSafeImageSrc(raw) {
 // real progress off Content-Length as each chunk comes in. onProgress gets a 0..1 fraction; pass
 // null to skip it. Throws a real Error (the server's own message where available) on any HTTP or
 // network failure — never silently "succeeds". The actual file delivery is a separate, real
-// request — see deliverViaIframeGet/deliverViaIframeForm below — only ever issued once this one
+// request — see deliverViaIframeGet below — only ever issued once this one
 // has confirmed there is a good file waiting, so a failed export never reaches the browser as a
 // download attempt.
 async function fetchToCompletion(url, init, onProgress) {
@@ -161,152 +158,212 @@ function safeExportFilename(title) {
 }
 
 function hexToRgb(hex) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+  const c = parseColor(hex);
+  return c ? [c.r, c.g, c.b] : [0, 0, 0];
 }
 
-// Same fixed geometry pdf_service.py's build_notebook_pdf used to draw the dot-grid page
-// background as a reusable PDF Form XObject (one shared resource stamped on every page instead
-// of a per-page cost) — reproduced here as a small canvas raster instead, for the same reason:
-// jsPDF's addImage(..., alias) embeds an image ONCE and reuses it by reference wherever the same
-// alias is passed again, so this canvas is built once per export and stamped behind every page
-// exactly like the old Form XObject was, not re-rasterized or re-embedded per page. Unlike
-// pdf_service.py's _safe_color/_flatten_over (a workaround for a ReportLab Form XObject dropping
-// alpha), a canvas fillStyle understands an rgba(...)/hex string natively and composites it
-// correctly on its own — no manual alpha flattening needed here.
-const GRID_SPACING_PT = 20 * 0.75; // matches editor.css's 20px dot-grid at 100% zoom (see _CANVAS_PX_TO_PT below)
-const GRID_DOT_RADIUS_PT = 0.75;   // 1px dot at 0.75pt/px
-const GRID_RASTER_SCALE = 2;       // drawn at 2x so the dots stay crisp once embedded, same idea as this module's own page raster (toDataURL multiplier: 2)
-function buildGridDataUrl(widthPt, heightPt, bg, dot) {
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(widthPt * GRID_RASTER_SCALE);
-  canvas.height = Math.round(heightPt * GRID_RASTER_SCALE);
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = bg || '#f4f5f7';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = dot || '#e1e4e8';
-  const spacing = GRID_SPACING_PT * GRID_RASTER_SCALE;
-  const radius = GRID_DOT_RADIUS_PT * GRID_RASTER_SCALE;
-  for (let y = spacing / 2; y < canvas.height; y += spacing) {
-    for (let x = spacing / 2; x < canvas.width; x += spacing) {
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-    }
-  }
-  return canvas.toDataURL('image/png');
+// Same fixed page layout the PDF always had: the notebook page at 0.75 pt per canvas px, 36 pt margins, a 26 pt header strip.
+const CANVAS_PX_TO_PT = 0.75, PDF_MARGIN = 36, PDF_HEADER_H = 26;
+const GRID_SPACING_PT = 20 * CANVAS_PX_TO_PT;       // the editor's 20px dot grid
+const GRID_DOT_PT = 2 * 0.75;                       // 1px dot radius at 0.75pt/px -> 1.5pt square, as before
+
+function enlivenBatch(rawObjects) {
+  return new Promise((resolve, reject) => {
+    const result = fabric.util.enlivenObjects(rawObjects, resolve);
+    if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
+  });
 }
 
 /**
- * Renders every page to a PNG on an off-screen Fabric canvas (unchanged), then assembles the
- * whole multi-page PDF itself, in the browser, via jsPDF (loaded globally from the page's own
- * <script> tag, same way fabric.js already is) — no request to the server at all. `loadPages()`
- * supplies [{id, title, objects}], already withExportSafeImageSrc'd; pass
- * loadPagesFromExportDataUrl(url) for the normal (fetch-based) case, or a function reading
- * already-loaded data for a caller (the open editor) that has it in memory already.
- * `notebookTitle` only names the downloaded file (sanitized the same way the server used to).
- * `toast(message, type)` is the caller's own toast function — called with the success message on
- * completion, or the error message (type 'error') on failure; either way this function itself
- * never throws, so the caller doesn't need its own try/catch.
+ * Fabric objects for one page. Fabric leaves a hole for an object it could not build (an image whose file would not load), and one
+ * corrupt entry can make the whole batch throw — so a failed batch is retried object by object, and the caller counts every hole.
+ */
+async function enlivenPage(rawObjects) {
+  try { return await enlivenBatch(rawObjects); }
+  catch (error) {
+    const rebuilt = [];
+    for (const entry of rawObjects) {
+      try { rebuilt.push((await enlivenBatch([entry]))[0] || null); } catch (e) { rebuilt.push(null); }
+    }
+    return rebuilt;
+  }
+}
+
+/**
+ * Builds the whole notebook PDF and returns { blob, stats } — no UI, no download (exportNotebookAsPdf wraps this).
+ *
+ * Memory model: ONE page's Fabric objects are alive at a time; each finished page, and each image, is appended to the writer's Blob
+ * parts and released. Raster fallback uses one reusable scratch canvas capped at rasterBudgetPx (default 6 MP, well under the ~16 MP
+ * area limit of iOS Safari). The raw JSON of the notebook is dropped page by page as it is rendered.
+ * Practical limits (not guarantees): the final document is still assembled as one Blob in the browser, so total size is bounded by
+ * what the browser can hold for a Blob; the page JSON arrives up front (callers' loadPages contract), which is bounded by the
+ * app's own per-page object cap; very image-heavy notebooks are limited by the images' own (already bounded) embedded size.
+ *
+ * `onProgress({ page, total, phase })` is called per page; `signal` cancels between objects and pages. Objects that cannot be
+ * exported are never dropped silently: they are listed in stats.failed / stats.lostOnLoad for the caller to report.
+ */
+export async function buildNotebookPdf({ pages, title = '', signal, onProgress, limits, deps = {} }) {
+  const fabricNs = deps.fabric || window.fabric;
+  const createCanvas = deps.createCanvas || (() => document.createElement('canvas'));
+  if (!pages || !pages.length) throw new Error('No pages to export.');
+  const exportPaper = chooseExportPaper(pages.map(p => p.objects));
+  const paperTheme = PAPERS[exportPaper];
+  const contentW = EXPORT_PAGE_WIDTH * CANVAS_PX_TO_PT, contentH = EXPORT_PAGE_HEIGHT * CANVAS_PX_TO_PT;
+  const pageW = contentW + PDF_MARGIN * 2, pageH = contentH + PDF_MARGIN * 2 + PDF_HEADER_H;
+  const contentBottom = pageH - PDF_MARGIN - PDF_HEADER_H - contentH;     // PDF space is y-up
+  const writer = new PdfWriter({ title: isWinAnsi(title) ? title : '', deflate: deps.deflate });
+  const painter = new ObjectPainter({ writer, fabric: fabricNs, createCanvas, fetchBytes: deps.fetchBytes, signal, limits });
+  const stats = painter.stats;
+  stats.lostOnLoad = 0; stats.pages = pages.length; stats.paper = exportPaper;
+  try {
+    const dot = parseColor(paperTheme.dot), paper = parseColor(paperTheme.paper);
+    await writer.definePattern('Grid', { tile: GRID_SPACING_PT, dot: GRID_DOT_PT, origin: [PDF_MARGIN, contentBottom], color: [dot.r, dot.g, dot.b], alpha: dot.a });
+    let lastYield = performance.now();
+    for (let i = 0; i < pages.length; i++) {
+      painter.throwIfAborted();
+      const page = pages[i], raw = resolveForExport(page.objects, exportPaper);
+      page.objects = null;                                                  // the raw JSON is no longer needed once resolved
+      const objects = await enlivenPage(raw);
+      stats.lostOnLoad += raw.length - objects.filter(Boolean).length;      // e.g. an image whose file could not be loaded: reported, never silent
+      const pg = writer.beginPage(pageW, pageH);
+      const label = String(page.title || `Page ${i + 1}`);
+      if (isWinAnsi(label)) pg.text(label, PDF_MARGIN, pageH - (PDF_MARGIN - 6), { font: 'F2', size: 11, color: hexToRgb('#2c3e50') });
+      else await painter.drawTextBitmap(pg, label, { x: PDF_MARGIN, y: pageH - (PDF_MARGIN - 6), size: 11 });
+      pg.save(); pg.strokeRGB(...hexToRgb('#dddddd')); pg.lineWidth(1); pg.moveTo(PDF_MARGIN, pageH - PDF_MARGIN); pg.lineTo(pageW - PDF_MARGIN, pageH - PDF_MARGIN); pg.paint('S'); pg.restore();
+      pg.save(); pg.fillRGB(paper.r, paper.g, paper.b); pg.rect(PDF_MARGIN, contentBottom, contentW, contentH); pg.paint('f');
+      pg.fillPattern('Grid'); pg.rect(PDF_MARGIN, contentBottom, contentW, contentH); pg.paint('f'); pg.restore();
+      pg.text(`Page ${i + 1} of ${pages.length}`, pageW - PDF_MARGIN, PDF_MARGIN / 2, { size: 8, color: hexToRgb('#999999'), align: 'right' });
+      // From here on the page is in canvas pixels, y down — the notebook's own coordinate system — clipped to the page like the old canvas was.
+      pg.save(); pg.cm(CANVAS_PX_TO_PT, 0, 0, -CANVAS_PX_TO_PT, PDF_MARGIN, pageH - PDF_MARGIN - PDF_HEADER_H);
+      pg.rect(0, 0, EXPORT_PAGE_WIDTH, EXPORT_PAGE_HEIGHT); pg.raw('W n');
+      for (const object of objects) {
+        constrainObjectToExportPage(object);
+        await painter.drawObject(pg, object);
+        const now = performance.now();
+        if (now - lastYield > 60) { await new Promise(resolve => setTimeout(resolve, 0)); lastYield = performance.now(); }
+      }
+      pg.restore();
+      await writer.endPage(pg);
+      objects.length = 0;
+      onProgress?.({ page: i + 1, total: pages.length, phase: 'render', stats });
+      const now = performance.now();
+      if (now - lastYield > 30 || i === pages.length - 1) { await new Promise(resolve => setTimeout(resolve, 0)); lastYield = performance.now(); }
+    }
+    painter.throwIfAborted();
+    const blob = writer.finish();
+    stats.bytes = blob.size; stats.images = writer.stats.images; stats.imageBytes = writer.stats.imageBytes;
+    return { blob, stats };
+  } catch (error) {
+    writer.discard();
+    throw error;
+  } finally {
+    painter.dispose();
+  }
+}
+
+/**
+ * Hands the finished PDF to the browser. `download` makes it a file download; `target=_blank` + `noopener` guarantees that a browser
+ * which shows PDFs inline instead opens them in a NEW tab and never replaces the notebook the user is working in. A blob: address is
+ * how any file built in the browser is exposed (it cannot be renamed); the viewer tab's title comes from the PDF's own /Title. The
+ * object URL stays valid for 5 minutes so that tab can be reloaded, then is released.
+ */
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = filename; link.target = '_blank'; link.rel = 'noopener'; link.style.display = 'none';
+  document.body.appendChild(link); link.click();
+  setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 5 * 60 * 1000);
+  return url;
+}
+
+/**
+ * A browser gives a page no way to ask "was my download or new tab blocked?", so instead of guessing, every finished export also
+ * shows this small notice for a minute. Its buttons are real clicks by the user, which no popup blocker refuses: Download saves the
+ * file again, and Open in new tab reports it when even that is blocked (window.open returns null), so a blocked export is never a
+ * dead end.
+ */
+function showReadyPill(url, filename, toast) {
+  ensureExportPillStyle();
+  document.querySelector('.notes-export-pill.ready')?.remove();
+  const pill = document.createElement('div'); pill.className = 'notes-export-pill ready'; pill.setAttribute('role', 'status');
+  pill.innerHTML = '<span class="lbl">PDF is ready. If nothing downloaded:</span><button type="button" data-act="download">Download</button><button type="button" data-act="open">Open in new tab</button><button type="button" data-act="close" aria-label="Dismiss">✕</button>';
+  const remove = () => pill.remove();
+  pill.addEventListener('click', event => {
+    const act = event.target.closest('button')?.dataset.act;
+    if (act === 'download') { const a = document.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); }
+    else if (act === 'open') {
+      const tab = window.open(url, '_blank');
+      if (!tab) toast?.('Your browser blocked the new tab — use Download instead.', 'error');
+      else { try { tab.opener = null; } catch (e) { /* cross-origin guard: nothing to clear */ } }
+    } else if (act === 'close') remove();
+  });
+  document.body.appendChild(pill);
+  setTimeout(remove, 60000);
+}
+
+function ensureExportPillStyle() {
+  if (document.getElementById('notesExportPillStyle')) return;
+  const style = document.createElement('style'); style.id = 'notesExportPillStyle';
+  style.textContent = '.notes-export-pill{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:3000;display:flex;align-items:center;gap:.6rem;max-width:calc(100vw - 24px);padding:.4rem .5rem .4rem .9rem;background:var(--surface,#fff);color:var(--text-1,#222);border:1px solid var(--border,#ddd);border-radius:999px;box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.18));font-size:.8rem;font-weight:600}'
+    + '.notes-export-pill .bar{width:90px;height:6px;border-radius:3px;background:var(--border,#ddd);overflow:hidden}.notes-export-pill .bar i{display:block;height:100%;width:0;background:var(--accent,#4a86e8);transition:width .15s}'
+    + '.notes-export-pill.ready{flex-wrap:wrap;justify-content:center;border-radius:16px}'
+    + '.notes-export-pill button{min-height:32px;padding:0 .85rem;border:1px solid var(--border,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;cursor:pointer}';
+  document.head.appendChild(style);
+}
+
+let activeExport = null;     // at most one PDF export at a time, across every export button on the page
+
+/**
+ * Exports the notebook as a PDF entirely in the browser (see buildNotebookPdf for the pipeline) and starts the download. `loadPages()`
+ * supplies [{id, title, objects}], already withExportSafeImageSrc'd; pass loadPagesFromExportDataUrl(url) for the normal (fetch-based)
+ * case, or a function reading already-loaded data for a caller (the open editor) that has it in memory already. `notebookTitle` only
+ * names the downloaded file. `toast(message, type)` is the caller's own toast function; this function never throws. While running,
+ * a small progress pill shows the page count with a Cancel button; cancelling, failing or finishing always restores the button.
  */
 export async function exportNotebookAsPdf({ notebookId, notebookTitle, btn, loadPages, toast, gridTheme, successMessage = 'PDF download started.' }) {
   if (!btn || btn.disabled) return;
+  if (activeExport) { toast?.('A PDF export is already running — please wait for it to finish.', 'error'); return; }
   const originalHTML = btn.innerHTML;
+  const controller = new AbortController();
+  activeExport = controller;
   btn.disabled = true;
   btn.classList.add('exporting');
   const progress = createExportProgress(btn, 'Preparing');
   progress.start();
-  const offEl = document.createElement('canvas');
-  const offCanvas = new fabric.StaticCanvas(offEl, { renderOnAddRemove: false });
-  const theme = gridTheme || (() => {
-    const rootStyle = getComputedStyle(document.documentElement);
-    return { bg: rootStyle.getPropertyValue('--bg').trim(), dot: rootStyle.getPropertyValue('--border').trim() };
-  })();
+  ensureExportPillStyle();
+  const pill = document.createElement('div'); pill.className = 'notes-export-pill'; pill.setAttribute('role', 'status');
+  pill.innerHTML = '<span class="lbl">Preparing PDF…</span><span class="bar"><i></i></span><button type="button">Cancel</button>';
+  const pillLabel = pill.querySelector('.lbl'), pillBar = pill.querySelector('.bar i');
+  pill.querySelector('button').addEventListener('click', () => { controller.abort(); pillLabel.textContent = 'Cancelling…'; });
+  document.body.appendChild(pill);
   try {
-    const jsPDFCtor = window.jspdf?.jsPDF;
-    if (!jsPDFCtor) throw new Error('PDF export isn’t ready yet — please reload the page and try again.');
     const pages = await loadPages();
     if (!pages.length) throw new Error('No pages to export.');
     progress.setLabel('Generating');
-
-    // Same fixed page geometry pdf_service.py's build_notebook_pdf used (_CANVAS_PX_TO_PT = 0.75
-    // is the standard CSS-px-to-PDF-pt conversion) — EXPORT_PAGE_WIDTH/HEIGHT above already
-    // mirror its _CANVAS_PX_W/H, so reusing them here keeps every PDF page exactly the notebook's
-    // real, fixed page size, same as before.
-    const CANVAS_PX_TO_PT = 0.75;
-    const margin = 36, headerH = 26;
-    const contentW = EXPORT_PAGE_WIDTH * CANVAS_PX_TO_PT, contentH = EXPORT_PAGE_HEIGHT * CANVAS_PX_TO_PT;
-    const pageW = contentW + margin * 2, pageH = contentH + margin * 2 + headerH;
-    const totalPages = pages.length;
-
-    // jsPDF's `format` array alone is NOT taken as literal [width, height] — it defaults to
-    // portrait orientation and silently SWAPS a landscape-shaped array to enforce that, which
-    // left every exported page 1298x1872 instead of the intended 1872x1298: the page-content
-    // image was then still drawn at its real (unswapped) 1800pt width onto a page only 1298pt
-    // wide, so roughly the right third of every page's content fell off the page entirely.
-    // Passing the real orientation makes jsPDF keep the dimensions exactly as given.
-    const doc = new jsPDFCtor({ unit: 'pt', format: [pageW, pageH], orientation: pageW >= pageH ? 'landscape' : 'portrait', compress: true });
-    const gridDataUrl = buildGridDataUrl(contentW, contentH, theme.bg, theme.dot);
-
-    // The page raster used to render at 2x pixel density (4800x3200 per page) purely for print
-    // sharpness — that's also the single most expensive step per page (canvas paint, PNG encode,
-    // then jsPDF's own PNG decode/recompress while embedding it), and it happens once per page.
-    // 1x matches the canvas's own native resolution — the exact same pixels the notebook already
-    // renders with on screen at 100% zoom — so it's not a real quality loss for how these pages
-    // are actually viewed, while cutting the dominant per-page cost to a quarter.
-    const RASTER_MULTIPLIER = 1;
-    let lastYield = performance.now();
-    for (let i = 0; i < totalPages; i++) {
-      const page = pages[i];
-      const objects = await new Promise((resolve, reject) => {
-        const result = fabric.util.enlivenObjects(page.objects, resolve);
-        if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
-      });
-      offCanvas.clear();
-      offCanvas.setDimensions({ width: EXPORT_PAGE_WIDTH, height: EXPORT_PAGE_HEIGHT });
-      objects.forEach(o => { constrainObjectToExportPage(o); offCanvas.add(o); });
-      offCanvas.renderAll();
-      const image = offCanvas.toDataURL({ format: 'png', multiplier: RASTER_MULTIPLIER });
-
-      if (i > 0) doc.addPage([pageW, pageH]);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...hexToRgb('#2c3e50'));
-      doc.text(String(page.title || `Page ${i + 1}`), margin, margin - 6);
-      doc.setDrawColor(...hexToRgb('#dddddd')); doc.setLineWidth(1);
-      doc.line(margin, margin, pageW - margin, margin);
-      // Grid stamped first (shared alias -> embedded once, reused every page — see
-      // buildGridDataUrl's own comment), then this page's own transparent content raster on top.
-      doc.addImage(gridDataUrl, 'PNG', margin, margin + headerH, contentW, contentH, 'notebookGrid');
-      doc.addImage(image, 'PNG', margin, margin + headerH, contentW, contentH);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...hexToRgb('#999999'));
-      doc.text(`Page ${i + 1} of ${totalPages}`, pageW - margin, pageH - margin / 2, { align: 'right' });
-
-      // Rasterizing + embedding every page is the dominant, genuinely measurable cost of this
-      // export, so it drives the bar in direct proportion to pages actually done — not an
-      // arbitrary schedule. The last stretch is reserved for jsPDF's own output/save call below.
-      progress.advance(((i + 1) / totalPages) * 99);
-      // A real yield to the browser (canvas rendering + jsPDF's image embedding are pure
-      // synchronous CPU work, with no actual network/timer wait left anywhere in this loop to
-      // naturally let the progress bar's setInterval/repaint run) — but only roughly every 80ms
-      // of real work, not every single page: each yield itself costs a few ms of real wall-clock
-      // time (a browser timer's own minimum resolution), which adds up across many pages if paid
-      // on every one. This still keeps the bar visibly live without that compounding cost.
-      const now = performance.now();
-      if (now - lastYield > 80 || i === totalPages - 1) {
-        await new Promise(resolve => setTimeout(resolve, 0));
-        lastYield = performance.now();
-      }
-    }
-
+    const { blob, stats } = await buildNotebookPdf({
+      pages, title: notebookTitle || '', signal: controller.signal,
+      onProgress: ({ page, total }) => {
+        progress.setLabel(`Page ${page}/${total}`); progress.advance((page / total) * 99);
+        pillLabel.textContent = `Exporting PDF — page ${page} of ${total}`; pillBar.style.width = `${Math.round((page / total) * 100)}%`;
+      },
+    });
     progress.setLabel('Ready');
     await progress.complete();
     progress.setLabel('Downloading');
     await new Promise(resolve => setTimeout(resolve, 0));
-    doc.save(`${safeExportFilename(notebookTitle)}.pdf`);
-    toast?.(successMessage);
+    const fileName = `${safeExportFilename(notebookTitle)}.pdf`;
+    const fileUrl = saveBlob(blob, fileName);
+    showReadyPill(fileUrl, fileName, toast);
+    const problems = stats.failed.length + stats.lostOnLoad;
+    toast?.(problems ? `${successMessage} ${problems} object${problems === 1 ? '' : 's'} (for example an image that could not be loaded) could not be included.` : successMessage, problems ? 'error' : undefined);
     return true;
   } catch (error) {
-    toast?.(error.message || 'Unable to export this notebook.', 'error');
+    if (error?.name === 'AbortError') toast?.('PDF export cancelled.');
+    else toast?.(error.message || 'Unable to export this notebook.', 'error');
     return false;
   } finally {
-    offCanvas.dispose();
+    activeExport = null;
+    pill.remove();
     progress.stop();
     btn.disabled = false;
     btn.classList.remove('exporting');

@@ -1,4 +1,5 @@
 import { createExportProgress, exportNotebookAsPdf, exportNotebookAsJson, withExportSafeImageSrc } from './notebook-export.js';
+import { PAPERS, isLightPaper, adaptLiveObject, restoreStored } from './ink-theme.js';
 
 const root = document.getElementById('noteEditor');
 const notebookId = root.dataset.notebookId;
@@ -12,6 +13,34 @@ const isReadOnly = root.dataset.readOnly === 'true';
 const apiBase = root.dataset.apiBase || '/api/v01/notebooks';
 const canvas = new fabric.Canvas('notesCanvas', { selection: true, preserveObjectStacking: true });
 window.__notesCanvas = canvas;
+/* ── Page paper + ink (see ink-theme.js for the full reasoning) ──
+   The page the notes sit on follows the app theme ('auto') unless the viewer pins it to light or dark paper (a per-viewer
+   preference, kept in localStorage — never saved into the note). Default ink and default text are drawn in whichever colour
+   reads on that paper; colours the user chose are never touched. */
+const PAPER_KEY = 'notesPaper';
+function paperMode() { try { const m = localStorage.getItem(PAPER_KEY); return m === 'light' || m === 'dark' ? m : 'auto'; } catch (e) { return 'auto'; } }
+let paperState = null;
+function currentPaper() {
+  if (paperState) return paperState;
+  const mode = paperMode();
+  if (mode !== 'auto') { const p = PAPERS[mode]; paperState = { mode, light: mode === 'light', ink: p.ink, stickyText: p.stickyText, stickyBg: p.stickyBg, paper: p.paper, dot: p.dot }; }
+  else { const shell = document.getElementById('canvasShell'); const bg = shell ? getComputedStyle(shell).backgroundColor : token('--bg'); paperState = { mode, light: isLightPaper(bg), ink: token('--text-1'), stickyText: token('--warning-text'), stickyBg: token('--warning-bg') }; }
+  return paperState;
+}
+function refreshPaper() {
+  paperState = null;
+  const shell = document.getElementById('canvasShell'); const mode = paperMode();
+  if (shell) { if (mode === 'auto') { shell.removeAttribute('data-paper'); } else { shell.setAttribute('data-paper', mode); } }
+  const p = currentPaper();
+  document.dispatchEvent(new CustomEvent('notes:paper', { detail: p }));
+  return p;
+}
+window.__notesPaperInfo = () => currentPaper();
+/* Saved data, undo history and JSON export always carry the colour a stroke was CREATED with, never the one it is drawn with
+   right now, so switching theme/paper (or saving while in the other theme) can never change a note. One choke point:
+   every Fabric serialisation (toJSON, toObject, clone) goes through Object.prototype.toObject. */
+const _fabricToObject = fabric.Object.prototype.toObject;
+fabric.Object.prototype.toObject = function (props) { return restoreStored(_fabricToObject.call(this, props), this); };
 canvas.wrapperEl.style.setProperty('position', 'relative', 'important'); canvas.wrapperEl.style.setProperty('inset', 'auto', 'important');
 /* ROOT CAUSE of "can't resize a tall text box's width — the handle is off the visible page":
    Fabric's stock ml/mr (width-only) resize handles sit at the object's true vertical center,
@@ -78,7 +107,7 @@ window.__notesReadOnly = false;    // read by drawing-tools.js to suppress pen/e
 */
 // Custom fabric properties this app relies on — shared by save (objectRecord), undo/redo
 // (snapshot), and copy/paste/export so every serialize/enliven round-trip stays identical.
-const NOTES_PROPS = ['objectId', 'objectType', 'objectVersion', 'themeText', 'themeSticky', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg', 'strokeOnly', 'globalCompositeOperation', 'arrowKind', 'arrowFamily', 'arrowHeadSize', 'arrowHeadsEnabled'];
+const NOTES_PROPS = ['objectId', 'objectType', 'objectVersion', 'themeText', 'themeSticky', 'themeInk', 'baseStroke', 'baseComposite', 'assetId', 'shapeTextId', 'shapeTextFor', 'minHeight', 'customColor', 'customBg', 'strokeOnly', 'globalCompositeOperation', 'arrowKind', 'arrowFamily', 'arrowHeadSize', 'arrowHeadsEnabled', 'dashStyle'];
 const pageObjectsCache = new Map();   // pageId -> { objects: fabric.Object[], cachedAt: number }
 const assetUrlCache = new Map();      // assetId -> { url: string, expiresAt: number }
 const PAGE_CACHE_TTL_MS = 50 * 60 * 1000;  // must stay comfortably under the 1h signed-URL TTL
@@ -112,6 +141,7 @@ async function preloadPage(id) {
   preloadingPageIds.add(id);
   try {
     const data = await api(`${apiBase}/${notebookId}/pages/${id}/objects`);
+    if (!pageObjectsCache.has(id)) recordVersions(id, data.objects);
     const raw = data.objects.map(buildRawFabricEntry);
     const objects = await new Promise((resolve, reject) => {
       const result = fabric.util.enlivenObjects(raw, resolve);
@@ -148,7 +178,15 @@ const fontMetricsPromise = (async () => {
   fabric.util.clearFabricFontCache('DM Sans');
 })();
 
-function api(path, options = {}) { return fetch(path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok || !d.success) throw new Error(d.message || 'Request failed.'); return d; }); }
+function api(path, options = {}) {
+  const { timeout, ...fetchOptions } = options;
+  const ctrl = timeout && window.AbortController ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
+  return fetch(path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(fetchOptions.headers || {}) }, ...fetchOptions, ...(ctrl ? { signal: ctrl.signal } : {}) })
+    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok || !d.success) throw new Error(d.message || 'Request failed.'); return d; })
+    .catch(error => { throw (error && error.name === 'AbortError') ? new Error('The request timed out.') : error; })
+    .finally(() => { if (timer) clearTimeout(timer); });
+}
 function status(text, kind = '') { const e = document.getElementById('saveState'); e.className = `save-state ${kind}`; e.innerHTML = `<i class="fas fa-${kind === 'saving' ? 'spinner fa-spin' : kind === 'failed' ? 'exclamation-circle' : 'check-circle'}"></i> ${text}`; }
 function toast(text, type = 'success') { const r = document.getElementById('notesToastRegion'); const e = document.createElement('div'); e.className = `notes-toast ${type}`; e.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i><span></span>`; e.querySelector('span').textContent = text; r.appendChild(e); setTimeout(() => e.remove(), 4500); }
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; }
@@ -434,7 +472,12 @@ function applyTextColor(color) {
 function applyStickyBackground(color) { if (currentMode === 'read') return; window.__notesStickyBgColor = color; const object = canvas.getActiveObject(); if (!object || object.objectType !== 'sticky_note') return; object.set({ backgroundColor: color }); object.customBg = true; object.initDimensions(); if (nativeTextEditor?.object === object) nativeTextEditor.element.style.background = color; canvas.fire('object:modified', { target: object }); canvas.requestRenderAll(); markDirty(); }
 window.__notesBeginNativeTextEdit = beginNativeTextEdit; window.__notesApplyTextColor = applyTextColor; window.__notesSyncActiveTextOverlay = syncNativeTextOverlay; window.__notesApplyStickyBackground = applyStickyBackground;
 window.__notesGetNativeEditor = () => nativeTextEditor; window.__notesTextSelectionOffsets = textSelectionOffsets; window.__notesSetCaretOffset = setCaretOffset;
-function applyCanvasTheme() { canvas.getObjects().forEach(o => { if (o.themeText && !o.customColor) o.set('fill', token('--text-1')); if (o.themeSticky) { if (!o.customColor) o.set('fill', token('--warning-text')); if (!o.customBg) o.set('backgroundColor', token('--warning-bg')); } }); canvas.requestRenderAll(); }
+function applyThemeToObject(o, p) {
+  if (o.themeText && !o.customColor) o.set('fill', p.ink);
+  if (o.themeSticky) { if (!o.customColor) o.set('fill', p.stickyText); if (!o.customBg) o.set('backgroundColor', p.stickyBg); }
+  adaptLiveObject(o, p.light, p.ink);
+}
+function applyCanvasTheme() { const p = currentPaper(); canvas.getObjects().forEach(o => applyThemeToObject(o, p)); canvas.requestRenderAll(); }
 
 /* ════════════════════════════════════════════════════════════════
    READ MODE / FULL SCREEN / TOOLBAR TOGGLE — controller
@@ -512,7 +555,7 @@ async function setMode(next) {
   finishNativeTextEdit();
   if (next === 'read') {
     canvas.discardActiveObject();
-    if (dirty) { clearTimeout(saveTimer); await save(); }
+    if (dirty && !(await flushSave())) { toast('Could not save, so Read mode was not entered. Your changes are kept.', 'error'); return; }
     previousActiveTool = activeTool;
     window.__notesReadOnly = true;
     canvas.isDrawingMode = false;
@@ -625,11 +668,9 @@ document.getElementById('toolbarToggleBtn')?.addEventListener('click', () => { i
    page's objects in memory (the live canvas for the active page, a cache for others visited
    this session, or one more request only for a page neither of those covers — see
    getPageObjectsForExport below) and gains nothing from the bulk export-data route the other
-   two callers use. Rendering itself (each page's objects onto a private off-screen StaticCanvas)
-   is unchanged — the resulting PDF is now assembled entirely client-side via jsPDF (see that
-   shared module for why the dot-grid background is reproduced as a small reusable canvas raster
-   instead of being part of this per-page raster), and why each image's `src` is rewritten to a
-   same-origin URL before this canvas ever loads it (a tainted canvas can't be exported). */
+   two callers use. The PDF is built entirely client-side, one page at a time, by pdf-writer.js / pdf-render.js through
+   notebook-export.js (vector strokes and shapes, embedded photos, per-object raster only where vector is not exact); every
+   image's `src` is rewritten to a same-origin URL first so its bytes can be read back (a tainted canvas cannot be read). */
 async function getPageObjectsForExport(pageId) {
   if (pageId === activePageId) return withExportSafeImageSrc(canvas.getObjects().map(o => o.toObject(NOTES_PROPS)));
   const cached = pageObjectsCache.get(pageId);
@@ -665,8 +706,11 @@ document.getElementById('pagesCollapseBtn')?.addEventListener('click', () => set
 
 /* ════════════════════════════════════════════════════════════════ */
 
-function markDirty() { if (loading) return; dirty = true; clearTimeout(saveTimer); if (autoSaveEnabled) { status('Saving…', 'saving'); saveTimer = setTimeout(save, 1400); } else status('Unsaved changes', 'saving'); snapshot(); }
-function snapshot() { if (loading) return; const state = JSON.stringify(canvas.toJSON(NOTES_PROPS)); if (history[historyIndex] === state) { updateUndoRedoUI(); return; } history = history.slice(0, historyIndex + 1); history.push(state); historyIndex = history.length - 1; if (history.length > 40) { history.shift(); historyIndex -= 1; } updateUndoRedoUI(); }
+function markDirty() { if (loading) return; dirty = true; editSeq++; clearTimeout(saveTimer); if (autoSaveEnabled) { status('Saving…', 'saving'); saveTimer = setTimeout(save, 1400); } else status('Unsaved changes', 'saving'); snapshot(); }
+/* One undo step per user gesture: while a gesture is in progress (eraser drag, shape draw) snapshot() only notes that one is due. */
+let historyBatchDepth = 0, snapshotPending = false;
+window.__notesHistoryBatch = { begin() { historyBatchDepth++; }, end() { historyBatchDepth = Math.max(0, historyBatchDepth - 1); if (!historyBatchDepth && snapshotPending) { snapshotPending = false; snapshot(); } } };
+function snapshot() { if (loading) return; if (historyBatchDepth > 0) { snapshotPending = true; return; } const state = JSON.stringify(canvas.toJSON(NOTES_PROPS)); if (history[historyIndex] === state) { updateUndoRedoUI(); return; } history = history.slice(0, historyIndex + 1); history.push(state); historyIndex = history.length - 1; if (history.length > 40) { history.shift(); historyIndex -= 1; } updateUndoRedoUI(); }
 /* Shared by loadPage() and restoreHistory() so a page load and an Undo/Redo
    reconstruct objects through the exact same finalization — this is the one
    place that decides editable/lockScaling/control-visibility/min-height for
@@ -696,6 +740,7 @@ function finalizeLoadedObject(o) {
   // along with the shape by default. Never overrides an explicit false, only fills in the gap for
   // legacy content that predates this property existing at all.
   if (o.objectType === 'shape' && o.strokeUniform !== false) o.strokeUniform = true;
+  applyThemeToObject(o, currentPaper());           // default ink/text read on the current paper; saved colours are untouched
 }
 function setTool(name) { activeTool=name; window.__notesEraserActive = false; window.__notesDeactivateInkTools?.(); document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === name)); canvas.isDrawingMode = name === 'draw' && currentMode === 'edit'; canvas.selection = name === 'select' && currentMode === 'edit'; const cursor = name === 'select' ? 'default' : name === 'draw' ? 'crosshair' : 'text'; canvas.defaultCursor = cursor; canvas.hoverCursor = cursor; canvas.freeDrawingCursor = cursor; }
 function addObject(object, type) { if (currentMode === 'read') return; object.objectId = object.objectId || uid(); object.objectType = type; canvas.add(object).setActiveObject(object); canvas.requestRenderAll(); markDirty(); }
@@ -736,7 +781,7 @@ function objectRecord(object) {
   // client-side via uid(), so presence of an id alone doesn't distinguish new-vs-existing here),
   // a number means "this is the version I last read/saved — reject my write if the server's
   // current version doesn't match, instead of silently overwriting a change I don't know about."
-  return { id: object.objectId || (object.objectId = uid()), object_type: object.objectType || 'shape', asset_id: object.assetId || null, expected_version: typeof object.objectVersion === 'number' ? object.objectVersion : null, transform: { left: fabricData.left || 0, top: fabricData.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0 }, payload: { fabric: fabricData } };
+  return { id: object.objectId || (object.objectId = uid()), object_type: object.objectType || 'shape', asset_id: object.assetId || null, expected_version: versionsOf(activePageId).has(String(object.objectId)) ? versionsOf(activePageId).get(String(object.objectId)) : null, transform: { left: fabricData.left || 0, top: fabricData.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0 }, payload: { fabric: fabricData } };
 }
 
 /* A page can hold any number of objects — the ONLY thing chunked here is the save
@@ -753,79 +798,153 @@ function objectRecord(object) {
    finalizeLoadedObject path a normal page load uses, so it renders identically either way).
    Runs entirely programmatically — resets dirty/deletedIds afterward so this reconciliation
    itself is never mistaken for a new unsaved user edit that needs saving again. */
-function resolveSaveConflicts(conflicts) {
+/* ════════════════════════════════════════════════════════════════
+   SAVE PIPELINE — what was wrong, and how it works now
+   ROOT CAUSES of "Unable to save" / "This page changed elsewhere — N objects refreshed" and of Undo/Redo breaking:
+   1. The version each object was last saved at (`objectVersion`) travelled inside undo/redo snapshots. The server bumps EVERY
+      object's version on EVERY save (a save rewrites the whole page), so after any save a snapshot carries stale versions;
+      undoing/redoing then made the next save conflict on every object, and the "refresh to match the server" step threw the
+      restored state away. Deletions were tracked from canvas events (suppressed while undo/redo/page-load run), so undoing an
+      add never removed it from the server and undoing an erase tried to update rows the server had already deleted.
+   2. `dirty = false` was set after the whole (multi-request) save, wiping edits and erases made while it was in flight.
+   3. A request that committed on the server but whose response was lost (timeout / network drop) left the client with old versions;
+      every later save then conflicted or hit a duplicate-id INSERT (HTTP 500) — permanently, until reload. `saving` could also stay
+      true forever when a request hung, silently stopping all further saves.
+   4. Page switching did not wait for the save to finish, nor stop when it failed, and reset the dirty flag for the page it left.
+   Now: the server version of every object lives in one per-page map (`knownVersions`, filled ONLY from server responses); deletions
+   are computed at save time as "known to the server but no longer on the page"; a save remembers the edit counter it started from
+   and only clears `dirty` if nothing changed meanwhile; every request has a timeout; after any failure the next attempt first
+   re-reads the page to learn which of our writes actually landed (matched by content, never by guesswork), then retries with
+   backoff (bounded); and navigating away waits for a confirmed save or an explicit choice. ════════════════════════════════════════════════════════════════ */
+const knownVersions = new Map();            // pageId -> Map(objectId -> version the SERVER has)
+const lastSentSig = new Map();              // pageId -> Map(objectId -> content signature of the last attempt to write it)
+const attemptedDeletes = new Map();         // pageId -> Set(objectId) we asked the server to delete but have no confirmation for
+const SAVE_TIMEOUT_MS = window.__NOTES_SAVE_TIMEOUT_MS || 60000, MAX_SAVE_RETRIES = 5;
+let editSeq = 0, savePromise = null, saveFailures = 0, retryTimer = null, needsResync = false, lastSaveError = '';
+const pageMap = (store, pageId, make) => { if (!store.has(pageId)) store.set(pageId, make()); return store.get(pageId); };
+const versionsOf = pageId => pageMap(knownVersions, pageId, () => new Map());
+function recordVersions(pageId, rows) { const m = versionsOf(pageId); m.clear(); (rows || []).forEach(r => m.set(String(r.id), r.version)); }
+function stableSig(value) {
+  const walk = v => (v && typeof v === 'object') ? (Array.isArray(v) ? v.map(walk) : Object.keys(v).sort().reduce((o, k) => { o[k] = walk(v[k]); return o; }, {})) : v;
+  return JSON.stringify(walk(value));
+}
+function resolveSaveConflicts(conflicts, pageId) {
   let removedCount = 0, updatedCount = 0;
-  const toEnliven = [];
+  const toEnliven = [], versions = versionsOf(pageId);
+  loading = true;                                             // removing/re-adding objects here is reconciliation, not a user edit
   conflicts.forEach(({ id, current }) => {
     const object = canvas.getObjects().find(o => o.objectId === id);
     if (object) canvas.remove(object);
-    if (current) { toEnliven.push(buildRawFabricEntry(current)); updatedCount++; }
-    else if (object) removedCount++;
+    if (current) { toEnliven.push(buildRawFabricEntry(current)); versions.set(String(id), current.version); updatedCount++; }
+    else { versions.delete(String(id)); if (object) removedCount++; }
   });
-  const finish = () => { canvas.discardActiveObject(); canvas.requestRenderAll(); updateObjectCount(); dirty = false; deletedIds = []; };
+  const finish = () => { loading = false; canvas.discardActiveObject(); canvas.requestRenderAll(); updateObjectCount(); };
   if (toEnliven.length) {
     fabric.util.enlivenObjects(toEnliven, enlivened => { enlivened.forEach(object => { finalizeLoadedObject(object); canvas.add(object); }); finish(); });
   } else {
     finish();
   }
   const parts = [];
-  if (updatedCount) parts.push(`${updatedCount} object${updatedCount === 1 ? '' : 's'} refreshed`);
-  if (removedCount) parts.push(`${removedCount} object${removedCount === 1 ? '' : 's'} removed`);
-  toast(`This page changed elsewhere — ${parts.join(', ')} to match the latest version.`, 'error');
+  if (updatedCount) parts.push(updatedCount + ' object' + (updatedCount === 1 ? '' : 's') + ' refreshed');
+  if (removedCount) parts.push(removedCount + ' object' + (removedCount === 1 ? '' : 's') + ' removed');
+  toast('This page was changed elsewhere — ' + parts.join(', ') + ' to match the latest version.', 'error');
 }
 
-async function save() {
-  if (isReadOnly) return;
-  // ROOT CAUSE of erased/edited content sometimes never reaching the server at all (visually
-  // gone locally, but the DELETE — or a subsequent chunk's upsert — never actually fires): this
-  // used to just `return` here whenever a save was already in flight, silently dropping whatever
-  // markDirty()/eraseAt's object:removed just queued (dirty=true, deletedIds populated) with
-  // nothing left to schedule another attempt — the 1400ms debounce timer that would normally
-  // retry had already been consumed by the save that's currently in flight. On a real network
-  // round trip (this app always talks to a remote Postgres — see app/db/__init__.py) that
-  // in-flight save can easily still be pending when the NEXT edit's timer fires, especially right
-  // after an erase-then-redraw done in quick succession. saveAgainNeeded guarantees a followup
-  // save() once the in-flight one finishes, instead of the edit being lost until some unrelated
-  // future edit happens to schedule a new timer.
-  if (saving) { saveAgainNeeded = true; return; }
-  if (!dirty || !activePageId) return;
-  saving = true; status('Saving…', 'saving');
-  const allConflicts = [];
-  const applySavedVersions = savedRows => {
-    const byId = new Map(savedRows.map(row => [row.id, row]));
-    canvas.getObjects().forEach(object => { const row = byId.get(object.objectId); if (row) object.objectVersion = row.version; });
-  };
-  try {
-    const objects = canvas.getObjects().map(objectRecord);
-    const pageId = activePageId;
-    if (!objects.length) {
-      const data = await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects: [], deleted: deletedIds, start_index: 0 }) });
-      applySavedVersions(data.saved || []); allConflicts.push(...(data.conflicts || []));
-    } else {
-      for (let start = 0; start < objects.length; start += SAVE_CHUNK_SIZE) {
-        const chunk = objects.slice(start, start + SAVE_CHUNK_SIZE);
-        const data = await api(`${apiBase}/${notebookId}/pages/${pageId}/objects`, { method: 'PUT', body: JSON.stringify({ objects: chunk, deleted: start === 0 ? deletedIds : [], start_index: start }) });
-        applySavedVersions(data.saved || []); allConflicts.push(...(data.conflicts || []));
-      }
-    }
-    dirty = false; deletedIds = []; status('Saved');
-    // Never a silent overwrite: anything the server refused (someone else changed or deleted it
-    // since this client last read it) gets patched in from the server's current state instead —
-    // everything else in this same save already succeeded normally above.
-    if (allConflicts.length) resolveSaveConflicts(allConflicts);
-  } catch (error) {
-    // dirty/deletedIds are deliberately left untouched on failure (nothing was actually
-    // persisted) — showUnsavedChangesDialog's "Save & Continue" (or the next edit's own
-    // debounce timer) remains the retry path, exactly as before this fix.
-    status('Save failed', 'failed'); toast(error.message, 'error');
-  } finally {
-    saving = false;
-    // Only re-invoked for the "something else queued a save while this one was in flight"
-    // case above — never on failure, so a persistent error can't turn this into a tight retry
-    // loop hammering the server.
-    if (saveAgainNeeded) { saveAgainNeeded = false; if (dirty) save(); }
-  }
+/* After a failed save the server may or may not have applied part of it. Re-read the page and adopt the server's version of every
+   object whose stored content is exactly what we last tried to write — those writes landed. Anything else (someone else's edit)
+   keeps its old version and is reported as a genuine conflict by the next save. */
+async function resyncPage(pageId) {
+  const data = await api(apiBase + '/' + notebookId + '/pages/' + pageId + '/objects', { timeout: 30000 });
+  const versions = versionsOf(pageId), sent = lastSentSig.get(pageId) || new Map(), delTried = attemptedDeletes.get(pageId) || new Set();
+  const onServer = new Set();
+  (data.objects || []).forEach(row => {
+    const id = String(row.id); onServer.add(id);
+    if (versions.get(id) === row.version) return;
+    const fabricData = row.payload && row.payload.fabric;
+    if (sent.has(id) && fabricData && stableSig(fabricData) === sent.get(id)) versions.set(id, row.version);
+  });
+  Array.from(versions.keys()).forEach(id => { if (!onServer.has(id) && delTried.has(id)) { versions.delete(id); delTried.delete(id); } });
 }
+
+// One attempt at making the server match the page. Resolves true when everything that was on the page when it started is persisted.
+async function saveOnce() {
+  const pageId = activePageId, seq = editSeq;
+  if (needsResync) { await resyncPage(pageId); needsResync = false; }
+  const versions = versionsOf(pageId);
+  const live = canvas.getObjects();
+  const objects = live.map(objectRecord);
+  const present = new Set(objects.map(o => String(o.id)));
+  const deletions = []; versions.forEach((version, id) => { if (!present.has(id)) deletions.push({ id, expected_version: version }); });
+  const sent = pageMap(lastSentSig, pageId, () => new Map()); sent.clear();
+  objects.forEach(o => sent.set(String(o.id), stableSig(o.payload && o.payload.fabric)));
+  const delTried = pageMap(attemptedDeletes, pageId, () => new Set()); deletions.forEach(d => delTried.add(d.id));
+  const conflicts = [];
+  const byId = new Map(live.map(o => [String(o.objectId), o]));
+  const applySaved = rows => (rows || []).forEach(row => { versions.set(String(row.id), row.version); const o = byId.get(String(row.id)); if (o) o.objectVersion = row.version; });
+  const url = apiBase + '/' + notebookId + '/pages/' + pageId + '/objects';
+  if (!objects.length) {
+    const data = await api(url, { method: 'PUT', timeout: SAVE_TIMEOUT_MS, body: JSON.stringify({ objects: [], deleted: deletions, start_index: 0 }) });
+    applySaved(data.saved); conflicts.push(...(data.conflicts || []));
+  } else {
+    for (let start = 0; start < objects.length; start += SAVE_CHUNK_SIZE) {
+      const chunk = objects.slice(start, start + SAVE_CHUNK_SIZE);
+      const data = await api(url, { method: 'PUT', timeout: SAVE_TIMEOUT_MS, body: JSON.stringify({ objects: chunk, deleted: start === 0 ? deletions : [], start_index: start }) });
+      applySaved(data.saved); conflicts.push(...(data.conflicts || []));
+    }
+  }
+  const conflicted = new Set(conflicts.map(c => String(c.id)));
+  deletions.forEach(d => { if (!conflicted.has(d.id)) { versions.delete(d.id); delTried.delete(d.id); } });
+  // A conflict whose server copy is exactly what we just sent means an earlier attempt of ours already landed (lost response): adopt it quietly.
+  const real = [];
+  conflicts.forEach(c => {
+    const id = String(c.id), cur = c.current, fabricData = cur && cur.payload && cur.payload.fabric;
+    if (cur && sent.has(id) && fabricData && stableSig(fabricData) === sent.get(id)) { versions.set(id, cur.version); return; }
+    if (!cur && present.has(id) && delTried.has(id)) { versions.delete(id); delTried.delete(id); editSeq++; return; }   // our own delete landed, then the object came back (undo): re-insert it
+    real.push(c);
+  });
+  if (real.length) resolveSaveConflicts(real, pageId);
+  if (editSeq === seq) dirty = false; else dirty = true;                       // edits made while we were saving stay pending
+  if (!dirty) deletedIds = [];
+  return true;
+}
+function describeSaveError(error) { const m = String(error && error.message || ''); if (/timed out|abort/i.test(m)) return 'The save timed out.'; if (/failed to fetch|networkerror|load failed|network/i.test(m)) return 'The connection dropped.'; return m || 'Unable to save your changes.'; }
+async function runSave() {
+  saving = true; clearTimeout(retryTimer); status('Saving…', 'saving');
+  let ok = true;
+  try {
+    do {
+      saveAgainNeeded = false;
+      try { await saveOnce(); saveFailures = 0; lastSaveError = ''; }
+      catch (error) { ok = false; saveFailures++; needsResync = true; lastSaveError = describeSaveError(error); break; }
+    } while (ok && dirty);                                     // edits that arrived while we were saving go out in the next pass
+  } finally { saving = false; savePromise = null; }
+  if (ok) { status(dirty ? 'Unsaved changes' : 'Saved', dirty ? 'saving' : ''); if (dirty && autoSaveEnabled) { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); } return !dirty; }
+  if (saveFailures <= MAX_SAVE_RETRIES) {
+    const delay = Math.min(30000, 2000 * Math.pow(2, saveFailures - 1));
+    status('Save failed — retrying in ' + Math.round(delay / 1000) + 's', 'failed');
+    if (saveFailures === 1) toast(lastSaveError + ' Your changes are kept and will be retried automatically.', 'error');
+    retryTimer = setTimeout(save, delay);
+  } else {
+    status('Save failed — click to retry', 'failed');
+    toast(lastSaveError + ' Your changes are still on this page; use Save to try again.', 'error');
+  }
+  return false;
+}
+function save() {
+  if (isReadOnly) return Promise.resolve(true);
+  if (saving) { saveAgainNeeded = true; return savePromise || Promise.resolve(false); }
+  if (!dirty || !activePageId) return Promise.resolve(true);
+  savePromise = runSave();
+  return savePromise;
+}
+// Resolves true only when nothing is left unsaved. Used before leaving a page / switching mode.
+async function flushSave() {
+  clearTimeout(saveTimer);
+  for (let i = 0; i < 3 && dirty; i++) { const ok = await save(); if (!ok) return false; }
+  return !dirty;
+}
+function retrySaveNow() { saveFailures = 0; clearTimeout(retryTimer); save(); }
+window.addEventListener('online', () => { if (dirty) retrySaveNow(); });
 function updatePageNav() {
   const label = document.getElementById('pageNavLabel');
   const prevBtn = document.getElementById('prevPageBtn');
@@ -871,7 +990,7 @@ document.getElementById('collapsedPageMenuBtn')?.addEventListener('click', event
 async function loadPage(id) {
   if (!id) { showEmptyEditor(); return; }
   finishNativeTextEdit();
-  await save();
+  if (activePageId && activePageId !== id && !(await flushSave())) { toast('Could not save this page, so you were kept on it and nothing was lost. Saving will be retried.', 'error'); return; }
 
   // Snapshot the page we're LEAVING using its current live objects (so any
   // adds/removes/edits made this session are reflected), not the stale
@@ -910,6 +1029,7 @@ async function loadPage(id) {
   deletedIds = [];
   try {
     const data = await api(`${apiBase}/${notebookId}/pages/${id}/objects`);
+    recordVersions(id, data.objects);
     const raw = data.objects.map(buildRawFabricEntry);
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Loading this page took too long. Some saved content may be corrupted.')), 10000);
@@ -933,7 +1053,7 @@ async function loadPage(id) {
     loading = false; document.getElementById('canvasLoading').hidden = true;
   }
 }
-async function openBlankPage(id) { await save(); if (activePageId && activePageId !== id) { pageObjectsCache.set(activePageId, { objects: canvas.getObjects().slice(), cachedAt: Date.now() }); } activePageId = id; hideEmptyEditor(); loading = true; document.querySelectorAll('.page-item').forEach(p => p.classList.toggle('active', p.dataset.pageId === id)); canvas.clear(); updateObjectCount(); deletedIds = []; history = []; historyIndex = -1; dirty = false; loading = false; applyFixedPageBounds(); document.getElementById('canvasLoading').hidden = true; canvas.requestRenderAll(); status('Saved'); updateUndoRedoUI(); updatePageNav(); pageObjectsCache.set(id, { objects: [], cachedAt: Date.now() }); }
+async function openBlankPage(id) { if (activePageId && activePageId !== id && !(await flushSave())) { toast('Could not save this page, so you were kept on it and nothing was lost. Saving will be retried.', 'error'); return; } knownVersions.set(id, new Map()); if (activePageId && activePageId !== id) { pageObjectsCache.set(activePageId, { objects: canvas.getObjects().slice(), cachedAt: Date.now() }); } activePageId = id; hideEmptyEditor(); loading = true; document.querySelectorAll('.page-item').forEach(p => p.classList.toggle('active', p.dataset.pageId === id)); canvas.clear(); updateObjectCount(); deletedIds = []; history = []; historyIndex = -1; dirty = false; loading = false; applyFixedPageBounds(); document.getElementById('canvasLoading').hidden = true; canvas.requestRenderAll(); status('Saved'); updateUndoRedoUI(); updatePageNav(); pageObjectsCache.set(id, { objects: [], cachedAt: Date.now() }); }
 function showEmptyEditor() { activePageId = null; dirty = false; canvas.clear(); updateObjectCount(); dirty = false; history = []; historyIndex = -1; document.getElementById('canvasLoading').hidden = true; const shell = document.getElementById('canvasShell'); let empty = document.getElementById('emptyPageEditor'); if (!empty) { empty = document.createElement('div'); empty.id = 'emptyPageEditor'; empty.className = 'canvas-empty-state'; empty.innerHTML = '<i class="far fa-file-alt"></i><strong>No pages yet</strong><span>Create a page to begin taking notes.</span>'; shell.append(empty); } empty.hidden = false; status('Saved'); updateUndoRedoUI(); updatePageNav(); }
 function hideEmptyEditor() { document.getElementById('emptyPageEditor')?.setAttribute('hidden', ''); }
 // Canonical notebook page size — the ONE source of truth for every page's physical geometry.
@@ -943,7 +1063,8 @@ function hideEmptyEditor() { document.getElementById('emptyPageEditor')?.setAttr
 // applyFixedPageBounds() and mirrored server-side in app/services/pdf_service.py (_CANVAS_PX_W/H)
 // so the PDF export never has to invent its own page dimensions — it just reads this one.
 const PAGE_WIDTH = 2400, PAGE_HEIGHT = 1600;
-function resize() { canvas.setDimensions({ width: PAGE_WIDTH, height: PAGE_HEIGHT }); canvas.calcOffset(); canvas.requestRenderAll(); }
+function resize() { applyPageSize(); canvas.calcOffset(); canvas.requestRenderAll(); }
+function applyPageSize() { const z = canvas.getZoom() || 1; canvas.setDimensions({ width: Math.round(PAGE_WIDTH * z), height: Math.round(PAGE_HEIGHT * z) }); }
 /* Keeps an object's bounding box fully inside the fixed page rectangle [0,PAGE_WIDTH] x
    [0,PAGE_HEIGHT] — nudging its position back in if a drag/resize/paste would put any part of
    it outside, rather than letting it silently extend past the page (the old architecture just
@@ -973,7 +1094,7 @@ function constrainObjectToPage(object) {
 // this an explicit step rather than an assumption. The legacy-content safety net described above
 // (constrainObjectToPage via object:added) already ran while these objects were being restored,
 // so nothing further is needed here.
-function applyFixedPageBounds() { canvas.setDimensions({ width: PAGE_WIDTH, height: PAGE_HEIGHT }); canvas.calcOffset(); }
+function applyFixedPageBounds() { applyPageSize(); canvas.calcOffset(); fitPageOnFirstTouchLoad(); }
 /* Floating page-menu / rename-prompt / jump-popover — a single shared "portal" so only one
    is ever open at once, all positioned by the same routine. Appended to `root`, never
    document.body: during native Fullscreen only root's own subtree is painted, so a
@@ -1183,12 +1304,12 @@ function renderPages(pages, selectedId = null, shouldLoad = true) {
 async function refreshPages() { const data = await api(`${apiBase}/${notebookId}/pages`); const next = data.pages.some(page => page.id === activePageId) ? activePageId : data.pages[0]?.id || null; renderPages(data.pages, next, false); if (next) await loadPage(next); else showEmptyEditor(); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 let pendingNavigation = null;
-function showUnsavedChangesDialog(action) { if (!dirty) return action(); pendingNavigation = action; let dialog = document.getElementById('unsavedChangesModal'); if (!dialog) { dialog = document.createElement('div'); dialog.id = 'unsavedChangesModal'; dialog.className = 'modal-bd'; dialog.innerHTML = '<div class="modal-box notes-modal"><div class="modal-hdr"><h5><i class="fas fa-exclamation-circle" style="color:var(--warning-text)"></i> Unsaved Changes</h5></div><div class="modal-bdy"><p class="notes-confirm-text">You have unsaved changes. What would you like to do?</p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" data-unsaved-cancel>Cancel</button><button class="sbtn sbtn-danger" data-unsaved-discard>Discard Changes</button><button class="sbtn sbtn-primary" data-unsaved-save>Save &amp; Continue</button></div></div>'; root.append(dialog); dialog.querySelector('[data-unsaved-cancel]').addEventListener('click', () => { pendingNavigation = null; dialog.classList.remove('open'); }); dialog.querySelector('[data-unsaved-discard]').addEventListener('click', () => { dirty = false; deletedIds = []; const next = pendingNavigation; pendingNavigation = null; dialog.classList.remove('open'); next?.(); }); dialog.querySelector('[data-unsaved-save]').addEventListener('click', async () => { const next = pendingNavigation; await save(); if (dirty) return; pendingNavigation = null; dialog.classList.remove('open'); next?.(); }); } dialog.classList.add('open'); }
+function showUnsavedChangesDialog(action) { if (!dirty) return action(); pendingNavigation = action; let dialog = document.getElementById('unsavedChangesModal'); if (!dialog) { dialog = document.createElement('div'); dialog.id = 'unsavedChangesModal'; dialog.className = 'modal-bd'; dialog.innerHTML = '<div class="modal-box notes-modal"><div class="modal-hdr"><h5><i class="fas fa-exclamation-circle" style="color:var(--warning-text)"></i> Unsaved Changes</h5></div><div class="modal-bdy"><p class="notes-confirm-text">You have unsaved changes. What would you like to do?</p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" data-unsaved-cancel>Cancel</button><button class="sbtn sbtn-danger" data-unsaved-discard>Discard Changes</button><button class="sbtn sbtn-primary" data-unsaved-save>Save &amp; Continue</button></div></div>'; root.append(dialog); dialog.querySelector('[data-unsaved-cancel]').addEventListener('click', () => { pendingNavigation = null; dialog.classList.remove('open'); }); dialog.querySelector('[data-unsaved-discard]').addEventListener('click', () => { clearTimeout(saveTimer); clearTimeout(retryTimer); if (activePageId) { pageObjectsCache.delete(activePageId); } dirty = false; deletedIds = []; saveFailures = 0; const next = pendingNavigation; pendingNavigation = null; dialog.classList.remove('open'); next?.(); }); dialog.querySelector('[data-unsaved-save]').addEventListener('click', async () => { const next = pendingNavigation; const ok = await flushSave(); if (!ok || dirty) { toast('Still could not save. Your changes are kept — try again, or Cancel.', 'error'); return; } pendingNavigation = null; dialog.classList.remove('open'); next?.(); }); } dialog.classList.add('open'); }
 
 function clampTextHeight(object) { if (!['sticky_note', 'rich_text'].includes(object?.objectType)) return; if (object.minHeight && object.height < object.minHeight) object.set('height', object.minHeight); }
 function preserveStickyTextSize(object) { if (!['sticky_note', 'rich_text'].includes(object?.objectType) || object.type !== 'textbox') return; const scaleX = Math.abs(object.scaleX || 1), scaleY = Math.abs(object.scaleY || 1); if (scaleX === 1 && scaleY === 1) return; const requestedWidth = Math.max(140, object.width * scaleX); const requestedHeight = Math.max(40, object.height * scaleY); object.set({ width: requestedWidth, scaleX: 1, scaleY: 1 }); object.initDimensions(); if (scaleY !== 1) object.minHeight = Math.max(requestedHeight, object.height); clampTextHeight(object); object.setCoords(); }
 function updateObjectCount() { const el = document.getElementById('objectCount'); if (el) el.innerHTML = `<i class="fas fa-shapes"></i> Objects: ${canvas.getObjects().length}`; }
-canvas.on('object:added', event => { constrainObjectToPage(event.target); markDirty(); updateObjectCount(); }); canvas.on('object:moving', event => constrainObjectToPage(event.target)); canvas.on('object:scaling', event => preserveStickyTextSize(event.target)); canvas.on('object:modified', event => { preserveStickyTextSize(event.target); constrainObjectToPage(event.target); markDirty(); }); canvas.on('object:removed', e => { if (!loading && e.target?.objectId && typeof e.target.objectVersion === 'number') deletedIds.push({ id: e.target.objectId, expected_version: e.target.objectVersion }); markDirty(); updateObjectCount(); });
+canvas.on('object:added', event => { constrainObjectToPage(event.target); markDirty(); updateObjectCount(); }); canvas.on('object:moving', event => constrainObjectToPage(event.target)); canvas.on('object:scaling', event => preserveStickyTextSize(event.target)); canvas.on('object:modified', event => { preserveStickyTextSize(event.target); constrainObjectToPage(event.target); markDirty(); }); canvas.on('object:removed', () => { markDirty(); updateObjectCount(); });
 // A Textbox/Sticky Note growing taller mid-edit (constrainObjectToPage) and finishing an edit
 // (clampTextHeight/constrainObjectToPage/markDirty) are handled directly inside the
 // native-text-editor overlay's sync()/finishNativeTextEdit() (see beginNativeTextEdit above) —
@@ -1205,7 +1326,9 @@ canvas.on('path:created', e => {
   // 'multiply' on top lets ink beneath show through like a real marker instead of being
   // tinted/occluded.
   const inkTool = window.__notesInkTool;
-  if (inkTool === 'highlighter') e.path.set({ globalCompositeOperation: 'multiply' });
+  if (inkTool === 'highlighter') { e.path.set({ globalCompositeOperation: 'multiply' }); e.path.baseComposite = 'multiply'; adaptLiveObject(e.path, currentPaper().light, currentPaper().ink); }
+  else if (window.__notesInkExplicit) { e.path.customColor = true; e.path.themeInk = false; }          // a colour the user picked: never adapted
+  else { e.path.themeInk = true; e.path.baseStroke = inkTool === 'pencil' ? 'rgba(0, 0, 0, 0.82)' : '#000000'; }   // default ink: stored as the usual black, drawn to suit the paper
 }); canvas.on('mouse:dblclick', event => { if (currentMode === 'read') return; if (['i-text', 'textbox'].includes(event.target?.type)) { event.e.preventDefault(); beginNativeTextEdit(event.target, { x: event.e.clientX, y: event.e.clientY }); } });
 canvas.on('mouse:down', async e => {
   // ROOT CAUSE of "Ctrl+C/Ctrl+V on a selected canvas object silently does nothing": clicking the
@@ -1235,7 +1358,7 @@ canvas.on('mouse:down', async e => {
   // through every time. Text creation must be opt-in to the Text tool specifically, not opt-out of
   // every other tool; the eraser/shape/drawing-mode checks stay as a safety net for the (separate,
   // window.__notes*-flagged) ink/shape tools, which don't reset this module's own `activeTool`.
-  if (!e.target && activeTool === 'text' && !window.__notesEraserActive && !window.__notesShapeToolActive && !canvas.isDrawingMode) { const p = canvas.getPointer(e.e); await createEditableText({ left: p.x, top: p.y, fontSize: window.__notesDefaultSize || 22, fill: token('--text-1'), themeText: true }, 'rich_text'); } }); canvas.on('mouse:move', e => { lastPointerCanvas = canvas.getPointer(e.e); if (!pan) return; const v = canvas.viewportTransform; v[4] += e.e.clientX - lastPan.clientX; v[5] += e.e.clientY - lastPan.clientY; lastPan = e.e; canvas.requestRenderAll(); }); canvas.on('mouse:up', () => { pan = false; canvas.selection = currentMode === 'edit'; });
+  if (!e.target && activeTool === 'text' && !window.__notesEraserActive && !window.__notesShapeToolActive && !canvas.isDrawingMode) { const p = canvas.getPointer(e.e); await createEditableText({ left: p.x, top: p.y, fontSize: window.__notesDefaultSize || 22, fill: token('--text-1'), themeText: true }, 'rich_text'); } }); canvas.on('mouse:move', e => { lastPointerCanvas = canvas.getPointer(e.e); if (!pan) return; const v = canvas.viewportTransform; v[4] += e.e.clientX - lastPan.clientX; v[5] += e.e.clientY - lastPan.clientY; lastPan = e.e; canvas.requestRenderAll(); }); canvas.on('mouse:up', () => { pan = false; canvas.selection = currentMode === 'edit' && !window.__notesShapeToolActive && !window.__notesEraserActive && !canvas.isDrawingMode; });
 // Tracked purely so object Ctrl+V (below) can paste near where the user's pointer actually is
 // instead of always offsetting from the original object — cheap (just a coordinate pair, no
 // render triggered) and touches nothing about existing pan/select/draw mouse handling above.
@@ -1259,7 +1382,48 @@ canvas.wrapperEl.addEventListener('mouseleave', () => { pointerOverCanvas = fals
    always reads a fresh offset at the exact moment it turns a click into a text index. */
 canvas.wrapperEl.addEventListener('mousedown', () => canvas.calcOffset(), true);
 canvas.wrapperEl.addEventListener('touchstart', () => canvas.calcOffset(), true);
-canvas.on('mouse:wheel', e => { const shell = document.getElementById('canvasShell'); if (e.e.ctrlKey) { let z = canvas.getZoom() * (0.999 ** e.e.deltaY); z = Math.min(3, Math.max(.25, z)); canvas.zoomToPoint({ x: e.e.offsetX, y: e.e.offsetY }, z); canvas.zoomToPoint({ x: e.e.offsetX, y: e.e.offsetY }, z); repositionNativeTextEditor(); document.getElementById('zoomValue').textContent = `${Math.round(z * 100)}%`; e.e.preventDefault(); e.e.stopPropagation(); return; } if (e.e.shiftKey) { shell.scrollLeft += e.e.deltaY; e.e.preventDefault(); } });
+/* Touch gestures. Fabric swallows every touch on the canvas (no scrolling, no pinch), so these are handled first, in the capture
+   phase, and only for the gestures that are NOT drawing/selecting:
+     - two fingers: pinch to zoom + drag to pan (a stroke that the first finger had just begun is cancelled, not committed);
+     - one finger on empty page with the Select tool (or any one-finger drag in Read mode): pan, instead of a selection box.
+   Pen / Pencil / Highlighter / Eraser / Text / shapes with one finger go straight to Fabric untouched, so drawing never scrolls
+   the page and the browser's own pinch/scroll never fights the canvas (touch-action:none on the canvas, see editor.css). */
+(function setupTouchGestures() {
+  const shell = document.getElementById('canvasShell'); if (!shell) return;
+  let g = null;
+  const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const cancelStroke = () => {
+    try { if (canvas.isDrawingMode && canvas._isCurrentlyDrawing) { canvas._isCurrentlyDrawing = false; if (canvas.freeDrawingBrush?._reset) canvas.freeDrawingBrush._reset(); canvas.clearContext(canvas.contextTop); } } catch (e) { /* nothing to cancel */ }
+  };
+  const emptyPageUnder = e => { if (currentMode === 'read') return true; if (activeTool !== 'select' || canvas.isDrawingMode || window.__notesEraserActive || window.__notesShapeToolActive) return false; try { return !canvas.findTarget(e); } catch (err) { return false; } };
+  canvas.wrapperEl.addEventListener('touchstart', e => {
+    if (e.touches.length >= 2) {
+      cancelStroke(); canvas.discardActiveObject?.();
+      const m = mid(e.touches);
+      g = { mode: 'pinch', d0: dist(e.touches), z0: canvas.getZoom(), x: m.x, y: m.y };
+      e.preventDefault(); e.stopPropagation();
+    } else if (e.touches.length === 1 && emptyPageUnder(e)) {
+      g = { mode: 'pan', x: e.touches[0].clientX, y: e.touches[0].clientY };
+      e.stopPropagation();                                   // not preventDefault: a plain tap must still deselect via the click path
+    } else g = null;
+  }, { capture: true, passive: false });
+  canvas.wrapperEl.addEventListener('touchmove', e => {
+    if (!g) return;
+    if (g.mode === 'pinch' && e.touches.length >= 2) {
+      const m = mid(e.touches);
+      shell.scrollLeft -= (m.x - g.x); shell.scrollTop -= (m.y - g.y); g.x = m.x; g.y = m.y;
+      setZoomLevel(g.z0 * dist(e.touches) / (g.d0 || 1), m.x, m.y);
+      e.preventDefault(); e.stopPropagation();
+    } else if (g.mode === 'pan' && e.touches.length === 1) {
+      const t = e.touches[0]; shell.scrollLeft -= (t.clientX - g.x); shell.scrollTop -= (t.clientY - g.y); g.x = t.clientX; g.y = t.clientY;
+      e.preventDefault(); e.stopPropagation();
+    }
+  }, { capture: true, passive: false });
+  const end = e => { if (g && (!e.touches || e.touches.length === 0)) g = null; else if (g && g.mode === 'pinch' && e.touches.length < 2) g = null; };
+  canvas.wrapperEl.addEventListener('touchend', end, true); canvas.wrapperEl.addEventListener('touchcancel', end, true);
+})();
+canvas.on('mouse:wheel', e => { const shell = document.getElementById('canvasShell'); if (e.e.ctrlKey) { setZoomLevel(canvas.getZoom() * (0.999 ** e.e.deltaY), e.e.clientX, e.e.clientY); e.e.preventDefault(); e.e.stopPropagation(); return; } if (e.e.shiftKey) { shell.scrollLeft += e.e.deltaY; e.e.preventDefault(); } });
 document.addEventListener('keydown', event => {
   if (currentMode === 'read') return;
   if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
@@ -1496,7 +1660,7 @@ function restoreHistory(index) {
     canvas.requestRenderAll();
     loading = false;
     historyIndex = index;
-    dirty = true;
+    dirty = true; editSeq++;
     clearTimeout(saveTimer);
     if (autoSaveEnabled) { status('Saving…', 'saving'); saveTimer = setTimeout(save, 1400); } else status('Unsaved changes', 'saving');
     updateUndoRedoUI();
@@ -1504,7 +1668,40 @@ function restoreHistory(index) {
   const result = fabric.util.enlivenObjects(raw, finish);
   if (result && typeof result.then === 'function') result.then(finish);
 }
-function changeZoom(delta) { const z = Math.min(3, Math.max(.25, canvas.getZoom() + delta)); canvas.setZoom(z); document.getElementById('zoomValue').textContent = `${Math.round(z * 100)}%`; repositionNativeTextEditor(); } document.getElementById('zoomInBtn').addEventListener('click', () => changeZoom(.1)); document.getElementById('zoomOutBtn').addEventListener('click', () => changeZoom(-.1));
+/* Zoom: viewport zoom AND element size move together (element = page x zoom), anchored on a point so the content under
+   the fingers / cursor stays put. Before, only the viewport zoomed and the element stayed 2400x1600: zooming out left the same
+   huge scroll area, zooming in cropped the page. Positions are in page coordinates throughout, so nothing saved changes. */
+const COARSE_POINTER = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+const MIN_ZOOM = COARSE_POINTER ? 0.1 : 0.25, MAX_ZOOM = 3;
+/* Selection handles: theme accent, round, and big enough to grab with a finger (Fabric's touchCornerSize is the touch hit area). */
+function applySelectionStyle() {
+  const accent = token('--accent') || '#4c6ef5';
+  fabric.Object.prototype.set({ cornerColor: '#ffffff', cornerStrokeColor: accent, borderColor: accent, cornerStyle: 'circle', transparentCorners: false,
+    cornerSize: COARSE_POINTER ? 16 : 10, touchCornerSize: COARSE_POINTER ? 40 : 24, borderScaleFactor: 1.5 });
+  canvas.getObjects().forEach(o => { o.set({ cornerStrokeColor: accent, borderColor: accent, cornerSize: COARSE_POINTER ? 16 : 10, touchCornerSize: COARSE_POINTER ? 40 : 24 }); o.dirty = true; });
+  canvas.requestRenderAll();
+}
+function setZoomLevel(zoom, clientX, clientY) {
+  const shell = document.getElementById('canvasShell');
+  const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)), old = canvas.getZoom() || 1;
+  const sr = shell.getBoundingClientRect(), wr = canvas.wrapperEl.getBoundingClientRect();
+  const cx = clientX == null ? sr.left + sr.width / 2 : clientX, cy = clientY == null ? sr.top + sr.height / 2 : clientY;
+  const px = (cx - wr.left) / old, py = (cy - wr.top) / old;
+  canvas.setZoom(z); applyPageSize(); canvas.calcOffset();
+  const wr2 = canvas.wrapperEl.getBoundingClientRect();
+  shell.scrollLeft += (wr2.left + px * z) - cx; shell.scrollTop += (wr2.top + py * z) - cy;
+  document.getElementById('zoomValue').textContent = Math.round(z * 100) + '%';
+  repositionNativeTextEditor(); canvas.requestRenderAll();
+}
+function changeZoom(delta) { setZoomLevel(canvas.getZoom() + delta); }
+// On a phone/tablet the page opens fitted to the screen width (pinch or +/- to work closer); never on desktop.
+let initialFitDone = false;
+function fitPageOnFirstTouchLoad() {
+  if (initialFitDone) return; initialFitDone = true;
+  if (!COARSE_POINTER) return;
+  const shell = document.getElementById('canvasShell');
+  if (shell && shell.clientWidth && shell.clientWidth < PAGE_WIDTH) setZoomLevel(Math.min(1, (shell.clientWidth - 12) / PAGE_WIDTH));
+} document.getElementById('zoomInBtn').addEventListener('click', () => changeZoom(.1)); document.getElementById('zoomOutBtn').addEventListener('click', () => changeZoom(-.1));
 document.getElementById('notebookTitle').addEventListener('change', async e => { if (currentMode === 'read') return; try { await api(`${apiBase}/${notebookId}`, { method: 'PATCH', body: JSON.stringify({ title: e.target.value }) }); toast('Notebook renamed.'); } catch (error) { toast(error.message, 'error'); } });
 /* Instant page creation — no title prompt. A blank POST body makes the server assign the
    next "Untitled" name (see notes_service.create_page); the student renames it later via
@@ -1552,7 +1749,27 @@ document.addEventListener('click', closePageMenus); document.addEventListener('c
 // this was a latent bug, never actually triggered until now. Only skip the close when the scroll
 // event's target is inside the panel that's currently open — every other scroll (canvas, page
 // rail, anywhere else) still closes it exactly as before.
-window.addEventListener('scroll', event => { if (pageMenuPortal && pageMenuPortal.contains(event.target)) return; closePageMenus(); }, true); new MutationObserver(applyCanvasTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); window.addEventListener('resize', () => { closePageMenus(); resize(); }); window.addEventListener('beforeunload', event => { if (!dirty) return; event.preventDefault(); event.returnValue = ''; });
+window.addEventListener('scroll', event => { if (pageMenuPortal && pageMenuPortal.contains(event.target)) return; closePageMenus(); }, true); document.getElementById('saveState')?.addEventListener('click', () => { if (document.getElementById('saveState').classList.contains('failed')) retrySaveNow(); });
+(function setupPaperAndDrawer() {
+  const paperBtn = document.getElementById('paperBtn');
+  const labels = { auto: 'Auto (follows the theme)', light: 'Light paper', dark: 'Dark paper' };
+  const paint = () => { const m = paperMode(); if (paperBtn) { paperBtn.title = 'Page background: ' + labels[m]; paperBtn.setAttribute('aria-label', 'Page background: ' + labels[m]); paperBtn.classList.toggle('active', m !== 'auto'); } };
+  paint(); refreshPaper(); applyCanvasTheme(); applySelectionStyle();
+  paperBtn?.addEventListener('click', () => {
+    const next = { auto: 'light', light: 'dark', dark: 'auto' }[paperMode()];
+    try { localStorage.setItem(PAPER_KEY, next); } catch (e) { /* preference simply isn't remembered */ }
+    refreshPaper(); applyCanvasTheme(); paint(); toast('Page background: ' + labels[next]);
+  });
+  // Phones: the Pages sidebar becomes a drawer over the canvas instead of taking a third of the screen.
+  const rail = document.getElementById('pageRail'), scrim = document.getElementById('railScrim'), openBtn = document.getElementById('mobilePagesBtn');
+  const setOpen = open => { rail?.classList.toggle('mobile-open', open); if (scrim) scrim.hidden = !open; openBtn?.setAttribute('aria-expanded', String(open)); };
+  openBtn?.addEventListener('click', () => setOpen(!rail.classList.contains('mobile-open')));
+  scrim?.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && rail?.classList.contains('mobile-open')) setOpen(false); });
+  rail?.addEventListener('click', e => { if (e.target.closest('.page-item') && window.matchMedia('(max-width: 768px)').matches) setOpen(false); });
+  window.addEventListener('resize', () => { if (!window.matchMedia('(max-width: 768px)').matches) setOpen(false); });
+})();
+new MutationObserver(() => { refreshPaper(); applyCanvasTheme(); applySelectionStyle(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); window.addEventListener('resize', () => { closePageMenus(); resize(); }); window.addEventListener('beforeunload', event => { if (!dirty) return; event.preventDefault(); event.returnValue = ''; });
 if (isReadOnly) initReadOnlyView();
 applyToolbarVisibility(); updateReadModeUI(); updateFullscreenUI(); updateToolbarToggleUI();
 resize(); fontMetricsPromise.then(refreshPages).catch(error => { toast(error.message, 'error'); showEmptyEditor(); });
