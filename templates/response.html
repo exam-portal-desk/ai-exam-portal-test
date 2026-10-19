@@ -433,13 +433,6 @@ hr { border-color:var(--border); margin:1rem 0; opacity:1; }
 .disc-cb-cancel { padding:.38rem .9rem; background:var(--surface-2); color:var(--text-2); border:1px solid var(--border); border-radius:var(--radius); font-size:.75rem; font-weight:600; font-family:inherit; cursor:pointer; }
 .disc-cb-delete { padding:.38rem .9rem; background:var(--danger); color:#fff; border:none; border-radius:var(--radius); font-size:.75rem; font-weight:600; font-family:inherit; cursor:pointer; }
 
-.disc-toast {
-  position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
-  color:#fff; border-radius:var(--radius); padding:.55rem 1rem;
-  font-size:.8rem; font-weight:600; box-shadow:var(--shadow-lg);
-  animation:toast-in .2s ease-out;
-}
-@keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── Analysis mode: off = a clean page (no AI / discussion controls), also what gets printed ── */
 .analysis-switch { display:inline-flex; align-items:center; gap:.5rem; cursor:pointer; margin:0 .35rem 0 0; font-size:.78rem; font-weight:600; color:var(--text-2); user-select:none; }
@@ -1604,14 +1597,7 @@ document.addEventListener('click', () => {
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-function discToast(msg, type) {
-  const t = document.createElement('div');
-  t.className = 'disc-toast';
-  t.style.background = type === 'err' ? '#ef4444' : type === 'warn' ? '#d97706' : '#2d5be3';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
-}
+function discToast(msg, type) { Notify.show({ type: type === 'err' ? 'error' : type === 'warn' ? 'warning' : 'info', message: msg }); }
 
 // ── Content renderer (\n, pipe-tables) ───────────────────────────────────────
 

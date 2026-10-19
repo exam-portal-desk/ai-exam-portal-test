@@ -1,6 +1,6 @@
 import { exportNotebookAsPdf, exportNotebookAsJson, loadPagesFromExportDataUrl } from './notebook-export.js';
 
-const toast=(m,t='success')=>{const r=document.getElementById('notesToastRegion'),e=document.createElement('div');e.className=`notes-toast ${t}`;e.textContent=m;r.append(e);setTimeout(()=>e.remove(),4000)};
+const toast=(m,t='success')=>window.Notify.show({type:t,message:m});
 const libraryGrid=document.getElementById('libraryGrid');
 async function handleLikeOrBookmark(button,group){
   const a=button.dataset.action,id=group.dataset.id;button.disabled=true;

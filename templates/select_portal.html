@@ -135,29 +135,6 @@
 }
 .portal-back:hover { color: var(--text-1); }
 
-/* Flash */
-.flash-wrap { margin-bottom: 1.25rem; }
-.flash-item {
-  display: flex;
-  align-items: flex-start;
-  gap: .55rem;
-  padding: .65rem .85rem;
-  border-radius: var(--radius);
-  border: 1px solid;
-  font-size: .82rem;
-  font-weight: 500;
-  margin-bottom: .4rem;
-}
-.flash-success { background:var(--success-bg);border-color:var(--success-border);color:var(--success-text); }
-.flash-warning { background:var(--warning-bg);border-color:var(--warning-border);color:var(--warning-text); }
-.flash-danger,
-.flash-error   { background:var(--danger-bg); border-color:var(--danger-border); color:var(--danger-text); }
-.flash-info    { background:var(--info-bg);   border-color:var(--info-border);   color:var(--info-text); }
-.flash-x {
-  margin-left:auto;background:none;border:none;color:inherit;
-  opacity:.5;cursor:pointer;font-size:1rem;line-height:1;flex-shrink:0;
-}
-.flash-x:hover { opacity:1; }
 </style>
 
 <div class="portal-page">
@@ -173,20 +150,6 @@
       <p>Your account has access to multiple portals</p>
     </div>
 
-    {# ── Flash messages ── #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-wrap">
-          {% for category, message in messages %}
-            <div class="flash-item flash-{{ category }}">
-              <i class="fas fa-{{ 'exclamation-triangle' if category in ('error','warning') else 'check-circle' if category == 'success' else 'info-circle' }}" style="flex-shrink:0;margin-top:.1rem;font-size:.78rem"></i>
-              <span>{{ message }}</span>
-              <button class="flash-x" onclick="this.parentElement.remove()">&times;</button>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
 
     {# ── User Portal ── #}
     <form method="POST" style="margin:0">
@@ -234,16 +197,5 @@
   </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  setTimeout(function () {
-    document.querySelectorAll('.flash-item').forEach(function (el) {
-      el.style.transition = 'opacity .3s';
-      el.style.opacity = '0';
-      setTimeout(function () { el.remove(); }, 300);
-    });
-  }, 5000);
-});
-</script>
 
 {% endblock %}

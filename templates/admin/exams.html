@@ -1158,7 +1158,7 @@ document.addEventListener('submit', function (e) {
   const ma = form.querySelector('input[name="max_attempts"]');
   if (ma && ma.value.trim() !== '' && !/^\d+$/.test(ma.value.trim())) {
     e.preventDefault();
-    alert('Max Attempts must be a whole non-negative number');
+    Notify.warning('Max Attempts must be a whole non-negative number');
     ma.focus();
     return;
   }
@@ -1596,7 +1596,7 @@ document.getElementById('confirmReleaseBtn').addEventListener('click', function 
     btn.innerHTML = _releaseIsCurrently
       ? '<i class="fas fa-lock me-1"></i>Unrelease'
       : '<i class="fas fa-unlock-alt me-1"></i>Release';
-    alert('Server error. Please try again.');
+    Notify.error('Server error. Please try again.');
   });
 });
 

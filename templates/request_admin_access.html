@@ -78,10 +78,7 @@
 <script>
 var _userData = null;
 
-function showAlert(containerId, msg, type) {
-  var c = document.getElementById(containerId);
-  c.innerHTML = '<div class="auth-alert '+type+'"><i class="fas fa-'+(type==='danger'?'exclamation-triangle':'info-circle')+'" style="flex-shrink:0;font-size:.75rem;margin-top:.1rem"></i><span>'+msg+'</span></div>';
-}
+function showAlert(containerId, msg, type) { Notify.show({ type: type, message: msg, html: true }); }
 
 function verifyUser() {
   var un = document.getElementById('raUsername').value.trim();
@@ -132,7 +129,7 @@ function verifyUser() {
 function submitRequest() {
   var level  = document.getElementById('raAccessLevel').value;
   var reason = document.getElementById('raReason').value.trim();
-  if (!reason) { alert('Please provide a reason.'); return; }
+  if (!reason) { Notify.warning('Please provide a reason.'); return; }
   var btn = document.getElementById('submitBtn');
   btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Submitting…';
   fetch('/api/v01/access-requests', {
@@ -144,8 +141,8 @@ function submitRequest() {
       document.getElementById('requestForm').style.display='none';
       document.getElementById('pendingMsg').style.display='block';
       document.getElementById('pendingMsg').innerHTML='<div class="auth-alert success"><i class="fas fa-check-circle" style="flex-shrink:0;font-size:.75rem;margin-top:.1rem"></i><span>'+d.message+'</span></div>';
-    } else { alert(d.message||'Failed to submit.'); }
-  }).catch(function(){ btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane"></i> Submit Request'; alert('Network error.'); });
+    } else { Notify.error(d.message||'Failed to submit.'); }
+  }).catch(function(){ btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane"></i> Submit Request'; Notify.error('Network error.'); });
 }
 
 function resetForm() {

@@ -180,10 +180,6 @@
 }
 
 /* ── Themed toast (no alert()/confirm()/prompt() anywhere) ── */
-.imap-toast { position:fixed; bottom:1.25rem; right:1.25rem; z-index:99999; min-width:260px; max-width:400px; background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:var(--radius); padding:.75rem 1rem; box-shadow:var(--shadow-lg); display:flex; align-items:flex-start; gap:.65rem; animation:imapToastIn .2s ease-out; }
-.imap-toast.success { border-left-color:var(--success); }
-.imap-toast.danger  { border-left-color:var(--danger); }
-.imap-toast.warning { border-left-color:var(--warning); }
 @keyframes imapToastIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
 /* ── Themed modal backdrop (Review / Discard-confirm / Image preview) ── */
@@ -453,16 +449,7 @@
   document.addEventListener('mousedown', hideQTip);
   document.addEventListener('dragstart', hideQTip);
 
-  function toast(msg, type){
-    const t = document.createElement('div');
-    t.className = 'imap-toast ' + (type || 'success');
-    const icons = {success:'fa-check-circle', danger:'fa-times-circle', warning:'fa-exclamation-triangle'};
-    const colors = {success:'var(--success)', danger:'var(--danger)', warning:'var(--warning)'};
-    t.innerHTML = '<i class="fas ' + (icons[type] || icons.success) + '" style="color:' + (colors[type] || colors.success) + '"></i>' +
-                  '<div style="font-size:.82rem;color:var(--text-1)">' + escapeHtml(msg) + '</div>';
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 4200);
-  }
+  function toast(msg, type){ Notify.show({ type: type || 'success', message: msg }); }
   function openModal(id){ document.getElementById(id).classList.add('show'); }
   function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 

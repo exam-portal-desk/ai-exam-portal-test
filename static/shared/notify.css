@@ -1,0 +1,100 @@
+/* ══ Notify — the one notification surface for the User and Admin portals ═══════════════════════════════════════════════════════
+   Everything is built from the theme tokens (theme.css), so it follows light, dark, midnight, emerald and sunset without per-theme
+   rules. A notification is a quiet raised card — neutral surface, a tinted icon tile that carries the meaning, a hairline that counts
+   down the time left — never a coloured banner. The welcome message is its own, slightly larger card (see .nf-welcome). */
+
+.nf-region {
+  position: fixed; z-index: 10200; right: max(1.1rem, env(safe-area-inset-right)); bottom: max(1.1rem, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: flex-end; gap: .55rem;
+  width: min(23rem, calc(100vw - 1.6rem)); pointer-events: none;
+}
+/* the welcome card is its own region: centred under the top bar, out of the way of the page */
+.nf-region-top { top: max(.85rem, env(safe-area-inset-top)); bottom: auto; right: auto; left: 50%; transform: translateX(-50%); align-items: center; width: min(26rem, calc(100vw - 1.6rem)); }
+
+.nf-toast {
+  --nf-c: var(--info-text, var(--accent, #4a86e8));
+  position: relative; overflow: hidden; pointer-events: auto; box-sizing: border-box; width: 100%;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: start; column-gap: .7rem;
+  padding: .7rem .6rem .75rem .7rem;
+  background: color-mix(in srgb, var(--surface, #fff) 94%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15); backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid var(--border, rgba(128, 128, 128, .28)); border-radius: calc(var(--radius, 10px) + 4px);
+  box-shadow: var(--shadow-lg, 0 14px 38px rgba(0, 0, 0, .18)), 0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
+  color: var(--text-1, #222); font-family: inherit;
+  animation: nf-in .38s cubic-bezier(.2, .9, .25, 1) both;
+}
+.nf-success { --nf-c: var(--success-text, #1e8e4e); }
+.nf-error   { --nf-c: var(--danger-text, #c0392b); }
+.nf-warning { --nf-c: var(--warning-text, #b7791f); }
+.nf-info    { --nf-c: var(--info-text, var(--accent, #4a86e8)); }
+
+.nf-ic {
+  width: 1.9rem; height: 1.9rem; border-radius: .6rem; display: grid; place-items: center; font-size: .82rem; flex-shrink: 0;
+  color: var(--nf-c); background: color-mix(in srgb, var(--nf-c) 13%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--nf-c) 22%, transparent) inset;
+}
+.nf-body { min-width: 0; padding-top: .05rem; }
+.nf-title { font-size: .84rem; font-weight: 700; line-height: 1.3; letter-spacing: -.005em; overflow-wrap: anywhere; }
+.nf-msg   { font-size: .79rem; font-weight: 500; line-height: 1.42; color: var(--text-2, #555); overflow-wrap: anywhere; word-break: break-word; }
+.nf-title + .nf-msg { margin-top: .12rem; color: var(--text-3, #777); }
+.nf-msg:only-child { color: var(--text-1, #222); font-weight: 600; font-size: .83rem; }
+.nf-msg b, .nf-msg strong, .nf-title b, .nf-title strong { font-weight: 800; }
+.nf-msg code, .nf-title code { font-size: .92em; padding: .05em .3em; border-radius: .3em; background: var(--surface-2, rgba(128, 128, 128, .15)); }
+
+.nf-x {
+  width: 1.5rem; height: 1.5rem; border: 0; border-radius: .45rem; background: transparent; color: var(--text-3, #888); cursor: pointer;
+  display: grid; place-items: center; font-size: .7rem; transition: background .15s, color .15s;
+}
+.nf-x:hover { background: var(--surface-2, rgba(128, 128, 128, .15)); color: var(--text-1, #222); }
+.nf-x:focus-visible, .nf-toast:focus-visible { outline: 2px solid var(--accent, #4a86e8); outline-offset: 2px; }
+
+/* the countdown hairline — pauses with the timer (hover / keyboard focus / hidden tab) */
+.nf-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: color-mix(in srgb, var(--nf-c) 70%, transparent); transform-origin: left center; animation: nf-count var(--nf-ms, 4500ms) linear forwards; }
+.nf-toast.nf-paused .nf-bar { animation-play-state: paused; }
+.nf-toast.nf-sticky .nf-bar { display: none; }
+
+.nf-toast.nf-leave { animation: nf-out .24s ease-in both; pointer-events: none; }
+.nf-toast.nf-bump { animation: nf-bump .35s ease-out; }
+
+/* ── welcome ───────────────────────────────────────────────────────────────────────────────── */
+.nf-welcome {
+  --nf-c: var(--accent, #4a86e8);
+  grid-template-columns: auto 1fr auto; align-items: center; column-gap: .85rem; padding: .8rem .75rem .85rem .85rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #4a86e8) 10%, var(--surface, #fff)), var(--surface, #fff) 62%);
+  border-color: color-mix(in srgb, var(--accent, #4a86e8) 28%, var(--border, #ccc)); animation: nf-welcome-in .6s cubic-bezier(.18, .9, .22, 1) both;
+}
+.nf-welcome .nf-avatar {
+  position: relative; width: 2.55rem; height: 2.55rem; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  font-size: .95rem; font-weight: 800; letter-spacing: .02em; color: var(--accent-on, #fff);
+  background: linear-gradient(145deg, var(--accent, #4a86e8), color-mix(in srgb, var(--accent, #4a86e8) 55%, #000));
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent, #4a86e8) 70%, transparent);
+}
+.nf-welcome .nf-avatar::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent, #4a86e8) 55%, transparent); opacity: 0; animation: nf-ring 1.1s .25s ease-out 1 both; }
+.nf-welcome .nf-eyebrow { font-size: .64rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent, #4a86e8); line-height: 1.2; }
+.nf-welcome .nf-name { font-size: 1.08rem; font-weight: 800; line-height: 1.25; letter-spacing: -.012em; margin-top: .08rem; overflow-wrap: anywhere; }
+.nf-welcome .nf-sub { font-size: .75rem; color: var(--text-3, #777); margin-top: .1rem; }
+.nf-welcome .nf-bar { background: linear-gradient(90deg, var(--accent, #4a86e8), color-mix(in srgb, var(--accent, #4a86e8) 30%, transparent)); }
+
+@keyframes nf-in { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.97); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes nf-out { to { opacity: 0; transform: translate3d(14px, 0, 0) scale(.97); } }
+@keyframes nf-bump { 0%, 100% { transform: none; } 40% { transform: scale(1.025); } }
+@keyframes nf-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes nf-welcome-in { from { opacity: 0; transform: translate3d(0, -16px, 0) scale(.94); filter: blur(4px); } 60% { filter: none; } to { opacity: 1; transform: none; filter: none; } }
+@keyframes nf-ring { 0% { opacity: .9; transform: scale(.82); } 100% { opacity: 0; transform: scale(1.35); } }
+
+/* phones: everything slides in from the top, full width, clear of the bottom bars, pills and keyboards */
+@media (max-width: 640px) {
+  .nf-region, .nf-region-top { top: max(.6rem, env(safe-area-inset-top)); bottom: auto; left: .6rem; right: .6rem; width: auto; transform: none; align-items: stretch; }
+  .nf-toast { animation-name: nf-in-top; }
+  .nf-toast.nf-leave { animation-name: nf-out-top; }
+}
+@keyframes nf-in-top { from { opacity: 0; transform: translate3d(0, -14px, 0) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes nf-out-top { to { opacity: 0; transform: translate3d(0, -10px, 0) scale(.97); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-toast, .nf-welcome { animation: nf-fade .18s ease both !important; filter: none !important; }
+  .nf-toast.nf-leave { animation: nf-fade-out .12s ease both !important; }
+  .nf-welcome .nf-avatar::after { animation: none; }
+  .nf-bar { animation-duration: var(--nf-ms, 4500ms); }
+}
+@keyframes nf-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nf-fade-out { to { opacity: 0; } }

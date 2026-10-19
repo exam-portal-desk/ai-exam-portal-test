@@ -1815,7 +1815,7 @@ document.addEventListener('DOMContentLoaded', function() {
           target.focus();
           target.selectionStart = target.selectionEnd = s + latex.length;
           target.dispatchEvent(new Event('input', { bubbles: true }));
-        } else alert('LaTeX received. Paste manually:\n\n' + latex);
+        } else Notify.info('LaTeX received. Paste it manually:', { sub: latex, sticky: true });
       }
     } catch(e) { console.error(e); }
   }, false);

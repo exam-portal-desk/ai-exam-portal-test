@@ -326,17 +326,7 @@ html, body { overflow:hidden !important; height:100% !important; }
 .modal-footer { border-top:1px solid var(--border) !important; }
 .btn-close { filter:var(--btn-close-filter,none); }
 
-/* Themed toast (no alert()/confirm() anywhere on this page) */
-.pv-toast {
-  position:fixed; bottom:1.25rem; right:1.25rem; z-index:99999; min-width:260px; max-width:380px;
-  background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent);
-  border-radius:var(--radius); padding:.75rem 1rem; box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.2));
-  display:flex; align-items:flex-start; gap:.65rem; animation:pvToastIn .2s ease-out;
-}
-.pv-toast.success { border-left-color:var(--success); }
-.pv-toast.danger  { border-left-color:var(--danger); }
-.pv-toast.warning { border-left-color:var(--warning); }
-@keyframes pvToastIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+/* Notifications: the shared system (static/shared/notify.js) — no alert()/confirm() anywhere on this page */
 
 /* Themed confirm dialog (bulk apply) */
 .pv-confirm-backdrop { display:none; position:fixed; inset:0; z-index:10060; background:rgba(0,0,0,.6); align-items:center; justify-content:center; }
@@ -1052,15 +1042,7 @@ class ExamPreviewPortal {
     else this.toast(`Updated ${okCount} of ${results.length} — ${failCount} failed`, 'warning');
   }
 
-  toast(msg, type) {
-    const colors = { success: 'var(--success)', danger: 'var(--danger)', warning: 'var(--warning)' };
-    const icons = { success: 'fa-check-circle', danger: 'fa-times-circle', warning: 'fa-exclamation-triangle' };
-    const t = document.createElement('div');
-    t.className = `pv-toast ${type || 'success'}`;
-    t.innerHTML = `<i class="fas ${icons[type] || icons.success}" style="color:${colors[type] || colors.success}"></i><div style="font-size:.82rem;color:var(--text-1)">${msg}</div>`;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
-  }
+  toast(msg, type) { Notify.show({ type: type || 'success', message: msg, html: true }); }
 }
 
 let preview;

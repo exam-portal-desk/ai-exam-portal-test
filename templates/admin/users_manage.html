@@ -62,21 +62,8 @@
   @keyframes modalIn { from{opacity:0;transform:scale(0.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
   .modal-icon { width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.6rem; }
 
-  /* Toast */
-  #toastContainer { position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none; }
-  .toast-item { display:flex;align-items:center;gap:0.65rem;padding:0.75rem 1.1rem;border-radius:12px;font-size:0.83rem;font-weight:600;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.35);min-width:240px;max-width:340px;pointer-events:all;animation:toastIn 0.25s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes toastIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
-  .toast-item.removing { animation:toastOut 0.22s ease forwards; }
-  @keyframes toastOut { to{opacity:0;transform:translateX(40px)} }
-  .toast-success { background:linear-gradient(135deg,#059669,#10b981); }
-  .toast-danger  { background:linear-gradient(135deg,#dc2626,#ef4444); }
-  .toast-warning { background:linear-gradient(135deg,#d97706,#f59e0b); }
-  .toast-close { margin-left:auto;background:none;border:none;color:#fff;opacity:0.7;cursor:pointer;font-size:0.85rem;padding:0;flex-shrink:0; }
-  .toast-close:hover { opacity:1; }
 </style>
 
-<!-- Toast Container -->
-<div id="toastContainer"></div>
 
 <!-- Ghost Warning Modal -->
 <div id="ghostModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
@@ -415,21 +402,8 @@ function executeBulkUpdate() {
     .finally(()=>{btn.innerHTML=orig;updateBulkState();});
 }
 
-/* ── HTML Toast ── */
-function toast(msg,type='success') {
-  const icons={success:'fa-check-circle',danger:'fa-times-circle',warning:'fa-exclamation-triangle'};
-  const el=document.createElement('div');
-  el.className=`toast-item toast-${type}`;
-  el.innerHTML=`<i class="fas ${icons[type]||'fa-info-circle'}" style="flex-shrink:0"></i>
-    <span style="flex:1;line-height:1.4">${msg}</span>
-    <button class="toast-close" onclick="removeToast(this.parentElement)"><i class="fas fa-times"></i></button>`;
-  document.getElementById('toastContainer').appendChild(el);
-  setTimeout(()=>removeToast(el),4000);
-}
-function removeToast(el){
-  if(!el||el._removing)return;el._removing=true;
-  el.classList.add('removing');setTimeout(()=>el.remove(),220);
-}
+/* ── Toast: the shared notification system (static/shared/notify.js) ── */
+function toast(msg,type='success') { Notify.show({ type, message: msg, html: true }); }
 
 function loadStats() {
   fetch('/api/v01/admin/users/stats').then(r=>r.json()).then(d=>{

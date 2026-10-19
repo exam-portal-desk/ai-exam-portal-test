@@ -482,23 +482,6 @@
 .request-name { font-size:.83rem; font-weight:600; color:var(--text-1); }
 .request-time { font-size:.68rem; color:var(--text-3); }
 
-/* Toast */
-#toastContainer { position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; display:flex; flex-direction:column; gap:.5rem; pointer-events:none; }
-.toast {
-  background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent);
-  border-radius:var(--radius); padding:.7rem 1rem; min-width:220px; max-width:320px;
-  display:flex; align-items:center; gap:.6rem; box-shadow:var(--shadow-lg);
-  font-size:.82rem; font-weight:500; color:var(--text-1); pointer-events:all;
-  animation:toastIn .2s ease-out;
-}
-@keyframes toastIn { from{opacity:0; transform:translateX(16px);} to{opacity:1; transform:translateX(0);} }
-.toast.success { border-left-color:var(--success); }
-.toast.error   { border-left-color:var(--danger); }
-.toast.warning { border-left-color:var(--warning); }
-.toast-icon { flex-shrink:0; font-size:.85rem; color:var(--accent); }
-.toast.success .toast-icon { color:var(--success); }
-.toast.error   .toast-icon { color:var(--danger); }
-.toast.warning .toast-icon { color:var(--warning); }
 
 /* Mobile */
 @media(max-width:640px){
@@ -533,7 +516,6 @@
 [hidden] { display:none !important; }
 </style>
 
-<div id="toastContainer"></div>
 
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-box">
@@ -758,16 +740,7 @@ function _bumpLastMsgId(convId, id){
   if(!_lastMsgId[convId] || id > _lastMsgId[convId]) _lastMsgId[convId] = id;
 }
 
-function showToast(msg, type='info', duration=4000){
-  const icons={success:'fa-check-circle',error:'fa-times-circle',info:'fa-info-circle',warning:'fa-exclamation-triangle'};
-  let c=document.getElementById('toastContainer');
-  if(!c){c=document.createElement('div');c.id='toastContainer';document.body.appendChild(c);}
-  const t=document.createElement('div');
-  t.className=`toast ${type}`;
-  t.innerHTML=`<i class="fas ${icons[type]||icons.info} toast-icon"></i><span>${msg}</span>`;
-  c.appendChild(t);
-  setTimeout(()=>t.remove(),duration);
-}
+function showToast(msg, type='info', duration=4000){ Notify.show({ type, message: msg, html: true, duration }); }
 
 function showConfirm(title,msg,onOk,danger=true){
   document.getElementById('confirmTitle').textContent=title;

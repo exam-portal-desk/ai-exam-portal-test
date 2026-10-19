@@ -4,6 +4,8 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta charset="utf-8" />
   <title>LaTeX Editor - SmartAIExam</title>
+  <link href="{{ url_for('static', filename='shared/notify.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='shared/notify.js') }}"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <!-- Theme init — must be first to avoid flash -->
@@ -1047,7 +1049,7 @@ $$\ce{2H2 + O2 -> 2H2O}$$"></textarea>
           });
         }
       } catch(e) {
-        alert('Failed to send. Copy manually:\n\n' + latex.substring(0, 500));
+        Notify.warning('Failed to send. Copy it manually:', { sub: latex.substring(0, 500), sticky: true });
       }
     });
 

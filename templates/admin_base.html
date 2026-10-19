@@ -34,6 +34,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
+  {% with notify_portal = 'admin' %}{% include "partials/_notify.html" %}{% endwith %}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" defer></script>
@@ -459,35 +460,6 @@
   .accs-opt-name { font-size: 0.82rem; font-weight: 600; color: var(--text-1); line-height: 1.2; }
   .accs-opt-desc { font-size: 0.67rem; color: var(--text-3); margin-top: 1px; }
 
-  /* ══ GLOBAL ADMIN TOAST ══════════════════════════════════ */
-  #adminToastContainer {
-    position: fixed; bottom: 1.5rem; right: 1.5rem;
-    z-index: 10100;                                  /* above the Access card's backdrop (select-enhance.css, 10050) */
-    max-width: calc(100vw - 2rem);
-    display: flex; flex-direction: column; gap: .4rem;
-    pointer-events: none;
-  }
-  .admin-toast {
-    display: flex; align-items: flex-start; gap: .6rem;
-    padding: .65rem 1rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    pointer-events: auto;
-    animation: admin-tin .2s ease-out;
-    min-width: 220px; max-width: 340px;
-  }
-  @keyframes admin-tin {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .admin-toast-icon { font-size: .9rem; flex-shrink: 0; margin-top: .05rem; }
-  .admin-toast.success .admin-toast-icon { color: var(--success-text); }
-  .admin-toast.danger  .admin-toast-icon { color: var(--danger-text); }
-  .admin-toast.warning .admin-toast-icon { color: var(--warning-text); }
-  .admin-toast-msg { font-size: .82rem; font-weight: 600; color: var(--text-1); }
-  .admin-toast-sub { font-size: .72rem; color: var(--text-3); margin-top: .08rem; }
   </style>
 </head>
 <body>
@@ -652,18 +624,6 @@
     <div class="admin-topbar">
       <!-- topbar slots for child pages if needed -->
     </div>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-          {% for category, message in messages %}
-          adminToast('{{ message | replace("'", "\\'") }}', '{{ "danger" if category in ("error","danger") else category }}');
-          {% endfor %}
-        });
-        </script>
-      {% endif %}
-    {% endwith %}
 
     {% block content %}{% endblock %}
   </div>
@@ -876,7 +836,7 @@
           a.value=a.value.slice(0,s)+latex+a.value.slice(e);
           a.selectionStart=a.selectionEnd=s+latex.length;
           a.dispatchEvent(new Event('input',{bubbles:true}));
-        } else { alert('Paste manually:\n\n'+latex); }
+        } else { Notify.info('Paste it manually:', { sub: latex, sticky: true }); }
       }
     }catch(ex){console.error(ex);}
   },false);
@@ -900,17 +860,6 @@
 })();
 </script>
 {% endif %}
-
-<!-- ══ AUTO-DISMISS ALERTS ════════════════════════════════ -->
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-  document.querySelectorAll('.alert-success').forEach(function(a){
-    var t=a.textContent.toLowerCase();
-    if(t.includes('login successful')||t.includes('logged out')||t.includes('logout'))
-      setTimeout(function(){try{new bootstrap.Alert(a).close();}catch(e){}},600);
-  });
-});
-</script>
 
 <!-- ══ SIDEBAR TOOLTIPS ═══════════════════════════════════ -->
 <script>
@@ -1018,26 +967,8 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 
-<!-- ══ GLOBAL ADMIN TOAST ════════════════════════════════ -->
-<div id="adminToastContainer"></div>
 <script>
-window.adminToast = function(msg, type, sub, ms) {
-  ms = ms || 3000;
-  type = type || 'success';
-  var icons = { success: 'fa-check-circle', danger: 'fa-times-circle', warning: 'fa-exclamation-circle' };
-  var el = document.createElement('div');
-  el.className = 'admin-toast ' + type;
-  el.innerHTML =
-    '<i class="fas ' + (icons[type] || 'fa-info-circle') + ' admin-toast-icon"></i>' +
-    '<div><div class="admin-toast-msg">' + msg + '</div>' +
-      (sub ? '<div class="admin-toast-sub">' + sub + '</div>' : '') +
-    '</div>';
-  var c = document.getElementById('adminToastContainer');
-  if (!c) return;
-  c.appendChild(el);
-  setTimeout(function() { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; }, ms - 300);
-  setTimeout(function() { el.remove(); }, ms);
-};
+/* adminToast() is provided by shared/notify.js (one implementation for both portals). */
 
 /* A locked sidebar item explains itself instead of navigating. Purely a courtesy: the page and its API refuse this admin
    on the server whatever the menu does. Capture phase + stopImmediatePropagation so no other handler (the LaTeX editor

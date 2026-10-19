@@ -188,7 +188,7 @@ function api(path, options = {}) {
     .finally(() => { if (timer) clearTimeout(timer); });
 }
 function status(text, kind = '') { const e = document.getElementById('saveState'); e.className = `save-state ${kind}`; e.innerHTML = `<i class="fas fa-${kind === 'saving' ? 'spinner fa-spin' : kind === 'failed' ? 'exclamation-circle' : 'check-circle'}"></i> ${text}`; }
-function toast(text, type = 'success') { const r = document.getElementById('notesToastRegion'); const e = document.createElement('div'); e.className = `notes-toast ${type}`; e.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i><span></span>`; e.querySelector('span').textContent = text; r.appendChild(e); setTimeout(() => e.remove(), 4500); }
+function toast(text, type = 'success') { window.Notify.show({ type, message: text }); }
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; }
 function token(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 async function ensureTextMetrics() { await fontMetricsPromise; canvas.getObjects().forEach(object => { if (object.type === 'i-text' || object.type === 'textbox') object.initDimensions(); }); canvas.requestRenderAll(); }

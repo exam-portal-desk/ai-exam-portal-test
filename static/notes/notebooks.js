@@ -4,16 +4,7 @@ const api = '/api/v01/notebooks';
 let selectedNotebookId = null;
 let selectedNotebookVisibility = 'private';
 
-function toast(message, type = 'success') {
-  const region = document.getElementById('notesToastRegion');
-  if (!region) return;
-  const item = document.createElement('div');
-  item.className = `notes-toast ${type}`;
-  item.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i><span></span>`;
-  item.querySelector('span').textContent = message;
-  region.appendChild(item);
-  window.setTimeout(() => item.remove(), 4500);
-}
+function toast(message, type = 'success') { window.Notify.show({ type, message }); }
 
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }

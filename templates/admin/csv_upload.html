@@ -969,30 +969,7 @@
     document.getElementById('csvProcessing').style.display = 'none';
   }
 
-  function csvToast(title, type, msg) {
-    const colors = { success:'var(--success)', danger:'var(--danger)', warning:'var(--warning)', info:'var(--accent)' };
-    const icons  = { success:'fa-check-circle', danger:'fa-times-circle', warning:'fa-exclamation-triangle', info:'fa-info-circle' };
-    const t = document.createElement('div');
-    t.style.cssText = `position:fixed;bottom:1.5rem;right:1.5rem;z-index:99999;min-width:260px;max-width:360px;
-      background:var(--surface);border:1px solid var(--border);border-left:4px solid ${colors[type]||colors.info};
-      border-radius:var(--radius);padding:.75rem 1rem;box-shadow:var(--shadow-lg);
-      display:flex;align-items:flex-start;gap:.65rem;animation:csvTIn .2s ease-out;`;
-    t.innerHTML = `
-      <i class="fas ${icons[type]||icons.info}" style="color:${colors[type]||colors.info};margin-top:.1rem;flex-shrink:0;font-size:.95rem;"></i>
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:.82rem;color:var(--text-1);">${title}</div>
-        ${msg ? `<div style="font-size:.76rem;color:var(--text-3);margin-top:.15rem;">${msg}</div>` : ''}
-      </div>
-      <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:.8rem;padding:0;line-height:1;flex-shrink:0;">✕</button>`;
-    if (!document.getElementById('csvToastStyle')) {
-      const s = document.createElement('style');
-      s.id = 'csvToastStyle';
-      s.textContent = '@keyframes csvTIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}';
-      document.head.appendChild(s);
-    }
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
-  }
+  function csvToast(title, type, msg) { Notify.show({ type, title, message: msg || '', html: true }); }
 
   window.csvDragOver=function(e){e.preventDefault();document.getElementById('csvDropZone').classList.add('drag-over');};
   window.csvDragLeave=function(){document.getElementById('csvDropZone').classList.remove('drag-over');};
