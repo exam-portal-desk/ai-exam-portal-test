@@ -158,6 +158,14 @@
 
 <div class="modal-bd" id="deleteNotebookModal" aria-hidden="true"><div class="modal-box notes-modal"><div class="modal-hdr notes-danger-head"><h5><i class="fas fa-trash-alt"></i> Move notebook to Trash</h5><button class="modal-x" data-close-modal="deleteNotebookModal"><i class="fas fa-times"></i></button></div><div class="modal-bdy"><p class="notes-confirm-text">This notebook will be removed from your workspace. You can restore it from Trash before the retention period ends.</p><p class="notes-form-message" id="deleteNotebookMessage" role="status"></p></div><div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="deleteNotebookModal">Cancel</button><button class="sbtn sbtn-danger" id="confirmDeleteNotebook" type="button"><i class="fas fa-trash-alt"></i> Move to Trash</button></div></div></div>
 
+<div class="modal-bd" id="confirmActionModal" aria-hidden="true" role="dialog" aria-labelledby="confirmActionTitle">
+  <div class="modal-box notes-modal">
+    <div class="modal-hdr notes-danger-head" id="confirmActionHead"><h5><i class="fas fa-exclamation-triangle" id="confirmActionIcon"></i> <span id="confirmActionTitle">Are you sure?</span></h5><button class="modal-x" type="button" data-close-modal="confirmActionModal" aria-label="Cancel"><i class="fas fa-times"></i></button></div>
+    <div class="modal-bdy"><p class="notes-confirm-text" id="confirmActionText"></p></div>
+    <div class="modal-ftr"><button class="sbtn sbtn-ghost" type="button" data-close-modal="confirmActionModal">Cancel</button><button class="sbtn sbtn-danger" id="confirmActionOk" type="button">Confirm</button></div>
+  </div>
+</div>
+
 <div class="notes-toast-region" id="notesToastRegion" aria-live="polite"></div>
 {% endblock %}
 {% block scripts %}<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script><script type="module" src="{{ url_for('static', filename='notes/notebooks.js') }}"></script>{% endblock %}

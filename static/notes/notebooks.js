@@ -2,6 +2,7 @@ import { exportNotebookAsPdf, exportNotebookAsJson, loadPagesFromExportDataUrl }
 
 const api = '/api/v01/notebooks';
 let selectedNotebookId = null;
+let selectedNotebookVisibility = 'private';
 
 function toast(message, type = 'success') {
   const region = document.getElementById('notesToastRegion');
@@ -17,6 +18,32 @@ function toast(message, type = 'success') {
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 function message(id, text = '', success = false) { const el = document.getElementById(id); if (el) { el.textContent = text; el.classList.toggle('success', success); } }
+
+/* One shared confirmation dialog for every action that changes who can see a notebook, or removes it from view. Resolves true only on
+   the explicit confirm button; Cancel, the X, a click outside or Escape all resolve false (the modal's `open` class going away is the
+   single signal for all of them). Built from the same modal markup as the delete / remove-access confirmations. */
+let pendingConfirm = null;
+function confirmAction({ title, message: text, confirmLabel = 'Confirm', icon = 'fa-exclamation-triangle', danger = true }) {
+  const modal = document.getElementById('confirmActionModal');
+  if (!modal) return Promise.resolve(false);                                   // no dialog available: never act without one
+  if (pendingConfirm) pendingConfirm(false);
+  document.getElementById('confirmActionTitle').textContent = title;
+  document.getElementById('confirmActionText').textContent = text;
+  document.getElementById('confirmActionIcon').className = `fas ${icon}`;
+  document.getElementById('confirmActionHead').classList.toggle('notes-danger-head', danger);
+  const ok = document.getElementById('confirmActionOk');
+  ok.className = `sbtn ${danger ? 'sbtn-danger' : 'sbtn-primary'}`; ok.innerHTML = '';
+  ok.append(Object.assign(document.createElement('i'), { className: `fas ${icon}` }), ` ${confirmLabel}`);
+  return new Promise(resolve => {
+    const settle = value => { if (pendingConfirm !== settle) return; pendingConfirm = null; observer.disconnect(); ok.removeEventListener('click', onOk); resolve(value); };
+    const onOk = () => { settle(true); closeModal('confirmActionModal'); };
+    const observer = new MutationObserver(() => { if (!modal.classList.contains('open')) settle(false); });
+    pendingConfirm = settle;
+    observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    ok.addEventListener('click', onOk);
+    openModal('confirmActionModal'); ok.focus();
+  });
+}
 
 async function request(url, options = {}) {
   const response = await fetch(url, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
@@ -48,6 +75,7 @@ function isModalSaving(modalId) {
     || (modalId === 'removeShareAccessModal' && removeShareAccessSaving);
 }
 document.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', () => { if (!isModalSaving(button.dataset.closeModal)) closeModal(button.dataset.closeModal); }));
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.getElementById('confirmActionModal')?.classList.contains('open')) closeModal('confirmActionModal'); });
 document.querySelectorAll('.modal-bd').forEach(modal => modal.addEventListener('click', event => { if (event.target === modal && !isModalSaving(modal.id)) closeModal(modal.id); }));
 
 let createNotebookSaving = false;
@@ -171,13 +199,17 @@ actionMenu?.addEventListener('click', event => {
     message('editNotebookMessage'); openModal('editNotebookModal');
   }
   if (actionBtn.dataset.action === 'visibility') {
+    selectedNotebookVisibility = visibility;
     document.getElementById('visibilityNotebookValue').value = visibility;
     visibilityNotebookRepaint();
     message('visibilityNotebookMessage'); openModal('visibilityNotebookModal');
   }
   if (actionBtn.dataset.action === 'delete') { message('deleteNotebookMessage'); openModal('deleteNotebookModal'); }
   if (actionBtn.dataset.action === 'share') { openShareModal(id, title); }
-  if (actionBtn.dataset.action === 'leave') { leaveNotebook(id); }
+  if (actionBtn.dataset.action === 'leave') {
+    confirmAction({ title: 'Remove from My Notebooks', icon: 'fa-sign-out-alt', confirmLabel: 'Remove', message: `Remove “${title}” from My Notebooks? It will disappear from your list. The owner's notebook is not deleted, but you will need to be given access again to get it back.` })
+      .then(confirmed => { if (confirmed) leaveNotebook(id); });
+  }
   closeActionMenu();
 });
 
@@ -341,6 +373,14 @@ function setVisibilityNotebookSaving(isSaving) {
 document.getElementById('visibilityNotebookForm')?.addEventListener('submit', async event => {
   event.preventDefault(); if (visibilityNotebookSaving) return;
   const form = event.currentTarget;
+  const next = new FormData(form).get('visibility');
+  if (next === selectedNotebookVisibility) { closeModal('visibilityNotebookModal'); return; }          // nothing to change
+  const wording = {
+    public: { title: 'Make notebook public', icon: 'fa-globe', confirmLabel: 'Make public', danger: false, message: 'Anyone on the platform will be able to find this notebook in the Public Library, open it, and import a copy. Make sure it contains nothing you want to keep private.' },
+    unlisted: { title: 'Make notebook unlisted', icon: 'fa-link', confirmLabel: 'Make unlisted', danger: false, message: 'The notebook will leave the Public Library listing. People who already have its link may still be able to open it.' },
+    private: { title: 'Make notebook private', icon: 'fa-lock', confirmLabel: 'Make private', danger: true, message: 'The notebook will be removed from the Public Library and only you (and anyone you shared it with) will be able to open it.' },
+  }[next];
+  if (wording && !(await confirmAction(wording))) return;
   message('visibilityNotebookMessage'); visibilityNotebookSaving = true; setVisibilityNotebookSaving(true);
   try { await request(`${api}/${selectedNotebookId}`, { method: 'PATCH', body: JSON.stringify({ visibility: new FormData(form).get('visibility') }) }); toast('Notebook visibility updated.'); window.location.reload(); }
   catch (error) { message('visibilityNotebookMessage', error.message); }
@@ -576,7 +616,10 @@ function createPermissionControl(name, permission, onChange) {
       opt.innerHTML = `<span>${label}</span>`;
       if (value === current) opt.insertAdjacentHTML('beforeend', '<i class="fas fa-check"></i>');
       opt.addEventListener('click', () => {
-        if (value !== current) { current = value; onChange(value); paintLabel(); paintOptions(); }
+        if (value !== current) {
+          // onChange may return a promise that resolves to false to veto the change (e.g. the user cancelled a confirmation): the old value stays
+          Promise.resolve(onChange(value)).then(accepted => { if (accepted === false) return; current = value; paintLabel(); paintOptions(); });
+        }
         closeAllDropdowns();
       });
       menu.appendChild(opt);
@@ -688,6 +731,9 @@ async function loadShareCurrentList() {
     data.shares.forEach(share => {
       renderShareRow(shareEls.currentList, { id: share.user_id, name: share.full_name || share.username, permission: share.permission }, {
         onPermissionChange: async value => {
+          const label = SHARE_PERMISSIONS.find(([v]) => v === value)?.[1] || value;
+          const who = share.full_name || share.username;
+          if (!(await confirmAction({ title: 'Change permission', icon: 'fa-user-shield', confirmLabel: 'Change', danger: value !== 'edit', message: `Change ${who}'s access to “${label}”? This takes effect immediately.` }))) return false;
           try {
             await request(`${api}/${shareNotebookId}/shares/${share.user_id}`, { method: 'PATCH', body: JSON.stringify({ permission: value }) });
             toast('Permission updated.');
