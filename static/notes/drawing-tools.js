@@ -1365,7 +1365,7 @@ setTimeout(() => {
   const showPolyHint = on => {
     if (!polyHint) {
       polyHint = document.createElement('div'); polyHint.className = 'notes-poly-hint'; polyHint.hidden = true;
-      polyHint.innerHTML = '<span>Click to add points</span><button type="button" data-poly="done">Done</button><button type="button" data-poly="cancel">Cancel</button>';
+      polyHint.innerHTML = '<span>Click to add points · Enter, double-click or right-click to finish</span><button type="button" data-poly="done">Done</button><button type="button" data-poly="cancel">Cancel</button>';
       polyHint.addEventListener('mousedown', e => e.preventDefault());
       polyHint.addEventListener('click', e => { const b = e.target.closest('[data-poly]'); if (!b) return; if (b.dataset.poly === 'done') finishPolyline(); else leaveShapeTool(); });
       (document.getElementById('canvasShell') || document.body).appendChild(polyHint);
@@ -1396,6 +1396,7 @@ setTimeout(() => {
       opacity: window.__notesShapeOpacity ?? 1, objectId: id(), objectType: 'shape' });
     path.strokeOnly = true;
     applyDashTo(path, window.__notesShapeDash || 'solid');
+    canvas.add(path);                                                        // fires object:added -> autosave + one undo step (inside the history batch)
     finalizeShape(path, path.left + (path.width * (path.scaleX || 1)) / 2, path.top + (path.height * (path.scaleY || 1)) / 2);
     window.__notesHistoryBatch?.end();
     canvas.discardActiveObject(); canvas.requestRenderAll();                 // the tool stays armed for the next polyline
@@ -1752,6 +1753,17 @@ setTimeout(() => {
     }
   });
   canvas.on('mouse:dblclick', () => { if (polyActive && polyPts.length) finishPolyline(); });
+  /* Right-click while a shape tool is armed never opens the browser menu. In a polyline it finishes the line (2+ points), then clears a
+     started-but-too-short one, then — with nothing in progress — leaves the tool, so repeated right-clicks always "step out". */
+  canvas.upperCanvasEl.addEventListener('contextmenu', event => {
+    if (!placingShape && !polyActive) return;
+    event.preventDefault();
+    if (polyActive) {
+      if (polyPts.length >= 2) finishPolyline();
+      else if (polyPts.length) { polyPts = []; polyCursor = null; canvas.requestRenderAll(); }
+      else leaveShapeTool();
+    } else if (!shapeDraft) leaveShapeTool();
+  });
   document.addEventListener('keydown', event => {
     if (!placingShape && !polyActive) return;
     if (event.key === 'Escape') { if (polyActive && polyPts.length) { polyPts = []; polyCursor = null; canvas.requestRenderAll(); return; } leaveShapeTool(); }
